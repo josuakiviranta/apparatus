@@ -1,7 +1,11 @@
-import { mkdirSync, writeFileSync, existsSync, readFileSync } from "fs";
+import { mkdirSync, writeFileSync, existsSync, readFileSync, copyFileSync } from "fs";
 import { join, resolve } from "path";
 import { spawnSync, spawn } from "child_process";
-import { getKickoffPromptPath } from "../lib/assets";
+import { getKickoffPromptPath, getPromptPath } from "../lib/assets";
+
+const BRAINSTORM_TRIGGER = `\
+Study specs/*.md and src/* in parallel using subagents to understand the project. \
+Then invoke the Skill tool with skill name "superpowers:brainstorming".`;
 
 export async function newCommand(projectName: string): Promise<void> {
   const targetPath = resolve(process.cwd(), projectName);
@@ -37,7 +41,10 @@ export async function newCommand(projectName: string): Promise<void> {
   const sessionId = await runKickoffSession(targetPath, projectName);
 
   console.log("\n\nKickoff complete. Opening interactive session...\n");
-  const resumeArgs = sessionId ? ["--resume", sessionId] : [];
+  const resumeArgs = [
+    "--dangerously-skip-permissions",
+    ...(sessionId ? ["--resume", sessionId] : []),
+  ];
   const result = spawnSync("claude", resumeArgs, {
     cwd: targetPath,
     stdio: "inherit",
@@ -54,22 +61,20 @@ export function scaffoldProject(targetPath: string, _projectName: string): void 
   mkdirSync(join(targetPath, "src", "tests", "unit"), { recursive: true });
   mkdirSync(join(targetPath, "src", "tests", "scenarios"), { recursive: true });
 
-  const emptyFiles = [
-    "AGENTS.md",
-    "IMPLEMENTATION_PLAN.md",
-    "PROMPT_build.md",
-    "PROMPT_plan.md",
-    "README.md",
-  ];
+  const emptyFiles = ["AGENTS.md", "IMPLEMENTATION_PLAN.md", "README.md"];
   for (const f of emptyFiles) {
     writeFileSync(join(targetPath, f), "");
   }
 
-  writeFileSync(join(targetPath, ".gitignore"), "PROMPT-*.md\nIMPLEMENTATION_PLAN.md\n");
+  copyFileSync(getPromptPath("plan"), join(targetPath, "PROMPT_plan.md"));
+  copyFileSync(getPromptPath("build"), join(targetPath, "PROMPT_build.md"));
+
+  writeFileSync(join(targetPath, ".gitignore"), "PROMPT_plan.md\nPROMPT_build.md\nIMPLEMENTATION_PLAN.md\n");
 }
 
 export function buildKickoffPrompt(template: string, projectName: string): string {
-  return template.replace(/\{\{PROJECT_NAME\}\}/g, projectName);
+  const substituted = template.replace(/\{\{PROJECT_NAME\}\}/g, projectName);
+  return `${substituted}\n\n${BRAINSTORM_TRIGGER}`;
 }
 
 async function runKickoffSession(cwd: string, projectName: string): Promise<string | null> {
