@@ -30,9 +30,13 @@ export function isCleanInterval(every: number): boolean {
   return [1, 2, 3, 4, 5, 6, 10, 12, 15, 20, 30, 60].includes(every);
 }
 
+function shellEscape(s: string): string {
+  return "'" + s.replace(/'/g, "'\\''") + "'";
+}
+
 export function buildCronLine(projectFolder: string, every: number): string {
   const logPath = join(projectFolder, ".meditate.log");
-  return `${buildCronExpression(every)} /bin/bash -c 'ralph meditate ${projectFolder} &>> ${logPath}'`;
+  return `${buildCronExpression(every)} /bin/bash -c 'ralph meditate ${shellEscape(projectFolder)} &>> ${shellEscape(logPath)}'`;
 }
 
 export function insertCronEntry(crontab: string, cronLine: string, anchor: string): string {
@@ -56,7 +60,12 @@ export function deleteCronEntry(crontab: string, anchor: string): string {
 export function readSentinel(projectFolder: string): MeditationSentinel | null {
   const p = join(projectFolder, ".meditate.json");
   if (!existsSync(p)) return null;
-  return JSON.parse(readFileSync(p, "utf8")) as MeditationSentinel;
+  try {
+    return JSON.parse(readFileSync(p, "utf8")) as MeditationSentinel;
+  } catch {
+    console.error(`Warning: corrupt .meditate.json in ${projectFolder}, ignoring`);
+    return null;
+  }
 }
 
 export function writeSentinel(projectFolder: string, sentinel: MeditationSentinel): void {

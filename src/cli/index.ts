@@ -42,7 +42,10 @@ program
   .option("--every <n>", "Schedule interval in minutes (registers cron job)", parseInt)
   .option("--until <datetime>", "Stop scheduling after this ISO 8601 datetime")
   .action(async (actionOrFolder: string, projectFolderArg: string | undefined, options: { every?: number; until?: string }) => {
-    if (actionOrFolder === "stop" && projectFolderArg) {
+    if ((actionOrFolder === "stop" || actionOrFolder === "status") && !projectFolderArg) {
+      console.error(`Usage: ralph meditate ${actionOrFolder} <project-folder>`);
+      process.exit(1);
+    } else if (actionOrFolder === "stop" && projectFolderArg) {
       await meditateStop(projectFolderArg);
     } else if (actionOrFolder === "status" && projectFolderArg) {
       await meditateStatus(projectFolderArg);

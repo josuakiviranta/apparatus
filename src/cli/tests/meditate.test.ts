@@ -50,7 +50,7 @@ describe("buildCronLine", () => {
   it("includes the cron expression, ralph meditate command, and bash log redirect", () => {
     const line = buildCronLine("/abs/project", 30);
     expect(line).toContain("*/30 * * * *");
-    expect(line).toContain("ralph meditate /abs/project");
+    expect(line).toContain("ralph meditate '/abs/project'");
     expect(line).toContain(".meditate.log");
     expect(line).toContain("&>>");
   });

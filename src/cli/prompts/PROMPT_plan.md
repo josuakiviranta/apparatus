@@ -1,4 +1,4 @@
-. Study `specs/*` with up to 100 parallel Sonnet subagents to learn the application specifications.
+0a. Study `specs/*` with up to 100 parallel Sonnet subagents to learn the application specifications.
 0b. Study @IMPLEMENTATION_PLAN.md (if present) to understand the plan so far.
 0c. Study `src/lib/*` with up to 100 parallel Sonnet subagents to understand shared utilities & components.
 0d. For reference, the application source code is in `src/*`.
