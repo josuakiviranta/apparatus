@@ -14,11 +14,17 @@
 ## Behavior
 
 Each iteration:
-1. Pipe `<prompt-file>` to `claude -p --dangerously-skip-permissions --output-format=stream-json --model opus`
-2. Parse structured JSON output with `jq`
-3. `git add -A && git commit && git push`
+1. Run `claude -p --dangerously-skip-permissions --output-format=stream-json --model opus < <prompt-file>`, piping output to `jq` via process substitution
+2. Track claude's PID — on `SIGINT`/`SIGTERM`, only that PID is killed (not all claude processes)
+3. `git push` after iteration completes
 4. If push fails, retry with `-u origin <branch>`
 5. Check iteration count; stop if limit reached
+
+## Shutdown
+
+`Ctrl+C` → `cleanup()` trap fires → kills the tracked `CLAUDE_PID` only → exits cleanly.
+
+If `Ctrl+C` is unresponsive, the script prints its own PID (`$$`) in the banner at startup. From another terminal: `kill <PID>` — same trap fires, same clean shutdown.
 
 ## Distribution
 

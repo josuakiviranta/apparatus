@@ -29,6 +29,10 @@ ralph <project-folder>
 ```
 Shorthand for `implement`.
 
+## Stopping the loop
+
+Press `Ctrl+C`. Ralph cleanly terminates its own claude subprocess without affecting any other running claude sessions.
+
 ## First Run
 
 On first run in a project, ralph injects default `PROMPT_plan.md` and `PROMPT_build.md` files and exits.

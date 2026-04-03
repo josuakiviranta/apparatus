@@ -1,4 +1,4 @@
-import { spawnSync } from "child_process";
+import { spawnSync, spawn } from "child_process";
 import { existsSync, chmodSync } from "fs";
 import { resolve } from "path";
 import { bootstrapPrompts } from "../lib/prompts";
@@ -55,22 +55,32 @@ export async function implementCommand(
     args.push(String(options.max));
   }
 
+  const child = spawn(loopSh, args, {
+    cwd: absPath,
+    stdio: "inherit",
+    env: process.env,
+    detached: true, // own process group — so we can kill only ralph's subtree
+  });
+
+  if (!child.pid) {
+    console.error("Failed to launch loop.sh");
+    process.exit(1);
+  }
+
   console.log(`Starting implementation loop in ${absPath}...`);
   if (options.max !== undefined) {
     console.log(`Max iterations: ${options.max}`);
   }
+  console.log(`PID: ${child.pid}  (Ctrl+C or: kill ${child.pid})`);
   console.log();
 
-  const result = spawnSync(loopSh, args, {
-    cwd: absPath,
-    stdio: "inherit",
-    env: process.env,
-  });
+  const killGroup = () => {
+    try { process.kill(-child.pid!, "SIGTERM"); } catch {}
+  };
 
-  if (result.error) {
-    console.error("Failed to launch loop.sh:", result.error.message);
-    process.exit(1);
-  }
+  process.on("SIGINT", killGroup);
+  process.on("SIGTERM", killGroup);
 
-  process.exit(result.status ?? 0);
+  await new Promise<void>((resolve) => child.on("exit", resolve));
+  process.exit(0);
 }

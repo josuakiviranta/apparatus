@@ -16,11 +16,19 @@ MODE="build"
 
 ITERATION=0
 CURRENT_BRANCH=$(git branch --show-current)
+CLAUDE_PID=""
+
+cleanup() {
+    [ -n "$CLAUDE_PID" ] && kill "$CLAUDE_PID" 2>/dev/null
+    exit 0
+}
+trap cleanup INT TERM
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "Mode:   $MODE"
 echo "Prompt: $PROMPT_FILE"
 echo "Branch: $CURRENT_BRANCH"
+echo "PID:    $$ (kill $$ to stop)"
 [ $MAX_ITERATIONS -gt 0 ] && echo "Max:    $MAX_ITERATIONS iterations"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
@@ -43,18 +51,22 @@ while true; do
     # --model opus: Primary agent uses Opus for complex reasoning (task selection, prioritization)
     #               Can use 'sonnet' in build mode for speed if plan is clear and tasks well-defined
     # --verbose: Detailed execution logging
-    cat "$PROMPT_FILE" | claude -p \
+    claude -p \
         --dangerously-skip-permissions \
         --output-format=stream-json \
         --model opus \
-        | jq -r '
+        < "$PROMPT_FILE" \
+        > >(jq -r '
           if .type == "assistant" then
             .message.content[]? |
             if .type == "text" then .text
             elif .type == "tool_use" then "→ [tool] \(.name)"
             else empty end
           else empty end
-        ' 2>/dev/null
+        ' 2>/dev/null) &
+    CLAUDE_PID=$!
+    wait $CLAUDE_PID
+    CLAUDE_PID=""
 
     # Push changes after each iteration
     git push origin "$CURRENT_BRANCH" || {
