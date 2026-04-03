@@ -1,4 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync } from "fs";
+import { join } from "path";
+import { tmpdir } from "os";
 import {
   cronId,
   buildCronExpression,
@@ -6,6 +9,12 @@ import {
   buildCronLine,
   insertCronEntry,
   deleteCronEntry,
+  readSentinel,
+  writeSentinel,
+  removeSentinel,
+  ensureMeditationDirs,
+  appendMeditateGitignore,
+  MeditationSentinel,
 } from "../commands/meditate";
 
 describe("cronId", () => {
@@ -80,5 +89,85 @@ describe("deleteCronEntry", () => {
   it("returns crontab unchanged if anchor not found", () => {
     const crontab = "0 * * * * other-job\n";
     expect(deleteCronEntry(crontab, "# ralph-meditate-missing")).toBe(crontab);
+  });
+});
+
+let tmpDir: string;
+
+beforeEach(() => {
+  tmpDir = mkdtempSync(join(tmpdir(), "ralph-meditate-test-"));
+});
+
+afterEach(() => {
+  rmSync(tmpDir, { recursive: true, force: true });
+});
+
+describe("readSentinel", () => {
+  it("returns null when .meditate.json does not exist", () => {
+    expect(readSentinel(tmpDir)).toBeNull();
+  });
+
+  it("returns parsed sentinel when .meditate.json exists", () => {
+    const sentinel = { every: 30, cronId: "ralph-meditate-proj" };
+    writeFileSync(join(tmpDir, ".meditate.json"), JSON.stringify(sentinel));
+    expect(readSentinel(tmpDir)).toEqual(sentinel);
+  });
+});
+
+describe("writeSentinel / removeSentinel", () => {
+  it("writes and reads back a sentinel", () => {
+    const sentinel: MeditationSentinel = {
+      every: 60,
+      until: "2026-04-05T08:00:00",
+      cronId: "ralph-meditate-test",
+    };
+    writeSentinel(tmpDir, sentinel);
+    expect(existsSync(join(tmpDir, ".meditate.json"))).toBe(true);
+    expect(readSentinel(tmpDir)).toEqual(sentinel);
+  });
+
+  it("removeSentinel deletes the file if present", () => {
+    writeSentinel(tmpDir, { every: 30, cronId: "ralph-meditate-test" });
+    removeSentinel(tmpDir);
+    expect(existsSync(join(tmpDir, ".meditate.json"))).toBe(false);
+  });
+
+  it("removeSentinel is a no-op if file does not exist", () => {
+    expect(() => removeSentinel(tmpDir)).not.toThrow();
+  });
+});
+
+describe("ensureMeditationDirs", () => {
+  it("creates meditations/illuminations/ nested structure", () => {
+    ensureMeditationDirs(tmpDir);
+    expect(existsSync(join(tmpDir, "meditations", "illuminations"))).toBe(true);
+  });
+
+  it("is idempotent — does not throw if dirs already exist", () => {
+    ensureMeditationDirs(tmpDir);
+    expect(() => ensureMeditationDirs(tmpDir)).not.toThrow();
+  });
+});
+
+describe("appendMeditateGitignore", () => {
+  it("adds .meditate.json and .meditate.log to .gitignore", () => {
+    appendMeditateGitignore(tmpDir);
+    const content = readFileSync(join(tmpDir, ".gitignore"), "utf8");
+    expect(content).toContain(".meditate.json");
+    expect(content).toContain(".meditate.log");
+  });
+
+  it("creates .gitignore if it does not exist", () => {
+    expect(existsSync(join(tmpDir, ".gitignore"))).toBe(false);
+    appendMeditateGitignore(tmpDir);
+    expect(existsSync(join(tmpDir, ".gitignore"))).toBe(true);
+  });
+
+  it("does not duplicate entries if called twice", () => {
+    appendMeditateGitignore(tmpDir);
+    appendMeditateGitignore(tmpDir);
+    const content = readFileSync(join(tmpDir, ".gitignore"), "utf8");
+    const count = (content.match(/\.meditate\.json/g) ?? []).length;
+    expect(count).toBe(1);
   });
 });

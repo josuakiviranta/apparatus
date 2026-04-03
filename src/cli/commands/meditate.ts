@@ -50,3 +50,35 @@ export function deleteCronEntry(crontab: string, anchor: string): string {
   lines.splice(removeFrom, count);
   return lines.join("\n");
 }
+
+// ─── Filesystem utilities ────────────────────────────────────────────────────
+
+export function readSentinel(projectFolder: string): MeditationSentinel | null {
+  const p = join(projectFolder, ".meditate.json");
+  if (!existsSync(p)) return null;
+  return JSON.parse(readFileSync(p, "utf8")) as MeditationSentinel;
+}
+
+export function writeSentinel(projectFolder: string, sentinel: MeditationSentinel): void {
+  writeFileSync(join(projectFolder, ".meditate.json"), JSON.stringify(sentinel, null, 2) + "\n");
+}
+
+export function removeSentinel(projectFolder: string): void {
+  const p = join(projectFolder, ".meditate.json");
+  if (existsSync(p)) unlinkSync(p);
+}
+
+export function ensureMeditationDirs(projectFolder: string): void {
+  mkdirSync(join(projectFolder, "meditations", "illuminations"), { recursive: true });
+}
+
+export function appendMeditateGitignore(projectFolder: string): void {
+  const entries = [".meditate.json", ".meditate.log"];
+  const gitignorePath = join(projectFolder, ".gitignore");
+  const existing = existsSync(gitignorePath) ? readFileSync(gitignorePath, "utf8") : "";
+  const lines = existing.split("\n");
+  const toAdd = entries.filter((e) => !lines.includes(e));
+  if (toAdd.length === 0) return;
+  const sep = existing.length > 0 && !existing.endsWith("\n") ? "\n" : "";
+  writeFileSync(gitignorePath, existing + sep + toAdd.join("\n") + "\n");
+}
