@@ -1,28 +1,18 @@
 #!/bin/bash
-# Usage: ./loop.sh [plan] [max_iterations]
+# Usage: ./loop.sh <prompt-file-path> [max_iterations]
 # Examples:
-#   ./loop.sh              # Build mode, unlimited iterations
-#   ./loop.sh 20           # Build mode, max 20 iterations
-#   ./loop.sh plan         # Plan mode, unlimited iterations
-#   ./loop.sh plan 5       # Plan mode, max 5 iterations
+#   ./loop.sh /path/to/PROMPT_build.md
+#   ./loop.sh /path/to/PROMPT_build.md 20
 
-# Parse arguments
-if [ "$1" = "plan" ]; then
-    # Plan mode
-    MODE="plan"
-    PROMPT_FILE="PROMPT_plan.md"
-    MAX_ITERATIONS=${2:-0}
-elif [[ "$1" =~ ^[0-9]+$ ]]; then
-    # Build mode with max iterations
-    MODE="build"
-    PROMPT_FILE="PROMPT_build.md"
-    MAX_ITERATIONS=$1
-else
-    # Build mode, unlimited (no arguments or invalid input)
-    MODE="build"
-    PROMPT_FILE="PROMPT_build.md"
-    MAX_ITERATIONS=0
+if [ -z "$1" ]; then
+    echo "Error: prompt file path required"
+    echo "Usage: $0 <prompt-file-path> [max_iterations]"
+    exit 1
 fi
+
+PROMPT_FILE="$1"
+MAX_ITERATIONS=${2:-0}
+MODE="build"
 
 ITERATION=0
 CURRENT_BRANCH=$(git branch --show-current)
@@ -57,7 +47,14 @@ while true; do
         --dangerously-skip-permissions \
         --output-format=stream-json \
         --model opus \
-        --verbose
+        | jq -r '
+          if .type == "assistant" then
+            .message.content[]? |
+            if .type == "text" then .text
+            elif .type == "tool_use" then "→ [tool] \(.name)"
+            else empty end
+          else empty end
+        ' 2>/dev/null
 
     # Push changes after each iteration
     git push origin "$CURRENT_BRANCH" || {
