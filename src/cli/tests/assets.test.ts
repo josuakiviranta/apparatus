@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getAssetPath, getLoopShPath, getPromptPath } from "../lib/assets";
+import { getAssetPath, getLoopShPath, getPromptPath, getKickoffPromptPath } from "../lib/assets";
 
 describe("assets", () => {
   it("getLoopShPath returns a path ending in loop.sh", () => {
@@ -15,6 +15,11 @@ describe("assets", () => {
   it("getPromptPath('build') returns a path ending in PROMPT_build.md", () => {
     const p = getPromptPath("build");
     expect(p).toMatch(/PROMPT_build\.md$/);
+  });
+
+  it("getKickoffPromptPath returns a path ending in PROMPT_kickoff.md", () => {
+    const p = getKickoffPromptPath();
+    expect(p).toMatch(/PROMPT_kickoff\.md$/);
   });
 
   it("getAssetPath resolves relative to this file's directory", () => {

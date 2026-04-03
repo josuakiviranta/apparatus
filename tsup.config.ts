@@ -20,6 +20,10 @@ export default defineConfig({
       "src/cli/prompts/PROMPT_build.md",
       "dist/prompts/PROMPT_build.md"
     );
+    copyFileSync(
+      "src/cli/prompts/PROMPT_kickoff.md",
+      "dist/prompts/PROMPT_kickoff.md"
+    );
     copyFileSync("loop.sh", "dist/loop.sh");
     // Make loop.sh executable
     const { chmodSync } = await import("fs");

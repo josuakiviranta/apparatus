@@ -22,3 +22,7 @@ export function getPromptPath(type: "plan" | "build"): string {
     type === "plan" ? "PROMPT_plan.md" : "PROMPT_build.md";
   return getAssetPath(join("prompts", filename));
 }
+
+export function getKickoffPromptPath(): string {
+  return getAssetPath(join("prompts", "PROMPT_kickoff.md"));
+}
