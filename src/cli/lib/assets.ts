@@ -26,3 +26,7 @@ export function getPromptPath(type: "plan" | "build"): string {
 export function getKickoffPromptPath(): string {
   return getAssetPath(join("prompts", "PROMPT_kickoff.md"));
 }
+
+export function getMeditationPromptPath(): string {
+  return getAssetPath(join("prompts", "PROMPT_meditation.md"));
+}
