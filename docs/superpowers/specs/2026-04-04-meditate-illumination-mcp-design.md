@@ -31,7 +31,10 @@ ralph meditate <folder>
   │     └── mcpServers.illumination → node dist/mcp/illumination-server.js <project-root>
   │
   └── spawns  claude --print --permission-mode dontAsk
-                     --allowedTools Read Glob mcp__illumination__write_illumination
+                     --allowedTools mcp__illumination__read_file
+                                    mcp__illumination__glob_files
+                                    mcp__illumination__project_tree
+                                    mcp__illumination__write_illumination
                      --mcp-config <project-root>/.mcp.ralph-<pid>.json
                      -p "<meditation prompt>"
                           │
@@ -179,11 +182,17 @@ await server.connect(transport);
 
 ## Permission Model (final)
 
+> **Updated:** Native `Read` and `Glob` have been replaced by path-restricted MCP equivalents.
+> See `2026-04-04-meditate-path-restriction-design.md` for full details.
+
 | Tool | Allowed |
 |---|---|
-| `Read` | Yes — read any file in project |
-| `Glob` | Yes — list files in project |
-| `mcp__illumination__write_illumination` | Yes — write to `meditations/illuminations/` only |
+| `mcp__illumination__read_file` | Yes — reads within project root only |
+| `mcp__illumination__glob_files` | Yes — globs within project root only |
+| `mcp__illumination__project_tree` | Yes — trees within project root only |
+| `mcp__illumination__write_illumination` | Yes — writes to `meditations/illuminations/` only |
+| `Read` | No |
+| `Glob` | No |
 | `Write` | No |
 | `Bash` | No |
 | `ToolSearch` | No (not in allowedTools list) |

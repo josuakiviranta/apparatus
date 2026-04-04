@@ -63,29 +63,31 @@ The comment line is the anchor used by `stop` to find and remove the entry clean
 
 ### Permission Enforcement
 
-The meditation Claude session is invoked with hard permission constraints — not prompt-based guidance, but CLI-enforced restrictions:
+The meditation Claude session is invoked with hard permission constraints — not prompt-based guidance, but CLI-enforced restrictions. All file access is path-restricted via the illumination MCP server (see `2026-04-04-meditate-illumination-mcp-design.md` and `2026-04-04-meditate-path-restriction-design.md`):
 
 ```
 claude \
   --print \
   --output-format stream-json \
   --permission-mode dontAsk \
-  --allowedTools "Read" \
-  --allowedTools "Glob" \
-  --allowedTools "Write(meditations/illuminations/**)" \
-  --disallowedTools "ToolSearch" \
+  --allowedTools "mcp__illumination__read_file" \
+  --allowedTools "mcp__illumination__glob_files" \
+  --allowedTools "mcp__illumination__project_tree" \
+  --allowedTools "mcp__illumination__write_illumination" \
+  --mcp-config <project-root>/.mcp.ralph-<pid>.json \
   --add-dir /abs/path/to/project \
   -p "<meditation prompt>"
 ```
 
-Three separate `--allowedTools` flags are passed — one per rule. The `Write` path is relative to the project folder (Claude resolves it from the working directory). `ToolSearch` is explicitly disallowed to prevent the session from discovering and loading additional tools beyond the allow list.
+Four separate `--allowedTools` flags are passed — one per MCP tool. All tools are served by the illumination MCP server, which enforces that file operations stay within the project root.
 
 What this enforces:
-- `Read` — allowed anywhere in the working directory (project folder)
-- `Glob` — allowed for file discovery across the project
-- `Write` — allowed **only** under the relative path `meditations/illuminations/**`
-- `ToolSearch` — explicitly disallowed (prevents tool expansion)
-- `Bash`, `WebFetch`, `Edit`, `Agent`, all MCP tools — **auto-denied** by `dontAsk` mode
+- `mcp__illumination__read_file` — reads files within the project root only (path-validated by the MCP server)
+- `mcp__illumination__glob_files` — globs within the project root only (path-validated by the MCP server)
+- `mcp__illumination__project_tree` — recursive tree within the project root only (path-validated by the MCP server)
+- `mcp__illumination__write_illumination` — writes **only** to `meditations/illuminations/` (filename-validated by the MCP server)
+- Native `Read`, `Glob`, `Write` — **not allowed** (replaced by path-restricted MCP equivalents)
+- `Bash`, `WebFetch`, `Edit`, `Agent`, `ToolSearch` — **auto-denied** by `dontAsk` mode
 - No internet access: `WebFetch` denied, `Bash` denied (no curl/wget escape)
 
 `dontAsk` mode auto-denies any tool not in the allow list without prompting.
