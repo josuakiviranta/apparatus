@@ -2,6 +2,7 @@
   "name": "ralph-cli",
   "version": "0.1.0",
   "description": "Agentic loop runner CLI for AI-assisted project development",
+  "type": "module",
   "bin": {
     "ralph": "./dist/cli/index.js"
   },

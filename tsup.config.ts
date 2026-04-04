@@ -3,7 +3,7 @@ import { copyFileSync, mkdirSync, readdirSync } from "fs";
 
 export default defineConfig({
   entry: ["src/cli/index.ts", "src/cli/mcp/illumination-server.ts", "src/daemon/index.ts"],
-  format: ["cjs"],
+  format: ["esm"],
   outDir: "dist",
   clean: true,
   banner: {
