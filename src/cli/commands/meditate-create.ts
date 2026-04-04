@@ -3,11 +3,11 @@ import { existsSync, readFileSync } from "fs";
 import { resolve } from "path";
 import { getMeditateCreatePromptPath } from "../lib/assets";
 
-export function buildMeditateAddKickoffArgs(promptText: string): string[] {
+export function buildMeditateCreateKickoffArgs(promptText: string): string[] {
   return ["-p", promptText, "--output-format", "stream-json", "--dangerously-skip-permissions"];
 }
 
-export async function meditateAddCommand(projectFolder: string): Promise<void> {
+export async function meditateCreateCommand(projectFolder: string): Promise<void> {
   const absPath = resolve(projectFolder);
   if (!existsSync(absPath)) {
     console.error(`Error: project folder not found: ${absPath}`);
@@ -36,7 +36,7 @@ async function runMeditateCreateKickoff(cwd: string, promptText: string): Promis
   return new Promise((resolve) => {
     let sessionId: string | null = null;
     let buffer = "";
-    const args = buildMeditateAddKickoffArgs(promptText);
+    const args = buildMeditateCreateKickoffArgs(promptText);
     const child = spawn("claude", args, { cwd, env: process.env, stdio: ["ignore", "pipe", "pipe"] });
     child.stdout.on("data", (chunk: Buffer) => {
       buffer += chunk.toString();
