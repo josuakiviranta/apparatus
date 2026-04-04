@@ -2,8 +2,8 @@ import { Command } from "commander";
 import { planCommand } from "./commands/plan";
 import { implementCommand } from "./commands/implement";
 import { newCommand } from "./commands/new";
-import { meditateCommand, meditateStop, meditateStatus, meditateKill } from "./commands/meditate";
-import { meditateAddCommand } from "./commands/meditate-add";
+import { meditateCommand, meditateStop, meditateStatus } from "./commands/meditate";
+import { meditateCreateCommand } from "./commands/meditate-create";
 
 const program = new Command();
 
@@ -14,16 +14,14 @@ program
 
 program
   .command("plan <project-folder>")
-  .description(
-    "Open an interactive Claude planning session in the project folder"
-  )
+  .description("Open an interactive Claude planning session")
   .action(async (projectFolder: string) => {
     await planCommand(projectFolder);
   });
 
 program
   .command("implement <project-folder>")
-  .description("Run the agentic implementation loop in the project folder")
+  .description("Run the agentic implementation loop")
   .option("--max <n>", "Maximum number of loop iterations", parseInt)
   .action(async (projectFolder: string, options: { max?: number }) => {
     await implementCommand(projectFolder, options);
@@ -31,49 +29,39 @@ program
 
 program
   .command("new <project-name>")
-  .description("Scaffold a new project folder and launch a Claude kickoff session")
+  .description("Scaffold a new project and launch a kickoff session")
   .action(async (projectName: string) => {
     await newCommand(projectName);
   });
 
 program
-  .command("meditate <action-or-folder>")
-  .argument("[project-folder]")
-  .description("Run a meditation cycle (reflection only, no implementation)")
+  .command("meditate <project-folder>")
+  .description("Run a meditation cycle")
   .option("--every <n>", "Schedule interval in minutes (registers cron job)", parseInt)
   .option("--until <datetime>", "Stop scheduling after this ISO 8601 datetime")
-  .action(async (actionOrFolder: string, projectFolderArg: string | undefined, options: { every?: number; until?: string }) => {
-    if ((actionOrFolder === "stop" || actionOrFolder === "status" || actionOrFolder === "kill" || actionOrFolder === "add") && !projectFolderArg) {
-      console.error(`Usage: ralph meditate ${actionOrFolder} <project-folder>`);
-      process.exit(1);
-    } else if (actionOrFolder === "stop" && projectFolderArg) {
-      await meditateStop(projectFolderArg);
-    } else if (actionOrFolder === "status" && projectFolderArg) {
-      await meditateStatus(projectFolderArg);
-    } else if (actionOrFolder === "kill" && projectFolderArg) {
-      await meditateKill(projectFolderArg);
-    } else if (actionOrFolder === "add" && projectFolderArg) {
-      await meditateAddCommand(projectFolderArg);
-    } else {
-      await meditateCommand(actionOrFolder, options);
-    }
+  .action(async (projectFolder: string, options: { every?: number; until?: string }) => {
+    await meditateCommand(projectFolder, options);
   });
 
-// Default: ralph <project-folder> [plan|implement] — supports both arg orderings
 program
-  .argument("[project-folder]")
-  .argument("[subcommand]", "plan or implement (default: implement)")
-  .option("--max <n>", "Maximum number of loop iterations", parseInt)
-  .action(async (projectFolder: string | undefined, subcommand: string | undefined, options: { max?: number }) => {
-    if (!projectFolder) {
-      program.help();
-      return;
-    }
-    if (subcommand === "plan") {
-      await planCommand(projectFolder);
-    } else {
-      await implementCommand(projectFolder, options);
-    }
+  .command("meditate-create <project-folder>")
+  .description("Create a new meditation script")
+  .action(async (projectFolder: string) => {
+    await meditateCreateCommand(projectFolder);
+  });
+
+program
+  .command("meditate-stop <project-folder>")
+  .description("Stop schedule and any running session")
+  .action(async (projectFolder: string) => {
+    await meditateStop(projectFolder);
+  });
+
+program
+  .command("meditate-status <project-folder>")
+  .description("Show meditation schedule and session status")
+  .action(async (projectFolder: string) => {
+    await meditateStatus(projectFolder);
   });
 
 program.parse(process.argv);
