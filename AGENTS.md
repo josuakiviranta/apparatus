@@ -18,7 +18,7 @@
 ### Codebase Patterns
 
 - CLI entry: `src/cli/index.ts` → commander setup
-- Commands: `src/cli/commands/{plan,implement,new}.ts`
+- Commands: `src/cli/commands/{plan,implement,new,meditate,meditate-add}.ts`
 - Lib: `src/cli/lib/{assets,prompts}.ts`
 - Tests: `src/cli/tests/*.test.ts` (vitest)
 - Bundled prompts: `src/cli/prompts/PROMPT_{plan,build,kickoff}.md`
