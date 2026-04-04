@@ -11,7 +11,12 @@ const DAEMON_POLL_INTERVAL_MS = 100;
 
 function getDaemonBin(): { command: string; args: string[] } {
   const dir = basename(__dirname);
+  if (dir === "cli") {
+    // prod: dist/cli/ — daemon is one level up at dist/daemon/index.js
+    return { command: process.execPath, args: [join(__dirname, "..", "daemon", "index.js")] };
+  }
   if (dir === "dist") {
+    // legacy flat layout fallback
     return { command: process.execPath, args: [join(__dirname, "daemon", "index.js")] };
   }
   // dev mode — __dirname is somewhere in src/
