@@ -3,6 +3,7 @@ import { planCommand } from "./commands/plan";
 import { implementCommand } from "./commands/implement";
 import { newCommand } from "./commands/new";
 import { meditateCommand, meditateStop, meditateStatus, meditateKill } from "./commands/meditate";
+import { meditateAddCommand } from "./commands/meditate-add";
 
 const program = new Command();
 
@@ -42,7 +43,7 @@ program
   .option("--every <n>", "Schedule interval in minutes (registers cron job)", parseInt)
   .option("--until <datetime>", "Stop scheduling after this ISO 8601 datetime")
   .action(async (actionOrFolder: string, projectFolderArg: string | undefined, options: { every?: number; until?: string }) => {
-    if ((actionOrFolder === "stop" || actionOrFolder === "status" || actionOrFolder === "kill") && !projectFolderArg) {
+    if ((actionOrFolder === "stop" || actionOrFolder === "status" || actionOrFolder === "kill" || actionOrFolder === "add") && !projectFolderArg) {
       console.error(`Usage: ralph meditate ${actionOrFolder} <project-folder>`);
       process.exit(1);
     } else if (actionOrFolder === "stop" && projectFolderArg) {
@@ -51,6 +52,8 @@ program
       await meditateStatus(projectFolderArg);
     } else if (actionOrFolder === "kill" && projectFolderArg) {
       await meditateKill(projectFolderArg);
+    } else if (actionOrFolder === "add" && projectFolderArg) {
+      await meditateAddCommand(projectFolderArg);
     } else {
       await meditateCommand(actionOrFolder, options);
     }

@@ -1,6 +1,6 @@
 import { existsSync } from "fs";
 import { describe, it, expect } from "vitest";
-import { getAssetPath, getLoopShPath, getPromptPath, getKickoffPromptPath, getMeditationPromptPath, getIlluminationServerPath, getMetaMeditationsDir } from "../lib/assets";
+import { getAssetPath, getLoopShPath, getPromptPath, getKickoffPromptPath, getMeditationPromptPath, getIlluminationServerPath, getMetaMeditationsDir, getMeditateCreatePromptPath } from "../lib/assets";
 
 describe("assets", () => {
   it("getLoopShPath returns a path ending in loop.sh", () => {
@@ -41,6 +41,10 @@ describe("assets", () => {
   it("getMetaMeditationsDir resolves to an existing directory in the current repo", () => {
     const p = getMetaMeditationsDir();
     expect(existsSync(p)).toBe(true);
+  });
+
+  it("getMeditateCreatePromptPath returns path ending in PROMPT_meditate_create.md", () => {
+    expect(getMeditateCreatePromptPath()).toMatch(/PROMPT_meditate_create\.md$/);
   });
 
   it("getAssetPath resolves relative to this file's directory", () => {
