@@ -14,6 +14,7 @@ import {
   removeSentinel,
   ensureMeditationDirs,
   appendMeditateGitignore,
+  buildMeditationArgs,
   MeditationSentinel,
 } from "../commands/meditate";
 
@@ -169,5 +170,65 @@ describe("appendMeditateGitignore", () => {
     const content = readFileSync(join(tmpDir, ".gitignore"), "utf8");
     const count = (content.match(/\.meditate\.json/g) ?? []).length;
     expect(count).toBe(1);
+  });
+});
+
+describe("buildMeditationArgs", () => {
+  const absPath = "/fake/project";
+  const prompt = "test prompt";
+
+  it("includes Read and Glob in allowedTools", () => {
+    const args = buildMeditationArgs(absPath, prompt);
+    const allowed = args
+      .map((a, i) => (args[i - 1] === "--allowedTools" ? a : null))
+      .filter(Boolean);
+    expect(allowed).toContain("Read");
+    expect(allowed).toContain("Glob");
+  });
+
+  it("allows Write only to meditations/illuminations relative path", () => {
+    const args = buildMeditationArgs(absPath, prompt);
+    const allowed = args
+      .map((a, i) => (args[i - 1] === "--allowedTools" ? a : null))
+      .filter(Boolean);
+    const writePerm = allowed.find((a) => a?.startsWith("Write("));
+    expect(writePerm).toBe("Write(meditations/illuminations/**)");
+  });
+
+  it("does not allow Write to any absolute path", () => {
+    const args = buildMeditationArgs(absPath, prompt);
+    const allowed = args
+      .map((a, i) => (args[i - 1] === "--allowedTools" ? a : null))
+      .filter(Boolean);
+    const absoluteWrite = allowed.find(
+      (a) => a?.startsWith("Write(/") || a?.startsWith("Write(//")
+    );
+    expect(absoluteWrite).toBeUndefined();
+  });
+
+  it("disallows ToolSearch", () => {
+    const args = buildMeditationArgs(absPath, prompt);
+    const disallowed = args
+      .map((a, i) => (args[i - 1] === "--disallowedTools" ? a : null))
+      .filter(Boolean);
+    expect(disallowed).toContain("ToolSearch");
+  });
+
+  it("sets permission-mode to dontAsk", () => {
+    const args = buildMeditationArgs(absPath, prompt);
+    const modeIdx = args.indexOf("--permission-mode");
+    expect(args[modeIdx + 1]).toBe("dontAsk");
+  });
+
+  it("sets --add-dir to absPath", () => {
+    const args = buildMeditationArgs(absPath, prompt);
+    const dirIdx = args.indexOf("--add-dir");
+    expect(args[dirIdx + 1]).toBe(absPath);
+  });
+
+  it("passes prompt text via -p flag", () => {
+    const args = buildMeditationArgs(absPath, prompt);
+    const pIdx = args.indexOf("-p");
+    expect(args[pIdx + 1]).toBe(prompt);
   });
 });

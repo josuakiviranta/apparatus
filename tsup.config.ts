@@ -1,5 +1,5 @@
 import { defineConfig } from "tsup";
-import { copyFileSync, mkdirSync } from "fs";
+import { copyFileSync, mkdirSync, readdirSync } from "fs";
 
 export default defineConfig({
   entry: ["src/cli/index.ts"],
@@ -12,18 +12,9 @@ export default defineConfig({
   async onSuccess() {
     // Copy bundled assets to dist/
     mkdirSync("dist/prompts", { recursive: true });
-    copyFileSync(
-      "src/cli/prompts/PROMPT_plan.md",
-      "dist/prompts/PROMPT_plan.md"
-    );
-    copyFileSync(
-      "src/cli/prompts/PROMPT_build.md",
-      "dist/prompts/PROMPT_build.md"
-    );
-    copyFileSync(
-      "src/cli/prompts/PROMPT_kickoff.md",
-      "dist/prompts/PROMPT_kickoff.md"
-    );
+    for (const file of readdirSync("src/cli/prompts")) {
+      copyFileSync(`src/cli/prompts/${file}`, `dist/prompts/${file}`);
+    }
     copyFileSync("loop.sh", "dist/loop.sh");
     // Make loop.sh executable
     const { chmodSync } = await import("fs");

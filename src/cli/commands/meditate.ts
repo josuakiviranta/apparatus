@@ -119,8 +119,21 @@ function removeCronEntry(id: string): void {
 
 // ─── Session runner ───────────────────────────────────────────────────────────
 
+export function buildMeditationArgs(absPath: string, promptText: string): string[] {
+  return [
+    "--print",
+    "--output-format", "stream-json",
+    "--permission-mode", "dontAsk",
+    "--allowedTools", "Read",
+    "--allowedTools", "Glob",
+    "--allowedTools", "Write(meditations/illuminations/**)",
+    "--disallowedTools", "ToolSearch",
+    "--add-dir", absPath,
+    "-p", promptText,
+  ];
+}
+
 async function runMeditationSession(absPath: string): Promise<void> {
-  const illuminationsPath = resolve(join(absPath, "meditations", "illuminations"));
   const prompt = readFileSync(getMeditationPromptPath(), "utf8");
 
   const border = "\u2501".repeat(40);
@@ -131,15 +144,7 @@ async function runMeditationSession(absPath: string): Promise<void> {
   console.log(border);
   console.log();
 
-  const args = [
-    "--print",
-    "--output-format", "stream-json",
-    "--permission-mode", "dontAsk",
-    "--allowedTools", "Read",
-    "--allowedTools", `Write(${illuminationsPath}/**)`,
-    "--add-dir", absPath,
-    "-p", prompt,
-  ];
+  const args = buildMeditationArgs(absPath, prompt);
 
   const child = spawn("claude", args, {
     cwd: absPath,
@@ -160,12 +165,6 @@ async function runMeditationSession(absPath: string): Promise<void> {
           for (const block of (msg.message?.content ?? [])) {
             if (block.type === "text") {
               process.stdout.write(block.text);
-            } else if (block.type === "thinking") {
-              process.stdout.write(block.thinking);
-            } else if (block.type === "tool_use" && block.name === "Read") {
-              process.stdout.write(`\n\u2192 [tool] Read: ${block.input?.file_path}\n`);
-            } else if (block.type === "tool_use") {
-              process.stdout.write(`\n\u2192 [tool] ${block.name}\n`);
             }
           }
         }

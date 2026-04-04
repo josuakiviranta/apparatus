@@ -1,3 +1,5 @@
 node_modules/
 dist/
 docs/superpowers/plans/
+.meditate.json
+.meditate.log
