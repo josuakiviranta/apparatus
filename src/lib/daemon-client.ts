@@ -1,6 +1,9 @@
 // src/lib/daemon-client.ts
 import net from "net";
-import { join, basename } from "path";
+import { join, basename, dirname } from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 import { existsSync } from "fs";
 import { spawn } from "child_process";
 import { homedir } from "os";
