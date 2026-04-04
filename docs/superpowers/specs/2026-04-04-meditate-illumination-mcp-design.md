@@ -149,7 +149,7 @@ Replace any direct `Write` tool instruction with:
 ### `package.json`
 
 Add runtime dependencies:
-- `@modelcontextprotocol/server` `^1.0.0` — MCP server + stdio transport
+- `@modelcontextprotocol/sdk` `^1.0.0` — MCP server + stdio transport
 - `zod` — input schema validation (runtime `dependency`, not devDependency)
 
 Check whether `zod` is already present before adding.
@@ -157,17 +157,17 @@ Check whether `zod` is already present before adding.
 ## SDK Usage Pattern
 
 ```ts
-import { McpServer, StdioServerTransport } from "@modelcontextprotocol/server";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import * as z from "zod/v4";
 
 const server = new McpServer({ name: "illumination", version: "1.0.0" });
 
-server.registerTool("write_illumination", {
-  description: "Write a meditation illumination file to the project",
-  inputSchema: z.object({
-    filename: z.string().regex(/^[\w-]+\.md$/, "filename must match [\\w-]+\\.md"),
-    content: z.string()
-  })
+// Note: the tool() / registerTool() inputSchema accepts a raw shape object,
+// NOT wrapped in z.object(). The SDK wraps it internally.
+server.tool("write_illumination", "Write a meditation illumination file to the project", {
+  filename: z.string().regex(/^[\w-]+\.md$/, "filename must match [\\w-]+\\.md"),
+  content: z.string()
 }, async ({ filename, content }) => {
   // resolve path, mkdir, writeFile
   return { content: [{ type: "text", text: `Written to ${resolvedPath}` }] };
