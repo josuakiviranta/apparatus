@@ -2,14 +2,19 @@ import { join, basename } from "path";
 
 /**
  * Resolves a path to a bundled asset.
- * In production (tsup bundle): __dirname → dist/, assets at dist/loop.sh and dist/prompts/
+ * In production (tsup bundle): __dirname → dist/cli/, assets at dist/loop.sh and dist/prompts/
  * In dev (tsx): __dirname → src/cli/lib/, assets at src/cli/prompts/ and project root loop.sh
  */
-export function getAssetPath(filename: string): string {
+function isProduction(): boolean {
   const dir = basename(__dirname);
-  // In production, tsup compiles to dist/index.js so __dirname ends with "dist"
-  // In dev, tsx runs from src/cli/lib/ so __dirname ends with "lib"
-  const base = dir === "dist" ? __dirname : join(__dirname, "..");
+  // tsup now outputs to dist/cli/index.js (multiple entry points preserve structure)
+  return dir === "cli" || dir === "dist";
+}
+
+export function getAssetPath(filename: string): string {
+  // prod: dist/cli/ → up one → dist/ (where loop.sh and prompts/ live)
+  // dev:  src/cli/lib/ → up one → src/cli/ (where prompts/ live in dev)
+  const base = join(__dirname, "..");
   return join(base, filename);
 }
 
@@ -36,20 +41,20 @@ export function getMeditateCreatePromptPath(): string {
 }
 
 export function getMetaMeditationsDir(): string {
-  const dir = basename(__dirname);
-  // In production (dist/): package root is one level up
-  // In dev (src/cli/lib/): package root is three levels up
-  const packageRoot = dir === "dist"
-    ? join(__dirname, "..")
+  // prod: dist/cli/ → up two → package root
+  // dev:  src/cli/lib/ → up three → package root
+  const packageRoot = isProduction()
+    ? join(__dirname, "../..")
     : join(__dirname, "../../..");
   return join(packageRoot, "meditations");
 }
 
 export function getIlluminationServerPath(): string {
-  const dir = basename(__dirname);
-  if (dir === "dist") {
+  if (isProduction()) {
+    // prod: dist/cli/ → dist/cli/mcp/illumination-server.js
     return join(__dirname, "mcp", "illumination-server.js");
   } else {
+    // dev: src/cli/lib/ → src/cli/mcp/illumination-server.ts
     return join(__dirname, "..", "mcp", "illumination-server.ts");
   }
 }

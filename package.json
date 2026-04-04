@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Agentic loop runner CLI for AI-assisted project development",
   "bin": {
-    "ralph": "./dist/index.js"
+    "ralph": "./dist/cli/index.js"
   },
   "scripts": {
     "build": "tsup",
