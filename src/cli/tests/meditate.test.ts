@@ -367,3 +367,49 @@ describe("meditateStop with live session", () => {
     killSpy.mockRestore();
   });
 });
+
+describe("meditateStop stale artifact cleanup", () => {
+  it("removes stale .mcp.ralph-*.json files even when no sentinel exists", async () => {
+    const staleConfig = join(tmpDir, ".mcp.ralph-99999.json");
+    writeFileSync(staleConfig, "{}");
+
+    const killSpy = vi.spyOn(process, "kill").mockReturnValue(true as any);
+    await meditateStop(tmpDir);
+    killSpy.mockRestore();
+
+    expect(existsSync(staleConfig)).toBe(false);
+  });
+
+  it("removes stale PID file when PID is dead", async () => {
+    const sentinel: MeditationSentinel = { every: 5, cronId: "ralph-meditate-stale-test" };
+    writeSentinel(tmpDir, sentinel);
+    writePid(tmpDir, 999999999);
+
+    const killSpy = vi.spyOn(process, "kill").mockImplementation((pid, sig) => {
+      if (sig === 0) throw Object.assign(new Error(), { code: "ESRCH" });
+      return true as any;
+    });
+
+    await meditateStop(tmpDir);
+    killSpy.mockRestore();
+
+    expect(existsSync(join(tmpDir, ".meditate.pid"))).toBe(false);
+    expect(existsSync(join(tmpDir, ".meditate.json"))).toBe(false);
+  });
+
+  it("removes orphaned .mcp.ralph-*.json files when PID is dead", async () => {
+    writePid(tmpDir, 999999999);
+    const staleConfig = join(tmpDir, ".mcp.ralph-999999999.json");
+    writeFileSync(staleConfig, "{}");
+
+    const killSpy = vi.spyOn(process, "kill").mockImplementation((pid, sig) => {
+      if (sig === 0) throw Object.assign(new Error(), { code: "ESRCH" });
+      return true as any;
+    });
+
+    await meditateStop(tmpDir);
+    killSpy.mockRestore();
+
+    expect(existsSync(staleConfig)).toBe(false);
+  });
+});

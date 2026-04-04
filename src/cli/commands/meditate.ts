@@ -264,21 +264,43 @@ async function runMeditationSession(absPath: string): Promise<void> {
 
 export async function meditateStop(projectFolder: string): Promise<void> {
   const absPath = resolve(projectFolder);
-  const sentinel = readSentinel(absPath);
-  if (!sentinel) {
-    console.log("No active meditation schedule found.");
-    return;
-  }
-  removeCronEntry(sentinel.cronId);
-  removeSentinel(absPath);
 
+  // 1. Remove cron entry and sentinel
+  const sentinel = readSentinel(absPath);
+  if (sentinel) {
+    removeCronEntry(sentinel.cronId);
+    removeSentinel(absPath);
+  }
+
+  // 2. Send SIGTERM to running session if alive
   const pid = readPid(absPath);
   if (pid !== null && isPidAlive(pid)) {
     process.kill(pid, "SIGTERM");
+    console.log(`Sent SIGTERM to meditation session (PID ${pid}).`);
+  }
+
+  // 3. Remove PID file regardless
+  if (pid !== null) {
     removePid(absPath);
-    console.log(`Removed cron schedule. Sent SIGTERM to session (PID ${pid}).`);
+  }
+
+  // 4. Clean up orphaned MCP config files
+  const { readdirSync } = await import("fs");
+  try {
+    const files = readdirSync(absPath);
+    for (const f of files) {
+      if (/^\.mcp\.ralph-\d+\.json$/.test(f)) {
+        cleanupMcpConfig(join(absPath, f));
+      }
+    }
+  } catch {
+    // folder may not exist or be readable — ignore
+  }
+
+  if (sentinel || pid !== null) {
+    console.log("Meditation stopped.");
   } else {
-    console.log(`Removed cron schedule. No active session.`);
+    console.log("No active meditation schedule or session found.");
   }
 }
 
@@ -310,26 +332,6 @@ export async function meditateStatus(projectFolder: string): Promise<void> {
   } else {
     console.log(`Session:  idle`);
   }
-}
-
-export async function meditateKill(projectFolder: string): Promise<void> {
-  const absPath = resolve(projectFolder);
-  const pid = readPid(absPath);
-  if (pid === null) {
-    console.log("No active meditation session found.");
-    return;
-  }
-  if (!isPidAlive(pid)) {
-    console.log(`PID ${pid} is not running. Cleaning up stale lock file.`);
-    removePid(absPath);
-    return;
-  }
-  process.kill(pid, "SIGTERM");
-  removePid(absPath);
-  console.log(
-    `Sent SIGTERM to meditation session (PID ${pid}). ` +
-    `Cron schedule not removed — run \`ralph meditate stop <folder>\` to fully stop.`
-  );
 }
 
 export async function meditateCommand(
