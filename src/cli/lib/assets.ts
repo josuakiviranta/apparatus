@@ -30,3 +30,12 @@ export function getKickoffPromptPath(): string {
 export function getMeditationPromptPath(): string {
   return getAssetPath(join("prompts", "PROMPT_meditation.md"));
 }
+
+export function getIlluminationServerPath(): string {
+  const dir = basename(__dirname);
+  if (dir === "dist") {
+    return join(__dirname, "mcp", "illumination-server.js");
+  } else {
+    return join(__dirname, "..", "mcp", "illumination-server.ts");
+  }
+}

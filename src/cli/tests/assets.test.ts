@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getAssetPath, getLoopShPath, getPromptPath, getKickoffPromptPath, getMeditationPromptPath } from "../lib/assets";
+import { getAssetPath, getLoopShPath, getPromptPath, getKickoffPromptPath, getMeditationPromptPath, getIlluminationServerPath } from "../lib/assets";
 
 describe("assets", () => {
   it("getLoopShPath returns a path ending in loop.sh", () => {
@@ -25,6 +25,11 @@ describe("assets", () => {
   it("getMeditationPromptPath returns a path ending in PROMPT_meditation.md", () => {
     const p = getMeditationPromptPath();
     expect(p).toMatch(/PROMPT_meditation\.md$/);
+  });
+
+  it("getIlluminationServerPath returns a path ending in illumination-server.ts or .js", () => {
+    const p = getIlluminationServerPath();
+    expect(p).toMatch(/illumination-server\.(ts|js)$/);
   });
 
   it("getAssetPath resolves relative to this file's directory", () => {

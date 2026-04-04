@@ -1,7 +1,7 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, rmSync } from "fs";
 import { join, resolve, basename } from "path";
 import { spawnSync, spawn } from "child_process";
-import { getMeditationPromptPath } from "../lib/assets";
+import { getMeditationPromptPath, getIlluminationServerPath } from "../lib/assets";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -148,23 +148,48 @@ function removeCronEntry(id: string): void {
   writeCurrentCrontab(updated);
 }
 
+// ─── MCP config management ────────────────────────────────────────────────────
+
+function isDevMode(): boolean {
+  return basename(__dirname) !== "dist";
+}
+
+export function writeMcpConfig(projectRoot: string): string {
+  const configPath = join(projectRoot, `.mcp.ralph-${process.pid}.json`);
+  const serverPath = getIlluminationServerPath();
+  const command = isDevMode() ? "tsx" : "node";
+  const config = {
+    mcpServers: {
+      illumination: {
+        type: "stdio",
+        command,
+        args: [serverPath, projectRoot],
+      },
+    },
+  };
+  writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
+  return configPath;
+}
+
+export function cleanupMcpConfig(configPath: string): void {
+  rmSync(configPath, { force: true });
+}
+
 // ─── Session runner ───────────────────────────────────────────────────────────
 
-export function buildMeditationArgs(absPath: string, promptText: string): string[] {
-  // Claude Code resolves write targets to absolute paths before pattern matching.
-  // Relative patterns like "meditations/illuminations/**" are never matched.
-  // Use the double-slash prefix format the docs specify for absolute paths:
-  // Write(//Users/foo/bar/**) → allows writes to /Users/foo/bar/**
-  const illuminationsAbs = resolve(join(absPath, "meditations", "illuminations"));
-  const writePattern = `Write(//${illuminationsAbs.slice(1)}/**)`;
+export function buildMeditationArgs(
+  absPath: string,
+  promptText: string,
+  mcpConfigPath: string
+): string[] {
   return [
     "--print",
     "--output-format", "stream-json",
     "--permission-mode", "dontAsk",
     "--allowedTools", "Read",
     "--allowedTools", "Glob",
-    "--allowedTools", writePattern,
-    "--disallowedTools", "ToolSearch",
+    "--allowedTools", "mcp__illumination__write_illumination",
+    "--mcp-config", mcpConfigPath,
     "--add-dir", absPath,
     "-p", promptText,
   ];
@@ -174,6 +199,7 @@ async function runMeditationSession(absPath: string): Promise<void> {
   writePid(absPath, process.pid);
 
   const prompt = readFileSync(getMeditationPromptPath(), "utf8");
+  const mcpConfigPath = writeMcpConfig(absPath);
 
   const border = "\u2501".repeat(40);
   console.log(border);
@@ -183,7 +209,7 @@ async function runMeditationSession(absPath: string): Promise<void> {
   console.log(border);
   console.log();
 
-  const args = buildMeditationArgs(absPath, prompt);
+  const args = buildMeditationArgs(absPath, prompt, mcpConfigPath);
 
   const child = spawn("claude", args, {
     cwd: absPath,
@@ -194,6 +220,7 @@ async function runMeditationSession(absPath: string): Promise<void> {
   const cleanup = () => {
     child.kill("SIGTERM");
     removePid(absPath);
+    cleanupMcpConfig(mcpConfigPath);
   };
   process.once("SIGTERM", cleanup);
   process.once("SIGINT", cleanup);
@@ -220,7 +247,10 @@ async function runMeditationSession(absPath: string): Promise<void> {
 
   child.stderr.on("data", (chunk: Buffer) => process.stderr.write(chunk));
 
-  await new Promise<void>((res) => child.on("close", res));
+  await new Promise<void>((res) => child.on("close", () => {
+    try { cleanupMcpConfig(mcpConfigPath); } catch {}
+    res();
+  }));
 
   process.off("SIGTERM", cleanup);
   process.off("SIGINT", cleanup);

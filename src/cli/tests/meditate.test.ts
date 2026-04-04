@@ -20,6 +20,8 @@ import {
   ensureMeditationDirs,
   appendMeditateGitignore,
   buildMeditationArgs,
+  writeMcpConfig,
+  cleanupMcpConfig,
   MeditationSentinel,
 } from "../commands/meditate";
 
@@ -216,12 +218,41 @@ describe("isPidAlive", () => {
   });
 });
 
+describe("writeMcpConfig", () => {
+  it("writes a .mcp.ralph-<pid>.json file in the project folder", () => {
+    const configPath = writeMcpConfig(tmpDir);
+    expect(existsSync(configPath)).toBe(true);
+    expect(configPath).toMatch(/\.mcp\.ralph-\d+\.json$/);
+  });
+
+  it("config JSON contains illumination mcpServer entry with correct projectRoot", () => {
+    const configPath = writeMcpConfig(tmpDir);
+    const config = JSON.parse(readFileSync(configPath, "utf8"));
+    expect(config.mcpServers.illumination).toBeDefined();
+    const args: string[] = config.mcpServers.illumination.args;
+    expect(args[args.length - 1]).toBe(tmpDir);
+  });
+});
+
+describe("cleanupMcpConfig", () => {
+  it("removes the config file if it exists", () => {
+    const configPath = writeMcpConfig(tmpDir);
+    cleanupMcpConfig(configPath);
+    expect(existsSync(configPath)).toBe(false);
+  });
+
+  it("does not throw if the file does not exist", () => {
+    expect(() => cleanupMcpConfig(join(tmpDir, "nonexistent.json"))).not.toThrow();
+  });
+});
+
 describe("buildMeditationArgs", () => {
   const absPath = "/fake/project";
   const prompt = "test prompt";
+  const mcpConfigPath = "/fake/project/.mcp.ralph-12345.json";
 
   it("includes Read and Glob in allowedTools", () => {
-    const args = buildMeditationArgs(absPath, prompt);
+    const args = buildMeditationArgs(absPath, prompt, mcpConfigPath);
     const allowed = args
       .map((a, i) => (args[i - 1] === "--allowedTools" ? a : null))
       .filter(Boolean);
@@ -229,38 +260,47 @@ describe("buildMeditationArgs", () => {
     expect(allowed).toContain("Glob");
   });
 
-  it("allows Write to illuminations using absolute double-slash path format", () => {
-    const args = buildMeditationArgs(absPath, prompt);
+  it("allows the MCP illumination tool", () => {
+    const args = buildMeditationArgs(absPath, prompt, mcpConfigPath);
     const allowed = args
       .map((a, i) => (args[i - 1] === "--allowedTools" ? a : null))
       .filter(Boolean);
-    const writePerm = allowed.find((a) => a?.startsWith("Write("));
-    // Claude Code requires // prefix for absolute paths in allowedTools
-    expect(writePerm).toBe("Write(//fake/project/meditations/illuminations/**)");
+    expect(allowed).toContain("mcp__illumination__write_illumination");
   });
 
-  it("disallows ToolSearch", () => {
-    const args = buildMeditationArgs(absPath, prompt);
-    const disallowed = args
-      .map((a, i) => (args[i - 1] === "--disallowedTools" ? a : null))
+  it("does not allow Write tool", () => {
+    const args = buildMeditationArgs(absPath, prompt, mcpConfigPath);
+    const allowed = args
+      .map((a, i) => (args[i - 1] === "--allowedTools" ? a : null))
       .filter(Boolean);
-    expect(disallowed).toContain("ToolSearch");
+    expect(allowed.some((a) => a?.startsWith("Write"))).toBe(false);
+  });
+
+  it("does not disallow ToolSearch explicitly (not in allowedTools is sufficient)", () => {
+    const args = buildMeditationArgs(absPath, prompt, mcpConfigPath);
+    expect(args).not.toContain("--disallowedTools");
+  });
+
+  it("passes --mcp-config with the config path", () => {
+    const args = buildMeditationArgs(absPath, prompt, mcpConfigPath);
+    const idx = args.indexOf("--mcp-config");
+    expect(args[idx + 1]).toBe(mcpConfigPath);
   });
 
   it("sets permission-mode to dontAsk", () => {
-    const args = buildMeditationArgs(absPath, prompt);
+    const args = buildMeditationArgs(absPath, prompt, mcpConfigPath);
     const modeIdx = args.indexOf("--permission-mode");
     expect(args[modeIdx + 1]).toBe("dontAsk");
   });
 
   it("sets --add-dir to absPath", () => {
-    const args = buildMeditationArgs(absPath, prompt);
+    const args = buildMeditationArgs(absPath, prompt, mcpConfigPath);
     const dirIdx = args.indexOf("--add-dir");
     expect(args[dirIdx + 1]).toBe(absPath);
   });
 
   it("passes prompt text via -p flag", () => {
-    const args = buildMeditationArgs(absPath, prompt);
+    const args = buildMeditationArgs(absPath, prompt, mcpConfigPath);
     const pIdx = args.indexOf("-p");
     expect(args[pIdx + 1]).toBe(prompt);
   });
