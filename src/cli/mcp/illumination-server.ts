@@ -1,5 +1,6 @@
-import { mkdirSync, writeFileSync, statSync } from "fs";
-import { join } from "path";
+import { mkdirSync, writeFileSync, statSync, readFileSync, readdirSync } from "fs";
+import { join, resolve, isAbsolute } from "path";
+import fg from "fast-glob";
 
 // ─── Exported pure helpers (for testing) ──────────────────────────────────────
 
@@ -24,6 +25,67 @@ export function writeIllumination(
   const filePath = join(dir, filename);
   writeFileSync(filePath, content, "utf8");
   return filePath;
+}
+
+export function assertWithinRoot(inputPath: string, projectRoot: string): void {
+  const resolvedPath = resolve(inputPath);
+  const resolvedRoot = resolve(projectRoot);
+  if (!resolvedPath.startsWith(resolvedRoot + "/") && resolvedPath !== resolvedRoot) {
+    throw new Error("Path is outside the project folder");
+  }
+}
+
+export function readFile(projectRoot: string, filePath: string): string {
+  const resolvedPath = isAbsolute(filePath)
+    ? filePath
+    : resolve(projectRoot, filePath);
+  assertWithinRoot(resolvedPath, projectRoot);
+  return readFileSync(resolvedPath, "utf8");
+}
+
+export function validateGlobPattern(pattern: string): string | null {
+  if (pattern.startsWith("/")) return "Pattern must be relative (cannot start with /)";
+  if (pattern.split("/").some((p) => p === "..")) return "Pattern must not contain .. segments";
+  return null;
+}
+
+export async function globFiles(projectRoot: string, pattern: string): Promise<string> {
+  const err = validateGlobPattern(pattern);
+  if (err) throw new Error(err);
+  const matches = await fg(pattern, { cwd: projectRoot, dot: true });
+  if (matches.length === 0) return `No files matched pattern: ${pattern}`;
+  return matches.join("\n");
+}
+
+const SKIP_DIRS = new Set([
+  ".git", "node_modules", "dist", "build", "coverage",
+  ".next", ".turbo", "__pycache__", ".cache",
+]);
+
+export function projectTree(projectRoot: string, subPath?: string): string {
+  const root = subPath
+    ? (isAbsolute(subPath) ? subPath : resolve(projectRoot, subPath))
+    : projectRoot;
+  assertWithinRoot(root, projectRoot);
+
+  function walk(dir: string, prefix: string): string {
+    const entries = readdirSync(dir, { withFileTypes: true })
+      .sort((a, b) => a.name.localeCompare(b.name));
+    let out = "";
+    for (const entry of entries) {
+      if (entry.isDirectory() && SKIP_DIRS.has(entry.name)) continue;
+      if (entry.isDirectory()) {
+        out += `${prefix}${entry.name}/\n`;
+        out += walk(join(dir, entry.name), prefix + "  ");
+      } else {
+        out += `${prefix}${entry.name}\n`;
+      }
+    }
+    return out;
+  }
+
+  const result = walk(root, "").trimEnd();
+  return result || "Directory is empty";
 }
 
 // ─── Server bootstrap ─────────────────────────────────────────────────────────
@@ -80,6 +142,51 @@ if (!isTestEnv) {
           return {
             content: [{ type: "text" as const, text: `Error: ${msg}` }],
           };
+        }
+      },
+    );
+
+    server.tool(
+      "read_file",
+      "Read a file within the project folder. Accepts a path relative to project root or an absolute path inside it.",
+      { path: z.string() },
+      async ({ path: filePath }: { path: string }) => {
+        try {
+          const content = readFile(projectRoot, filePath);
+          return { content: [{ type: "text" as const, text: content }] };
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          return { content: [{ type: "text" as const, text: `Error: ${msg}` }] };
+        }
+      },
+    );
+
+    server.tool(
+      "glob_files",
+      "Find files matching a glob pattern within the project folder. Pattern must be relative to project root.",
+      { pattern: z.string() },
+      async ({ pattern }: { pattern: string }) => {
+        try {
+          const result = await globFiles(projectRoot, pattern);
+          return { content: [{ type: "text" as const, text: result }] };
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          return { content: [{ type: "text" as const, text: `Error: ${msg}` }] };
+        }
+      },
+    );
+
+    server.tool(
+      "project_tree",
+      "Show the full recursive file and folder tree of the project or a subdirectory. Skips noise folders (node_modules, dist, .git, etc.).",
+      { path: z.string().optional() },
+      async ({ path: subPath }: { path?: string }) => {
+        try {
+          const result = projectTree(projectRoot, subPath);
+          return { content: [{ type: "text" as const, text: result }] };
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          return { content: [{ type: "text" as const, text: `Error: ${msg}` }] };
         }
       },
     );

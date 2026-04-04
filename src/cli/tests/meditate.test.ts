@@ -258,13 +258,23 @@ describe("buildMeditationArgs", () => {
   const prompt = "test prompt";
   const mcpConfigPath = "/fake/project/.mcp.ralph-12345.json";
 
-  it("includes Read and Glob in allowedTools", () => {
+  it("does not include native Read or Glob in allowedTools", () => {
     const args = buildMeditationArgs(absPath, prompt, mcpConfigPath);
     const allowed = args
       .map((a, i) => (args[i - 1] === "--allowedTools" ? a : null))
       .filter(Boolean);
-    expect(allowed).toContain("Read");
-    expect(allowed).toContain("Glob");
+    expect(allowed).not.toContain("Read");
+    expect(allowed).not.toContain("Glob");
+  });
+
+  it("allows the three MCP read/glob/tree tools", () => {
+    const args = buildMeditationArgs(absPath, prompt, mcpConfigPath);
+    const allowed = args
+      .map((a, i) => (args[i - 1] === "--allowedTools" ? a : null))
+      .filter(Boolean);
+    expect(allowed).toContain("mcp__illumination__read_file");
+    expect(allowed).toContain("mcp__illumination__glob_files");
+    expect(allowed).toContain("mcp__illumination__project_tree");
   });
 
   it("allows the MCP illumination tool", () => {

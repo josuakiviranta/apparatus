@@ -4,3 +4,5 @@ docs/superpowers/plans/
 .meditate.json
 .meditate.log
 .meditate.pid
+.mcp.ralph-*.json
+node-compile-cache/
