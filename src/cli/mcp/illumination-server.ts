@@ -60,17 +60,15 @@ if (!isTestEnv) {
   ]).then(async ([{ McpServer }, { StdioServerTransport }, z]) => {
     const server = new McpServer({ name: "illumination", version: "1.0.0" });
 
-    server.registerTool(
+    server.tool(
       "write_illumination",
+      "Write a meditation illumination file to meditations/illuminations/. " +
+        "Use filename format: YYYY-MM-DDTHHMM-kebab-slug.md (e.g. 2026-04-04T1430-my-insight.md).",
       {
-        description:
-          "Write a meditation illumination file to meditations/illuminations/. " +
-          "Use filename format: YYYY-MM-DDTHHMM-kebab-slug.md (e.g. 2026-04-04T1430-my-insight.md).",
-        inputSchema: {
-          filename: z.string(),
-          content: z.string(),
-        },
+        filename: z.string(),
+        content: z.string(),
       },
+      // @ts-expect-error — SDK overloads cause deep type instantiation with dynamically-imported zod
       async ({ filename, content }: { filename: string; content: string }) => {
         try {
           const filePath = writeIllumination(projectRoot, filename, content);
