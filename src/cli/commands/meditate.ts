@@ -1,5 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, rmSync } from "fs";
-import { join, resolve, basename } from "path";
+import { join, resolve, basename, dirname } from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 import { spawnSync, spawn } from "child_process";
 import { getMeditationPromptPath, getIlluminationServerPath, getMetaMeditationsDir } from "../lib/assets";
 
@@ -52,7 +55,7 @@ export function appendMeditateGitignore(projectFolder: string): void {
 // ─── MCP config management ────────────────────────────────────────────────────
 
 function isDevMode(): boolean {
-  return basename(__dirname) !== "dist";
+  return basename(__dirname) !== "cli" && basename(__dirname) !== "dist";
 }
 
 export function writeMcpConfig(projectRoot: string): string {
