@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -22,6 +22,7 @@ import {
   buildMeditationArgs,
   writeMcpConfig,
   cleanupMcpConfig,
+  meditateStop,
   MeditationSentinel,
 } from "../commands/meditate";
 
@@ -309,5 +310,39 @@ describe("buildMeditationArgs", () => {
     const args = buildMeditationArgs(absPath, prompt, mcpConfigPath);
     const pIdx = args.indexOf("-p");
     expect(args[pIdx + 1]).toBe(prompt);
+  });
+});
+
+describe("meditateStop with live session", () => {
+  it("sends SIGTERM, removes PID file, and removes sentinel when process is alive", async () => {
+    const sentinel: MeditationSentinel = { every: 5, cronId: "ralph-meditate-stop-test" };
+    writeSentinel(tmpDir, sentinel);
+    writePid(tmpDir, process.pid);
+
+    // Mock process.kill to prevent real signals and allow isPidAlive check to pass
+    const killSpy = vi.spyOn(process, "kill").mockReturnValue(true as any);
+
+    await meditateStop(tmpDir);
+
+    expect(killSpy).toHaveBeenCalledWith(process.pid, "SIGTERM");
+    expect(existsSync(join(tmpDir, ".meditate.pid"))).toBe(false);
+    expect(existsSync(join(tmpDir, ".meditate.json"))).toBe(false);
+
+    killSpy.mockRestore();
+  });
+
+  it("does not call process.kill when no PID file exists", async () => {
+    const sentinel: MeditationSentinel = { every: 5, cronId: "ralph-meditate-stop-test" };
+    writeSentinel(tmpDir, sentinel);
+    // no PID file written
+
+    const killSpy = vi.spyOn(process, "kill").mockReturnValue(true as any);
+
+    await meditateStop(tmpDir);
+
+    expect(killSpy).not.toHaveBeenCalledWith(expect.anything(), "SIGTERM");
+    expect(existsSync(join(tmpDir, ".meditate.json"))).toBe(false);
+
+    killSpy.mockRestore();
   });
 });

@@ -268,23 +268,42 @@ export async function meditateStop(projectFolder: string): Promise<void> {
   }
   removeCronEntry(sentinel.cronId);
   removeSentinel(absPath);
-  console.log(`Meditation schedule stopped for ${absPath}`);
+
+  const pid = readPid(absPath);
+  if (pid !== null && isPidAlive(pid)) {
+    process.kill(pid, "SIGTERM");
+    removePid(absPath);
+    console.log(`Removed cron schedule. Sent SIGTERM to session (PID ${pid}).`);
+  } else {
+    console.log(`Removed cron schedule. No active session.`);
+  }
 }
 
 export async function meditateStatus(projectFolder: string): Promise<void> {
   const absPath = resolve(projectFolder);
   const sentinel = readSentinel(absPath);
-  if (!sentinel) {
-    console.log("No active meditation schedule.");
+  const pid = readPid(absPath);
+  const sessionRunning = pid !== null && isPidAlive(pid);
+
+  if (!sentinel && !sessionRunning) {
+    console.log("No active meditation schedule or session.");
     return;
   }
-  console.log(`Project:  ${absPath}`);
-  console.log(`Interval: every ${sentinel.every} minutes`);
-  console.log(`Until:    ${sentinel.until ?? "no end time set"}`);
-  console.log(`Cron ID:  ${sentinel.cronId}`);
-  const pid = readPid(absPath);
-  if (pid !== null && isPidAlive(pid)) {
-    console.log(`Session:  running (PID ${pid})`);
+
+  if (sentinel) {
+    console.log(`Project:  ${absPath}`);
+    console.log(`Interval: every ${sentinel.every} minutes`);
+    console.log(`Until:    ${sentinel.until ?? "no end time set"}`);
+    console.log(`Cron ID:  ${sentinel.cronId}`);
+  }
+
+  if (sessionRunning) {
+    if (!sentinel) {
+      console.log(`Project:  ${absPath}`);
+      console.log(`Session:  running (PID ${pid}) — manual one-shot, no cron schedule`);
+    } else {
+      console.log(`Session:  running (PID ${pid})`);
+    }
   } else {
     console.log(`Session:  idle`);
   }
@@ -304,7 +323,10 @@ export async function meditateKill(projectFolder: string): Promise<void> {
   }
   process.kill(pid, "SIGTERM");
   removePid(absPath);
-  console.log(`Sent SIGTERM to meditation session (PID ${pid}).`);
+  console.log(
+    `Sent SIGTERM to meditation session (PID ${pid}). ` +
+    `Cron schedule not removed — run \`ralph meditate stop <folder>\` to fully stop.`
+  );
 }
 
 export async function meditateCommand(
