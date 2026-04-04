@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, existsSync, readFileSync, realpathSync, mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { validateFilename, writeIllumination, assertWithinRoot, readFile, validateGlobPattern, globFiles, projectTree } from "../mcp/illumination-server";
+import { validateFilename, writeIllumination, assertWithinRoot, readFile, validateGlobPattern, globFiles, projectTree, listMetaMeditations, readMetaMeditation } from "../mcp/illumination-server";
 
 let tmpDir: string;
 
@@ -231,5 +231,57 @@ describe("projectTree", () => {
 
   it("throws for a subPath outside project root", () => {
     expect(() => projectTree(tmpDir, "../outside")).toThrow("outside the project folder");
+  });
+});
+
+describe("listMetaMeditations", () => {
+  it("returns newline-separated sorted filenames when dir has .md files", () => {
+    writeFileSync(join(tmpDir, "b-lens.md"), "content b");
+    writeFileSync(join(tmpDir, "a-lens.md"), "content a");
+    const result = listMetaMeditations(tmpDir);
+    expect(result).toBe("a-lens.md\nb-lens.md");
+  });
+
+  it("only lists .md files, ignoring other file types", () => {
+    writeFileSync(join(tmpDir, "a-lens.md"), "");
+    writeFileSync(join(tmpDir, "config.json"), "");
+    const result = listMetaMeditations(tmpDir);
+    expect(result).toContain("a-lens.md");
+    expect(result).not.toContain("config.json");
+  });
+
+  it("returns explanatory message with instructions when dir is empty", () => {
+    const result = listMetaMeditations(tmpDir);
+    expect(result).toContain("No meta-meditations found");
+    expect(result).toContain("meditations/");
+  });
+
+  it("returns explanatory message with instructions when dir does not exist", () => {
+    const result = listMetaMeditations(join(tmpDir, "nonexistent"));
+    expect(result).toContain("No meta-meditations found");
+    expect(result).toContain("meditations/");
+  });
+});
+
+describe("readMetaMeditation", () => {
+  it("returns file content for a valid existing filename", () => {
+    writeFileSync(join(tmpDir, "my-lens.md"), "# My Lens\ncontent here");
+    expect(readMetaMeditation(tmpDir, "my-lens.md")).toBe("# My Lens\ncontent here");
+  });
+
+  it("returns error for path traversal attempt (../secrets.md)", () => {
+    const result = readMetaMeditation(tmpDir, "../secrets.md");
+    expect(result).toMatch(/^Error:/);
+  });
+
+  it("returns error for filename without .md extension", () => {
+    const result = readMetaMeditation(tmpDir, "lens.txt");
+    expect(result).toMatch(/^Error:/);
+  });
+
+  it("returns error when file does not exist", () => {
+    const result = readMetaMeditation(tmpDir, "nonexistent.md");
+    expect(result).toMatch(/^Error:/);
+    expect(result).toContain("nonexistent.md");
   });
 });

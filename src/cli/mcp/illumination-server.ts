@@ -57,6 +57,35 @@ export async function globFiles(projectRoot: string, pattern: string): Promise<s
   return matches.join("\n");
 }
 
+const NO_META_MEDITATIONS_MESSAGE =
+  "No meta-meditations found. You can still proceed — reflect on the project code " +
+  "directly and write your illumination using write_illumination.\n\n" +
+  "To add meta-meditations: create .md files in the meditations/ folder of your " +
+  "ralph-cli installation (e.g. ~/.npm-global/lib/node_modules/ralph-cli/meditations/). " +
+  "Each file is a lens the agent will use to reflect on your project.";
+
+export function listMetaMeditations(meditationsDir: string): string {
+  try {
+    const files = readdirSync(meditationsDir)
+      .filter((f) => f.endsWith(".md"))
+      .sort();
+    if (files.length === 0) return NO_META_MEDITATIONS_MESSAGE;
+    return files.join("\n");
+  } catch {
+    return NO_META_MEDITATIONS_MESSAGE;
+  }
+}
+
+export function readMetaMeditation(meditationsDir: string, filename: string): string {
+  const err = validateFilename(filename);
+  if (err) return `Error: ${err}`;
+  try {
+    return readFileSync(join(meditationsDir, filename), "utf8");
+  } catch {
+    return `Error: file not found: ${filename}`;
+  }
+}
+
 const SKIP_DIRS = new Set([
   ".git", "node_modules", "dist", "build", "coverage",
   ".next", ".turbo", "__pycache__", ".cache",
@@ -95,6 +124,7 @@ const isTestEnv =
 
 if (!isTestEnv) {
   const projectRoot = process.argv[2];
+  const meditationsDir = process.argv[3] ?? "";
 
   if (!projectRoot) {
     console.error("Error: project root must be passed as first argument");
@@ -188,6 +218,30 @@ if (!isTestEnv) {
           const msg = err instanceof Error ? err.message : String(err);
           return { content: [{ type: "text" as const, text: `Error: ${msg}` }] };
         }
+      },
+    );
+
+    server.tool(
+      "list_meta_meditations",
+      "List available meta-meditation lens files from the ralph-cli installation. " +
+        "Call this first to see which lenses are available before reading any.",
+      {},
+      // @ts-expect-error — SDK overloads cause deep type instantiation with dynamically-imported zod
+      async () => {
+        const result = listMetaMeditations(meditationsDir);
+        return { content: [{ type: "text" as const, text: result }] };
+      },
+    );
+
+    server.tool(
+      "read_meta_meditation",
+      "Read a specific meta-meditation lens file by filename. " +
+        "Use list_meta_meditations first to get available filenames.",
+      { filename: z.string() },
+      // @ts-expect-error — SDK overloads cause deep type instantiation with dynamically-imported zod
+      async ({ filename }: { filename: string }) => {
+        const result = readMetaMeditation(meditationsDir, filename);
+        return { content: [{ type: "text" as const, text: result }] };
       },
     );
 

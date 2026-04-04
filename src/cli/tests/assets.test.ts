@@ -1,5 +1,6 @@
+import { existsSync } from "fs";
 import { describe, it, expect } from "vitest";
-import { getAssetPath, getLoopShPath, getPromptPath, getKickoffPromptPath, getMeditationPromptPath, getIlluminationServerPath } from "../lib/assets";
+import { getAssetPath, getLoopShPath, getPromptPath, getKickoffPromptPath, getMeditationPromptPath, getIlluminationServerPath, getMetaMeditationsDir } from "../lib/assets";
 
 describe("assets", () => {
   it("getLoopShPath returns a path ending in loop.sh", () => {
@@ -30,6 +31,16 @@ describe("assets", () => {
   it("getIlluminationServerPath returns a path ending in illumination-server.ts or .js", () => {
     const p = getIlluminationServerPath();
     expect(p).toMatch(/illumination-server\.(ts|js)$/);
+  });
+
+  it("getMetaMeditationsDir returns a path ending in meditations", () => {
+    const p = getMetaMeditationsDir();
+    expect(p).toMatch(/meditations$/);
+  });
+
+  it("getMetaMeditationsDir resolves to an existing directory in the current repo", () => {
+    const p = getMetaMeditationsDir();
+    expect(existsSync(p)).toBe(true);
   });
 
   it("getAssetPath resolves relative to this file's directory", () => {

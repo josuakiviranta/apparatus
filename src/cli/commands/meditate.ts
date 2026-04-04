@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, rmSync } from "fs";
 import { join, resolve, basename } from "path";
 import { spawnSync, spawn } from "child_process";
-import { getMeditationPromptPath, getIlluminationServerPath } from "../lib/assets";
+import { getMeditationPromptPath, getIlluminationServerPath, getMetaMeditationsDir } from "../lib/assets";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -163,7 +163,7 @@ export function writeMcpConfig(projectRoot: string): string {
       illumination: {
         type: "stdio",
         command,
-        args: [serverPath, projectRoot],
+        args: [serverPath, projectRoot, getMetaMeditationsDir()],
       },
     },
   };
@@ -190,6 +190,8 @@ export function buildMeditationArgs(
     "--allowedTools", "mcp__illumination__glob_files",
     "--allowedTools", "mcp__illumination__project_tree",
     "--allowedTools", "mcp__illumination__write_illumination",
+    "--allowedTools", "mcp__illumination__list_meta_meditations",
+    "--allowedTools", "mcp__illumination__read_meta_meditation",
     "--mcp-config", mcpConfigPath,
     "--add-dir", absPath,
     "-p", promptText,

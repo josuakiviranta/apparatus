@@ -31,6 +31,16 @@ export function getMeditationPromptPath(): string {
   return getAssetPath(join("prompts", "PROMPT_meditation.md"));
 }
 
+export function getMetaMeditationsDir(): string {
+  const dir = basename(__dirname);
+  // In production (dist/): package root is one level up
+  // In dev (src/cli/lib/): package root is three levels up
+  const packageRoot = dir === "dist"
+    ? join(__dirname, "..")
+    : join(__dirname, "../../..");
+  return join(packageRoot, "meditations");
+}
+
 export function getIlluminationServerPath(): string {
   const dir = basename(__dirname);
   if (dir === "dist") {

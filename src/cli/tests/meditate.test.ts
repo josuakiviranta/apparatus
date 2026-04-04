@@ -237,7 +237,8 @@ describe("writeMcpConfig", () => {
     const config = JSON.parse(readFileSync(configPath, "utf8"));
     expect(config.mcpServers.illumination).toBeDefined();
     const args: string[] = config.mcpServers.illumination.args;
-    expect(args[args.length - 1]).toBe(tmpDir);
+    expect(args[1]).toBe(tmpDir);           // projectRoot is second arg
+    expect(args[2]).toMatch(/meditations$/); // meditationsDir is third arg
   });
 });
 
@@ -320,6 +321,16 @@ describe("buildMeditationArgs", () => {
     const args = buildMeditationArgs(absPath, prompt, mcpConfigPath);
     const pIdx = args.indexOf("-p");
     expect(args[pIdx + 1]).toBe(prompt);
+  });
+
+  it("includes mcp__illumination__list_meta_meditations in allowedTools", () => {
+    const args = buildMeditationArgs(absPath, prompt, mcpConfigPath);
+    expect(args).toContain("mcp__illumination__list_meta_meditations");
+  });
+
+  it("includes mcp__illumination__read_meta_meditation in allowedTools", () => {
+    const args = buildMeditationArgs(absPath, prompt, mcpConfigPath);
+    expect(args).toContain("mcp__illumination__read_meta_meditation");
   });
 });
 
