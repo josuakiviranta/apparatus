@@ -1,17 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync } from "fs";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { mkdtempSync, rmSync, existsSync, readFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import {
-  cronId,
-  buildCronExpression,
-  isCleanInterval,
-  buildCronLine,
-  insertCronEntry,
-  deleteCronEntry,
-  readSentinel,
-  writeSentinel,
-  removeSentinel,
   pidPath,
   writePid,
   readPid,
@@ -22,84 +13,7 @@ import {
   buildMeditationArgs,
   writeMcpConfig,
   cleanupMcpConfig,
-  meditateStop,
-  MeditationSentinel,
 } from "../commands/meditate";
-
-describe("cronId", () => {
-  it("returns ralph-meditate-<basename>", () => {
-    expect(cronId("/home/user/my-project")).toBe("ralph-meditate-my-project");
-    expect(cronId("/projects/foo-bar")).toBe("ralph-meditate-foo-bar");
-  });
-});
-
-describe("buildCronExpression", () => {
-  it("returns */N * * * * for given minutes", () => {
-    expect(buildCronExpression(30)).toBe("*/30 * * * *");
-    expect(buildCronExpression(60)).toBe("*/60 * * * *");
-    expect(buildCronExpression(15)).toBe("*/15 * * * *");
-  });
-});
-
-describe("isCleanInterval", () => {
-  it("returns true for values that divide 60", () => {
-    for (const n of [1, 2, 3, 4, 5, 6, 10, 12, 15, 20, 30, 60]) {
-      expect(isCleanInterval(n), `${n} should be clean`).toBe(true);
-    }
-  });
-
-  it("returns false for values that do not divide 60", () => {
-    for (const n of [7, 11, 13, 17, 25, 45]) {
-      expect(isCleanInterval(n), `${n} should not be clean`).toBe(false);
-    }
-  });
-});
-
-describe("buildCronLine", () => {
-  it("includes the cron expression, ralph meditate command, and bash log redirect", () => {
-    const line = buildCronLine("/abs/project", 30);
-    expect(line).toContain("*/30 * * * *");
-    expect(line).toContain("ralph meditate '/abs/project'");
-    expect(line).toContain(".meditate.log");
-    expect(line).toContain("&>>");
-  });
-});
-
-describe("insertCronEntry", () => {
-  it("appends cron line and anchor to empty crontab", () => {
-    const result = insertCronEntry("", "*/30 * * * * ralph meditate /p >> /p/.meditate.log 2>&1", "# ralph-meditate-p");
-    expect(result).toContain("*/30 * * * *");
-    expect(result).toContain("# ralph-meditate-p");
-  });
-
-  it("appends to existing crontab with newline separator", () => {
-    const existing = "0 * * * * some-other-job\n";
-    const result = insertCronEntry(existing, "*/30 * * * * ralph meditate /p >> /p/.meditate.log 2>&1", "# ralph-meditate-p");
-    expect(result).toContain("some-other-job");
-    expect(result).toContain("# ralph-meditate-p");
-  });
-
-  it("is idempotent — does not insert twice if anchor already present", () => {
-    const existing = "*/30 * * * * ralph meditate /p >> /p/.meditate.log 2>&1\n# ralph-meditate-p\n";
-    const result = insertCronEntry(existing, "*/30 * * * * ralph meditate /p >> /p/.meditate.log 2>&1", "# ralph-meditate-p");
-    expect(result).toBe(existing);
-  });
-});
-
-describe("deleteCronEntry", () => {
-  it("removes cron line and anchor from crontab", () => {
-    const crontab = "0 * * * * other-job\n*/30 * * * * ralph meditate /p >> /p/.meditate.log 2>&1\n# ralph-meditate-p\n";
-    const result = deleteCronEntry(crontab, "# ralph-meditate-p");
-    expect(result).not.toContain("# ralph-meditate-p");
-    expect(result).not.toContain("ralph meditate /p");
-    expect(result).toContain("other-job");
-  });
-
-  it("returns crontab unchanged if anchor not found", () => {
-    const crontab = "0 * * * * other-job\n";
-    expect(deleteCronEntry(crontab, "# ralph-meditate-missing")).toBe(crontab);
-  });
-});
 
 let tmpDir: string;
 
@@ -109,41 +23,6 @@ beforeEach(() => {
 
 afterEach(() => {
   rmSync(tmpDir, { recursive: true, force: true });
-});
-
-describe("readSentinel", () => {
-  it("returns null when .meditate.json does not exist", () => {
-    expect(readSentinel(tmpDir)).toBeNull();
-  });
-
-  it("returns parsed sentinel when .meditate.json exists", () => {
-    const sentinel = { every: 30, cronId: "ralph-meditate-proj" };
-    writeFileSync(join(tmpDir, ".meditate.json"), JSON.stringify(sentinel));
-    expect(readSentinel(tmpDir)).toEqual(sentinel);
-  });
-});
-
-describe("writeSentinel / removeSentinel", () => {
-  it("writes and reads back a sentinel", () => {
-    const sentinel: MeditationSentinel = {
-      every: 60,
-      until: "2026-04-05T08:00:00",
-      cronId: "ralph-meditate-test",
-    };
-    writeSentinel(tmpDir, sentinel);
-    expect(existsSync(join(tmpDir, ".meditate.json"))).toBe(true);
-    expect(readSentinel(tmpDir)).toEqual(sentinel);
-  });
-
-  it("removeSentinel deletes the file if present", () => {
-    writeSentinel(tmpDir, { every: 30, cronId: "ralph-meditate-test" });
-    removeSentinel(tmpDir);
-    expect(existsSync(join(tmpDir, ".meditate.json"))).toBe(false);
-  });
-
-  it("removeSentinel is a no-op if file does not exist", () => {
-    expect(() => removeSentinel(tmpDir)).not.toThrow();
-  });
 });
 
 describe("ensureMeditationDirs", () => {
@@ -334,82 +213,3 @@ describe("buildMeditationArgs", () => {
   });
 });
 
-describe("meditateStop with live session", () => {
-  it("sends SIGTERM, removes PID file, and removes sentinel when process is alive", async () => {
-    const sentinel: MeditationSentinel = { every: 5, cronId: "ralph-meditate-stop-test" };
-    writeSentinel(tmpDir, sentinel);
-    writePid(tmpDir, process.pid);
-
-    // Mock process.kill to prevent real signals and allow isPidAlive check to pass
-    const killSpy = vi.spyOn(process, "kill").mockReturnValue(true as any);
-
-    await meditateStop(tmpDir);
-
-    expect(killSpy).toHaveBeenCalledWith(process.pid, "SIGTERM");
-    expect(existsSync(join(tmpDir, ".meditate.pid"))).toBe(false);
-    expect(existsSync(join(tmpDir, ".meditate.json"))).toBe(false);
-
-    killSpy.mockRestore();
-  });
-
-  it("does not call process.kill when no PID file exists", async () => {
-    const sentinel: MeditationSentinel = { every: 5, cronId: "ralph-meditate-stop-test" };
-    writeSentinel(tmpDir, sentinel);
-    // no PID file written
-
-    const killSpy = vi.spyOn(process, "kill").mockReturnValue(true as any);
-
-    await meditateStop(tmpDir);
-
-    expect(killSpy).not.toHaveBeenCalledWith(expect.anything(), "SIGTERM");
-    expect(existsSync(join(tmpDir, ".meditate.json"))).toBe(false);
-
-    killSpy.mockRestore();
-  });
-});
-
-describe("meditateStop stale artifact cleanup", () => {
-  it("removes stale .mcp.ralph-*.json files even when no sentinel exists", async () => {
-    const staleConfig = join(tmpDir, ".mcp.ralph-99999.json");
-    writeFileSync(staleConfig, "{}");
-
-    const killSpy = vi.spyOn(process, "kill").mockReturnValue(true as any);
-    await meditateStop(tmpDir);
-    killSpy.mockRestore();
-
-    expect(existsSync(staleConfig)).toBe(false);
-  });
-
-  it("removes stale PID file when PID is dead", async () => {
-    const sentinel: MeditationSentinel = { every: 5, cronId: "ralph-meditate-stale-test" };
-    writeSentinel(tmpDir, sentinel);
-    writePid(tmpDir, 999999999);
-
-    const killSpy = vi.spyOn(process, "kill").mockImplementation((pid, sig) => {
-      if (sig === 0) throw Object.assign(new Error(), { code: "ESRCH" });
-      return true as any;
-    });
-
-    await meditateStop(tmpDir);
-    killSpy.mockRestore();
-
-    expect(existsSync(join(tmpDir, ".meditate.pid"))).toBe(false);
-    expect(existsSync(join(tmpDir, ".meditate.json"))).toBe(false);
-  });
-
-  it("removes orphaned .mcp.ralph-*.json files when PID is dead", async () => {
-    writePid(tmpDir, 999999999);
-    const staleConfig = join(tmpDir, ".mcp.ralph-999999999.json");
-    writeFileSync(staleConfig, "{}");
-
-    const killSpy = vi.spyOn(process, "kill").mockImplementation((pid, sig) => {
-      if (sig === 0) throw Object.assign(new Error(), { code: "ESRCH" });
-      return true as any;
-    });
-
-    await meditateStop(tmpDir);
-    killSpy.mockRestore();
-
-    expect(existsSync(staleConfig)).toBe(false);
-  });
-});

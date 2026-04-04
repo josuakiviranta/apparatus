@@ -39,7 +39,7 @@ program
   .command("meditate <project-folder>")
   .description("Run a meditation cycle")
   .action(async (projectFolder: string) => {
-    await meditateCommand(projectFolder, {});
+    await meditateCommand(projectFolder);
   });
 
 program
