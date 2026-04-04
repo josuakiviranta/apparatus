@@ -113,7 +113,7 @@ export function ensureMeditationDirs(projectFolder: string): void {
 }
 
 export function appendMeditateGitignore(projectFolder: string): void {
-  const entries = [".meditate.json", ".meditate.log", ".meditate.pid"];
+  const entries = [".meditate.json", ".meditate.log", ".meditate.pid", ".mcp.ralph-*.json"];
   const gitignorePath = join(projectFolder, ".gitignore");
   const existing = existsSync(gitignorePath) ? readFileSync(gitignorePath, "utf8") : "";
   const lines = existing.split("\n");

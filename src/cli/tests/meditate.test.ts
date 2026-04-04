@@ -179,6 +179,12 @@ describe("appendMeditateGitignore", () => {
     const count = (content.match(/\.meditate\.json/g) ?? []).length;
     expect(count).toBe(1);
   });
+
+  it("adds .mcp.ralph-*.json to .gitignore", () => {
+    appendMeditateGitignore(tmpDir);
+    const content = readFileSync(join(tmpDir, ".gitignore"), "utf8");
+    expect(content).toContain(".mcp.ralph-*.json");
+  });
 });
 
 describe("pidPath", () => {
