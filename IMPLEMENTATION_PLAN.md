@@ -1,41 +1,39 @@
-# CLI Help Readability Implementation Plan
+# Ralph Heartbeat Daemon Implementation Plan
 
-> **Status:** All chunks COMPLETE (tag 0.0.10)
+> **Status: COMPLETE** — All 9 chunks implemented, 142 tests passing, tagged 0.0.11
 
-**Goal:** Make `ralph --help` show all commands and subcommands clearly, standardize to `ralph <command> <folder>` mental model, and remove dead/confusing command surface.
+**Goal:** Replace cron-based meditate scheduling with a persistent central daemon that ralph CLI owns and controls, with full observability via `ralph heartbeat` commands.
 
-**Architecture:** Three focused changes — rename meditate-add → meditate-create, harden meditateStop and remove meditateKill, then rewire index.ts to use flat Commander commands with the positional shorthand removed.
+**Architecture:** A long-running Node.js daemon at `~/.ralph/daemon.sock` manages all scheduled tasks. CLI communicates via JSON-lines over a Unix socket. Flat files in `~/.ralph/` store task registry (`tasks.json`) and per-run logs (`logs/<task-id>/<run-id>.log`). Tasks are dispatched by spawning `ralph <command> <args>` as a subprocess.
 
-**Tech Stack:** TypeScript, Commander.js, Vitest
-
-**Spec:** `docs/superpowers/specs/2026-04-04-cli-help-readability-design.md`
+**Tech Stack:** TypeScript, Node.js `net` (Unix sockets), `ink` + `react` (TUI), vitest
 
 ---
 
-## Completed Chunks
+## Implementation Summary
 
-### Chunk 1: Rename meditate-add → meditate-create ✅
-- Renamed `src/cli/commands/meditate-add.ts` → `meditate-create.ts`
-- Renamed `src/cli/tests/meditate-add.test.ts` → `meditate-create.test.ts`
-- Updated all exported function names (buildMeditateCreateKickoffArgs, meditateCreateCommand)
-- Updated AGENTS.md file list reference
+| Chunk | Status | Commit | Tests |
+|-------|--------|--------|-------|
+| 1. Build Config | ✅ Done | `859bd43` | Build passes |
+| 2. State Layer | ✅ Done | `7878d0e` | 14 tests |
+| 3. Scheduler | ✅ Done | `807de50` | 8 tests |
+| 4. Runner | ✅ Done | `69ca366` | 5 tests |
+| 5. Socket Server | ✅ Done | `ae36aaa` | 4 tests |
+| 6. Daemon Entry + Client | ✅ Done | `c46b2b2` | Integration glue |
+| 7. Heartbeat CLI Commands | ✅ Done | `c2cde96` | 4 tests |
+| 8. Watch TUI | ✅ Done | `33d98e0` | Manual only (TTY) |
+| 9. Meditate Cleanup | ✅ Done | `04eb795` | 28 remaining |
 
-### Chunk 2: Harden meditateStop + remove meditateKill ✅
-- Rewrote meditateStop to clean up orphaned `.mcp.ralph-*.json` files, stale PID files
-- Works even when no sentinel exists (crashed session scenario)
-- Removed meditateKill export entirely — meditateStop handles all cleanup
-- Added 3 new tests for stale artifact cleanup
+## Learnings
 
-### Chunk 3: Update index.ts — flat commands, remove shorthand ✅
-- Replaced single `meditate <action-or-folder>` dispatch with flat Commander commands
-- Commands: `meditate`, `meditate-create`, `meditate-stop`, `meditate-status`
-- Removed positional shorthand block (`ralph <folder> [plan|implement]`)
-- All commands visible in `ralph --help` at root level
+- `os.homedir()` does not reflect runtime `process.env.HOME` changes in tests. Use `process.env.HOME || homedir()` for testability.
+- Parallel subagent execution on shared filesystem can cause transient test failures. Run final verification sequentially.
+- The runner's `RALPH_TEST_CMD` needs `shell: true` for commands with quoted arguments like `process.exit(1)`.
+- Keeping the shebang banner on daemon entry is harmless — Node ignores it when spawned via `node path/to/file.js`.
 
----
+## Future Work
 
-## Notes
-
-- Commander.js doesn't support multi-word commands like `meditate create` alongside `meditate <folder>` — used hyphenated names (`meditate-create`, `meditate-stop`, `meditate-status`) instead
-- All 127 tests pass across 6 test files
-- Tagged as 0.0.10
+- [ ] `stream_logs` handler is stubbed (returns no-op). Implement for `ralph heartbeat logs --follow`.
+- [ ] Ink TUI (`HeartbeatWatch.tsx`) needs manual TTY testing and polish.
+- [ ] End-to-end integration test: start daemon, register task, verify execution, stop.
+- [ ] Daemon auto-restart on crash (systemd/launchd integration).

@@ -22,3 +22,14 @@
 - Lib: `src/cli/lib/{assets,prompts}.ts`
 - Tests: `src/cli/tests/*.test.ts` (vitest)
 - Bundled prompts: `src/cli/prompts/PROMPT_{plan,build,kickoff}.md`
+- Daemon: `src/daemon/{state,scheduler,runner,socket,index}.ts`
+- Shared lib: `src/lib/daemon-client.ts`
+- TUI components: `src/cli/components/HeartbeatWatch.tsx`
+
+### Daemon
+
+- Daemon socket: `~/.ralph/daemon.sock`, PID: `~/.ralph/daemon.pid`
+- Task registry: `~/.ralph/tasks.json`, logs: `~/.ralph/logs/<task-id>/<run-id>.log`
+- Dev mode daemon start: `tsx src/daemon/index.ts`
+- Prod mode: `node dist/daemon/index.js`
+- The CLI auto-starts the daemon when needed
