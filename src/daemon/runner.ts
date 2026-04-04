@@ -1,6 +1,9 @@
 import { spawn } from "child_process";
 import { existsSync, readFileSync } from "fs";
-import { join, basename } from "path";
+import { join, basename, dirname } from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 import { randomUUID } from "crypto";
 import { createRun, appendLogLine, closeRun } from "./state";
 import type { Task } from "./state";
@@ -15,7 +18,7 @@ export function getRalphCliPath(): { command: string; args: string[]; shell: boo
   const dir = basename(__dirname);
   if (dir === "daemon") {
     // production: dist/daemon/index.js -> dist/index.js
-    return { command: process.execPath, args: [join(__dirname, "..", "index.js")], shell: false };
+    return { command: process.execPath, args: [join(__dirname, "..", "cli", "index.js")], shell: false };
   }
   // dev mode: src/daemon -> src/cli/index.ts
   return { command: "tsx", args: [join(__dirname, "..", "cli", "index.ts")], shell: false };
