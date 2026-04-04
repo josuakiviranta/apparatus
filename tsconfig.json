@@ -4,12 +4,13 @@
     "module": "CommonJS",
     "moduleResolution": "node",
     "outDir": "dist",
-    "rootDir": "src/cli",
+    "rootDir": "src",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "jsx": "react"
   },
-  "include": ["src/cli/**/*"],
-  "exclude": ["node_modules", "dist", "src/cli/tests"]
+  "include": ["src/cli/**/*", "src/daemon/**/*"],
+  "exclude": ["node_modules", "dist", "src/cli/tests", "src/daemon/tests"]
 }
