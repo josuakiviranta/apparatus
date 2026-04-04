@@ -71,20 +71,24 @@ claude \
   --output-format stream-json \
   --permission-mode dontAsk \
   --allowedTools "Read" \
-  --allowedTools "Write(/abs/path/to/project/meditations/illuminations/**)" \
+  --allowedTools "Glob" \
+  --allowedTools "Write(meditations/illuminations/**)" \
+  --disallowedTools "ToolSearch" \
   --add-dir /abs/path/to/project \
   -p "<meditation prompt>"
 ```
 
-Two separate `--allowedTools` flags are passed — one per rule. The illuminations path is always an absolute path resolved at invocation time from the project folder argument.
+Three separate `--allowedTools` flags are passed — one per rule. The `Write` path is relative to the project folder (Claude resolves it from the working directory). `ToolSearch` is explicitly disallowed to prevent the session from discovering and loading additional tools beyond the allow list.
 
 What this enforces:
 - `Read` — allowed anywhere in the working directory (project folder)
-- `Write` — allowed **only** at the absolute path of `meditations/illuminations/`
+- `Glob` — allowed for file discovery across the project
+- `Write` — allowed **only** under the relative path `meditations/illuminations/**`
+- `ToolSearch` — explicitly disallowed (prevents tool expansion)
 - `Bash`, `WebFetch`, `Edit`, `Agent`, all MCP tools — **auto-denied** by `dontAsk` mode
 - No internet access: `WebFetch` denied, `Bash` denied (no curl/wget escape)
 
-`dontAsk` mode auto-denies any tool not in the allow list without prompting. The illuminations path is resolved to an absolute path at invocation time.
+`dontAsk` mode auto-denies any tool not in the allow list without prompting.
 
 ### Output Format
 
@@ -98,17 +102,12 @@ PID:     12345 (kill 12345 to stop)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
-Stream-json output is piped through a `jq` filter matching loop.sh's pattern, with two additions: thinking blocks are shown, and Read tool calls include the file path:
+Stream-json output is filtered to emit **text content only** — no thinking blocks, no tool_use blocks. This keeps the output clean for both terminal display and log capture:
 
 ```jq
 if .type == "assistant" then
   .message.content[]? |
   if .type == "text" then .text
-  elif .type == "thinking" then .thinking
-  elif .type == "tool_use" and .name == "Read"
-    then "→ [tool] Read: \(.input.file_path)"
-  elif .type == "tool_use"
-    then "→ [tool] \(.name)"
   else empty end
 else empty end
 ```
