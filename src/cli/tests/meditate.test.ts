@@ -12,6 +12,11 @@ import {
   readSentinel,
   writeSentinel,
   removeSentinel,
+  pidPath,
+  writePid,
+  readPid,
+  removePid,
+  isPidAlive,
   ensureMeditationDirs,
   appendMeditateGitignore,
   buildMeditationArgs,
@@ -151,11 +156,12 @@ describe("ensureMeditationDirs", () => {
 });
 
 describe("appendMeditateGitignore", () => {
-  it("adds .meditate.json and .meditate.log to .gitignore", () => {
+  it("adds .meditate.json, .meditate.log, and .meditate.pid to .gitignore", () => {
     appendMeditateGitignore(tmpDir);
     const content = readFileSync(join(tmpDir, ".gitignore"), "utf8");
     expect(content).toContain(".meditate.json");
     expect(content).toContain(".meditate.log");
+    expect(content).toContain(".meditate.pid");
   });
 
   it("creates .gitignore if it does not exist", () => {
@@ -173,6 +179,43 @@ describe("appendMeditateGitignore", () => {
   });
 });
 
+describe("pidPath", () => {
+  it("returns <folder>/.meditate.pid", () => {
+    expect(pidPath("/some/project")).toBe("/some/project/.meditate.pid");
+  });
+});
+
+describe("writePid / readPid / removePid", () => {
+  it("writes and reads back the PID", () => {
+    writePid(tmpDir, 12345);
+    expect(readPid(tmpDir)).toBe(12345);
+  });
+
+  it("readPid returns null when file does not exist", () => {
+    expect(readPid(tmpDir)).toBeNull();
+  });
+
+  it("removePid deletes the file", () => {
+    writePid(tmpDir, 99);
+    removePid(tmpDir);
+    expect(readPid(tmpDir)).toBeNull();
+  });
+
+  it("removePid is a no-op if file does not exist", () => {
+    expect(() => removePid(tmpDir)).not.toThrow();
+  });
+});
+
+describe("isPidAlive", () => {
+  it("returns true for the current process PID", () => {
+    expect(isPidAlive(process.pid)).toBe(true);
+  });
+
+  it("returns false for a PID that is not running", () => {
+    expect(isPidAlive(999999999)).toBe(false);
+  });
+});
+
 describe("buildMeditationArgs", () => {
   const absPath = "/fake/project";
   const prompt = "test prompt";
@@ -186,24 +229,14 @@ describe("buildMeditationArgs", () => {
     expect(allowed).toContain("Glob");
   });
 
-  it("allows Write only to meditations/illuminations relative path", () => {
+  it("allows Write to illuminations using absolute double-slash path format", () => {
     const args = buildMeditationArgs(absPath, prompt);
     const allowed = args
       .map((a, i) => (args[i - 1] === "--allowedTools" ? a : null))
       .filter(Boolean);
     const writePerm = allowed.find((a) => a?.startsWith("Write("));
-    expect(writePerm).toBe("Write(meditations/illuminations/**)");
-  });
-
-  it("does not allow Write to any absolute path", () => {
-    const args = buildMeditationArgs(absPath, prompt);
-    const allowed = args
-      .map((a, i) => (args[i - 1] === "--allowedTools" ? a : null))
-      .filter(Boolean);
-    const absoluteWrite = allowed.find(
-      (a) => a?.startsWith("Write(/") || a?.startsWith("Write(//")
-    );
-    expect(absoluteWrite).toBeUndefined();
+    // Claude Code requires // prefix for absolute paths in allowedTools
+    expect(writePerm).toBe("Write(//fake/project/meditations/illuminations/**)");
   });
 
   it("disallows ToolSearch", () => {

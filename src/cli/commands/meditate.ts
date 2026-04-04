@@ -77,12 +77,43 @@ export function removeSentinel(projectFolder: string): void {
   if (existsSync(p)) unlinkSync(p);
 }
 
+// ─── PID lock utilities ───────────────────────────────────────────────────────
+
+export function pidPath(projectFolder: string): string {
+  return join(projectFolder, ".meditate.pid");
+}
+
+export function writePid(projectFolder: string, pid: number): void {
+  writeFileSync(pidPath(projectFolder), String(pid));
+}
+
+export function readPid(projectFolder: string): number | null {
+  const p = pidPath(projectFolder);
+  if (!existsSync(p)) return null;
+  const n = parseInt(readFileSync(p, "utf8").trim(), 10);
+  return isNaN(n) ? null : n;
+}
+
+export function removePid(projectFolder: string): void {
+  const p = pidPath(projectFolder);
+  if (existsSync(p)) unlinkSync(p);
+}
+
+export function isPidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function ensureMeditationDirs(projectFolder: string): void {
   mkdirSync(join(projectFolder, "meditations", "illuminations"), { recursive: true });
 }
 
 export function appendMeditateGitignore(projectFolder: string): void {
-  const entries = [".meditate.json", ".meditate.log"];
+  const entries = [".meditate.json", ".meditate.log", ".meditate.pid"];
   const gitignorePath = join(projectFolder, ".gitignore");
   const existing = existsSync(gitignorePath) ? readFileSync(gitignorePath, "utf8") : "";
   const lines = existing.split("\n");
@@ -120,13 +151,19 @@ function removeCronEntry(id: string): void {
 // ─── Session runner ───────────────────────────────────────────────────────────
 
 export function buildMeditationArgs(absPath: string, promptText: string): string[] {
+  // Claude Code resolves write targets to absolute paths before pattern matching.
+  // Relative patterns like "meditations/illuminations/**" are never matched.
+  // Use the double-slash prefix format the docs specify for absolute paths:
+  // Write(//Users/foo/bar/**) → allows writes to /Users/foo/bar/**
+  const illuminationsAbs = resolve(join(absPath, "meditations", "illuminations"));
+  const writePattern = `Write(//${illuminationsAbs.slice(1)}/**)`;
   return [
     "--print",
     "--output-format", "stream-json",
     "--permission-mode", "dontAsk",
     "--allowedTools", "Read",
     "--allowedTools", "Glob",
-    "--allowedTools", "Write(meditations/illuminations/**)",
+    "--allowedTools", writePattern,
     "--disallowedTools", "ToolSearch",
     "--add-dir", absPath,
     "-p", promptText,
@@ -134,13 +171,15 @@ export function buildMeditationArgs(absPath: string, promptText: string): string
 }
 
 async function runMeditationSession(absPath: string): Promise<void> {
+  writePid(absPath, process.pid);
+
   const prompt = readFileSync(getMeditationPromptPath(), "utf8");
 
   const border = "\u2501".repeat(40);
   console.log(border);
   console.log(`Mode:    meditate`);
   console.log(`Project: ${absPath}`);
-  console.log(`PID:     ${process.pid} (kill ${process.pid} to stop)`);
+  console.log(`PID:     ${process.pid} (ralph meditate kill <folder> to stop)`);
   console.log(border);
   console.log();
 
@@ -151,6 +190,13 @@ async function runMeditationSession(absPath: string): Promise<void> {
     stdio: ["ignore", "pipe", "pipe"],
     env: process.env,
   });
+
+  const cleanup = () => {
+    child.kill("SIGTERM");
+    removePid(absPath);
+  };
+  process.once("SIGTERM", cleanup);
+  process.once("SIGINT", cleanup);
 
   let buffer = "";
   child.stdout.on("data", (chunk: Buffer) => {
@@ -175,6 +221,10 @@ async function runMeditationSession(absPath: string): Promise<void> {
   child.stderr.on("data", (chunk: Buffer) => process.stderr.write(chunk));
 
   await new Promise<void>((res) => child.on("close", res));
+
+  process.off("SIGTERM", cleanup);
+  process.off("SIGINT", cleanup);
+  removePid(absPath);
 }
 
 // ─── Command entry points ─────────────────────────────────────────────────────
@@ -202,6 +252,29 @@ export async function meditateStatus(projectFolder: string): Promise<void> {
   console.log(`Interval: every ${sentinel.every} minutes`);
   console.log(`Until:    ${sentinel.until ?? "no end time set"}`);
   console.log(`Cron ID:  ${sentinel.cronId}`);
+  const pid = readPid(absPath);
+  if (pid !== null && isPidAlive(pid)) {
+    console.log(`Session:  running (PID ${pid})`);
+  } else {
+    console.log(`Session:  idle`);
+  }
+}
+
+export async function meditateKill(projectFolder: string): Promise<void> {
+  const absPath = resolve(projectFolder);
+  const pid = readPid(absPath);
+  if (pid === null) {
+    console.log("No active meditation session found.");
+    return;
+  }
+  if (!isPidAlive(pid)) {
+    console.log(`PID ${pid} is not running. Cleaning up stale lock file.`);
+    removePid(absPath);
+    return;
+  }
+  process.kill(pid, "SIGTERM");
+  removePid(absPath);
+  console.log(`Sent SIGTERM to meditation session (PID ${pid}).`);
 }
 
 export async function meditateCommand(
@@ -232,6 +305,13 @@ export async function meditateCommand(
       removeSentinel(absPath);
       process.exit(0);
     }
+  }
+
+  // Prevent concurrent sessions: skip if a ralph meditate process is already running
+  const runningPid = readPid(absPath);
+  if (runningPid !== null && isPidAlive(runningPid)) {
+    console.log(`Meditation session already running (PID ${runningPid}). Skipping.`);
+    process.exit(0);
   }
 
   ensureMeditationDirs(absPath);
