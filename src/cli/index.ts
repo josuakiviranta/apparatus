@@ -2,7 +2,8 @@ import { Command } from "commander";
 import { planCommand } from "./commands/plan";
 import { implementCommand } from "./commands/implement";
 import { newCommand } from "./commands/new";
-import { meditateCommand, meditateStop, meditateStatus } from "./commands/meditate";
+import { meditateCommand } from "./commands/meditate";
+import { registerHeartbeatCommand } from "./commands/heartbeat";
 import { meditateCreateCommand } from "./commands/meditate-create";
 
 const program = new Command();
@@ -37,10 +38,8 @@ program
 program
   .command("meditate <project-folder>")
   .description("Run a meditation cycle")
-  .option("--every <n>", "Schedule interval in minutes (registers cron job)", parseInt)
-  .option("--until <datetime>", "Stop scheduling after this ISO 8601 datetime")
-  .action(async (projectFolder: string, options: { every?: number; until?: string }) => {
-    await meditateCommand(projectFolder, options);
+  .action(async (projectFolder: string) => {
+    await meditateCommand(projectFolder, {});
   });
 
 program
@@ -50,18 +49,6 @@ program
     await meditateCreateCommand(projectFolder);
   });
 
-program
-  .command("meditate-stop <project-folder>")
-  .description("Stop schedule and any running session")
-  .action(async (projectFolder: string) => {
-    await meditateStop(projectFolder);
-  });
-
-program
-  .command("meditate-status <project-folder>")
-  .description("Show meditation schedule and session status")
-  .action(async (projectFolder: string) => {
-    await meditateStatus(projectFolder);
-  });
+registerHeartbeatCommand(program);
 
 program.parse(process.argv);
