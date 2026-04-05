@@ -1,5 +1,6 @@
 import { mkdirSync, writeFileSync, statSync, readFileSync, readdirSync } from "fs";
-import { join, resolve, isAbsolute } from "path";
+import { join, resolve, isAbsolute, relative } from "path";
+import ignore from "ignore";
 import fg from "fast-glob";
 
 // ─── Exported pure helpers (for testing) ──────────────────────────────────────
@@ -87,9 +88,19 @@ export function readMetaMeditation(meditationsDir: string, filename: string): st
 }
 
 const SKIP_DIRS = new Set([
-  ".git", "node_modules", "dist", "build", "coverage",
-  ".next", ".turbo", "__pycache__", ".cache",
+  ".git", "node_modules", "dist", "build", "coverage", "node-compile-cache",
 ]);
+
+function buildIgnoreFilter(projectRoot: string): (relativePath: string) => boolean {
+  const gitignorePath = join(projectRoot, ".gitignore");
+  try {
+    const content = readFileSync(gitignorePath, "utf-8");
+    const ig = ignore().add(content);
+    return (relativePath: string) => ig.ignores(relativePath);
+  } catch {
+    return () => false;
+  }
+}
 
 export function projectTree(projectRoot: string, subPath?: string): string {
   const root = subPath
@@ -97,18 +108,21 @@ export function projectTree(projectRoot: string, subPath?: string): string {
     : projectRoot;
   assertWithinRoot(root, projectRoot);
 
+  const isIgnored = buildIgnoreFilter(projectRoot);
+
   function walk(dir: string, prefix: string): string {
     const entries = readdirSync(dir, { withFileTypes: true })
       .sort((a, b) => a.name.localeCompare(b.name));
     let out = "";
     for (const entry of entries) {
-      if (entry.isDirectory() && SKIP_DIRS.has(entry.name)) continue;
-      if (entry.isDirectory()) {
-        out += `${prefix}${entry.name}/\n`;
-        out += walk(join(dir, entry.name), prefix + "  ");
-      } else {
+      if (!entry.isDirectory()) {
         out += `${prefix}${entry.name}\n`;
+        continue;
       }
+      const relativePath = relative(projectRoot, join(dir, entry.name)) + "/";
+      if (SKIP_DIRS.has(entry.name) || isIgnored(relativePath)) continue;
+      out += `${prefix}${entry.name}/\n`;
+      out += walk(join(dir, entry.name), prefix + "  ");
     }
     return out;
   }

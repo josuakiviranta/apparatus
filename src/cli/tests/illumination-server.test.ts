@@ -204,14 +204,17 @@ describe("projectTree", () => {
     expect(result).not.toContain(".git");
   });
 
-  it("skips dist, build, coverage, .next, .turbo, __pycache__, .cache", () => {
-    for (const dir of ["dist", "build", "coverage", ".next", ".turbo", "__pycache__", ".cache"]) {
-      mkdirSync(join(tmpDir, dir));
+  it("skips dist, build, coverage via SKIP_DIRS", () => {
+    for (const name of ["dist", "build", "coverage"]) {
+      mkdirSync(join(tmpDir, name));
+      writeFileSync(join(tmpDir, name, "file.js"), "");
     }
+    writeFileSync(join(tmpDir, "index.ts"), "");
     const result = projectTree(tmpDir);
-    for (const dir of ["dist", "build", "coverage", ".next", ".turbo", "__pycache__", ".cache"]) {
-      expect(result).not.toContain(dir);
-    }
+    expect(result).not.toContain("dist");
+    expect(result).not.toContain("build");
+    expect(result).not.toContain("coverage");
+    expect(result).toContain("index.ts");
   });
 
   it("returns Directory is empty for an empty folder", () => {
@@ -231,6 +234,45 @@ describe("projectTree", () => {
 
   it("throws for a subPath outside project root", () => {
     expect(() => projectTree(tmpDir, "../outside")).toThrow("outside the project folder");
+  });
+
+  it("skips node-compile-cache", () => {
+    mkdirSync(join(tmpDir, "node-compile-cache"));
+    writeFileSync(join(tmpDir, "node-compile-cache", "abc123.bin"), "");
+    writeFileSync(join(tmpDir, "index.ts"), "");
+    const result = projectTree(tmpDir);
+    expect(result).not.toContain("node-compile-cache");
+    expect(result).toContain("index.ts");
+  });
+
+  it("excludes directories listed in .gitignore", () => {
+    writeFileSync(join(tmpDir, ".gitignore"), "vendor/\n");
+    mkdirSync(join(tmpDir, "vendor"));
+    writeFileSync(join(tmpDir, "vendor", "dep.js"), "");
+    writeFileSync(join(tmpDir, "index.ts"), "");
+    const result = projectTree(tmpDir);
+    expect(result).not.toContain("vendor");
+    expect(result).toContain("index.ts");
+  });
+
+  it("falls back gracefully when no .gitignore exists", () => {
+    mkdirSync(join(tmpDir, "src"));
+    writeFileSync(join(tmpDir, "src", "index.ts"), "");
+    // No .gitignore present
+    const result = projectTree(tmpDir);
+    expect(result).toContain("src/");
+    expect(result).toContain("index.ts");
+  });
+
+  it("excludes gitignored subdirectory when walking from a subPath", () => {
+    writeFileSync(join(tmpDir, ".gitignore"), "generated/\n");
+    mkdirSync(join(tmpDir, "src"));
+    mkdirSync(join(tmpDir, "src", "generated"));
+    writeFileSync(join(tmpDir, "src", "main.ts"), "");
+    writeFileSync(join(tmpDir, "src", "generated", "types.ts"), "");
+    const result = projectTree(tmpDir, "src");
+    expect(result).toContain("main.ts");
+    expect(result).not.toContain("generated");
   });
 });
 
