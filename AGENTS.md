@@ -9,11 +9,12 @@
 
 - Tests: `npx vitest run`
 - Typecheck: `npx tsc --noEmit`
+- Smoke test: `npx vitest run src/cli/tests/smoke.test.ts` (requires `npm run build` first)
 
 ## Operational Notes
 
 - `loop.sh` requires explicit prompt file path as first arg: `./loop.sh <prompt-file-path> [max_iterations]`
-- Asset path resolution in `src/cli/lib/assets.ts` detects dist vs dev via `basename(__dirname)` — in dist it uses `__dirname` directly, in dev it goes up one level to `src/cli/`
+- Prod/dev detection uses `__RALPH_PROD__` constant injected by tsup `define` at build time. Ambient type in `src/types/globals.d.ts`.
 
 ### Codebase Patterns
 
