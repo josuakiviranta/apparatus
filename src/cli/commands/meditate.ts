@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, rmSync } from "fs";
-import { join, resolve, basename, dirname } from "path";
+import { join, resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -55,7 +55,7 @@ export function appendMeditateGitignore(projectFolder: string): void {
 // ─── MCP config management ────────────────────────────────────────────────────
 
 function isDevMode(): boolean {
-  return basename(__dirname) !== "cli" && basename(__dirname) !== "dist";
+  return typeof __RALPH_PROD__ === "undefined";
 }
 
 export function writeMcpConfig(projectRoot: string): string {

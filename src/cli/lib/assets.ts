@@ -1,17 +1,15 @@
-import { join, basename, dirname } from "path";
+import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /**
  * Resolves a path to a bundled asset.
- * In production (tsup bundle): __dirname → dist/cli/, assets at dist/loop.sh and dist/prompts/
- * In dev (tsx): __dirname → src/cli/lib/, assets at src/cli/prompts/ and project root loop.sh
+ * In production (tsup bundle): __RALPH_PROD__ is defined → __dirname is dist/cli/
+ * In dev (tsx): __RALPH_PROD__ is undefined → __dirname is src/cli/lib/
  */
 function isProduction(): boolean {
-  const dir = basename(__dirname);
-  // tsup now outputs to dist/cli/index.js (multiple entry points preserve structure)
-  return dir === "cli" || dir === "dist";
+  return typeof __RALPH_PROD__ !== "undefined";
 }
 
 export function getAssetPath(filename: string): string {

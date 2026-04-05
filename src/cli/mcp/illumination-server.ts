@@ -160,7 +160,6 @@ if (!isTestEnv) {
         filename: z.string(),
         content: z.string(),
       },
-      // @ts-expect-error — SDK overloads cause deep type instantiation with dynamically-imported zod
       async ({ filename, content }: { filename: string; content: string }) => {
         try {
           const filePath = writeIllumination(projectRoot, filename, content);
@@ -226,7 +225,6 @@ if (!isTestEnv) {
       "List available meta-meditation lens files from the ralph-cli installation. " +
         "Call this first to see which lenses are available before reading any.",
       {},
-      // @ts-expect-error — SDK overloads cause deep type instantiation with dynamically-imported zod
       async () => {
         const result = listMetaMeditations(meditationsDir);
         return { content: [{ type: "text" as const, text: result }] };
@@ -238,7 +236,6 @@ if (!isTestEnv) {
       "Read a specific meta-meditation lens file by filename. " +
         "Use list_meta_meditations first to get available filenames.",
       { filename: z.string() },
-      // @ts-expect-error — SDK overloads cause deep type instantiation with dynamically-imported zod
       async ({ filename }: { filename: string }) => {
         const result = readMetaMeditation(meditationsDir, filename);
         return { content: [{ type: "text" as const, text: result }] };
