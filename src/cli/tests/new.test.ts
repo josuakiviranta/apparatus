@@ -16,63 +16,74 @@ afterEach(() => {
 
 describe("scaffoldProject", () => {
   it("creates empty scaffold files", () => {
-    const target = join(tmpDir, "myproject");
-    scaffoldProject(target, "myproject");
-
+    scaffoldProject(tmpDir, "my-project");
     for (const f of ["AGENTS.md", "IMPLEMENTATION_PLAN.md", "README.md"]) {
-      expect(existsSync(join(target, f)), `${f} should exist`).toBe(true);
-      expect(readFileSync(join(target, f), "utf8")).toBe("");
+      expect(existsSync(join(tmpDir, f)), `${f} should exist`).toBe(true);
+      expect(readFileSync(join(tmpDir, f), "utf8")).toBe("");
     }
   });
 
   it("creates PROMPT files with bundled default content", () => {
-    const target = join(tmpDir, "myproject");
-    scaffoldProject(target, "myproject");
-
+    scaffoldProject(tmpDir, "my-project");
     for (const f of ["PROMPT_plan.md", "PROMPT_build.md"]) {
-      expect(existsSync(join(target, f)), `${f} should exist`).toBe(true);
-      expect(readFileSync(join(target, f), "utf8").length).toBeGreaterThan(0);
+      expect(existsSync(join(tmpDir, f)), `${f} should exist`).toBe(true);
+      expect(readFileSync(join(tmpDir, f), "utf8").length).toBeGreaterThan(0);
     }
   });
 
   it("creates .gitignore with correct entries", () => {
-    const target = join(tmpDir, "myproject");
-    scaffoldProject(target, "myproject");
-
-    const content = readFileSync(join(target, ".gitignore"), "utf8");
+    scaffoldProject(tmpDir, "my-project");
+    const content = readFileSync(join(tmpDir, ".gitignore"), "utf8");
     expect(content).toContain("PROMPT_plan.md");
     expect(content).toContain("PROMPT_build.md");
     expect(content).toContain("IMPLEMENTATION_PLAN.md");
   });
 
-  it("creates specs/ directory", () => {
-    const target = join(tmpDir, "myproject");
-    scaffoldProject(target, "myproject");
-    expect(existsSync(join(target, "specs"))).toBe(true);
+  it("creates src/tests/integration/ directory", () => {
+    scaffoldProject(tmpDir, "my-project");
+    expect(existsSync(join(tmpDir, "src", "tests", "integration"))).toBe(true);
   });
 
-  it("creates src/tests subdirectories", () => {
-    const target = join(tmpDir, "myproject");
-    scaffoldProject(target, "myproject");
-
-    for (const sub of ["integration", "unit", "scenarios"]) {
-      expect(existsSync(join(target, "src", "tests", sub)), `src/tests/${sub} should exist`).toBe(true);
-    }
+  it("creates src/tests/unit/ directory", () => {
+    scaffoldProject(tmpDir, "my-project");
+    expect(existsSync(join(tmpDir, "src", "tests", "unit"))).toBe(true);
   });
 
   it("creates meditations/illuminations/ directory", () => {
-    const target = join(tmpDir, "myproject");
-    scaffoldProject(target, "myproject");
-    expect(existsSync(join(target, "meditations", "illuminations"))).toBe(true);
+    scaffoldProject(tmpDir, "my-project");
+    expect(existsSync(join(tmpDir, "meditations", "illuminations"))).toBe(true);
   });
 
-  it("adds meditate entries to .gitignore", () => {
-    const target = join(tmpDir, "myproject");
-    scaffoldProject(target, "myproject");
-    const content = readFileSync(join(target, ".gitignore"), "utf8");
-    expect(content).toContain("meditations/illuminations/");
-    expect(content).toContain(".meditate.json");
-    expect(content).toContain(".meditate.log");
+  it("creates scenario-tests/ directory", () => {
+    scaffoldProject(tmpDir, "my-project");
+    expect(existsSync(join(tmpDir, "scenario-tests"))).toBe(true);
+  });
+
+  it("creates scenario-runs/ directory", () => {
+    scaffoldProject(tmpDir, "my-project");
+    expect(existsSync(join(tmpDir, "scenario-runs"))).toBe(true);
+  });
+
+  it("creates specs/ directory", () => {
+    scaffoldProject(tmpDir, "my-project");
+    expect(existsSync(join(tmpDir, "specs"))).toBe(true);
+  });
+
+  it("adds meditations/illuminations/ to .gitignore", () => {
+    scaffoldProject(tmpDir, "my-project");
+    const gitignore = readFileSync(join(tmpDir, ".gitignore"), "utf8");
+    expect(gitignore).toContain("meditations/illuminations/");
+  });
+
+  it("adds scenario-runs/ to .gitignore", () => {
+    scaffoldProject(tmpDir, "my-project");
+    const gitignore = readFileSync(join(tmpDir, ".gitignore"), "utf8");
+    expect(gitignore).toContain("scenario-runs/");
+  });
+
+  it("does not create src/tests/scenarios/ directory", () => {
+    scaffoldProject(tmpDir, "my-project");
+    expect(existsSync(join(tmpDir, "src", "tests", "scenarios"))).toBe(false);
   });
 });
 

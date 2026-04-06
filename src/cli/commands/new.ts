@@ -59,8 +59,9 @@ export function scaffoldProject(targetPath: string, _projectName: string): void 
   mkdirSync(join(targetPath, "specs"), { recursive: true });
   mkdirSync(join(targetPath, "src", "tests", "integration"), { recursive: true });
   mkdirSync(join(targetPath, "src", "tests", "unit"), { recursive: true });
-  mkdirSync(join(targetPath, "src", "tests", "scenarios"), { recursive: true });
   mkdirSync(join(targetPath, "meditations", "illuminations"), { recursive: true });
+  mkdirSync(join(targetPath, "scenario-tests"), { recursive: true });
+  mkdirSync(join(targetPath, "scenario-runs"), { recursive: true });
 
   const emptyFiles = ["AGENTS.md", "IMPLEMENTATION_PLAN.md", "README.md"];
   for (const f of emptyFiles) {
@@ -77,8 +78,7 @@ export function scaffoldProject(targetPath: string, _projectName: string): void 
       "PROMPT_build.md",
       "IMPLEMENTATION_PLAN.md",
       "meditations/illuminations/",
-      ".meditate.json",
-      ".meditate.log",
+      "scenario-runs/",
     ].join("\n") + "\n"
   );
 }

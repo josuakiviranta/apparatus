@@ -102,7 +102,7 @@ export function buildMeditationArgs(
   ];
 }
 
-async function runMeditationSession(absPath: string): Promise<void> {
+export async function runMeditationSession(absPath: string): Promise<void> {
   writePid(absPath, process.pid);
 
   const prompt = readFileSync(getMeditationPromptPath(), "utf8");
@@ -118,7 +118,8 @@ async function runMeditationSession(absPath: string): Promise<void> {
 
   const args = buildMeditationArgs(absPath, prompt, mcpConfigPath);
 
-  const child = spawn("claude", args, {
+  const cmd = process.env.RALPH_TEST_CMD ?? "claude";
+  const child = spawn(cmd, args, {
     cwd: absPath,
     stdio: ["ignore", "pipe", "pipe"],
     env: process.env,
@@ -145,6 +146,8 @@ async function runMeditationSession(absPath: string): Promise<void> {
           for (const block of (msg.message?.content ?? [])) {
             if (block.type === "text") {
               process.stdout.write(block.text);
+            } else if (block.type === "tool_use") {
+              process.stdout.write(`\n→ [tool] ${block.name}\n`);
             }
           }
         }
@@ -154,7 +157,8 @@ async function runMeditationSession(absPath: string): Promise<void> {
 
   child.stderr.on("data", (chunk: Buffer) => process.stderr.write(chunk));
 
-  await new Promise<void>((res) => child.on("close", () => {
+  await new Promise<void>((res) => child.on("close", (code) => {
+    if (code !== 0) process.stderr.write(`Warning: claude exited with code ${code}\n`);
     try { cleanupMcpConfig(mcpConfigPath); } catch {}
     res();
   }));

@@ -37,6 +37,10 @@ export function getMeditationPromptPath(): string {
   return getAssetPath(join("prompts", "PROMPT_meditation.md"));
 }
 
+export function getScenarioPromptPath(): string {
+  return getAssetPath(join("prompts", "PROMPT_scenario.md"));
+}
+
 export function getMeditateCreatePromptPath(): string {
   return getAssetPath(join("prompts", "PROMPT_meditate_create.md"));
 }

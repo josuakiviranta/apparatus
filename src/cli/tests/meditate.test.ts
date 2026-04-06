@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync, existsSync, readFileSync } from "fs";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { mkdtempSync, rmSync, existsSync, readFileSync, chmodSync, writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import {
@@ -13,6 +13,7 @@ import {
   buildMeditationArgs,
   writeMcpConfig,
   cleanupMcpConfig,
+  runMeditationSession,
 } from "../commands/meditate";
 
 let tmpDir: string;
@@ -211,5 +212,56 @@ describe("buildMeditationArgs", () => {
     const args = buildMeditationArgs(absPath, prompt, mcpConfigPath);
     expect(args).toContain("mcp__illumination__read_meta_meditation");
   });
+});
+
+describe("runMeditationSession — subprocess behavior", () => {
+  let sessionDir: string;
+  let stderrSpy: ReturnType<typeof vi.spyOn>;
+  let stdoutSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    sessionDir = mkdtempSync(join(tmpdir(), "ralph-session-test-"));
+    stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+  });
+
+  afterEach(() => {
+    rmSync(sessionDir, { recursive: true, force: true });
+    stderrSpy.mockRestore();
+    stdoutSpy.mockRestore();
+    delete process.env.RALPH_TEST_CMD;
+  });
+
+  function makeStub(script: string): string {
+    const stubPath = join(sessionDir, "stub.sh");
+    writeFileSync(stubPath, `#!/bin/bash\n${script}\n`);
+    chmodSync(stubPath, 0o755);
+    return stubPath;
+  }
+
+  it("emits warning to stderr when claude exits with non-zero code", async () => {
+    process.env.RALPH_TEST_CMD = makeStub("exit 1");
+    await runMeditationSession(sessionDir);
+    const written = stderrSpy.mock.calls.map((c) => String(c[0])).join("");
+    expect(written).toContain("Warning: claude exited with code 1");
+  }, 15000);
+
+  it("does not emit warning when claude exits with code 0", async () => {
+    process.env.RALPH_TEST_CMD = makeStub("exit 0");
+    await runMeditationSession(sessionDir);
+    const written = stderrSpy.mock.calls.map((c) => String(c[0])).join("");
+    expect(written).not.toContain("Warning:");
+  }, 15000);
+
+  it("emits tool-use indicator for tool_use stream events", async () => {
+    const streamLine = JSON.stringify({
+      type: "assistant",
+      message: { content: [{ type: "tool_use", name: "read_file" }] },
+    });
+    process.env.RALPH_TEST_CMD = makeStub(`echo '${streamLine}'`);
+    await runMeditationSession(sessionDir);
+    const written = stdoutSpy.mock.calls.map((c) => String(c[0])).join("");
+    expect(written).toContain("→ [tool] read_file");
+  }, 15000);
 });
 

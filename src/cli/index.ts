@@ -5,6 +5,7 @@ import { newCommand } from "./commands/new";
 import { meditateCommand } from "./commands/meditate";
 import { registerHeartbeatCommand } from "./commands/heartbeat";
 import { meditateCreateCommand } from "./commands/meditate-create";
+import { runScenariosCommand } from "./commands/run-scenarios";
 
 const program = new Command();
 
@@ -47,6 +48,14 @@ program
   .description("Create a new meditation script")
   .action(async (projectFolder: string) => {
     await meditateCreateCommand(projectFolder);
+  });
+
+program
+  .command("run-scenarios <project-folder>")
+  .description("Discover and run scenario tests, writing actionable reports")
+  .option("--all", "Run all scenarios without interactive selection")
+  .action(async (projectFolder: string, options: { all?: boolean }) => {
+    await runScenariosCommand(projectFolder, options);
   });
 
 registerHeartbeatCommand(program);
