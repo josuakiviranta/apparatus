@@ -21,7 +21,7 @@
 
 - CLI entry: `src/cli/index.ts` → commander setup
 - Commands: `src/cli/commands/{plan,implement,new,meditate,meditate-create,run-scenarios}.ts`
-- Lib: `src/cli/lib/{assets,prompts}.ts`
+- Lib: `src/cli/lib/{assets,prompts,stream-formatter}.ts`
 - Tests: `src/cli/tests/*.test.ts` (vitest)
 - Bundled prompts: `src/cli/prompts/PROMPT_{plan,build,kickoff}.md`
 - Daemon: `src/daemon/{state,scheduler,runner,socket,index}.ts`

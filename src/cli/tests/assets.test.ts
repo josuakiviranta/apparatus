@@ -1,6 +1,6 @@
 import { existsSync } from "fs";
 import { describe, it, expect } from "vitest";
-import { getAssetPath, getLoopShPath, getPromptPath, getKickoffPromptPath, getMeditationPromptPath, getIlluminationServerPath, getMetaMeditationsDir, getMeditateCreatePromptPath } from "../lib/assets";
+import { getAssetPath, getLoopShPath, getPromptPath, getKickoffPromptPath, getMeditationPromptPath, getIlluminationServerPath, getMetaMeditationsDir, getMeditateCreatePromptPath, getStreamFormatterPath } from "../lib/assets";
 
 describe("assets", () => {
   it("getLoopShPath returns a path ending in loop.sh", () => {
@@ -45,6 +45,11 @@ describe("assets", () => {
 
   it("getMeditateCreatePromptPath returns path ending in PROMPT_meditate_create.md", () => {
     expect(getMeditateCreatePromptPath()).toMatch(/PROMPT_meditate_create\.md$/);
+  });
+
+  it("getStreamFormatterPath returns a path ending in stream-formatter.ts or .js", () => {
+    const p = getStreamFormatterPath();
+    expect(p).toMatch(/stream-formatter\.(ts|js)$/);
   });
 
   it("getAssetPath resolves relative to this file's directory", () => {

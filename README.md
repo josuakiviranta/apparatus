@@ -24,6 +24,12 @@ ralph implement <project-folder> [--max N]
 Runs the agentic build loop. Claude iterates, commits, and pushes changes until done (or `N` iterations).
 Uses `PROMPT_build.md` as the loop prompt.
 
+Each agent turn is annotated with:
+- `→ [read] path`, `→ [write] path`, `→ [edit] path` — file operations
+- `→ [grep] pattern`, `→ [glob] pattern`, `→ [bash] command` — search and shell
+- `▶ SUBAGENT: task` / `◀ SUBAGENT DONE` — subagent boundaries
+- `◈ ctx: N tokens` — main agent context window size after each turn
+
 ```bash
 ralph <project-folder>
 ```

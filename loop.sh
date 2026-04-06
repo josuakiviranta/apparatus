@@ -56,14 +56,18 @@ while true; do
         --output-format=stream-json \
         --model opus \
         < "$PROMPT_FILE" \
-        > >(jq -r '
-          if .type == "assistant" then
-            .message.content[]? |
-            if .type == "text" then .text
-            elif .type == "tool_use" then "→ [tool] \(.name)"
-            else empty end
-          else empty end
-        ' 2>/dev/null) &
+        | if [ -n "$RALPH_STREAM_FORMATTER" ] && [ -n "$RALPH_STREAM_FORMATTER_CMD" ]; then
+              "$RALPH_STREAM_FORMATTER_CMD" "$RALPH_STREAM_FORMATTER" 2>/dev/null
+          else
+              jq -r '
+                if .type == "assistant" then
+                  .message.content[]? |
+                  if .type == "text" then .text
+                  elif .type == "tool_use" then "→ [tool] \(.name)"
+                  else empty end
+                else empty end
+              ' 2>/dev/null
+          fi &
     CLAUDE_PID=$!
     wait $CLAUDE_PID
     CLAUDE_PID=""

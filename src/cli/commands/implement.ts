@@ -2,7 +2,7 @@ import { spawnSync, spawn } from "child_process";
 import { existsSync, chmodSync } from "fs";
 import { resolve } from "path";
 import { bootstrapPrompts } from "../lib/prompts";
-import { getLoopShPath } from "../lib/assets";
+import { getLoopShPath, getStreamFormatterPath } from "../lib/assets";
 
 export interface ImplementOptions {
   max?: number;
@@ -55,10 +55,18 @@ export async function implementCommand(
     args.push(String(options.max));
   }
 
+  // Determine formatter command: node in prod, tsx in dev
+  const formatterCmd = typeof __RALPH_PROD__ !== "undefined" ? "node" : "tsx";
+  const formatterPath = getStreamFormatterPath();
+
   const child = spawn(loopSh, args, {
     cwd: absPath,
     stdio: "inherit",
-    env: process.env,
+    env: {
+      ...process.env,
+      RALPH_STREAM_FORMATTER: formatterPath,
+      RALPH_STREAM_FORMATTER_CMD: formatterCmd,
+    },
     detached: true, // own process group — so we can kill only ralph's subtree
   });
 

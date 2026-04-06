@@ -54,6 +54,16 @@ export function getMetaMeditationsDir(): string {
   return join(packageRoot, "meditations");
 }
 
+export function getStreamFormatterPath(): string {
+  if (isProduction()) {
+    // prod: __dirname = dist/cli/ → dist/cli/lib/stream-formatter.js
+    return join(__dirname, "lib", "stream-formatter.js");
+  } else {
+    // dev: __dirname = src/cli/lib/ → src/cli/lib/stream-formatter.ts
+    return join(__dirname, "stream-formatter.ts");
+  }
+}
+
 export function getIlluminationServerPath(): string {
   if (isProduction()) {
     // prod: dist/cli/ → dist/cli/mcp/illumination-server.js
