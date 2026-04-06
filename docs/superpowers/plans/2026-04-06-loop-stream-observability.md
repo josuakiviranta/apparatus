@@ -601,3 +601,69 @@ Expected: All tests PASS.
 ```bash
 cd /Users/josu/Documents/projects/ralph-cli && git add tsup.config.ts && git commit -m "build: add stream-formatter as tsup entry point"
 ```
+
+---
+
+## Chunk 3: docs — AGENTS.md + README.md
+
+### Task 7: Update AGENTS.md
+
+**Files:**
+- Modify: `AGENTS.md`
+
+- [ ] **Step 1: Add stream-formatter.ts to the Codebase Patterns section**
+
+In `AGENTS.md`, find the line:
+
+```
+- Lib: `src/cli/lib/{assets,prompts}.ts`
+```
+
+Replace with:
+
+```
+- Lib: `src/cli/lib/{assets,prompts,stream-formatter}.ts`
+```
+
+- [ ] **Step 2: Commit**
+
+```bash
+cd /Users/josu/Documents/projects/ralph-cli && git add AGENTS.md && git commit -m "docs: add stream-formatter to AGENTS.md codebase patterns"
+```
+
+---
+
+### Task 8: Update README.md
+
+**Files:**
+- Modify: `README.md`
+
+- [ ] **Step 1: Update the implement command description to document enhanced output**
+
+Find:
+
+```
+ralph implement <project-folder> [--max N]
+```
+Runs the agentic build loop. Claude iterates, commits, and pushes changes until done (or `N` iterations).
+Uses `PROMPT_build.md` as the loop prompt.
+
+Replace with:
+
+```
+ralph implement <project-folder> [--max N]
+```
+Runs the agentic build loop. Claude iterates, commits, and pushes changes until done (or `N` iterations).
+Uses `PROMPT_build.md` as the loop prompt.
+
+Each agent turn is annotated with:
+- `→ [read] path`, `→ [write] path`, `→ [edit] path` — file operations
+- `→ [grep] pattern`, `→ [glob] pattern`, `→ [bash] command` — search and shell
+- `▶ SUBAGENT: task` / `◀ SUBAGENT DONE` — subagent boundaries
+- `◈ ctx: N tokens` — main agent context window size after each turn
+
+- [ ] **Step 2: Commit**
+
+```bash
+cd /Users/josu/Documents/projects/ralph-cli && git add README.md && git commit -m "docs: document stream-formatter output in README"
+```
