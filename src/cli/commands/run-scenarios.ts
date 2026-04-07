@@ -1,8 +1,7 @@
-import { existsSync, readdirSync, readFileSync, mkdirSync } from "fs";
+import { existsSync, readdirSync, readFileSync, mkdirSync, writeFileSync } from "fs";
 import { join, resolve } from "path";
 import { createInterface } from "readline";
-import { spawn, spawnSync } from "child_process";
-import { getScenarioPromptPath } from "../lib/assets";
+import { spawn } from "child_process";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -103,50 +102,68 @@ async function promptSelection(scenarios: ScenarioFile[]): Promise<ScenarioFile[
   });
 }
 
-// ─── Session runner ───────────────────────────────────────────────────────────
+// ─── Script runner ────────────────────────────────────────────────────────────
 
-export function buildScenarioArgs(promptText: string): string[] {
-  return [
-    "-p", promptText,
-    "--output-format", "stream-json",
-    "--dangerously-skip-permissions",
-  ];
-}
+async function runScenarioScript(
+  scenario: ScenarioFile,
+  outPath: string
+): Promise<void> {
+  return new Promise((res) => {
+    let stdout = "";
+    let stderr = "";
+    const timestamp = new Date().toISOString();
 
-async function runScenarioSession(cwd: string, promptText: string): Promise<void> {
-  return new Promise((resolve) => {
-    let buffer = "";
-    const args = buildScenarioArgs(promptText);
-    const child = spawn("claude", args, {
-      cwd,
+    const child = spawn("bash", [scenario.file], {
       env: process.env,
       stdio: ["ignore", "pipe", "pipe"],
     });
 
     child.stdout.on("data", (chunk: Buffer) => {
-      buffer += chunk.toString();
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-      for (const line of lines) {
-        if (!line.trim()) continue;
-        try {
-          const msg = JSON.parse(line);
-          if (msg.type === "assistant") {
-            for (const block of msg.message?.content ?? []) {
-              if (block.type === "text") process.stdout.write(block.text);
-              else if (block.type === "tool_use")
-                process.stdout.write(`\n→ [tool] ${block.name}\n`);
-            }
-          }
-        } catch {}
-      }
+      const text = chunk.toString();
+      stdout += text;
+      process.stdout.write(text);
     });
 
-    child.stderr.on("data", (chunk: Buffer) => process.stderr.write(chunk));
+    child.stderr.on("data", (chunk: Buffer) => {
+      const text = chunk.toString();
+      stderr += text;
+      process.stderr.write(text);
+    });
+
     child.on("close", (code) => {
-      if (code !== 0)
-        process.stderr.write(`Warning: scenario session exited with code ${code}\n`);
-      resolve();
+      const status = code === 0 ? "pass" : "fail";
+      const rawOutput = [stdout, stderr].filter(Boolean).join("").trim();
+      const report = [
+        `---`,
+        `date: ${timestamp}`,
+        `scenario: ${scenario.name}`,
+        `script: ${scenario.file}`,
+        `status: ${status}`,
+        `---`,
+        ``,
+        `# ${scenario.name}`,
+        ``,
+        `## What ran`,
+        scenario.description || scenario.name,
+        ``,
+        `## Result`,
+        status === "pass"
+          ? `Script exited with code 0.`
+          : `Script exited with code ${code}.`,
+        ``,
+        `<details>`,
+        `<summary>Raw output</summary>`,
+        ``,
+        "```",
+        rawOutput,
+        "```",
+        ``,
+        `</details>`,
+        ``,
+      ].join("\n");
+
+      writeFileSync(outPath, report, "utf8");
+      res();
     });
   });
 }
@@ -160,14 +177,6 @@ export async function runScenariosCommand(
   const absPath = resolve(projectFolder);
   if (!existsSync(absPath)) {
     console.error(`Error: project folder not found: ${absPath}`);
-    process.exit(1);
-  }
-
-  const which = spawnSync("which", ["claude"], { encoding: "utf8" });
-  if (which.status !== 0) {
-    console.error(
-      "Error: claude CLI not found.\nInstall it: npm install -g @anthropic-ai/claude-code"
-    );
     process.exit(1);
   }
 
@@ -196,23 +205,14 @@ export async function runScenariosCommand(
   const runsDir = join(absPath, "scenario-runs");
   mkdirSync(runsDir, { recursive: true });
 
-  const promptTemplate = readFileSync(getScenarioPromptPath(), "utf8");
-
   for (const scenario of selected) {
     const ts = formatTimestamp();
     const slug = slugify(scenario.name);
     const outFile = `${ts}-${slug}.md`;
     const outPath = join(runsDir, outFile);
-    const prompt = buildScenarioPrompt(
-      promptTemplate,
-      scenario.name,
-      scenario.description,
-      scenario.file,
-      outPath
-    );
 
     console.log(`\nRunning: ${scenario.name}...`);
-    await runScenarioSession(absPath, prompt);
-    console.log(`Done: scenario-runs/${outFile}`);
+    await runScenarioScript(scenario, outPath);
+    console.log(`Done: ${outPath}`);
   }
 }
