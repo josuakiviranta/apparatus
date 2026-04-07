@@ -7,3 +7,4 @@ docs/superpowers/plans/
 .mcp.ralph-*.json
 node-compile-cache/
 jiti/
+context-mode-guidance-*/
