@@ -201,6 +201,77 @@ describe("runLoop", () => {
     expect(clack.log.warn).toHaveBeenCalled();
   });
 
+  it("prints PID at startup for manual kill", async () => {
+    const { rlEmitter } = makeMockChild(0);
+    mockGitBranch("main");
+
+    const p = runLoop({
+      promptFile: "/proj/PROMPT_build.md",
+      cwd: "/proj",
+      max: 1,
+    });
+
+    await vi.waitFor(() => expect(cp.spawn).toHaveBeenCalledTimes(1));
+    rlEmitter.emit("close");
+    await p;
+
+    expect(clack.log.step).toHaveBeenCalledWith(
+      expect.stringMatching(/PID: \d+/)
+    );
+  });
+
+  it("retries git push with -u flag on initial failure", async () => {
+    const { rlEmitter } = makeMockChild(0);
+    // which claude succeeds, git branch succeeds, first git push fails, retry succeeds
+    vi.mocked(cp.spawnSync)
+      .mockReturnValueOnce({ stdout: "/usr/bin/claude\n", status: 0 } as any) // which claude
+      .mockReturnValueOnce({ stdout: "main\n", status: 0 } as any)             // git branch
+      .mockReturnValueOnce({ status: 1, stderr: "no upstream" } as any)         // git push (fail)
+      .mockReturnValueOnce({ status: 0, stderr: "" } as any);                   // git push -u (success)
+
+    const p = runLoop({
+      promptFile: "/proj/PROMPT_build.md",
+      cwd: "/proj",
+      max: 1,
+    });
+
+    await vi.waitFor(() => expect(cp.spawn).toHaveBeenCalledTimes(1));
+    rlEmitter.emit("close");
+    await p;
+
+    // First push: git push origin main
+    const pushCalls = vi.mocked(cp.spawnSync).mock.calls.filter(
+      (call) => call[0] === "git" && (call[1] as string[])[0] === "push"
+    );
+    expect(pushCalls).toHaveLength(2);
+    expect(pushCalls[0][1]).toEqual(["push", "origin", "main"]);
+    expect(pushCalls[1][1]).toEqual(["push", "-u", "origin", "main"]);
+  });
+
+  it("warns only after retry also fails", async () => {
+    const { rlEmitter } = makeMockChild(0);
+    // which claude succeeds, git branch succeeds, both pushes fail
+    vi.mocked(cp.spawnSync)
+      .mockReturnValueOnce({ stdout: "/usr/bin/claude\n", status: 0 } as any) // which claude
+      .mockReturnValueOnce({ stdout: "main\n", status: 0 } as any)             // git branch
+      .mockReturnValueOnce({ status: 1, stderr: "no upstream" } as any)         // git push (fail)
+      .mockReturnValueOnce({ status: 1, stderr: "still failing" } as any);      // git push -u (fail)
+
+    const p = runLoop({
+      promptFile: "/proj/PROMPT_build.md",
+      cwd: "/proj",
+      max: 1,
+    });
+
+    await vi.waitFor(() => expect(cp.spawn).toHaveBeenCalledTimes(1));
+    rlEmitter.emit("close");
+    await p;
+
+    expect(clack.log.warn).toHaveBeenCalledWith(
+      expect.stringContaining("still failing")
+    );
+  });
+
   it("spawns claude with correct flags and cwd", async () => {
     const { rlEmitter } = makeMockChild(0);
     mockGitBranch("feature");

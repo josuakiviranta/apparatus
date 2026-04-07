@@ -42,6 +42,7 @@ export async function runLoop(options: LoopOptions): Promise<void> {
   const branch = branchResult.stdout.trim() || "main";
 
   intro(`ralph implement  |  branch: ${branch}  |  prompt: ${promptFile}`);
+  log.step(`PID: ${process.pid}  (Ctrl+C or: kill ${process.pid})`);
 
   let iteration = 0;
   let currentPid: number | undefined;
@@ -121,7 +122,7 @@ export async function runLoop(options: LoopOptions): Promise<void> {
         log.warn(`claude exited with code ${exitCode}`);
       }
 
-      // Git push
+      // Git push (retry with -u on failure, matching loop.sh behavior)
       const s = spinner();
       s.start("git push...");
       const push = spawnSync("git", ["push", "origin", branch], {
@@ -129,8 +130,16 @@ export async function runLoop(options: LoopOptions): Promise<void> {
         encoding: "utf8",
       });
       if (push.status !== 0) {
-        s.stop("git push failed");
-        log.warn(`git push failed: ${push.stderr ?? "unknown error"}`);
+        s.stop("git push failed, retrying with -u...");
+        const retry = spawnSync("git", ["push", "-u", "origin", branch], {
+          cwd,
+          encoding: "utf8",
+        });
+        if (retry.status !== 0) {
+          log.warn(`git push failed: ${retry.stderr ?? "unknown error"}`);
+        } else {
+          log.step("git push done (set upstream)");
+        }
       } else {
         s.stop("git push done");
       }
