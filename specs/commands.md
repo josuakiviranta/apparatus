@@ -1,53 +1,129 @@
 # Commands
 
+All commands are registered in `src/cli/program.ts` via Commander.
+
 ## `ralph plan <project-folder>`
 
-Opens a two-phase brainstorm + interactive planning session.
+Opens an interactive Claude planning session.
 
-1. Resolve `<project-folder>` to absolute path (exit 1 if missing)
-2. Check `claude` is in PATH (exit 1 with install hint if not)
-3. **Phase 1 — Non-interactive brainstorm kickoff:** Spawns `claude -p <trigger> --output-format stream-json --dangerously-skip-permissions` with `cwd: projectFolder`. The trigger instructs Claude to study specs and source, then invoke the brainstorming skill. Streams assistant text and tool-use indicators to stdout. Captures the `session_id` from the stream-json output.
-4. **Phase 2 — Interactive resume:** Spawns `claude --dangerously-skip-permissions --resume <session_id>` with `stdio: inherit`, letting the user refine the brainstorm interactively.
-5. Exit when user closes the session
+**Behavior:**
+1. Non-interactive kickoff phase: spawns `claude -p --output-format=stream-json` to capture a session ID
+2. Interactive resume phase: spawns `claude --resume <session-id>` in the project folder as an interactive TUI
 
-> **Note:** This command does not run prompt bootstrap or read `PROMPT_plan.md`. The brainstorming skill provides the planning structure instead of a static prompt file.
+No prompt files required — injects a brainstorm trigger prompt directly.
 
-## `ralph implement <project-folder> [--max N]`
+## `ralph implement <project-folder>`
 
-Runs the agentic build loop via `loop.ts` (compiled into `dist/`).
+Runs the agentic implementation loop.
 
-1. Run [prompt bootstrap](bootstrap.md)
-2. Resolve & validate project folder
-3. Check `claude` is in PATH
-4. Run the loop engine (`src/cli/lib/loop.ts`) with `<project-folder>/PROMPT_build.md` and optional iteration cap
-5. Forward `SIGINT`/`SIGTERM` to the claude subprocess — kills only ralph's claude, not other sessions
+**Options:**
+- `--max <n>` — cap the number of loop iterations (default: unlimited)
 
-`--max N` caps the number of loop iterations (default: unlimited).
+**Behavior:**
+1. Resolves absolute path; exits if folder missing
+2. Calls `bootstrapPrompts()` — if prompts were injected, exits with instructions to review
+3. Delegates to `runLoop({ promptFile: PROMPT_build.md, cwd, max })` from `loop.ts`
 
-## Stopping the loop
+See [loop.md](loop.md) for iteration details, signal handling, and git push behavior.
 
-Press `Ctrl+C`. Ralph forwards the signal to its own process group, cleanly terminating the claude subprocess without affecting any other running claude sessions.
+## `ralph new <project-name>`
 
-The PID is printed at startup:
+Scaffolds a new project and launches a kickoff session.
 
-```
-PID: 12345  (Ctrl+C or: kill 12345)
-```
+**Behavior:**
+1. Conflict check: warns and exits if `./project-name/` already exists
+2. Creates directory scaffold:
+   - `specs/`
+   - `src/`
+   - `scenario-tests/`
+   - `scenario-runs/`
+   - Empty files: `README.md`, `AGENTS.md`, `IMPLEMENTATION_PLAN.md`
+   - Copies bundled `PROMPT_plan.md` and `PROMPT_build.md`
+   - `.gitignore` with `PROMPT_*.md`, `IMPLEMENTATION_PLAN.md`
+3. Runs `git init -b main`
+4. Two-phase kickoff session using bundled `PROMPT_kickoff.md`:
+   - Phase 1: Non-interactive — substitutes `{{PROJECT_NAME}}`, Claude writes `README.md` + `specs/README.md`
+   - Phase 2: Interactive TUI resume for user to refine
 
-From another terminal: `kill 12345` — triggers cleanup, killing only that session's claude process.
+## `ralph meditate <project-folder>`
 
-## Git push behavior
+Launches a sandboxed meditation Claude session.
 
-After each loop iteration, ralph runs `git push origin <branch>`. If the push fails (e.g., no upstream configured), it retries with `git push -u origin <branch>` to set the upstream tracking branch. If both attempts fail, a warning is logged and the loop continues.
+**Behavior:**
+1. Validates project folder exists
+2. Writes PID lock file at `<project-folder>/.ralph-meditate.pid`
+3. Writes per-PID MCP config for the illumination server
+4. Spawns Claude with strict `dontAsk` permissions:
+   - `Read` — globally allowed
+   - `Write` — restricted to `meditations/illuminations/` only
+5. Claude runs as an interactive session with MCP illumination server access
 
-## `ralph <project-folder>`
+**Stopping:** `ralph meditate kill <project-folder>` sends SIGTERM to the PID in the lock file.
 
-Alias for `implement`. No subcommand → runs the loop.
+## `ralph meditate create <project-folder>`
+
+Creates a new meditation script via a non-interactive Claude session.
+
+**Behavior:**
+1. Spawns a non-interactive Claude session to generate meditation topics
+2. No PID lock file, no permission restrictions
+3. Result is stored in the project's meditation directory
+
+## `ralph run-scenarios <project-folder> [--all]`
+
+Discovers and runs scenario tests.
+
+**Options:**
+- `--all` — skip interactive selection, run every discovered scenario
+
+**Behavior:**
+1. Discovers scenario scripts in `<project-folder>/scenario-tests/*.md`
+2. Without `--all`: presents interactive multi-select for which scenarios to run
+3. With `--all`: runs every discovered scenario
+4. Each scenario runs as an isolated non-interactive Claude session with a templated prompt
+5. Timestamped results written to `<project-folder>/scenario-runs/`
+6. Claude interprets the output and writes an actionable report
+
+## `ralph heartbeat` (subcommands)
+
+Schedules recurring tasks via the background daemon. Communicates via RPC (no direct Claude invocation).
+
+### `ralph heartbeat meditate <project-folder> --every <n>`
+
+Registers a recurring meditation task to run every `<n>` minutes. The daemon auto-starts if not already running.
+
+### `ralph heartbeat list`
+
+Lists all registered heartbeat tasks with their status.
+
+### `ralph heartbeat stop <task-id>`
+
+Stops and removes a registered heartbeat task.
+
+### `ralph heartbeat logs <task-id> [--follow]`
+
+Shows logs for a heartbeat task. `--follow` streams new log lines in real-time.
+
+### `ralph heartbeat watch`
+
+Real-time TUI dashboard of all heartbeat tasks. **Known issue:** Currently broken due to ink ESM/top-level-await incompatibility with tsup ESM output.
+
+## Git Push Behavior
+
+After each loop iteration, `loop.ts` pushes changes:
+1. `git push origin <branch>` (via `spawnSync`)
+2. On failure: retry with `git push -u origin <branch>`
+3. On second failure: log warning, continue looping
 
 ## Error Handling
 
-| Condition | Behavior |
-|---|---|
-| Project folder not found | Print error, exit 1 |
-| `claude` not in PATH | Print install hint, exit 1 |
-| Loop engine fails to start | Print error, exit 1 |
+| Condition | Command | Behavior |
+|-----------|---------|----------|
+| Project folder missing | `implement`, `meditate`, `run-scenarios` | Exit with error |
+| Project folder already exists | `new` | Warn and exit |
+| Prompt file missing | `implement` (via loop) | `cancel()` + exit |
+| `claude` not in PATH | `implement` (via loop) | `cancel()` + exit |
+| Claude exits non-zero | `implement` (via loop) | `log.warn()`, loop continues |
+| `git push` fails twice | `implement` (via loop) | `log.warn()`, loop continues |
+| No scenarios found | `run-scenarios` | Exit with message |
+| Daemon not running | `heartbeat` subcommands | Auto-starts daemon |

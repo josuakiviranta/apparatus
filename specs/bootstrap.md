@@ -1,6 +1,6 @@
 # Prompt Bootstrap
 
-Runs before every command. Ensures the project has prompt files before any Claude session starts.
+Runs before the `implement` command. Ensures the project has prompt files before the implementation loop starts.
 
 ## Algorithm
 
@@ -27,6 +27,13 @@ Injected default prompts into /path/to/project:
 
 Review and customize these prompts, then re-run your command.
 ```
+
+## Scope
+
+Currently only `implement` invokes prompt bootstrap. The other commands handle prompts differently:
+
+- `plan` — injects a brainstorm trigger prompt directly; no prompt files needed
+- `new` — uses `PROMPT_kickoff.md` and copies `PROMPT_plan.md`/`PROMPT_build.md` during project scaffolding
 
 ## Intent
 

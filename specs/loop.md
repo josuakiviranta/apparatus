@@ -1,35 +1,50 @@
-# Loop Script
+# Loop Module
 
-> **Superseded:** As of tag 0.0.16, `loop.sh` has been removed and replaced by `src/cli/lib/loop.ts`. This spec is retained as historical reference.
+`src/cli/lib/loop.ts` is the agentic implementation engine. It runs Claude in a headless loop, piping output through the stream formatter and pushing changes after each iteration.
 
-`loop.sh` is the agentic implementation engine. It runs Claude in a headless loop, committing and pushing changes after each iteration.
+## Interface
 
-## Signature
+```typescript
+export interface LoopOptions {
+  promptFile: string;  // absolute path to PROMPT_build.md
+  cwd: string;         // project folder (claude cwd + git ops)
+  max?: number;        // max iterations; undefined = unlimited
+  model?: string;      // passed to --model flag; defaults to "opus"
+}
 
-```bash
-./loop.sh <prompt-file> [max_iterations]
+export async function runLoop(options: LoopOptions): Promise<void>
 ```
 
-- `<prompt-file>`: absolute path to the prompt markdown file
-- `max_iterations`: optional cap (default: 0 = unlimited)
+Called by `implement.ts`. Checks `claude` availability before starting.
 
-## Behavior
+## Each Iteration
 
-Each iteration:
-1. Run `claude -p --dangerously-skip-permissions --output-format=stream-json --model opus < <prompt-file>`, piping output to `jq` via process substitution
-2. Track claude's PID — on `SIGINT`/`SIGTERM`, only that PID is killed (not all claude processes)
-3. `git push` after iteration completes
-4. If push fails, retry with `-u origin <branch>`
-5. Check iteration count; stop if limit reached
+1. Spawn `claude -p --dangerously-skip-permissions --output-format=stream-json --model <model>` with `cwd` set to the project folder and the prompt file piped to stdin
+2. Read stdout line-by-line through `processLine()` from `stream-formatter.ts`; write formatted output to `process.stdout`
+3. After claude exits: run `git push origin <branch>` in a clack spinner
+4. If push fails, retry with `git push -u origin <branch>`; log warning on second failure and continue
+5. Increment iteration counter; stop if `max` is reached
 
-## Shutdown
+## UI (clack/prompts)
 
-`Ctrl+C` → `cleanup()` trap fires → kills the tracked `CLAUDE_PID` only → exits cleanly.
+| What | Tool |
+|------|------|
+| Startup banner | `intro()` |
+| Iteration separator | `note()` |
+| PID display | `log.step()` |
+| Git push status | `spinner()` |
+| Loop end | `outro()` |
+| Claude stream output | Raw `process.stdout.write()` via stream-formatter |
 
-If `Ctrl+C` is unresponsive, the script prints its own PID (`$$`) in the banner at startup. From another terminal: `kill <PID>` — same trap fires, same clean shutdown.
+## Signal Handling
 
-## Distribution
+`SIGINT`/`SIGTERM` kills the claude child process group (`process.kill(-child.pid!, "SIGTERM")`). Requires `detached: true` on spawn. Calls `outro()` before exit. Signal listeners are removed in the `finally` block.
 
-`loop.sh` is bundled into `dist/` at build time by `tsup.config.ts`. At runtime, `getLoopShPath()` in `src/cli/lib/assets.ts` resolves its location relative to `dist/index.js`.
+## Error Handling
 
-The script is usable standalone as well — `ralph` simply calls it with an explicit prompt file path so it works from any directory.
+| Condition | Behavior |
+|-----------|----------|
+| `promptFile` not found | `cancel()` + exit before loop starts |
+| `claude` not in PATH | `cancel()` + exit before loop starts |
+| `git push` fails | `log.warn()` with error; loop continues |
+| Claude exits non-zero | `log.warn()` with exit code; loop continues |
