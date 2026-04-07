@@ -157,25 +157,27 @@ describe("processLine", () => {
     const { output, nextState } = processLine(line, initialState());
     expect(output).toContain("▶ SUBAGENT: Explore auth");
     expect(nextState.pendingSubagentIds.has("agent-1")).toBe(true);
+    expect(nextState.mainHeaderPrinted).toBe(true);
   });
 
   it("emits SUBAGENT DONE when tool_result matches pending id", () => {
-    const state: FormatterState = { pendingSubagentIds: new Set(["agent-1"]) };
+    const state: FormatterState = { pendingSubagentIds: new Set(["agent-1"]), mainHeaderPrinted: true };
     const line = JSON.stringify({ type: "tool_result", tool_use_id: "agent-1", content: "done" });
     const { output, nextState } = processLine(line, state);
     expect(output).toBe("◀ SUBAGENT DONE\n");
     expect(nextState.pendingSubagentIds.has("agent-1")).toBe(false);
+    expect(nextState.mainHeaderPrinted).toBe(false);
   });
 
   it("ignores tool_result for non-subagent ids", () => {
-    const state: FormatterState = { pendingSubagentIds: new Set() };
+    const state: FormatterState = { pendingSubagentIds: new Set(), mainHeaderPrinted: false };
     const line = JSON.stringify({ type: "tool_result", tool_use_id: "some-other-id", content: "ok" });
     const { output } = processLine(line, state);
     expect(output).toBe("");
   });
 
   it("closes pending subagents on next assistant turn", () => {
-    const state: FormatterState = { pendingSubagentIds: new Set(["agent-1"]) };
+    const state: FormatterState = { pendingSubagentIds: new Set(["agent-1"]), mainHeaderPrinted: true };
     const line = JSON.stringify({
       type: "assistant",
       message: {
@@ -186,6 +188,44 @@ describe("processLine", () => {
     const { output, nextState } = processLine(line, state);
     expect(output).toContain("◀ SUBAGENT DONE");
     expect(nextState.pendingSubagentIds.size).toBe(0);
+  });
+
+  it("does not repeat header on consecutive assistant events", () => {
+    const state: FormatterState = { pendingSubagentIds: new Set(), mainHeaderPrinted: true };
+    const line = JSON.stringify({
+      type: "assistant",
+      message: {
+        content: [{ type: "tool_use", name: "Read", id: "t2", input: { file_path: "/b.ts" } }],
+        usage: { input_tokens: 500, output_tokens: 5 },
+      },
+    });
+    const { output } = processLine(line, state);
+    expect(output).not.toContain(HEADER);
+    expect(output).toContain("→ [read] /b.ts");
+  });
+
+  it("skips events with no substantive content", () => {
+    const line = JSON.stringify({
+      type: "assistant",
+      message: {
+        content: [{ type: "text", text: "   " }],
+        usage: { input_tokens: 50, output_tokens: 1 },
+      },
+    });
+    const { output } = processLine(line, initialState());
+    expect(output).toBe("");
+  });
+
+  it("sums cache tokens into ctx total", () => {
+    const line = JSON.stringify({
+      type: "assistant",
+      message: {
+        content: [{ type: "text", text: "hi" }],
+        usage: { input_tokens: 1000, cache_read_input_tokens: 90000, cache_creation_input_tokens: 5000 },
+      },
+    });
+    const { output } = processLine(line, initialState());
+    expect(output).toContain("◈ ctx: 96,000 tokens");
   });
 
   it("omits token line when usage is absent", () => {

@@ -19,10 +19,6 @@ export function getAssetPath(filename: string): string {
   return join(base, filename);
 }
 
-export function getLoopShPath(): string {
-  return getAssetPath("loop.sh");
-}
-
 export function getPromptPath(type: "plan" | "build"): string {
   const filename =
     type === "plan" ? "PROMPT_plan.md" : "PROMPT_build.md";
@@ -52,16 +48,6 @@ export function getMetaMeditationsDir(): string {
     ? join(__dirname, "../..")
     : join(__dirname, "../../..");
   return join(packageRoot, "meditations");
-}
-
-export function getStreamFormatterPath(): string {
-  if (isProduction()) {
-    // prod: __dirname = dist/cli/ → dist/cli/lib/stream-formatter.js
-    return join(__dirname, "lib", "stream-formatter.js");
-  } else {
-    // dev: __dirname = src/cli/lib/ → src/cli/lib/stream-formatter.ts
-    return join(__dirname, "stream-formatter.ts");
-  }
 }
 
 export function getIlluminationServerPath(): string {

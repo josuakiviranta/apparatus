@@ -1,8 +1,7 @@
-import { spawnSync, spawn } from "child_process";
-import { existsSync, chmodSync } from "fs";
+import { existsSync } from "fs";
 import { resolve } from "path";
 import { bootstrapPrompts } from "../lib/prompts";
-import { getLoopShPath, getStreamFormatterPath } from "../lib/assets";
+import { runLoop } from "../lib/loop.js";
 
 export interface ImplementOptions {
   max?: number;
@@ -31,64 +30,7 @@ export async function implementCommand(
     process.exit(0);
   }
 
-  // Check that claude is available
-  const which = spawnSync("which", ["claude"], { encoding: "utf8" });
-  if (which.status !== 0) {
-    console.error(
-      "Error: claude CLI not found.\nInstall it: npm install -g @anthropic-ai/claude-code"
-    );
-    process.exit(1);
-  }
-
-  const loopSh = getLoopShPath();
-  if (!existsSync(loopSh)) {
-    console.error(`Error: loop.sh not found at ${loopSh}`);
-    process.exit(1);
-  }
-
-  // Ensure loop.sh is executable
-  chmodSync(loopSh, 0o755);
-
   const promptFile = resolve(absPath, "PROMPT_build.md");
-  const args: string[] = [promptFile];
-  if (options.max !== undefined) {
-    args.push(String(options.max));
-  }
-
-  // Determine formatter command: node in prod, tsx in dev
-  const formatterCmd = typeof __RALPH_PROD__ !== "undefined" ? "node" : "tsx";
-  const formatterPath = getStreamFormatterPath();
-
-  const child = spawn(loopSh, args, {
-    cwd: absPath,
-    stdio: "inherit",
-    env: {
-      ...process.env,
-      RALPH_STREAM_FORMATTER: formatterPath,
-      RALPH_STREAM_FORMATTER_CMD: formatterCmd,
-    },
-    detached: true, // own process group — so we can kill only ralph's subtree
-  });
-
-  if (!child.pid) {
-    console.error("Failed to launch loop.sh");
-    process.exit(1);
-  }
-
-  console.log(`Starting implementation loop in ${absPath}...`);
-  if (options.max !== undefined) {
-    console.log(`Max iterations: ${options.max}`);
-  }
-  console.log(`PID: ${child.pid}  (Ctrl+C or: kill ${child.pid})`);
-  console.log();
-
-  const killGroup = () => {
-    try { process.kill(-child.pid!, "SIGTERM"); } catch {}
-  };
-
-  process.on("SIGINT", killGroup);
-  process.on("SIGTERM", killGroup);
-
-  await new Promise<void>((resolve) => child.on("exit", resolve));
+  await runLoop({ promptFile, cwd: absPath, max: options.max });
   process.exit(0);
 }
