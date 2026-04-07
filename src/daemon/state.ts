@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, readdirSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 
@@ -97,6 +97,15 @@ export function closeRun(taskId: string, runId: string, endedAt: number, exitCod
   const header: RunHeader = { ...JSON.parse(lines[0]), endedAt, exitCode };
   const rest = lines.slice(1);
   writeFileSync(logPath, [JSON.stringify(header), ...rest].join("\n") + "\n");
+}
+
+export function listRuns(taskId: string): string[] {
+  const dir = join(getRalphDir(), "logs", taskId);
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .filter((f) => f.endsWith(".log"))
+    .map((f) => f.replace(/\.log$/, ""))
+    .sort();
 }
 
 export function readRunLogs(taskId: string, runId: string): { header: RunHeader; lines: LogLine[] } {

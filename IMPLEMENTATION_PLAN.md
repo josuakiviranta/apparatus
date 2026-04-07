@@ -1,352 +1,216 @@
-# Help Text Redesign Implementation Plan
+# Scenario Tests for ralph Commands Implementation Plan
 
-> **All chunks implemented and verified in tag 0.0.23.**
+> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [x]`) syntax for tracking.
+**Goal:** Add two scenario test scripts that cover the `heartbeat` subcommand lifecycle and `ralph meditate create`, exercising each path end-to-end with no lingering background processes.
 
-**Goal:** Make `ralph --help` self-sufficient — a new user can read it and know how to run any ralph feature.
+**Architecture:** Two shell scripts in `scenario-tests/` following the existing `@name`/`@description` header convention. The heartbeat script runs real daemon commands in sequence with a `trap` cleanup guarantee. The meditate-create script delegates to vitest, matching the existing `test-meditate-session.sh` pattern.
 
-**Architecture:** Pure text changes in two files. `program.ts` gets improved `.description()` strings and a `.addHelpText('after', ...)` workflow block on the root program and each top-level command. `heartbeat.ts` gets the same treatment for all eight subcommands. No new files, no new abstractions.
-
-**Tech Stack:** Commander.js `.description()`, `.addHelpText('after', string)`. Tests via Vitest + `createProgram()` introspection.
+**Tech Stack:** bash, Node.js (`dist/cli/index.js`), vitest, ralph daemon
 
 ---
 
-## Chunk 1: Update `program.ts` — descriptions + root afterText
+## Chunk 1: Heartbeat Lifecycle Script
 
-**Spec:** `docs/superpowers/specs/2026-04-07-help-text-design.md`
+**Spec:** `docs/superpowers/specs/2026-04-07-scenario-tests-commands-design.md`
 
-### Files
-- Modify: `src/cli/program.ts`
-- Modify: `src/cli/tests/cli-commands.test.ts`
-
----
-
-### Task 1: Update tests that assert old descriptions
-
-Two existing tests in `cli-commands.test.ts` hard-code the old description strings. Update them to assert the new values so they fail before the implementation change and pass after.
+### Task 1: Create `test-heartbeat-lifecycle.sh`
 
 **Files:**
-- Modify: `src/cli/tests/cli-commands.test.ts:33-50`
+- Create: `scenario-tests/test-heartbeat-lifecycle.sh`
 
-- [x] **Step 1.1: Update meditate description test (line 37)**
+**Context:** The heartbeat task ID format is `meditate:<basename-of-abs-path>` — the daemon constructs it as `${command}:${basename(args[0])}` (see `src/daemon/index.ts`). So for a temp dir `/tmp/tmp.XyZ123`, the task ID is `meditate:tmp.XyZ123`. The `logs` subcommand without `--follow` does a single request and prints the raw response; there may be no log content yet since the interval is 60 min and the task hasn't fired. The `|| true` on the logs step handles this gracefully.
 
-Change:
-```typescript
-expect(meditateCmd!.description()).toBe("Meditation commands");
-```
-To:
-```typescript
-expect(meditateCmd!.description()).toBe("Run a restricted Claude session that writes insights to meditations/illuminations/");
-```
+The dist CLI is at `$REPO_ROOT/dist/cli/index.js` — use `node "$REPO_ROOT/dist/cli/index.js"` consistently (same pattern as `test-run-scenarios.sh`).
 
-- [x] **Step 1.2: Update meditate create description test (line 49)**
+The `trap cleanup EXIT` fires after the explicit Step 6 stop, so `cleanup` will attempt a second `heartbeat stop` on an already-removed task. The `|| true` suppresses any error — this double-stop is intentional and safe.
 
-Change:
-```typescript
-expect(createCmd!.description()).toBe("Create a new meditation script");
-```
-To:
-```typescript
-expect(createCmd!.description()).toBe("Create a new meditation script with a guided Claude session");
-```
+- [ ] **Step 1: Create the script**
 
-- [x] **Step 1.3: Run tests to verify they now fail**
+Create `scenario-tests/test-heartbeat-lifecycle.sh` with this content:
 
 ```bash
-npm test -- --run src/cli/tests/cli-commands.test.ts
+#!/bin/bash
+# @name: Heartbeat Lifecycle
+# @description: Registers a meditate task, lists it, pauses, resumes, reads logs, then stops it — verifies no tasks linger after stop
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+TMP_PROJECT="$(mktemp -d)"
+TASK_ID="meditate:$(basename "$TMP_PROJECT")"
+
+cleanup() {
+  # Double-stop is intentional — trap fires after explicit Step 6 stop; || true suppresses already-removed error
+  node "$REPO_ROOT/dist/cli/index.js" heartbeat stop "$TASK_ID" 2>/dev/null || true
+  rm -rf "$TMP_PROJECT"
+}
+trap cleanup EXIT
+
+echo "=== Scenario: Heartbeat Lifecycle ==="
+echo "TASK_ID=$TASK_ID"
+echo ""
+
+echo "--- Step 1: Register task (every 60 min) ---"
+node "$REPO_ROOT/dist/cli/index.js" heartbeat meditate "$TMP_PROJECT" --every 60
+
+echo ""
+echo "--- Step 2: List tasks ---"
+node "$REPO_ROOT/dist/cli/index.js" heartbeat list
+
+echo ""
+echo "--- Step 3: Pause task ---"
+node "$REPO_ROOT/dist/cli/index.js" heartbeat pause "$TASK_ID"
+
+echo ""
+echo "--- Step 4: Resume task ---"
+node "$REPO_ROOT/dist/cli/index.js" heartbeat resume "$TASK_ID"
+
+echo ""
+echo "--- Step 5: Logs (no-follow) ---"
+node "$REPO_ROOT/dist/cli/index.js" heartbeat logs "$TASK_ID" || true
+
+echo ""
+echo "--- Step 6: Stop task ---"
+node "$REPO_ROOT/dist/cli/index.js" heartbeat stop "$TASK_ID"
+
+echo ""
+echo "--- Step 7: Verify task removed ---"
+node "$REPO_ROOT/dist/cli/index.js" heartbeat list
+
+echo ""
+echo "=== DONE ==="
 ```
 
-Expected: 2 failures on the description assertions. All other tests still pass.
+- [ ] **Step 2: Make executable**
+
+```bash
+chmod +x scenario-tests/test-heartbeat-lifecycle.sh
+```
+
+- [ ] **Step 3: Build dist if needed**
+
+```bash
+ls dist/cli/index.js 2>/dev/null || npm run build
+```
+
+- [ ] **Step 4: Run the script directly to verify it works**
+
+```bash
+bash scenario-tests/test-heartbeat-lifecycle.sh
+```
+
+Expected: prints each step header, each subcommand output (e.g. `Registered: meditate:/tmp/...`, `Paused: meditate:/tmp/...`, `Stopped and removed: meditate:/tmp/...`), final list shows "No heartbeat tasks registered." Exit code 0.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add scenario-tests/test-heartbeat-lifecycle.sh
+git commit -m "feat: add heartbeat lifecycle scenario test"
+```
 
 ---
 
-### Task 2: Update `program.ts` descriptions and add afterText
+## Chunk 2: Meditate Create Script
+
+### Task 2: Create `test-meditate-create.sh`
 
 **Files:**
-- Modify: `src/cli/program.ts`
+- Create: `scenario-tests/test-meditate-create.sh`
+- Reference: `src/cli/tests/meditate-create.test.ts` (existing vitest file being delegated to)
 
-- [x] **Step 2.1: Update root program description and add workflow afterText**
+**Context:** `ralph meditate create` is a two-phase interactive command (non-interactive Claude kickoff → TUI resume). It cannot be run end-to-end in a script without spawning real Claude. The vitest test file exercises `buildMeditateCreateKickoffArgs` and related pure functions with stubs. This script follows the identical pattern to `test-meditate-session.sh`.
 
-In `createProgram()`, after `.version("0.1.0")`, add:
-
-```typescript
-program
-  .addHelpText(
-    "after",
-    `
-Getting started (typical workflow):
-  ralph new my-app                        Scaffold a new project in ./my-app/
-  ralph plan my-app                       Open an interactive planning session
-  ralph implement my-app                  Run the agentic build loop (Ctrl-C to stop)
-  ralph implement my-app --max 3          Run at most 3 iterations
-  ralph run-scenarios my-app              Discover and run scenario tests
-
-Background scheduling (heartbeat):
-  ralph heartbeat meditate my-app --every 30        Run meditate on my-app every 30 min
-  ralph heartbeat list                              Show all scheduled tasks
-  ralph heartbeat logs meditate:my-app --follow     Stream live logs for a task
-  ralph heartbeat watch                             Live TUI dashboard
-  ralph heartbeat pause meditate:my-app             Suspend scheduling without removing
-  ralph heartbeat resume meditate:my-app            Re-enable a paused task
-  ralph heartbeat stop meditate:my-app              Remove task and kill any running session
-
-Meditation (restricted insight sessions):
-  ralph meditate my-app                   Run a one-shot meditation session
-  ralph meditate create my-app            Create a new meditation script`
-  );
-```
-
-- [x] **Step 2.2: Update `plan` command**
-
-Change:
-```typescript
-.description("Open an interactive Claude planning session")
-```
-To:
-```typescript
-.description("Open an interactive Claude session to write specs, README, and build prompts")
-.addHelpText("after", "\nExamples:\n  ralph plan my-app\n")
-```
-
-- [x] **Step 2.3: Update `implement` command**
-
-Change:
-```typescript
-.description("Run the agentic implementation loop")
-```
-To:
-```typescript
-.description("Run the agentic build loop — Claude reads prompts, writes code, commits, and pushes")
-.addHelpText("after", "\nExamples:\n  ralph implement my-app\n  ralph implement my-app --max 5\n")
-```
-
-- [x] **Step 2.4: Update `new` command**
-
-Change:
-```typescript
-.description("Scaffold a new project and launch a kickoff session")
-```
-To:
-```typescript
-.description("Create a new project folder with prompts, specs/, and a guided Claude kickoff session")
-.addHelpText("after", "\nExamples:\n  ralph new my-app\n")
-```
-
-- [x] **Step 2.5: Update `meditate` parent command**
-
-Change:
-```typescript
-.description("Meditation commands")
-```
-To:
-```typescript
-.description("Run a restricted Claude session that writes insights to meditations/illuminations/")
-.addHelpText("after", "\nExamples:\n  ralph meditate my-app\n")
-```
-
-- [x] **Step 2.6: Update `meditate create` subcommand**
-
-Change:
-```typescript
-.description("Create a new meditation script")
-```
-To:
-```typescript
-.description("Create a new meditation script with a guided Claude session")
-.addHelpText("after", "\nExamples:\n  ralph meditate create my-app\n")
-```
-
-- [x] **Step 2.7: Update `run-scenarios` command**
-
-Change:
-```typescript
-.description("Discover and run scenario tests, writing actionable reports")
-```
-To:
-```typescript
-.description("Discover scenario-tests/*.md files, run them with Claude, and write reports to scenario-runs/")
-.addHelpText("after", "\nExamples:\n  ralph run-scenarios my-app\n  ralph run-scenarios my-app --all\n")
-```
-
-- [x] **Step 2.8: Run tests to verify they pass**
+- [ ] **Step 1: Check what the meditate-create vitest file covers**
 
 ```bash
-npm test -- --run src/cli/tests/cli-commands.test.ts
+npx vitest run src/cli/tests/meditate-create.test.ts --reporter=verbose 2>&1 | head -40
 ```
 
-Expected: all tests pass.
+Expected: tests pass. Note which test names appear — the script description should match what's actually tested.
 
-- [x] **Step 2.9: Smoke-check the output**
+- [ ] **Step 2: Create the script**
+
+Create `scenario-tests/test-meditate-create.sh` with this content:
 
 ```bash
-node dist/cli/index.js --help
+#!/bin/bash
+# @name: Meditate Create Subcommand
+# @description: Verifies ralph meditate create unit behavior — argument parsing, kickoff args, and session handling — via vitest
+
+set -e
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+echo "=== Scenario: Meditate Create Subcommand ==="
+echo "Running vitest for meditateCreateCommand tests..."
+
+cd "$REPO_ROOT"
+npx vitest run src/cli/tests/meditate-create.test.ts --reporter=verbose 2>&1
+
+echo ""
+echo "=== PASS: meditate create tests completed ==="
 ```
 
-Expected: root help shows the "Getting started" and "Background scheduling" sections below the command list.
-
-If `dist/` is stale, run `npm run build` first.
-
-- [x] **Step 2.10: Commit**
+- [ ] **Step 3: Make executable**
 
 ```bash
-git add src/cli/program.ts src/cli/tests/cli-commands.test.ts
-git commit -m "feat: improve program.ts help text — descriptions and workflow afterText"
+chmod +x scenario-tests/test-meditate-create.sh
+```
+
+- [ ] **Step 4: Run the script directly to verify**
+
+```bash
+bash scenario-tests/test-meditate-create.sh
+```
+
+Expected: vitest output with all tests passing. Exit code 0.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add scenario-tests/test-meditate-create.sh
+git commit -m "feat: add meditate create scenario test"
 ```
 
 ---
 
-## Chunk 2: Update `heartbeat.ts` — subcommand descriptions + afterText
+## Chunk 3: End-to-End Verification
 
-**Spec:** `docs/superpowers/specs/2026-04-07-help-text-design.md`
-
-### Files
-- Modify: `src/cli/commands/heartbeat.ts`
-
----
-
-### Task 3: Update heartbeat subcommand descriptions and add examples
+### Task 3: Verify both scenarios run via `ralph run-scenarios`
 
 **Files:**
-- Modify: `src/cli/commands/heartbeat.ts`
+- No new files — this task just verifies the full pipeline works.
 
-- [x] **Step 3.1: Update `heartbeat` group description**
+**Context:** `ralph run-scenarios` discovers `scenario-tests/*.sh` files, builds a Claude prompt from the `@name`/`@description` headers, spawns a Claude session per scenario, and writes a report to `scenario-runs/`. Use `--all` to skip interactive selection.
 
-In `registerHeartbeatCommand()`:
-
-Change:
-```typescript
-.description("Manage background scheduled tasks")
-```
-To:
-```typescript
-.description("Manage background scheduled tasks (daemon-backed; persists across terminal sessions)")
-.addHelpText("after", `
-Examples:
-  ralph heartbeat list
-  ralph heartbeat watch`)
-```
-
-- [x] **Step 3.2: Update `heartbeat meditate` subcommand**
-
-Change:
-```typescript
-.description("Run meditate on a project folder on a heartbeat schedule")
-```
-To:
-```typescript
-.description("Schedule meditate to run on a project folder at a fixed interval")
-.addHelpText("after", "\nExamples:\n  ralph heartbeat meditate my-app --every 30\n")
-```
-
-- [x] **Step 3.3: Update `heartbeat list` subcommand**
-
-Change:
-```typescript
-.description("List all registered heartbeat tasks")
-```
-To:
-```typescript
-.description("List all registered tasks with their status and last run time")
-```
-
-- [x] **Step 3.4: Update `heartbeat stop` subcommand**
-
-Change:
-```typescript
-.description("Remove task and kill any running session")
-```
-To:
-```typescript
-.description("Remove a task from the schedule and kill any running session")
-.addHelpText("after", "\nExamples:\n  ralph heartbeat stop meditate:my-app\n")
-```
-
-- [x] **Step 3.5: Update `heartbeat pause` subcommand**
-
-Change:
-```typescript
-.description("Suspend scheduling without removing the task")
-```
-To:
-```typescript
-.description("Suspend scheduling for a task without removing it")
-.addHelpText("after", "\nExamples:\n  ralph heartbeat pause meditate:my-app\n")
-```
-
-- [x] **Step 3.6: Update `heartbeat resume` subcommand**
-
-Change:
-```typescript
-.description("Re-enable scheduling for a paused task")
-```
-To:
-```typescript
-.description("Re-enable scheduling for a paused task")
-.addHelpText("after", "\nExamples:\n  ralph heartbeat resume meditate:my-app\n")
-```
-
-- [x] **Step 3.7: Update `heartbeat kill` subcommand**
-
-Change:
-```typescript
-.description("Kill running session only — schedule stays")
-```
-To:
-```typescript
-.description("Kill the currently running session for a task; schedule is preserved")
-.addHelpText("after", "\nExamples:\n  ralph heartbeat kill meditate:my-app\n")
-```
-
-- [x] **Step 3.8: Update `heartbeat logs` subcommand**
-
-Change:
-```typescript
-.description("Print logs for a task")
-```
-To:
-```typescript
-.description("Print logs for a task; use --follow to stream live output")
-.addHelpText("after", "\nExamples:\n  ralph heartbeat logs meditate:my-app\n  ralph heartbeat logs meditate:my-app --follow\n")
-```
-
-- [x] **Step 3.9: Update `heartbeat watch` subcommand**
-
-Change:
-```typescript
-.description("Live TUI: all tasks + streaming output")
-```
-To:
-```typescript
-.description("Open a live TUI dashboard showing all tasks and streaming output")
-```
-
-- [x] **Step 3.10: Run full test suite**
+- [ ] **Step 1: Confirm dist is current**
 
 ```bash
-npm test -- --run
+npm run build
 ```
 
-Expected: all tests pass. (No heartbeat description tests exist yet — this step confirms nothing regressed.)
-
-- [x] **Step 3.11: Smoke-check heartbeat help**
+- [ ] **Step 2: Run both new scenarios via `ralph run-scenarios`**
 
 ```bash
-node dist/cli/index.js heartbeat --help
-node dist/cli/index.js heartbeat meditate --help
-node dist/cli/index.js heartbeat logs --help
+node dist/cli/index.js run-scenarios . --all 2>&1
 ```
 
-Build first if needed: `npm run build`
+Expected: both new scenarios appear in the list, Claude sessions run for each, two new `.md` files appear in `scenario-runs/` with `status: pass`.
 
-Expected:
-- `heartbeat --help` shows new group description + "Examples:" block
-- `heartbeat meditate --help` shows example with `--every 30`
-- `heartbeat logs --help` shows two examples (with and without `--follow`)
-
-- [x] **Step 3.12: Commit**
+- [ ] **Step 3: Verify no background daemon tasks linger**
 
 ```bash
-git add src/cli/commands/heartbeat.ts
-git commit -m "feat: improve heartbeat.ts help text — descriptions and per-subcommand examples"
+node dist/cli/index.js heartbeat list
+```
+
+Expected: "No heartbeat tasks registered." (or only pre-existing tasks, none from the test run).
+
+- [ ] **Step 4: Commit scenario-runs reports (optional)**
+
+If the reports are worth keeping:
+
+```bash
+git add scenario-runs/
+git commit -m "chore: add initial scenario run reports for heartbeat and meditate-create"
 ```

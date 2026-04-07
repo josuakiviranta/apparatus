@@ -14,7 +14,17 @@ const DAEMON_POLL_INTERVAL_MS = 100;
 
 function getDaemonBin(): { command: string; args: string[] } {
   if (typeof __RALPH_PROD__ !== "undefined") {
-    // prod: dist/cli/ — daemon is at dist/daemon/index.js
+    // prod: code may be in dist/cli/index.js or dist/chunk-*.js (tsup chunking)
+    // Walk up from __dirname until we find a dir containing daemon/index.js
+    let dir = __dirname;
+    for (let i = 0; i < 3; i++) {
+      const candidate = join(dir, "daemon", "index.js");
+      if (existsSync(candidate)) {
+        return { command: process.execPath, args: [candidate] };
+      }
+      dir = join(dir, "..");
+    }
+    // Fallback: assume dist/cli/ layout
     return { command: process.execPath, args: [join(__dirname, "..", "daemon", "index.js")] };
   }
   // dev mode — __dirname is somewhere in src/

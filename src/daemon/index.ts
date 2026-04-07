@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, writeFileSync, unlinkSync, readFileSync } from "
 import { join, basename } from "path";
 import { homedir } from "os";
 import net from "net";
-import { ensureDirs, readTasks, upsertTask, deleteTask, getTask } from "./state";
+import { ensureDirs, readTasks, upsertTask, deleteTask, getTask, listRuns, readRunLogs } from "./state";
 import { Scheduler } from "./scheduler";
 import { runTask, isSessionRunning, killSession } from "./runner";
 import { createSocketServer } from "./socket";
@@ -122,9 +122,29 @@ const server = createSocketServer(sockPath, {
     if (!killSession(task)) throw new Error(`No active session for: ${taskId}`);
   },
 
-  stream_logs: (_taskId, _follow, _onLine) => {
-    // v1: not implemented — use `ralph heartbeat watch` for live output
-    return () => {};
+  stream_logs: (taskId, follow, onLine) => {
+    const runs = listRuns(taskId);
+    if (runs.length === 0) {
+      onLine({ type: "logs", taskId, runs: [], message: "No log runs found for this task." });
+      return () => {};
+    }
+    const latestRunId = runs[runs.length - 1];
+    const { header, lines } = readRunLogs(taskId, latestRunId);
+    if (!follow) {
+      onLine({ type: "logs", taskId, runId: latestRunId, header, lines });
+      return () => {};
+    }
+    // follow mode: send existing lines first, then stream new ones via broadcast
+    for (const line of lines) {
+      onLine({ type: "log_line", taskId, ...line });
+    }
+    const listener = (event: object) => {
+      if ((event as any).type === "log_line" && (event as any).taskId === taskId) {
+        onLine(event);
+      }
+    };
+    watchListeners.add(listener);
+    return () => watchListeners.delete(listener);
   },
 
   watch: (onEvent) => {
