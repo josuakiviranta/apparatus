@@ -90,3 +90,13 @@ Commands:
 5. Glob and remove any `.mcp.ralph-*.json` files in the project folder (handles orphaned configs from crashed sessions)
 
 Steps 1–5 run regardless of whether a live session is found.
+
+## Implementation Notes
+
+**Implemented in 0.0.19:**
+
+- `meditate-create` renamed to `meditate create` using Commander v12's nested subcommand pattern (parent command with argument + subcommand)
+- `createProgram()` extracted to `src/cli/program.ts` for testability; `index.ts` is now a pure entry point
+- `meditate stop` and `meditate status` NOT implemented — functionality handled by `heartbeat stop`/`heartbeat pause`/`heartbeat resume` per IMPLEMENTATION_PLAN decision
+
+**Deviation from spec:** The spec proposed registering flat multi-word commands via `program.command('meditate stop <project-folder>')`. Commander v12 does not support multi-word command names this way. Instead, `meditate` is a command group with `create` as a subcommand. Users see `meditate` in `ralph --help` and discover `create` via `ralph meditate --help`.

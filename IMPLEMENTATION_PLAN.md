@@ -12,6 +12,7 @@ All core commands and infrastructure are complete.
 - **meditate.ts fixes**: RALPH_TEST_CMD override, exit code surfacing, tool-use progress indicators.
 - **Scaffold correction** (tag 0.0.18): Removed TS-specific `src/tests/{integration,unit}/` and `meditations/illuminations/` from `ralph new` scaffold. Now language-agnostic per run-scenarios spec.
 - **loop.sh removed** (tag 0.0.18): Deleted `loop.sh` and its copy step from `tsup.config.ts`. CLI uses `loop.ts` exclusively.
+- **CLI help consolidation** (tag 0.0.19): Restructured `meditate-create` hyphenated command into `meditate create` subcommand using Commander v12 nested command pattern. Extracted `createProgram()` into `src/cli/program.ts` for testability. Added 7 new tests for command structure and parse routing.
 
 ## Known Issues
 
@@ -19,6 +20,5 @@ All core commands and infrastructure are complete.
 
 ## Future Work
 
-- **CLI help consolidation**: Remove `meditate stop`/`meditate status` commands, redirect to `heartbeat stop`/`heartbeat pause`/`heartbeat resume` per CLI help readability spec.
 - **Smoke test loop.ts end-to-end**: Run `ralph <project> implement --max 1` against a real project to verify clack output, stream formatting, git push spinner, and clean exit.
 - **Update specs for loop.sh removal**: Historical specs reference loop.sh — update to reflect loop.ts as the sole engine.
