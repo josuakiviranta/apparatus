@@ -34,7 +34,7 @@ describe("CLI command structure", () => {
     const program = createProgram();
     const meditateCmd = program.commands.find((c) => c.name() === "meditate");
     expect(meditateCmd).toBeDefined();
-    expect(meditateCmd!.description()).toBe("Meditation commands");
+    expect(meditateCmd!.description()).toBe("Run a restricted Claude session that writes insights to meditations/illuminations/");
   });
 
   it("meditate create subcommand has the correct description", () => {
@@ -46,7 +46,7 @@ describe("CLI command structure", () => {
       (c) => c.name() === "create"
     );
     expect(createCmd).toBeDefined();
-    expect(createCmd!.description()).toBe("Create a new meditation script");
+    expect(createCmd!.description()).toBe("Create a new meditation script with a guided Claude session");
   });
 });
 
