@@ -6,6 +6,7 @@ All prior plan items (loop.ts module, stream-formatter observability) are comple
 
 - **loop.ts module** (tag 0.0.16): Replaced loop.sh with TypeScript `runLoop()` in `src/cli/lib/loop.ts`. Uses `@clack/prompts` for UI, imports `stream-formatter.processLine()` directly. `implement.ts` simplified to call `runLoop()`. Dead code (`getLoopShPath`, `getStreamFormatterPath`) removed from assets.ts.
 - **stream-formatter observability** (tag 0.0.15): `processLine()` renders tool calls, subagent boundaries, token counts with cache support, and `mainHeaderPrinted` dedup.
+- **stream-formatter standalone fix** (tag 0.0.17): Fixed `import.meta.url` guard broken by tsup chunk splitting. Replaced with filename pattern test.
 
 ## Future Work
 
