@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { processLine, initialState, type FormatterState } from "../lib/stream-formatter";
+import { processLine, initialState, flushState, type FormatterState } from "../lib/stream-formatter";
 
 const HEADER = "┌─ MAIN AGENT ──────────────────────────────────────────\n";
 
@@ -146,7 +146,7 @@ describe("processLine", () => {
     expect(output).toContain("→ [tool] TodoWrite");
   });
 
-  it("renders Agent tool_use as SUBAGENT START and stores the id in state", () => {
+  it("renders Agent tool_use as SUBAGENT START and stores id, description, buffer in state", () => {
     const line = JSON.stringify({
       type: "assistant",
       message: {
@@ -157,41 +157,78 @@ describe("processLine", () => {
     const { output, nextState } = processLine(line, initialState());
     expect(output).toContain("▶ SUBAGENT: Explore auth");
     expect(nextState.pendingSubagentIds.has("agent-1")).toBe(true);
+    expect(nextState.subagentDescriptions.get("agent-1")).toBe("Explore auth");
+    expect(nextState.subagentBuffers.has("agent-1")).toBe(true);
     expect(nextState.mainHeaderPrinted).toBe(true);
   });
 
-  it("emits SUBAGENT DONE when tool_result matches pending id", () => {
-    const state: FormatterState = { pendingSubagentIds: new Set(["agent-1"]), mainHeaderPrinted: true };
-    const line = JSON.stringify({ type: "tool_result", tool_use_id: "agent-1", content: "done" });
+  it("buffers subagent assistant event, no immediate output", () => {
+    const state: FormatterState = {
+      pendingSubagentIds: new Set(["agent-1"]),
+      subagentBuffers: new Map([["agent-1", ""]]),
+      subagentDescriptions: new Map([["agent-1", "Explore auth"]]),
+      mainHeaderPrinted: true,
+      lastMainCtxTotal: 0,
+    };
+    const line = JSON.stringify({
+      type: "assistant",
+      parent_tool_use_id: "agent-1",
+      message: {
+        content: [{ type: "tool_use", name: "Glob", id: "t1", input: { pattern: "**/*.ts" } }],
+        usage: { input_tokens: 500, output_tokens: 5 },
+      },
+    });
     const { output, nextState } = processLine(line, state);
-    expect(output).toBe("◀ SUBAGENT DONE\n");
+    expect(output).toBe("");
+    expect(nextState.subagentBuffers.get("agent-1")).toBe("  → [glob] **/*.ts\n");
+  });
+
+  it("flushes subagent buffer as labeled block on close", () => {
+    const state: FormatterState = {
+      pendingSubagentIds: new Set(["agent-1"]),
+      subagentBuffers: new Map([["agent-1", "  → [glob] **/*.ts\n"]]),
+      subagentDescriptions: new Map([["agent-1", "Explore auth"]]),
+      mainHeaderPrinted: true,
+      lastMainCtxTotal: 0,
+    };
+    const line = JSON.stringify({
+      type: "user",
+      message: {
+        content: [{ type: "tool_result", tool_use_id: "agent-1", content: [] }],
+      },
+    });
+    const { output, nextState } = processLine(line, state);
+    expect(output).toContain("┌─ SUBAGENT: Explore auth");
+    expect(output).toContain("  → [glob] **/*.ts");
+    expect(output).toContain("◀ ──");
     expect(nextState.pendingSubagentIds.has("agent-1")).toBe(false);
     expect(nextState.mainHeaderPrinted).toBe(false);
   });
 
-  it("ignores tool_result for non-subagent ids", () => {
-    const state: FormatterState = { pendingSubagentIds: new Set(), mainHeaderPrinted: false };
-    const line = JSON.stringify({ type: "tool_result", tool_use_id: "some-other-id", content: "ok" });
+  it("ignores tool_result for non-subagent ids (user-wrapped)", () => {
+    const state: FormatterState = {
+      pendingSubagentIds: new Set(),
+      subagentBuffers: new Map(),
+      subagentDescriptions: new Map(),
+      mainHeaderPrinted: false,
+      lastMainCtxTotal: 0,
+    };
+    const line = JSON.stringify({
+      type: "user",
+      message: { content: [{ type: "tool_result", tool_use_id: "some-other-id", content: "ok" }] },
+    });
     const { output } = processLine(line, state);
     expect(output).toBe("");
   });
 
-  it("closes pending subagents on next assistant turn", () => {
-    const state: FormatterState = { pendingSubagentIds: new Set(["agent-1"]), mainHeaderPrinted: true };
-    const line = JSON.stringify({
-      type: "assistant",
-      message: {
-        content: [{ type: "text", text: "continuing" }],
-        usage: { input_tokens: 300, output_tokens: 5 },
-      },
-    });
-    const { output, nextState } = processLine(line, state);
-    expect(output).toContain("◀ SUBAGENT DONE");
-    expect(nextState.pendingSubagentIds.size).toBe(0);
-  });
-
   it("does not repeat header on consecutive assistant events", () => {
-    const state: FormatterState = { pendingSubagentIds: new Set(), mainHeaderPrinted: true };
+    const state: FormatterState = {
+      pendingSubagentIds: new Set(),
+      subagentBuffers: new Map(),
+      subagentDescriptions: new Map(),
+      mainHeaderPrinted: true,
+      lastMainCtxTotal: 0,
+    };
     const line = JSON.stringify({
       type: "assistant",
       message: {
@@ -247,5 +284,114 @@ describe("processLine", () => {
     });
     const { output } = processLine(line, initialState());
     expect(output).toContain("◈ ctx: 1,234,567 tokens");
+  });
+
+  // ctx growth gating tests
+  it("prints ctx line when total grows, suppresses when equal", () => {
+    const line = JSON.stringify({
+      type: "assistant",
+      message: {
+        content: [{ type: "text", text: "hi" }],
+        usage: { input_tokens: 1000, output_tokens: 5 },
+      },
+    });
+    // First call from initialState: 1000 > 0 → prints
+    const { output: o1, nextState: s1 } = processLine(line, initialState());
+    expect(o1).toContain("◈ ctx: 1,000 tokens");
+    expect(s1.lastMainCtxTotal).toBe(1000);
+
+    // Second call: 1000 is not > 1000 → suppressed
+    const { output: o2 } = processLine(line, s1);
+    expect(o2).not.toContain("◈ ctx");
+  });
+
+  it("suppresses ctx line when total has not grown", () => {
+    const state: FormatterState = {
+      pendingSubagentIds: new Set(),
+      subagentBuffers: new Map(),
+      subagentDescriptions: new Map(),
+      mainHeaderPrinted: false,
+      lastMainCtxTotal: 5000,
+    };
+    const line = JSON.stringify({
+      type: "assistant",
+      message: {
+        content: [{ type: "text", text: "same size" }],
+        usage: { input_tokens: 5000, output_tokens: 5 },
+      },
+    });
+    const { output } = processLine(line, state);
+    expect(output).not.toContain("◈ ctx");
+  });
+
+  it("never prints ctx line for subagent assistant events", () => {
+    const state: FormatterState = {
+      pendingSubagentIds: new Set(["agent-1"]),
+      subagentBuffers: new Map([["agent-1", ""]]),
+      subagentDescriptions: new Map([["agent-1", "Explore auth"]]),
+      mainHeaderPrinted: true,
+      lastMainCtxTotal: 0,
+    };
+    const line = JSON.stringify({
+      type: "assistant",
+      parent_tool_use_id: "agent-1",
+      message: {
+        content: [{ type: "tool_use", name: "Glob", id: "t1", input: { pattern: "**/*.ts" } }],
+        usage: { input_tokens: 9999, output_tokens: 5 },
+      },
+    });
+    const { output } = processLine(line, state);
+    expect(output).toBe(""); // buffered, not printed — no ctx line emitted
+  });
+
+  // formatSubagentBlock tests (tested via processLine/flushState)
+  it("formatSubagentBlock: normal description produces correct framing", () => {
+    const state: FormatterState = {
+      pendingSubagentIds: new Set(["a1"]),
+      subagentBuffers: new Map([["a1", "  → [glob] **/*.ts\n"]]),
+      subagentDescriptions: new Map([["a1", "Study specs"]]),
+      mainHeaderPrinted: true,
+      lastMainCtxTotal: 0,
+    };
+    const line = JSON.stringify({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: "a1", content: [] }] } });
+    const { output } = processLine(line, state);
+    expect(output).toContain("┌─ SUBAGENT: Study specs ");
+    expect(output).toContain("◀ ──");
+    expect(output).toContain("  → [glob] **/*.ts");
+  });
+
+  it("formatSubagentBlock: long description clamps dashes to zero", () => {
+    const longDesc = "A".repeat(60); // label alone exceeds totalWidth=56
+    const state: FormatterState = {
+      pendingSubagentIds: new Set(["a1"]),
+      subagentBuffers: new Map([["a1", ""]]),
+      subagentDescriptions: new Map([["a1", longDesc]]),
+      mainHeaderPrinted: true,
+      lastMainCtxTotal: 0,
+    };
+    const line = JSON.stringify({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: "a1", content: [] }] } });
+    const { output } = processLine(line, state);
+    // Should not throw and should still contain the description
+    expect(output).toContain(`┌─ SUBAGENT: ${longDesc}`);
+  });
+});
+
+describe("flushState", () => {
+  it("returns formatted block for each pending subagent", () => {
+    const state: FormatterState = {
+      pendingSubagentIds: new Set(["agent-1"]),
+      subagentBuffers: new Map([["agent-1", "  → [glob] **/*.ts\n"]]),
+      subagentDescriptions: new Map([["agent-1", "Explore auth"]]),
+      mainHeaderPrinted: true,
+      lastMainCtxTotal: 0,
+    };
+    const output = flushState(state);
+    expect(output).toContain("┌─ SUBAGENT: Explore auth");
+    expect(output).toContain("  → [glob] **/*.ts");
+    expect(output).toContain("◀ ──");
+  });
+
+  it("returns empty string when no pending subagents", () => {
+    expect(flushState(initialState())).toBe("");
   });
 });

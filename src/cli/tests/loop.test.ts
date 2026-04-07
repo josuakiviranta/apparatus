@@ -30,12 +30,16 @@ vi.mock("@clack/prompts", () => ({
 vi.mock("../lib/stream-formatter.js", () => ({
   processLine: vi.fn(() => ({
     output: "",
-    nextState: { pendingSubagentIds: new Set(), mainHeaderPrinted: false },
+    nextState: { pendingSubagentIds: new Set(), subagentBuffers: new Map(), subagentDescriptions: new Map(), mainHeaderPrinted: false, lastMainCtxTotal: 0 },
   })),
   initialState: vi.fn(() => ({
     pendingSubagentIds: new Set(),
+    subagentBuffers: new Map(),
+    subagentDescriptions: new Map(),
     mainHeaderPrinted: false,
+    lastMainCtxTotal: 0,
   })),
+  flushState: vi.fn(() => ""),
 }));
 
 // --- Imports after mocks ---
@@ -140,7 +144,7 @@ describe("runLoop", () => {
   it("feeds each stdout line through processLine and writes output", async () => {
     vi.mocked(formatter.processLine).mockReturnValue({
       output: "→ [read] file.ts\n",
-      nextState: { pendingSubagentIds: new Set(), mainHeaderPrinted: true },
+      nextState: { pendingSubagentIds: new Set(), subagentBuffers: new Map(), subagentDescriptions: new Map(), mainHeaderPrinted: true, lastMainCtxTotal: 0 },
     });
 
     const { rlEmitter } = makeMockChild(0);

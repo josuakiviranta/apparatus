@@ -9,7 +9,7 @@ import {
   log,
   note,
 } from "@clack/prompts";
-import { processLine, initialState } from "./stream-formatter.js";
+import { processLine, initialState, flushState } from "./stream-formatter.js";
 
 export interface LoopOptions {
   promptFile: string; // absolute path to PROMPT_build.md
@@ -114,6 +114,8 @@ export async function runLoop(options: LoopOptions): Promise<void> {
         if (output) process.stdout.write(output);
       });
       await new Promise<void>((resolve) => rl.on("close", resolve));
+      const flush = flushState(state);
+      if (flush) process.stdout.write(flush);
       await exitPromise;
 
       currentPid = undefined;
