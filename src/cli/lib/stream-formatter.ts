@@ -134,11 +134,13 @@ export function processLine(
   return { output, nextState: { pendingSubagentIds: nextPending, mainHeaderPrinted: nextHeaderPrinted } };
 }
 
-// Only run as main entry point when executed directly
+// Only run as main entry point when executed directly.
+// Note: cannot use import.meta.url comparison because tsup moves this code
+// into a shared chunk whose URL differs from process.argv[1].
 if (
   typeof process !== "undefined" &&
   process.argv[1] &&
-  import.meta.url === `file://${process.argv[1]}`
+  /stream-formatter\.(js|ts)$/.test(process.argv[1])
 ) {
   const rl = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
   let state = initialState();
