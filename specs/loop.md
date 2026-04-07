@@ -1,5 +1,7 @@
 # Loop Script
 
+> **Superseded:** As of tag 0.0.16, `loop.sh` has been removed and replaced by `src/cli/lib/loop.ts`. This spec is retained as historical reference.
+
 `loop.sh` is the agentic implementation engine. It runs Claude in a headless loop, committing and pushing changes after each iteration.
 
 ## Signature

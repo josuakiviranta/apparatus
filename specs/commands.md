@@ -13,15 +13,13 @@ Opens an interactive Claude Code TUI for planning/spec writing.
 
 ## `ralph implement <project-folder> [--max N]`
 
-Runs the agentic build loop via `loop.sh`.
+Runs the agentic build loop via `loop.ts` (compiled into `dist/`).
 
 1. Run [prompt bootstrap](bootstrap.md)
 2. Resolve & validate project folder
 3. Check `claude` is in PATH
-4. Resolve `loop.sh` path from bundled assets
-5. `chmod +x loop.sh` if needed
-6. Spawn `loop.sh <project-folder>/PROMPT_build.md [N]` in its own process group (`detached: true`)
-7. Forward `SIGINT`/`SIGTERM` to the process group — kills only ralph's claude, not other sessions
+4. Run the loop engine (`src/cli/lib/loop.ts`) with `<project-folder>/PROMPT_build.md` and optional iteration cap
+5. Forward `SIGINT`/`SIGTERM` to the claude subprocess — kills only ralph's claude, not other sessions
 
 `--max N` caps the number of loop iterations (default: unlimited).
 
@@ -35,7 +33,7 @@ If `Ctrl+C` is unresponsive, the PID is printed at startup:
 PID: 12345  (Ctrl+C or: kill 12345)
 ```
 
-From another terminal: `kill 12345` — triggers the cleanup trap in `loop.sh`, killing only that session's claude process.
+From another terminal: `kill 12345` — triggers cleanup, killing only that session's claude process.
 
 ## `ralph <project-folder>`
 
@@ -47,4 +45,4 @@ Alias for `implement`. No subcommand → runs the loop.
 |---|---|
 | Project folder not found | Print error, exit 1 |
 | `claude` not in PATH | Print install hint, exit 1 |
-| `loop.sh` not found | Print path, exit 1 |
+| Loop engine fails to start | Print error, exit 1 |
