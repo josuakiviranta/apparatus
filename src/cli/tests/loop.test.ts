@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { EventEmitter } from "events";
+import { EventEmitter } from "events"; // still used for child.stdout mock
 
 // --- Mocks (must be hoisted before imports) ---
 
@@ -25,18 +25,25 @@ vi.mock("@clack/prompts", () => ({
   spinner: vi.fn(() => ({ start: vi.fn(), stop: vi.fn() })),
   log: { warn: vi.fn(), step: vi.fn() },
   note: vi.fn(),
+  stream: {
+    message: vi.fn(async (gen: AsyncIterable<string>) => {
+      for await (const _ of gen) {
+        /* no-op */
+      }
+    }),
+  },
 }));
 
 vi.mock("../lib/stream-formatter.js", () => ({
   processLine: vi.fn(() => ({
     output: "",
-    nextState: { pendingSubagentIds: new Set(), subagentBuffers: new Map(), subagentDescriptions: new Map(), mainHeaderPrinted: false, lastMainCtxTotal: 0 },
+    nextState: { pendingSubagentIds: new Set(), subagentBuffers: new Map(), subagentDescriptions: new Map(), mainAgentOpen: false, lastMainCtxTotal: 0 },
   })),
   initialState: vi.fn(() => ({
     pendingSubagentIds: new Set(),
     subagentBuffers: new Map(),
     subagentDescriptions: new Map(),
-    mainHeaderPrinted: false,
+    mainAgentOpen: false,
     lastMainCtxTotal: 0,
   })),
   flushState: vi.fn(() => ""),
@@ -53,9 +60,8 @@ import { runLoop } from "../lib/loop.js";
 
 // --- Helpers ---
 
-function makeMockChild(exitCode = 0) {
+function makeMockChild(exitCode = 0, lines: string[] = []) {
   const stdoutEmitter = new EventEmitter();
-  const rlEmitter = new EventEmitter();
   const stdinMock = { end: vi.fn(), pipe: vi.fn(), write: vi.fn() };
 
   const child = {
@@ -67,11 +73,18 @@ function makeMockChild(exitCode = 0) {
     }),
   };
 
-  // rl.createInterface mock returns an emitter that fires 'close' after 'exit'
-  vi.mocked(readline.createInterface).mockReturnValue(rlEmitter as any);
+  const rlMock = {
+    [Symbol.asyncIterator]: async function* () {
+      for (const line of lines) {
+        yield line;
+      }
+    },
+  };
+
+  vi.mocked(readline.createInterface).mockReturnValue(rlMock as any);
   vi.mocked(cp.spawn).mockReturnValue(child as any);
 
-  return { child, rlEmitter };
+  return { child };
 }
 
 function mockGitBranch(branch = "main") {
@@ -120,130 +133,61 @@ describe("runLoop", () => {
   });
 
   it("runs exactly max iterations then calls outro()", async () => {
-    const { rlEmitter } = makeMockChild(0);
+    makeMockChild(0);
     mockGitBranch("main");
-
-    const p = runLoop({
-      promptFile: "/proj/PROMPT_build.md",
-      cwd: "/proj",
-      max: 2,
-    });
-
-    // Simulate readline close for each iteration
-    await vi.waitFor(() => expect(cp.spawn).toHaveBeenCalledTimes(1));
-    rlEmitter.emit("close");
-    await vi.waitFor(() => expect(cp.spawn).toHaveBeenCalledTimes(2));
-    rlEmitter.emit("close");
-
-    await p;
-
+    await runLoop({ promptFile: "/proj/PROMPT_build.md", cwd: "/proj", max: 2 });
     expect(cp.spawn).toHaveBeenCalledTimes(2);
     expect(clack.outro).toHaveBeenCalled();
   });
 
-  it("feeds each stdout line through processLine and writes output", async () => {
+  it("calls processLine for each line and passes generator to stream.message", async () => {
+    const testLine = '{"type":"assistant","message":{"content":[]}}';
     vi.mocked(formatter.processLine).mockReturnValue({
       output: "→ [read] file.ts\n",
-      nextState: { pendingSubagentIds: new Set(), subagentBuffers: new Map(), subagentDescriptions: new Map(), mainHeaderPrinted: true, lastMainCtxTotal: 0 },
+      nextState: { pendingSubagentIds: new Set(), subagentBuffers: new Map(), subagentDescriptions: new Map(), mainAgentOpen: false, lastMainCtxTotal: 0 },
     });
 
-    const { rlEmitter } = makeMockChild(0);
+    makeMockChild(0, [testLine]);
     mockGitBranch("main");
-    const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
 
-    const p = runLoop({
-      promptFile: "/proj/PROMPT_build.md",
-      cwd: "/proj",
-      max: 1,
-    });
+    await runLoop({ promptFile: "/proj/PROMPT_build.md", cwd: "/proj", max: 1 });
 
-    await vi.waitFor(() => expect(cp.spawn).toHaveBeenCalledTimes(1));
-    rlEmitter.emit("line", '{"type":"assistant","message":{"content":[]}}');
-    rlEmitter.emit("close");
-    await p;
-
-    expect(formatter.processLine).toHaveBeenCalled();
-    expect(writeSpy).toHaveBeenCalledWith("→ [read] file.ts\n");
-    writeSpy.mockRestore();
+    expect(formatter.processLine).toHaveBeenCalledWith(testLine, expect.any(Object));
+    expect((clack as any).stream.message).toHaveBeenCalledTimes(1);
   });
 
   it("calls log.warn when claude exits with non-zero code", async () => {
-    const { rlEmitter } = makeMockChild(1);
+    makeMockChild(1);
     mockGitBranch("main");
-
-    const p = runLoop({
-      promptFile: "/proj/PROMPT_build.md",
-      cwd: "/proj",
-      max: 1,
-    });
-
-    await vi.waitFor(() => expect(cp.spawn).toHaveBeenCalledTimes(1));
-    rlEmitter.emit("close");
-    await p;
-
+    await runLoop({ promptFile: "/proj/PROMPT_build.md", cwd: "/proj", max: 1 });
     expect(clack.log.warn).toHaveBeenCalledWith(expect.stringContaining("1"));
   });
 
   it("calls log.warn when git push fails", async () => {
-    const { rlEmitter } = makeMockChild(0);
-    // which claude succeeds, git branch succeeds, git push fails
+    makeMockChild(0);
     vi.mocked(cp.spawnSync)
-      .mockReturnValueOnce({ stdout: "/usr/bin/claude\n", status: 0 } as any) // which claude
-      .mockReturnValueOnce({ stdout: "main\n", status: 0 } as any)             // git branch
-      .mockReturnValue({ status: 1, stderr: "push failed" } as any);            // git push
-
-    const p = runLoop({
-      promptFile: "/proj/PROMPT_build.md",
-      cwd: "/proj",
-      max: 1,
-    });
-
-    await vi.waitFor(() => expect(cp.spawn).toHaveBeenCalledTimes(1));
-    rlEmitter.emit("close");
-    await p;
-
+      .mockReturnValueOnce({ stdout: "/usr/bin/claude\n", status: 0 } as any)
+      .mockReturnValueOnce({ stdout: "main\n", status: 0 } as any)
+      .mockReturnValue({ status: 1, stderr: "push failed" } as any);
+    await runLoop({ promptFile: "/proj/PROMPT_build.md", cwd: "/proj", max: 1 });
     expect(clack.log.warn).toHaveBeenCalled();
   });
 
   it("prints PID at startup for manual kill", async () => {
-    const { rlEmitter } = makeMockChild(0);
+    makeMockChild(0);
     mockGitBranch("main");
-
-    const p = runLoop({
-      promptFile: "/proj/PROMPT_build.md",
-      cwd: "/proj",
-      max: 1,
-    });
-
-    await vi.waitFor(() => expect(cp.spawn).toHaveBeenCalledTimes(1));
-    rlEmitter.emit("close");
-    await p;
-
-    expect(clack.log.step).toHaveBeenCalledWith(
-      expect.stringMatching(/PID: \d+/)
-    );
+    await runLoop({ promptFile: "/proj/PROMPT_build.md", cwd: "/proj", max: 1 });
+    expect(clack.log.step).toHaveBeenCalledWith(expect.stringMatching(/PID: \d+/));
   });
 
   it("retries git push with -u flag on initial failure", async () => {
-    const { rlEmitter } = makeMockChild(0);
-    // which claude succeeds, git branch succeeds, first git push fails, retry succeeds
+    makeMockChild(0);
     vi.mocked(cp.spawnSync)
-      .mockReturnValueOnce({ stdout: "/usr/bin/claude\n", status: 0 } as any) // which claude
-      .mockReturnValueOnce({ stdout: "main\n", status: 0 } as any)             // git branch
-      .mockReturnValueOnce({ status: 1, stderr: "no upstream" } as any)         // git push (fail)
-      .mockReturnValueOnce({ status: 0, stderr: "" } as any);                   // git push -u (success)
-
-    const p = runLoop({
-      promptFile: "/proj/PROMPT_build.md",
-      cwd: "/proj",
-      max: 1,
-    });
-
-    await vi.waitFor(() => expect(cp.spawn).toHaveBeenCalledTimes(1));
-    rlEmitter.emit("close");
-    await p;
-
-    // First push: git push origin main
+      .mockReturnValueOnce({ stdout: "/usr/bin/claude\n", status: 0 } as any)
+      .mockReturnValueOnce({ stdout: "main\n", status: 0 } as any)
+      .mockReturnValueOnce({ status: 1, stderr: "no upstream" } as any)
+      .mockReturnValueOnce({ status: 0, stderr: "" } as any);
+    await runLoop({ promptFile: "/proj/PROMPT_build.md", cwd: "/proj", max: 1 });
     const pushCalls = vi.mocked(cp.spawnSync).mock.calls.filter(
       (call) => call[0] === "git" && (call[1] as string[])[0] === "push"
     );
@@ -253,44 +197,20 @@ describe("runLoop", () => {
   });
 
   it("warns only after retry also fails", async () => {
-    const { rlEmitter } = makeMockChild(0);
-    // which claude succeeds, git branch succeeds, both pushes fail
+    makeMockChild(0);
     vi.mocked(cp.spawnSync)
-      .mockReturnValueOnce({ stdout: "/usr/bin/claude\n", status: 0 } as any) // which claude
-      .mockReturnValueOnce({ stdout: "main\n", status: 0 } as any)             // git branch
-      .mockReturnValueOnce({ status: 1, stderr: "no upstream" } as any)         // git push (fail)
-      .mockReturnValueOnce({ status: 1, stderr: "still failing" } as any);      // git push -u (fail)
-
-    const p = runLoop({
-      promptFile: "/proj/PROMPT_build.md",
-      cwd: "/proj",
-      max: 1,
-    });
-
-    await vi.waitFor(() => expect(cp.spawn).toHaveBeenCalledTimes(1));
-    rlEmitter.emit("close");
-    await p;
-
-    expect(clack.log.warn).toHaveBeenCalledWith(
-      expect.stringContaining("still failing")
-    );
+      .mockReturnValueOnce({ stdout: "/usr/bin/claude\n", status: 0 } as any)
+      .mockReturnValueOnce({ stdout: "main\n", status: 0 } as any)
+      .mockReturnValueOnce({ status: 1, stderr: "no upstream" } as any)
+      .mockReturnValueOnce({ status: 1, stderr: "still failing" } as any);
+    await runLoop({ promptFile: "/proj/PROMPT_build.md", cwd: "/proj", max: 1 });
+    expect(clack.log.warn).toHaveBeenCalledWith(expect.stringContaining("still failing"));
   });
 
   it("spawns claude with correct flags and cwd", async () => {
-    const { rlEmitter } = makeMockChild(0);
+    makeMockChild(0);
     mockGitBranch("feature");
-
-    const p = runLoop({
-      promptFile: "/proj/PROMPT_build.md",
-      cwd: "/proj",
-      max: 1,
-      model: "sonnet",
-    });
-
-    await vi.waitFor(() => expect(cp.spawn).toHaveBeenCalledTimes(1));
-    rlEmitter.emit("close");
-    await p;
-
+    await runLoop({ promptFile: "/proj/PROMPT_build.md", cwd: "/proj", max: 1, model: "sonnet" });
     expect(cp.spawn).toHaveBeenCalledWith(
       "claude",
       expect.arrayContaining([
@@ -302,5 +222,12 @@ describe("runLoop", () => {
       ]),
       expect.objectContaining({ cwd: "/proj", detached: true })
     );
+  });
+
+  it("calls stream.message once per loop iteration", async () => {
+    makeMockChild(0);
+    mockGitBranch("main");
+    await runLoop({ promptFile: "/proj/PROMPT_build.md", cwd: "/proj", max: 3 });
+    expect((clack as any).stream.message).toHaveBeenCalledTimes(3);
   });
 });

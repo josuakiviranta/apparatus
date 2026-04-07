@@ -1,6 +1,6 @@
 #!/bin/bash
 # @name: stream-formatter output markers
-# @description: Pipes synthetic stream-json through stream-formatter.js and asserts all expected output markers appear (MAIN AGENT header, file tool labels, subagent boundaries, token counts)
+# @description: Pipes synthetic stream-json through stream-formatter.js and asserts all expected output markers appear (▶/◀ open/close markers, file tool labels, subagent boundaries, token counts)
 
 set -e
 
@@ -43,14 +43,13 @@ check() {
 echo "=== Scenario: stream-formatter output markers ==="
 echo ""
 
-check "┌─ MAIN AGENT"
+check "▶ MAIN AGENT"
 check "Analyzing codebase..."
 check "→ [read] /src/foo.ts"
+check "◀ MAIN AGENT"
 check "▶ SUBAGENT: Explore auth patterns"
-check "┌─ SUBAGENT: Explore auth patterns"
 check "  → [glob] **/*.ts"
-check "◀ ──"
-check "◈ ctx: 5,000 tokens"
+check "◀ SUBAGENT"
 check "→ [bash] npm test"
 check "◈ ctx: 5,200 tokens"
 

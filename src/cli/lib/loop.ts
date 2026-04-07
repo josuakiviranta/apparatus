@@ -8,6 +8,7 @@ import {
   spinner,
   log,
   note,
+  stream,
 } from "@clack/prompts";
 import { processLine, initialState, flushState } from "./stream-formatter.js";
 
@@ -89,10 +90,6 @@ export async function runLoop(options: LoopOptions): Promise<void> {
 
       currentPid = child.pid;
 
-      // Feed prompt file into stdin
-      const readStream = createReadStream(promptFile);
-      readStream.pipe(child.stdin as NodeJS.WritableStream);
-
       // Track exit code
       let exitCode = 0;
       const exitPromise = new Promise<void>((resolve) => {
@@ -102,20 +99,28 @@ export async function runLoop(options: LoopOptions): Promise<void> {
         });
       });
 
-      // Process stdout line-by-line through stream-formatter
-      const rl = readline.createInterface({
-        input: child.stdout as NodeJS.ReadableStream,
-        crlfDelay: Infinity,
-      });
-      let state = initialState();
-      rl.on("line", (line) => {
-        const { output, nextState } = processLine(line, state);
-        state = nextState;
-        if (output) process.stdout.write(output);
-      });
-      await new Promise<void>((resolve) => rl.on("close", resolve));
-      const flush = flushState(state);
-      if (flush) process.stdout.write(flush);
+      // Stream session output through clack
+      async function* sessionStream(): AsyncGenerator<string> {
+        const readStream = createReadStream(promptFile);
+        readStream.pipe(child.stdin as NodeJS.WritableStream);
+
+        const rl = readline.createInterface({
+          input: child.stdout as NodeJS.ReadableStream,
+          crlfDelay: Infinity,
+        });
+
+        let state = initialState();
+        for await (const line of rl) {
+          const { output, nextState } = processLine(line, state);
+          state = nextState;
+          if (output) yield output;
+        }
+
+        const flush = flushState(state);
+        if (flush) yield flush;
+      }
+
+      await stream.message(sessionStream());
       await exitPromise;
 
       currentPid = undefined;

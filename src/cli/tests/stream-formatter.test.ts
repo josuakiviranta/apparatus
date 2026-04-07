@@ -1,8 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { processLine, initialState, flushState, type FormatterState } from "../lib/stream-formatter";
 
-const HEADER = "┌─ MAIN AGENT ──────────────────────────────────────────\n";
-
 describe("processLine", () => {
   it("ignores system events", () => {
     const line = JSON.stringify({ type: "system", session_id: "abc" });
@@ -30,9 +28,7 @@ describe("processLine", () => {
       },
     });
     const { output } = processLine(line, initialState());
-    expect(output).toBe(
-      HEADER + "Hello world\n◈ ctx: 1,234 tokens\n"
-    );
+    expect(output).toBe("▶ MAIN AGENT\nHello world\n◈ ctx: 1,234 tokens\n");
   });
 
   it("renders Read tool_use with file path", () => {
@@ -155,11 +151,11 @@ describe("processLine", () => {
       },
     });
     const { output, nextState } = processLine(line, initialState());
-    expect(output).toContain("▶ SUBAGENT: Explore auth");
+    expect(output).toBe("▶ SUBAGENT: Explore auth\n");
     expect(nextState.pendingSubagentIds.has("agent-1")).toBe(true);
     expect(nextState.subagentDescriptions.get("agent-1")).toBe("Explore auth");
     expect(nextState.subagentBuffers.has("agent-1")).toBe(true);
-    expect(nextState.mainHeaderPrinted).toBe(true);
+    expect(nextState.mainAgentOpen).toBe(false);
   });
 
   it("buffers subagent assistant event, no immediate output", () => {
@@ -167,7 +163,7 @@ describe("processLine", () => {
       pendingSubagentIds: new Set(["agent-1"]),
       subagentBuffers: new Map([["agent-1", ""]]),
       subagentDescriptions: new Map([["agent-1", "Explore auth"]]),
-      mainHeaderPrinted: true,
+      mainAgentOpen: false,
       lastMainCtxTotal: 0,
     };
     const line = JSON.stringify({
@@ -188,7 +184,7 @@ describe("processLine", () => {
       pendingSubagentIds: new Set(["agent-1"]),
       subagentBuffers: new Map([["agent-1", "  → [glob] **/*.ts\n"]]),
       subagentDescriptions: new Map([["agent-1", "Explore auth"]]),
-      mainHeaderPrinted: true,
+      mainAgentOpen: false,
       lastMainCtxTotal: 0,
     };
     const line = JSON.stringify({
@@ -198,11 +194,9 @@ describe("processLine", () => {
       },
     });
     const { output, nextState } = processLine(line, state);
-    expect(output).toContain("┌─ SUBAGENT: Explore auth");
-    expect(output).toContain("  → [glob] **/*.ts");
-    expect(output).toContain("◀ ──");
+    expect(output).toBe("  → [glob] **/*.ts\n◀ SUBAGENT\n▶ MAIN AGENT\n");
     expect(nextState.pendingSubagentIds.has("agent-1")).toBe(false);
-    expect(nextState.mainHeaderPrinted).toBe(false);
+    expect(nextState.mainAgentOpen).toBe(true);
   });
 
   it("ignores tool_result for non-subagent ids (user-wrapped)", () => {
@@ -210,7 +204,7 @@ describe("processLine", () => {
       pendingSubagentIds: new Set(),
       subagentBuffers: new Map(),
       subagentDescriptions: new Map(),
-      mainHeaderPrinted: false,
+      mainAgentOpen: false,
       lastMainCtxTotal: 0,
     };
     const line = JSON.stringify({
@@ -226,7 +220,7 @@ describe("processLine", () => {
       pendingSubagentIds: new Set(),
       subagentBuffers: new Map(),
       subagentDescriptions: new Map(),
-      mainHeaderPrinted: true,
+      mainAgentOpen: true,
       lastMainCtxTotal: 0,
     };
     const line = JSON.stringify({
@@ -237,7 +231,7 @@ describe("processLine", () => {
       },
     });
     const { output } = processLine(line, state);
-    expect(output).not.toContain(HEADER);
+    expect(output).not.toContain("▶ MAIN AGENT");
     expect(output).toContain("→ [read] /b.ts");
   });
 
@@ -310,7 +304,7 @@ describe("processLine", () => {
       pendingSubagentIds: new Set(),
       subagentBuffers: new Map(),
       subagentDescriptions: new Map(),
-      mainHeaderPrinted: false,
+      mainAgentOpen: false,
       lastMainCtxTotal: 5000,
     };
     const line = JSON.stringify({
@@ -329,7 +323,7 @@ describe("processLine", () => {
       pendingSubagentIds: new Set(["agent-1"]),
       subagentBuffers: new Map([["agent-1", ""]]),
       subagentDescriptions: new Map([["agent-1", "Explore auth"]]),
-      mainHeaderPrinted: true,
+      mainAgentOpen: false,
       lastMainCtxTotal: 0,
     };
     const line = JSON.stringify({
@@ -344,54 +338,98 @@ describe("processLine", () => {
     expect(output).toBe(""); // buffered, not printed — no ctx line emitted
   });
 
-  // formatSubagentBlock tests (tested via processLine/flushState)
-  it("formatSubagentBlock: normal description produces correct framing", () => {
-    const state: FormatterState = {
-      pendingSubagentIds: new Set(["a1"]),
-      subagentBuffers: new Map([["a1", "  → [glob] **/*.ts\n"]]),
-      subagentDescriptions: new Map([["a1", "Study specs"]]),
-      mainHeaderPrinted: true,
-      lastMainCtxTotal: 0,
-    };
-    const line = JSON.stringify({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: "a1", content: [] }] } });
-    const { output } = processLine(line, state);
-    expect(output).toContain("┌─ SUBAGENT: Study specs ");
-    expect(output).toContain("◀ ──");
-    expect(output).toContain("  → [glob] **/*.ts");
+  it("emits ▶ MAIN AGENT on first substantive main agent event", () => {
+    const line = JSON.stringify({
+      type: "assistant",
+      message: {
+        content: [{ type: "text", text: "Hello" }],
+        usage: { input_tokens: 100, output_tokens: 5 },
+      },
+    });
+    const { output, nextState } = processLine(line, initialState());
+    expect(output).toContain("▶ MAIN AGENT\n");
+    expect(nextState.mainAgentOpen).toBe(true);
   });
 
-  it("formatSubagentBlock: long description clamps dashes to zero", () => {
-    const longDesc = "A".repeat(60); // label alone exceeds totalWidth=56
-    const state: FormatterState = {
-      pendingSubagentIds: new Set(["a1"]),
-      subagentBuffers: new Map([["a1", ""]]),
-      subagentDescriptions: new Map([["a1", longDesc]]),
-      mainHeaderPrinted: true,
+  it("does not emit ▶ MAIN AGENT again on second event when already open", () => {
+    const line = JSON.stringify({
+      type: "assistant",
+      message: {
+        content: [{ type: "text", text: "Second" }],
+        usage: { input_tokens: 200, output_tokens: 5 },
+      },
+    });
+    const stateWithOpen: FormatterState = {
+      pendingSubagentIds: new Set(),
+      subagentBuffers: new Map(),
+      subagentDescriptions: new Map(),
+      mainAgentOpen: true,
       lastMainCtxTotal: 0,
     };
-    const line = JSON.stringify({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: "a1", content: [] }] } });
-    const { output } = processLine(line, state);
-    // Should not throw and should still contain the description
-    expect(output).toContain(`┌─ SUBAGENT: ${longDesc}`);
+    const { output } = processLine(line, stateWithOpen);
+    expect(output).not.toContain("▶ MAIN AGENT");
+  });
+
+  it("emits ◀ MAIN AGENT before ▶ SUBAGENT when main agent is open", () => {
+    const line = JSON.stringify({
+      type: "assistant",
+      message: {
+        content: [{ type: "tool_use", name: "Agent", id: "a1", input: { description: "Do something" } }],
+        usage: { input_tokens: 300, output_tokens: 5 },
+      },
+    });
+    const stateWithOpen: FormatterState = {
+      pendingSubagentIds: new Set(),
+      subagentBuffers: new Map(),
+      subagentDescriptions: new Map(),
+      mainAgentOpen: true,
+      lastMainCtxTotal: 0,
+    };
+    const { output, nextState } = processLine(line, stateWithOpen);
+    expect(output).toBe("◀ MAIN AGENT\n▶ SUBAGENT: Do something\n");
+    expect(nextState.mainAgentOpen).toBe(false);
+  });
+
+  it("emits only ▶ SUBAGENT when main agent is not open (edge case: first event)", () => {
+    const line = JSON.stringify({
+      type: "assistant",
+      message: {
+        content: [{ type: "tool_use", name: "Agent", id: "a1", input: { description: "First thing" } }],
+        usage: { input_tokens: 300, output_tokens: 5 },
+      },
+    });
+    const { output, nextState } = processLine(line, initialState());
+    expect(output).toBe("▶ SUBAGENT: First thing\n");
+    expect(output).not.toContain("◀ MAIN AGENT");
+    expect(nextState.mainAgentOpen).toBe(false);
   });
 });
 
 describe("flushState", () => {
-  it("returns formatted block for each pending subagent", () => {
+  it("returns buffered content + close marker for each pending subagent", () => {
     const state: FormatterState = {
       pendingSubagentIds: new Set(["agent-1"]),
       subagentBuffers: new Map([["agent-1", "  → [glob] **/*.ts\n"]]),
       subagentDescriptions: new Map([["agent-1", "Explore auth"]]),
-      mainHeaderPrinted: true,
+      mainAgentOpen: false,
       lastMainCtxTotal: 0,
     };
     const output = flushState(state);
-    expect(output).toContain("┌─ SUBAGENT: Explore auth");
-    expect(output).toContain("  → [glob] **/*.ts");
-    expect(output).toContain("◀ ──");
+    expect(output).toBe("  → [glob] **/*.ts\n◀ SUBAGENT\n");
   });
 
-  it("returns empty string when no pending subagents", () => {
+  it("closes main agent block if open", () => {
+    const state: FormatterState = {
+      pendingSubagentIds: new Set(),
+      subagentBuffers: new Map(),
+      subagentDescriptions: new Map(),
+      mainAgentOpen: true,
+      lastMainCtxTotal: 0,
+    };
+    expect(flushState(state)).toBe("◀ MAIN AGENT\n");
+  });
+
+  it("returns empty string when nothing is open", () => {
     expect(flushState(initialState())).toBe("");
   });
 });

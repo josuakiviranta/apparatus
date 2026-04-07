@@ -4,7 +4,7 @@ export interface FormatterState {
   pendingSubagentIds: Set<string>;
   subagentBuffers: Map<string, string>;      // parent_tool_use_id → accumulated indented lines
   subagentDescriptions: Map<string, string>; // parent_tool_use_id → description for block header
-  mainHeaderPrinted: boolean;
+  mainAgentOpen: boolean;
   lastMainCtxTotal: number;
 }
 
@@ -13,12 +13,10 @@ export function initialState(): FormatterState {
     pendingSubagentIds: new Set(),
     subagentBuffers: new Map(),
     subagentDescriptions: new Map(),
-    mainHeaderPrinted: false,
+    mainAgentOpen: false,
     lastMainCtxTotal: 0,
   };
 }
-
-const HEADER = "┌─ MAIN AGENT ──────────────────────────────────────────\n";
 
 function formatToolUse(name: string, input: Record<string, unknown>): string {
   switch (name) {
@@ -44,19 +42,14 @@ function formatToolUse(name: string, input: Record<string, unknown>): string {
   }
 }
 
-function formatSubagentBlock(desc: string, buf: string): string {
-  const label = `┌─ SUBAGENT: ${desc} `;
-  const totalWidth = 56;
-  const dashes = "─".repeat(Math.max(0, totalWidth - label.length));
-  return `\n${label}${dashes}\n${buf}◀ ${"─".repeat(totalWidth - 2)}\n\n`;
-}
-
 export function flushState(state: FormatterState): string {
   let output = "";
   for (const id of state.pendingSubagentIds) {
-    const desc = state.subagentDescriptions.get(id) ?? "";
     const buf = state.subagentBuffers.get(id) ?? "";
-    output += formatSubagentBlock(desc, buf);
+    output += buf + "◀ SUBAGENT\n";
+  }
+  if (state.mainAgentOpen) {
+    output += "◀ MAIN AGENT\n";
   }
   return output;
 }
@@ -86,25 +79,21 @@ export function processLine(
     const nextPending = new Set(state.pendingSubagentIds);
     const nextBuffers = new Map(state.subagentBuffers);
     const nextDescriptions = new Map(state.subagentDescriptions);
-    let nextHeaderPrinted = state.mainHeaderPrinted;
+    let nextMainAgentOpen = state.mainAgentOpen;
 
     for (const item of userContent) {
       const block = item as Record<string, unknown>;
       if (block.type === "tool_result") {
         const id = String(block.tool_use_id ?? "");
         if (nextPending.has(id)) {
-          const desc = nextDescriptions.get(id) ?? "";
           const buf = nextBuffers.get(id) ?? "";
-          output += formatSubagentBlock(desc, buf);
+          output += buf + "◀ SUBAGENT\n▶ MAIN AGENT\n";
+          nextMainAgentOpen = true;
           nextPending.delete(id);
           nextBuffers.delete(id);
           nextDescriptions.delete(id);
         }
       }
-    }
-
-    if (nextPending.size === 0 && state.pendingSubagentIds.size > 0) {
-      nextHeaderPrinted = false;
     }
 
     return {
@@ -114,7 +103,7 @@ export function processLine(
         pendingSubagentIds: nextPending,
         subagentBuffers: nextBuffers,
         subagentDescriptions: nextDescriptions,
-        mainHeaderPrinted: nextHeaderPrinted,
+        mainAgentOpen: nextMainAgentOpen,
       },
     };
   }
@@ -163,7 +152,7 @@ export function processLine(
   const nextPending = new Set(state.pendingSubagentIds);
   const nextBuffers = new Map(state.subagentBuffers);
   const nextDescriptions = new Map(state.subagentDescriptions);
-  let nextHeaderPrinted = state.mainHeaderPrinted;
+  let nextMainAgentOpen = state.mainAgentOpen;
   let nextLastMainCtxTotal = state.lastMainCtxTotal;
 
   // Skip events with no substantive content (no visible text or tool calls)
@@ -182,16 +171,20 @@ export function processLine(
         pendingSubagentIds: nextPending,
         subagentBuffers: nextBuffers,
         subagentDescriptions: nextDescriptions,
-        mainHeaderPrinted: nextHeaderPrinted,
+        mainAgentOpen: nextMainAgentOpen,
         lastMainCtxTotal: nextLastMainCtxTotal,
       },
     };
   }
 
-  // Print header only once per logical turn (reset after subagent or at start)
-  if (!nextHeaderPrinted) {
-    output += HEADER;
-    nextHeaderPrinted = true;
+  // Check if any content blocks are non-Agent (text or non-Agent tool_use)
+  const hasNonAgentContent = content.some((b) => {
+    const block = b as Record<string, unknown>;
+    return block.type !== "tool_use" || String((block as any).name) !== "Agent";
+  });
+  if (hasNonAgentContent && !nextMainAgentOpen) {
+    output += "▶ MAIN AGENT\n";
+    nextMainAgentOpen = true;
   }
 
   for (const block of content) {
@@ -203,6 +196,10 @@ export function processLine(
       const input = (b.input ?? {}) as Record<string, unknown>;
       if (name === "Agent") {
         const desc = String(input.description ?? input.prompt ?? "");
+        if (nextMainAgentOpen) {
+          output += "◀ MAIN AGENT\n";
+          nextMainAgentOpen = false;
+        }
         output += `▶ SUBAGENT: ${desc}\n`;
         nextPending.add(String(b.id));
         nextDescriptions.set(String(b.id), desc);
@@ -213,8 +210,8 @@ export function processLine(
     }
   }
 
-  // Gate ctx line on growth — only print when total increases
-  if (typeof usage?.input_tokens === "number") {
+  // Gate ctx line on growth — only print when total increases and main agent is open
+  if (nextMainAgentOpen && typeof usage?.input_tokens === "number") {
     const total =
       (usage.input_tokens ?? 0) +
       (usage.cache_read_input_tokens ?? 0) +
@@ -231,7 +228,7 @@ export function processLine(
       pendingSubagentIds: nextPending,
       subagentBuffers: nextBuffers,
       subagentDescriptions: nextDescriptions,
-      mainHeaderPrinted: nextHeaderPrinted,
+      mainAgentOpen: nextMainAgentOpen,
       lastMainCtxTotal: nextLastMainCtxTotal,
     },
   };
