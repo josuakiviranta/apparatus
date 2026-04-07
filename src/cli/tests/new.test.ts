@@ -39,19 +39,11 @@ describe("scaffoldProject", () => {
     expect(content).toContain("IMPLEMENTATION_PLAN.md");
   });
 
-  it("creates src/tests/integration/ directory", () => {
+  it("creates src/ directory (language-agnostic, no subdirs)", () => {
     scaffoldProject(tmpDir, "my-project");
-    expect(existsSync(join(tmpDir, "src", "tests", "integration"))).toBe(true);
-  });
-
-  it("creates src/tests/unit/ directory", () => {
-    scaffoldProject(tmpDir, "my-project");
-    expect(existsSync(join(tmpDir, "src", "tests", "unit"))).toBe(true);
-  });
-
-  it("creates meditations/illuminations/ directory", () => {
-    scaffoldProject(tmpDir, "my-project");
-    expect(existsSync(join(tmpDir, "meditations", "illuminations"))).toBe(true);
+    expect(existsSync(join(tmpDir, "src"))).toBe(true);
+    // No TS-specific subdirs
+    expect(existsSync(join(tmpDir, "src", "tests"))).toBe(false);
   });
 
   it("creates scenario-tests/ directory", () => {
@@ -69,10 +61,15 @@ describe("scaffoldProject", () => {
     expect(existsSync(join(tmpDir, "specs"))).toBe(true);
   });
 
-  it("adds meditations/illuminations/ to .gitignore", () => {
+  it("does not include meditations/illuminations/ in .gitignore", () => {
     scaffoldProject(tmpDir, "my-project");
     const gitignore = readFileSync(join(tmpDir, ".gitignore"), "utf8");
-    expect(gitignore).toContain("meditations/illuminations/");
+    expect(gitignore).not.toContain("meditations/illuminations/");
+  });
+
+  it("does not create meditations/ directory", () => {
+    scaffoldProject(tmpDir, "my-project");
+    expect(existsSync(join(tmpDir, "meditations"))).toBe(false);
   });
 
   it("adds scenario-runs/ to .gitignore", () => {
@@ -81,9 +78,9 @@ describe("scaffoldProject", () => {
     expect(gitignore).toContain("scenario-runs/");
   });
 
-  it("does not create src/tests/scenarios/ directory", () => {
+  it("does not create src/tests/ subdirectories", () => {
     scaffoldProject(tmpDir, "my-project");
-    expect(existsSync(join(tmpDir, "src", "tests", "scenarios"))).toBe(false);
+    expect(existsSync(join(tmpDir, "src", "tests"))).toBe(false);
   });
 });
 

@@ -43,7 +43,7 @@ describe("assets", () => {
   });
 
   it("getAssetPath resolves relative to this file's directory", () => {
-    const p = getAssetPath("loop.sh");
+    const p = getAssetPath("prompts");
     expect(typeof p).toBe("string");
     expect(p.length).toBeGreaterThan(0);
   });

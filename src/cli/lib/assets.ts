@@ -13,7 +13,7 @@ function isProduction(): boolean {
 }
 
 export function getAssetPath(filename: string): string {
-  // prod: dist/cli/ → up one → dist/ (where loop.sh and prompts/ live)
+  // prod: dist/cli/ → up one → dist/ (where prompts/ live)
   // dev:  src/cli/lib/ → up one → src/cli/ (where prompts/ live in dev)
   const base = join(__dirname, "..");
   return join(base, filename);

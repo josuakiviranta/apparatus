@@ -21,10 +21,6 @@ export default defineConfig({
     for (const file of readdirSync("src/cli/prompts")) {
       copyFileSync(`src/cli/prompts/${file}`, `dist/prompts/${file}`);
     }
-    copyFileSync("loop.sh", "dist/loop.sh");
-    // Make loop.sh executable
-    const { chmodSync } = await import("fs");
-    chmodSync("dist/loop.sh", 0o755);
     console.log("Assets copied to dist/");
   },
 });

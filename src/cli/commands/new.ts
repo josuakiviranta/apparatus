@@ -57,9 +57,7 @@ export async function newCommand(projectName: string): Promise<void> {
 export function scaffoldProject(targetPath: string, _projectName: string): void {
   mkdirSync(targetPath, { recursive: true });
   mkdirSync(join(targetPath, "specs"), { recursive: true });
-  mkdirSync(join(targetPath, "src", "tests", "integration"), { recursive: true });
-  mkdirSync(join(targetPath, "src", "tests", "unit"), { recursive: true });
-  mkdirSync(join(targetPath, "meditations", "illuminations"), { recursive: true });
+  mkdirSync(join(targetPath, "src"), { recursive: true });
   mkdirSync(join(targetPath, "scenario-tests"), { recursive: true });
   mkdirSync(join(targetPath, "scenario-runs"), { recursive: true });
 
@@ -77,7 +75,6 @@ export function scaffoldProject(targetPath: string, _projectName: string): void 
       "PROMPT_plan.md",
       "PROMPT_build.md",
       "IMPLEMENTATION_PLAN.md",
-      "meditations/illuminations/",
       "scenario-runs/",
     ].join("\n") + "\n"
   );
