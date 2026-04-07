@@ -1,216 +1,821 @@
-# Scenario Tests for ralph Commands Implementation Plan
+# Clack-Unified Stream Output Implementation Plan
 
-> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Status: COMPLETE** — All tasks implemented, tested, committed, and tagged as `0.0.25`. Pushed to origin on 2026-04-07.
 
-**Goal:** Add two scenario test scripts that cover the `heartbeat` subcommand lifecycle and `ralph meditate create`, exercising each path end-to-end with no lingering background processes.
+> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [x]`) syntax for tracking.
 
-**Architecture:** Two shell scripts in `scenario-tests/` following the existing `@name`/`@description` header convention. The heartbeat script runs real daemon commands in sequence with a `trap` cleanup guarantee. The meditate-create script delegates to vitest, matching the existing `test-meditate-session.sh` pattern.
+**Goal:** Route all Claude session output through a single `stream.message()` clack call per loop iteration, so the `│` gutter frames the entire session uniformly, and replace ASCII box-drawing block markers with `▶`/`◀` open/close pairs.
 
-**Tech Stack:** bash, Node.js (`dist/cli/index.js`), vitest, ralph daemon
+**Architecture:** `stream-formatter.ts` gains `mainAgentOpen` state (replaces `mainHeaderPrinted`) and emits `▶ MAIN AGENT` / `◀ MAIN AGENT` / `▶ SUBAGENT: <desc>` / `◀ SUBAGENT` markers instead of box-drawing borders. `loop.ts` replaces the `readline → processLine → stdout.write` loop with an async generator that is passed once to `await stream.message()` per iteration. No other files change.
+
+**Tech Stack:** TypeScript, Node.js readline (async iterable), `@clack/prompts` v1.2.0 (`stream.message`), vitest
 
 ---
 
-## Chunk 1: Heartbeat Lifecycle Script
+## Chunk 1: Update stream-formatter.ts
 
-**Spec:** `docs/superpowers/specs/2026-04-07-scenario-tests-commands-design.md`
-
-### Task 1: Create `test-heartbeat-lifecycle.sh`
+### Task 1: Update stream-formatter tests for new state shape and block markers
 
 **Files:**
-- Create: `scenario-tests/test-heartbeat-lifecycle.sh`
+- Modify: `src/cli/tests/stream-formatter.test.ts`
 
-**Context:** The heartbeat task ID format is `meditate:<basename-of-abs-path>` — the daemon constructs it as `${command}:${basename(args[0])}` (see `src/daemon/index.ts`). So for a temp dir `/tmp/tmp.XyZ123`, the task ID is `meditate:tmp.XyZ123`. The `logs` subcommand without `--follow` does a single request and prints the raw response; there may be no log content yet since the interval is 60 min and the task hasn't fired. The `|| true` on the logs step handles this gracefully.
+- [x] **Step 1: Remove the `HEADER` constant and the `formatSubagentBlock` tests at the bottom**
 
-The dist CLI is at `$REPO_ROOT/dist/cli/index.js` — use `node "$REPO_ROOT/dist/cli/index.js"` consistently (same pattern as `test-run-scenarios.sh`).
+Delete lines 4 and 348–376 (the `const HEADER` declaration and the two `formatSubagentBlock` `it()` blocks):
 
-The `trap cleanup EXIT` fires after the explicit Step 6 stop, so `cleanup` will attempt a second `heartbeat stop` on an already-removed task. The `|| true` suppresses any error — this double-stop is intentional and safe.
+```ts
+// DELETE this line at the top:
+const HEADER = "┌─ MAIN AGENT ──────────────────────────────────────────\n";
 
-- [ ] **Step 1: Create the script**
+// DELETE these two it() blocks entirely:
+it("formatSubagentBlock: normal description produces correct framing", () => { ... });
+it("formatSubagentBlock: long description clamps dashes to zero", () => { ... });
+```
 
-Create `scenario-tests/test-heartbeat-lifecycle.sh` with this content:
+- [x] **Step 2: Update the "renders text content with header and token count" test**
+
+Replace the assertion that uses `HEADER`:
+
+```ts
+// Before (line 33-35):
+expect(output).toBe(
+  HEADER + "Hello world\n◈ ctx: 1,234 tokens\n"
+);
+
+// After:
+expect(output).toBe("▶ MAIN AGENT\nHello world\n◈ ctx: 1,234 tokens\n");
+```
+
+- [x] **Step 3: Update the "renders Agent tool_use as SUBAGENT START" test**
+
+The `Agent` tool_use now closes the main agent block before opening the subagent. `mainHeaderPrinted` becomes `mainAgentOpen` and its value inverts (main is closed when subagent opens):
+
+```ts
+// Before (line 157-163):
+const { output, nextState } = processLine(line, initialState());
+expect(output).toContain("▶ SUBAGENT: Explore auth");
+expect(nextState.pendingSubagentIds.has("agent-1")).toBe(true);
+expect(nextState.subagentDescriptions.get("agent-1")).toBe("Explore auth");
+expect(nextState.subagentBuffers.has("agent-1")).toBe(true);
+expect(nextState.mainHeaderPrinted).toBe(true);
+
+// After:
+const { output, nextState } = processLine(line, initialState());
+// initialState has mainAgentOpen: false, so no ◀ MAIN AGENT emitted
+expect(output).toBe("▶ SUBAGENT: Explore auth\n");
+expect(nextState.pendingSubagentIds.has("agent-1")).toBe(true);
+expect(nextState.subagentDescriptions.get("agent-1")).toBe("Explore auth");
+expect(nextState.subagentBuffers.has("agent-1")).toBe(true);
+expect(nextState.mainAgentOpen).toBe(false);
+```
+
+- [x] **Step 4: Update the "buffers subagent assistant event" test — fix state shape**
+
+Replace `mainHeaderPrinted` with `mainAgentOpen` in the constructed state (subagent is open → main is closed):
+
+```ts
+// Before (line 166-170):
+const state: FormatterState = {
+  pendingSubagentIds: new Set(["agent-1"]),
+  subagentBuffers: new Map([["agent-1", ""]]),
+  subagentDescriptions: new Map([["agent-1", "Explore auth"]]),
+  mainHeaderPrinted: true,
+  lastMainCtxTotal: 0,
+};
+
+// After:
+const state: FormatterState = {
+  pendingSubagentIds: new Set(["agent-1"]),
+  subagentBuffers: new Map([["agent-1", ""]]),
+  subagentDescriptions: new Map([["agent-1", "Explore auth"]]),
+  mainAgentOpen: false,
+  lastMainCtxTotal: 0,
+};
+```
+
+- [x] **Step 5: Update the "flushes subagent buffer as labeled block on close" test**
+
+The new format emits buffered content + `◀ SUBAGENT\n▶ MAIN AGENT\n`. No box-drawing borders:
+
+```ts
+// Replace the entire test:
+it("flushes subagent buffer as labeled block on close", () => {
+  const state: FormatterState = {
+    pendingSubagentIds: new Set(["agent-1"]),
+    subagentBuffers: new Map([["agent-1", "  → [glob] **/*.ts\n"]]),
+    subagentDescriptions: new Map([["agent-1", "Explore auth"]]),
+    mainAgentOpen: false,
+    lastMainCtxTotal: 0,
+  };
+  const line = JSON.stringify({
+    type: "user",
+    message: {
+      content: [{ type: "tool_result", tool_use_id: "agent-1", content: [] }],
+    },
+  });
+  const { output, nextState } = processLine(line, state);
+  expect(output).toBe("  → [glob] **/*.ts\n◀ SUBAGENT\n▶ MAIN AGENT\n");
+  expect(nextState.pendingSubagentIds.has("agent-1")).toBe(false);
+  expect(nextState.mainAgentOpen).toBe(true);
+});
+```
+
+- [x] **Step 6: Fix `mainHeaderPrinted` → `mainAgentOpen` in remaining state constructions**
+
+Four more tests construct `FormatterState` directly. Update each:
+
+```ts
+// "ignores tool_result for non-subagent ids" (line 208-222):
+// mainHeaderPrinted: false → mainAgentOpen: false
+
+// "does not repeat header on consecutive assistant events" (line 224-242):
+// mainHeaderPrinted: true → mainAgentOpen: true
+// Also update assertion: expect(output).not.toContain("▶ MAIN AGENT")
+// (no ▶ MAIN AGENT emitted when mainAgentOpen is already true)
+
+// "suppresses ctx line when total has not grown" (line 309-325):
+// mainHeaderPrinted: false → mainAgentOpen: false
+
+// "never prints ctx line for subagent assistant events" (line 327-345):
+// mainHeaderPrinted: true → mainAgentOpen: false
+// (subagent is open = main is closed)
+```
+
+- [x] **Step 7: Replace the two `flushState` describe tests**
+
+```ts
+describe("flushState", () => {
+  it("returns buffered content + close marker for each pending subagent", () => {
+    const state: FormatterState = {
+      pendingSubagentIds: new Set(["agent-1"]),
+      subagentBuffers: new Map([["agent-1", "  → [glob] **/*.ts\n"]]),
+      subagentDescriptions: new Map([["agent-1", "Explore auth"]]),
+      mainAgentOpen: false,
+      lastMainCtxTotal: 0,
+    };
+    const output = flushState(state);
+    expect(output).toBe("  → [glob] **/*.ts\n◀ SUBAGENT\n");
+  });
+
+  it("closes main agent block if open", () => {
+    const state: FormatterState = {
+      pendingSubagentIds: new Set(),
+      subagentBuffers: new Map(),
+      subagentDescriptions: new Map(),
+      mainAgentOpen: true,
+      lastMainCtxTotal: 0,
+    };
+    expect(flushState(state)).toBe("◀ MAIN AGENT\n");
+  });
+
+  it("returns empty string when nothing is open", () => {
+    expect(flushState(initialState())).toBe("");
+  });
+});
+```
+
+- [x] **Step 8: Add new tests for block transition logic**
+
+Add inside `describe("processLine", ...)` before the closing brace:
+
+```ts
+it("emits ▶ MAIN AGENT on first substantive main agent event", () => {
+  const line = JSON.stringify({
+    type: "assistant",
+    message: {
+      content: [{ type: "text", text: "Hello" }],
+      usage: { input_tokens: 100, output_tokens: 5 },
+    },
+  });
+  const { output, nextState } = processLine(line, initialState());
+  expect(output).toContain("▶ MAIN AGENT\n");
+  expect(nextState.mainAgentOpen).toBe(true);
+});
+
+it("does not emit ▶ MAIN AGENT again on second event when already open", () => {
+  const line = JSON.stringify({
+    type: "assistant",
+    message: {
+      content: [{ type: "text", text: "Second" }],
+      usage: { input_tokens: 200, output_tokens: 5 },
+    },
+  });
+  const stateWithOpen: FormatterState = {
+    pendingSubagentIds: new Set(),
+    subagentBuffers: new Map(),
+    subagentDescriptions: new Map(),
+    mainAgentOpen: true,
+    lastMainCtxTotal: 0,
+  };
+  const { output } = processLine(line, stateWithOpen);
+  expect(output).not.toContain("▶ MAIN AGENT");
+});
+
+it("emits ◀ MAIN AGENT before ▶ SUBAGENT when main agent is open", () => {
+  const line = JSON.stringify({
+    type: "assistant",
+    message: {
+      content: [{ type: "tool_use", name: "Agent", id: "a1", input: { description: "Do something" } }],
+      usage: { input_tokens: 300, output_tokens: 5 },
+    },
+  });
+  const stateWithOpen: FormatterState = {
+    pendingSubagentIds: new Set(),
+    subagentBuffers: new Map(),
+    subagentDescriptions: new Map(),
+    mainAgentOpen: true,
+    lastMainCtxTotal: 0,
+  };
+  const { output, nextState } = processLine(line, stateWithOpen);
+  expect(output).toBe("◀ MAIN AGENT\n▶ SUBAGENT: Do something\n");
+  expect(nextState.mainAgentOpen).toBe(false);
+});
+
+it("emits only ▶ SUBAGENT when main agent is not open (edge case: first event)", () => {
+  const line = JSON.stringify({
+    type: "assistant",
+    message: {
+      content: [{ type: "tool_use", name: "Agent", id: "a1", input: { description: "First thing" } }],
+      usage: { input_tokens: 300, output_tokens: 5 },
+    },
+  });
+  const { output, nextState } = processLine(line, initialState());
+  expect(output).toBe("▶ SUBAGENT: First thing\n");
+  expect(output).not.toContain("◀ MAIN AGENT");
+  expect(nextState.mainAgentOpen).toBe(false);
+});
+```
+
+- [x] **Step 9: Run the tests and confirm they all fail**
 
 ```bash
-#!/bin/bash
-# @name: Heartbeat Lifecycle
-# @description: Registers a meditate task, lists it, pauses, resumes, reads logs, then stops it — verifies no tasks linger after stop
+cd /Users/josu/Documents/projects/ralph-cli && npx vitest run src/cli/tests/stream-formatter.test.ts
+```
 
-set -euo pipefail
+Expected: multiple failures (HEADER not defined, mainHeaderPrinted not in FormatterState, assertions on box borders fail).
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-TMP_PROJECT="$(mktemp -d)"
-TASK_ID="meditate:$(basename "$TMP_PROJECT")"
+---
 
-cleanup() {
-  # Double-stop is intentional — trap fires after explicit Step 6 stop; || true suppresses already-removed error
-  node "$REPO_ROOT/dist/cli/index.js" heartbeat stop "$TASK_ID" 2>/dev/null || true
-  rm -rf "$TMP_PROJECT"
+### Task 2: Implement stream-formatter.ts changes
+
+**Files:**
+- Modify: `src/cli/lib/stream-formatter.ts`
+
+- [x] **Step 1: Update the FormatterState interface — replace `mainHeaderPrinted` with `mainAgentOpen`**
+
+```ts
+// Before:
+export interface FormatterState {
+  pendingSubagentIds: Set<string>;
+  subagentBuffers: Map<string, string>;
+  subagentDescriptions: Map<string, string>;
+  mainHeaderPrinted: boolean;
+  lastMainCtxTotal: number;
 }
-trap cleanup EXIT
 
-echo "=== Scenario: Heartbeat Lifecycle ==="
-echo "TASK_ID=$TASK_ID"
-echo ""
-
-echo "--- Step 1: Register task (every 60 min) ---"
-node "$REPO_ROOT/dist/cli/index.js" heartbeat meditate "$TMP_PROJECT" --every 60
-
-echo ""
-echo "--- Step 2: List tasks ---"
-node "$REPO_ROOT/dist/cli/index.js" heartbeat list
-
-echo ""
-echo "--- Step 3: Pause task ---"
-node "$REPO_ROOT/dist/cli/index.js" heartbeat pause "$TASK_ID"
-
-echo ""
-echo "--- Step 4: Resume task ---"
-node "$REPO_ROOT/dist/cli/index.js" heartbeat resume "$TASK_ID"
-
-echo ""
-echo "--- Step 5: Logs (no-follow) ---"
-node "$REPO_ROOT/dist/cli/index.js" heartbeat logs "$TASK_ID" || true
-
-echo ""
-echo "--- Step 6: Stop task ---"
-node "$REPO_ROOT/dist/cli/index.js" heartbeat stop "$TASK_ID"
-
-echo ""
-echo "--- Step 7: Verify task removed ---"
-node "$REPO_ROOT/dist/cli/index.js" heartbeat list
-
-echo ""
-echo "=== DONE ==="
+// After:
+export interface FormatterState {
+  pendingSubagentIds: Set<string>;
+  subagentBuffers: Map<string, string>;
+  subagentDescriptions: Map<string, string>;
+  mainAgentOpen: boolean;
+  lastMainCtxTotal: number;
+}
 ```
 
-- [ ] **Step 2: Make executable**
+- [x] **Step 2: Update `initialState()` — replace `mainHeaderPrinted: false` with `mainAgentOpen: false`**
 
-```bash
-chmod +x scenario-tests/test-heartbeat-lifecycle.sh
+```ts
+export function initialState(): FormatterState {
+  return {
+    pendingSubagentIds: new Set(),
+    subagentBuffers: new Map(),
+    subagentDescriptions: new Map(),
+    mainAgentOpen: false,
+    lastMainCtxTotal: 0,
+  };
+}
 ```
 
-- [ ] **Step 3: Build dist if needed**
+- [x] **Step 3: Remove the `HEADER` constant and `formatSubagentBlock` function**
 
-```bash
-ls dist/cli/index.js 2>/dev/null || npm run build
+Delete lines 21 and 47–52:
+
+```ts
+// DELETE:
+const HEADER = "┌─ MAIN AGENT ──────────────────────────────────────────\n";
+
+// DELETE:
+function formatSubagentBlock(desc: string, buf: string): string {
+  const label = `┌─ SUBAGENT: ${desc} `;
+  const totalWidth = 56;
+  const dashes = "─".repeat(Math.max(0, totalWidth - label.length));
+  return `\n${label}${dashes}\n${buf}◀ ${"─".repeat(totalWidth - 2)}\n\n`;
+}
 ```
 
-- [ ] **Step 4: Run the script directly to verify it works**
+- [x] **Step 4: Update `flushState()` — emit buffered content + `◀ SUBAGENT`, close main agent if open**
 
-```bash
-bash scenario-tests/test-heartbeat-lifecycle.sh
+```ts
+export function flushState(state: FormatterState): string {
+  let output = "";
+  for (const id of state.pendingSubagentIds) {
+    const buf = state.subagentBuffers.get(id) ?? "";
+    output += buf + "◀ SUBAGENT\n";
+  }
+  if (state.mainAgentOpen) {
+    output += "◀ MAIN AGENT\n";
+  }
+  return output;
+}
 ```
 
-Expected: prints each step header, each subcommand output (e.g. `Registered: meditate:/tmp/...`, `Paused: meditate:/tmp/...`, `Stopped and removed: meditate:/tmp/...`), final list shows "No heartbeat tasks registered." Exit code 0.
+- [x] **Step 5: Update the user/tool_result block in `processLine`**
 
-- [ ] **Step 5: Commit**
+The user event handler (around lines 82–119) handles `tool_result` events that close subagent blocks. Replace it entirely with:
+
+```ts
+// BEFORE (lines 82–119 in processLine):
+if (event.type === "user") {
+  const msg = event.message as { content?: unknown[] } | undefined;
+  const userContent = msg?.content ?? [];
+  let output = "";
+  const nextPending = new Set(state.pendingSubagentIds);
+  const nextBuffers = new Map(state.subagentBuffers);
+  const nextDescriptions = new Map(state.subagentDescriptions);
+  let nextHeaderPrinted = state.mainHeaderPrinted;
+
+  for (const item of userContent) {
+    const block = item as Record<string, unknown>;
+    if (block.type === "tool_result") {
+      const id = String(block.tool_use_id ?? "");
+      if (nextPending.has(id)) {
+        const desc = nextDescriptions.get(id) ?? "";
+        const buf = nextBuffers.get(id) ?? "";
+        output += formatSubagentBlock(desc, buf);
+        nextPending.delete(id);
+        nextBuffers.delete(id);
+        nextDescriptions.delete(id);
+      }
+    }
+  }
+
+  if (nextPending.size === 0 && state.pendingSubagentIds.size > 0) {
+    nextHeaderPrinted = false;
+  }
+
+  return {
+    output,
+    nextState: {
+      ...state,
+      pendingSubagentIds: nextPending,
+      subagentBuffers: nextBuffers,
+      subagentDescriptions: nextDescriptions,
+      mainHeaderPrinted: nextHeaderPrinted,
+    },
+  };
+}
+
+// AFTER:
+if (event.type === "user") {
+  const msg = event.message as { content?: unknown[] } | undefined;
+  const userContent = msg?.content ?? [];
+  let output = "";
+  const nextPending = new Set(state.pendingSubagentIds);
+  const nextBuffers = new Map(state.subagentBuffers);
+  const nextDescriptions = new Map(state.subagentDescriptions);
+  let nextMainAgentOpen = state.mainAgentOpen;
+
+  for (const item of userContent) {
+    const block = item as Record<string, unknown>;
+    if (block.type === "tool_result") {
+      const id = String(block.tool_use_id ?? "");
+      if (nextPending.has(id)) {
+        const buf = nextBuffers.get(id) ?? "";
+        // Emit buffered subagent content, close subagent, reopen main agent
+        output += buf + "◀ SUBAGENT\n▶ MAIN AGENT\n";
+        nextMainAgentOpen = true;
+        nextPending.delete(id);
+        nextBuffers.delete(id);
+        nextDescriptions.delete(id);
+      }
+    }
+  }
+
+  return {
+    output,
+    nextState: {
+      ...state,
+      pendingSubagentIds: nextPending,
+      subagentBuffers: nextBuffers,
+      subagentDescriptions: nextDescriptions,
+      mainAgentOpen: nextMainAgentOpen,
+    },
+  };
+}
+```
+
+- [x] **Step 6: Update the main agent section in `processLine`**
+
+Replace `mainHeaderPrinted` tracking and `HEADER` emission with `mainAgentOpen` and `▶ MAIN AGENT`:
+
+```ts
+// Find and update variable declaration (around line 165):
+// BEFORE: let nextHeaderPrinted = state.mainHeaderPrinted;
+// AFTER:  let nextMainAgentOpen = state.mainAgentOpen;
+
+// Find and update the header block (around line 192):
+// BEFORE:
+if (!nextHeaderPrinted) {
+  output += HEADER;
+  nextHeaderPrinted = true;
+}
+// AFTER:
+if (!nextMainAgentOpen) {
+  output += "▶ MAIN AGENT\n";
+  nextMainAgentOpen = true;
+}
+
+// Find and update the Agent tool_use case (around line 204):
+// BEFORE:
+if (name === "Agent") {
+  const desc = String(input.description ?? input.prompt ?? "");
+  output += `▶ SUBAGENT: ${desc}\n`;
+  nextPending.add(String(b.id));
+  nextDescriptions.set(String(b.id), desc);
+  nextBuffers.set(String(b.id), "");
+}
+// AFTER:
+if (name === "Agent") {
+  const desc = String(input.description ?? input.prompt ?? "");
+  if (nextMainAgentOpen) {
+    output += "◀ MAIN AGENT\n";
+    nextMainAgentOpen = false;
+  }
+  output += `▶ SUBAGENT: ${desc}\n`;
+  nextPending.add(String(b.id));
+  nextDescriptions.set(String(b.id), desc);
+  nextBuffers.set(String(b.id), "");
+}
+
+// Find and update the return statement:
+// BEFORE: mainHeaderPrinted: nextHeaderPrinted,
+// AFTER:  mainAgentOpen: nextMainAgentOpen,
+```
+
+- [x] **Step 7: Run the tests and confirm they all pass**
 
 ```bash
-git add scenario-tests/test-heartbeat-lifecycle.sh
-git commit -m "feat: add heartbeat lifecycle scenario test"
+cd /Users/josu/Documents/projects/ralph-cli && npx vitest run src/cli/tests/stream-formatter.test.ts
+```
+
+Expected: all tests pass.
+
+- [x] **Step 8: Run the full test suite to check for regressions**
+
+```bash
+cd /Users/josu/Documents/projects/ralph-cli && npm test
+```
+
+Expected: all tests pass (loop.test.ts may have some failures from the state shape change — those will be fixed in Chunk 2).
+
+- [x] **Step 9: Commit**
+
+```bash
+cd /Users/josu/Documents/projects/ralph-cli && git add src/cli/lib/stream-formatter.ts src/cli/tests/stream-formatter.test.ts && git commit -m "feat: replace box-drawing blocks with ▶/◀ open-close markers in stream-formatter"
 ```
 
 ---
 
-## Chunk 2: Meditate Create Script
+## Chunk 2: Update loop.ts to use stream.message()
 
-### Task 2: Create `test-meditate-create.sh`
+### Task 3: Update loop.ts tests for async generator + stream.message
 
 **Files:**
-- Create: `scenario-tests/test-meditate-create.sh`
-- Reference: `src/cli/tests/meditate-create.test.ts` (existing vitest file being delegated to)
+- Modify: `src/cli/tests/loop.test.ts`
 
-**Context:** `ralph meditate create` is a two-phase interactive command (non-interactive Claude kickoff → TUI resume). It cannot be run end-to-end in a script without spawning real Claude. The vitest test file exercises `buildMeditateCreateKickoffArgs` and related pure functions with stubs. This script follows the identical pattern to `test-meditate-session.sh`.
+- [x] **Step 1: Add `stream` to the `@clack/prompts` mock**
 
-- [ ] **Step 1: Check what the meditate-create vitest file covers**
+```ts
+// Before (line 21-28):
+vi.mock("@clack/prompts", () => ({
+  intro: vi.fn(),
+  outro: vi.fn(),
+  cancel: vi.fn(),
+  spinner: vi.fn(() => ({ start: vi.fn(), stop: vi.fn() })),
+  log: { warn: vi.fn(), step: vi.fn() },
+  note: vi.fn(),
+}));
 
-```bash
-npx vitest run src/cli/tests/meditate-create.test.ts --reporter=verbose 2>&1 | head -40
+// After:
+vi.mock("@clack/prompts", () => ({
+  intro: vi.fn(),
+  outro: vi.fn(),
+  cancel: vi.fn(),
+  spinner: vi.fn(() => ({ start: vi.fn(), stop: vi.fn() })),
+  log: { warn: vi.fn(), step: vi.fn() },
+  note: vi.fn(),
+  stream: {
+    message: vi.fn(async (gen: AsyncIterable<string>) => {
+      // Drain the generator so processLine is exercised in tests
+      for await (const _ of gen) { /* no-op */ }
+    }),
+  },
+}));
 ```
 
-Expected: tests pass. Note which test names appear — the script description should match what's actually tested.
+- [x] **Step 2: Update the stream-formatter mock to use `mainAgentOpen` instead of `mainHeaderPrinted`**
 
-- [ ] **Step 2: Create the script**
+```ts
+// Before (line 30-43):
+vi.mock("../lib/stream-formatter.js", () => ({
+  processLine: vi.fn(() => ({
+    output: "",
+    nextState: { pendingSubagentIds: new Set(), subagentBuffers: new Map(), subagentDescriptions: new Map(), mainHeaderPrinted: false, lastMainCtxTotal: 0 },
+  })),
+  initialState: vi.fn(() => ({
+    pendingSubagentIds: new Set(),
+    subagentBuffers: new Map(),
+    subagentDescriptions: new Map(),
+    mainHeaderPrinted: false,
+    lastMainCtxTotal: 0,
+  })),
+  flushState: vi.fn(() => ""),
+}));
 
-Create `scenario-tests/test-meditate-create.sh` with this content:
-
-```bash
-#!/bin/bash
-# @name: Meditate Create Subcommand
-# @description: Verifies ralph meditate create unit behavior — argument parsing, kickoff args, and session handling — via vitest
-
-set -e
-
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-
-echo "=== Scenario: Meditate Create Subcommand ==="
-echo "Running vitest for meditateCreateCommand tests..."
-
-cd "$REPO_ROOT"
-npx vitest run src/cli/tests/meditate-create.test.ts --reporter=verbose 2>&1
-
-echo ""
-echo "=== PASS: meditate create tests completed ==="
+// After:
+vi.mock("../lib/stream-formatter.js", () => ({
+  processLine: vi.fn(() => ({
+    output: "",
+    nextState: { pendingSubagentIds: new Set(), subagentBuffers: new Map(), subagentDescriptions: new Map(), mainAgentOpen: false, lastMainCtxTotal: 0 },
+  })),
+  initialState: vi.fn(() => ({
+    pendingSubagentIds: new Set(),
+    subagentBuffers: new Map(),
+    subagentDescriptions: new Map(),
+    mainAgentOpen: false,
+    lastMainCtxTotal: 0,
+  })),
+  flushState: vi.fn(() => ""),
+}));
 ```
 
-- [ ] **Step 3: Make executable**
+- [x] **Step 3: Update `makeMockChild` — replace the EventEmitter rl with an async iterable**
 
-```bash
-chmod +x scenario-tests/test-meditate-create.sh
+The new `loop.ts` uses `for await (const line of rl)` instead of `rl.on('line', ...)`. Update the helper to return an async-iterable readline mock:
+
+```ts
+function makeMockChild(exitCode = 0, lines: string[] = []) {
+  const stdoutEmitter = new EventEmitter();
+  const stdinMock = { end: vi.fn(), pipe: vi.fn(), write: vi.fn() };
+
+  const child = {
+    pid: 42,
+    stdin: stdinMock,
+    stdout: stdoutEmitter,
+    on: vi.fn((event: string, cb: (...args: unknown[]) => void) => {
+      if (event === "exit") setTimeout(() => cb(exitCode, null), 5);
+    }),
+  };
+
+  // Return an async iterable — compatible with "for await (const line of rl)"
+  const rlMock = {
+    [Symbol.asyncIterator]: async function* () {
+      for (const line of lines) {
+        yield line;
+      }
+    },
+  };
+
+  vi.mocked(readline.createInterface).mockReturnValue(rlMock as any);
+  vi.mocked(cp.spawn).mockReturnValue(child as any);
+
+  return { child };
+}
 ```
 
-- [ ] **Step 4: Run the script directly to verify**
+- [x] **Step 4: Update all `makeMockChild` call sites — remove `rlEmitter` usage**
 
-```bash
-bash scenario-tests/test-meditate-create.sh
+The old tests used `rlEmitter.emit("close")` to end the readline. That's no longer needed — the async iterable ends naturally. Update each test:
+
+```ts
+// Before:
+const { rlEmitter } = makeMockChild(0);
+// ... later:
+rlEmitter.emit("close");
+
+// After:
+makeMockChild(0);
+// (no close emission needed)
 ```
 
-Expected: vitest output with all tests passing. Exit code 0.
+Update all tests: `runs exactly max iterations`, `feeds each stdout line through processLine`, `calls log.warn when claude exits`, `calls log.warn when git push fails`, `prints PID at startup`, `retries git push with -u`, `warns only after retry also fails`, `spawns claude with correct flags`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Replace the "feeds each stdout line through processLine and writes output" test**
+
+The new test verifies `processLine` is called and `stream.message` is invoked — not `stdout.write`:
+
+```ts
+it("calls processLine for each line from readline and passes generator to stream.message", async () => {
+  const testLine = '{"type":"assistant","message":{"content":[]}}';
+  vi.mocked(formatter.processLine).mockReturnValue({
+    output: "→ [read] file.ts\n",
+    nextState: { pendingSubagentIds: new Set(), subagentBuffers: new Map(), subagentDescriptions: new Map(), mainAgentOpen: false, lastMainCtxTotal: 0 },
+  });
+
+  makeMockChild(0, [testLine]);
+  mockGitBranch("main");
+
+  await runLoop({ promptFile: "/proj/PROMPT_build.md", cwd: "/proj", max: 1 });
+
+  expect(formatter.processLine).toHaveBeenCalledWith(testLine, expect.any(Object));
+  expect((clack as any).stream.message).toHaveBeenCalledTimes(1);
+  // No stdout.write spy — output goes through stream.message
+});
+```
+
+- [x] **Step 6: Add a test that stream.message is called once per iteration**
+
+```ts
+it("calls stream.message once per loop iteration", async () => {
+  makeMockChild(0);
+  mockGitBranch("main");
+
+  await runLoop({ promptFile: "/proj/PROMPT_build.md", cwd: "/proj", max: 3 });
+
+  expect((clack as any).stream.message).toHaveBeenCalledTimes(3);
+});
+```
+
+- [x] **Step 7: Run the tests and confirm they fail**
 
 ```bash
-git add scenario-tests/test-meditate-create.sh
-git commit -m "feat: add meditate create scenario test"
+cd /Users/josu/Documents/projects/ralph-cli && npx vitest run src/cli/tests/loop.test.ts
 ```
+
+Expected: failures on `stream.message` not being called, `rlEmitter` references, and state shape.
 
 ---
 
-## Chunk 3: End-to-End Verification
-
-### Task 3: Verify both scenarios run via `ralph run-scenarios`
+### Task 4: Implement loop.ts changes
 
 **Files:**
-- No new files — this task just verifies the full pipeline works.
+- Modify: `src/cli/lib/loop.ts`
 
-**Context:** `ralph run-scenarios` discovers `scenario-tests/*.sh` files, builds a Claude prompt from the `@name`/`@description` headers, spawns a Claude session per scenario, and writes a report to `scenario-runs/`. Use `--all` to skip interactive selection.
+- [x] **Step 1: Add `stream` to the `@clack/prompts` import**
 
-- [ ] **Step 1: Confirm dist is current**
+```ts
+// Before (line 4-11):
+import {
+  intro,
+  outro,
+  cancel,
+  spinner,
+  log,
+  note,
+} from "@clack/prompts";
 
-```bash
-npm run build
+// After:
+import {
+  intro,
+  outro,
+  cancel,
+  spinner,
+  log,
+  note,
+  stream,
+} from "@clack/prompts";
 ```
 
-- [ ] **Step 2: Run both new scenarios via `ralph run-scenarios`**
+- [x] **Step 2: Define `sessionStream` as an inner async generator inside `runLoop`, after the signal handler setup and before the while loop**
 
-```bash
-node dist/cli/index.js run-scenarios . --all 2>&1
+Add this function inside `runLoop`, after `process.on("SIGTERM", onSignal)` (around line 64) and before `try {`:
+
+```ts
+async function* sessionStream(
+  spawnedChild: ReturnType<typeof spawn>
+): AsyncGenerator<string> {
+  const readStream = createReadStream(promptFile);
+  readStream.pipe(spawnedChild.stdin as NodeJS.WritableStream);
+
+  const rl = readline.createInterface({
+    input: spawnedChild.stdout as NodeJS.ReadableStream,
+    crlfDelay: Infinity,
+  });
+
+  let state = initialState();
+  for await (const line of rl) {
+    const { output, nextState } = processLine(line, state);
+    state = nextState;
+    if (output) yield output;
+  }
+
+  const flush = flushState(state);
+  if (flush) yield flush;
+}
 ```
 
-Expected: both new scenarios appear in the list, Claude sessions run for each, two new `.md` files appear in `scenario-runs/` with `status: pass`.
+- [x] **Step 3: Replace the readline + stdout.write block inside the while loop**
 
-- [ ] **Step 3: Verify no background daemon tasks linger**
+Find the section from "Feed prompt file into stdin" through the `log.warn` for non-zero exit (lines ~92–125) and replace with the generator call:
 
-```bash
-node dist/cli/index.js heartbeat list
+```ts
+// REMOVE all of this:
+// Feed prompt file into stdin
+const readStream = createReadStream(promptFile);
+readStream.pipe(child.stdin as NodeJS.WritableStream);
+
+// Track exit code
+let exitCode = 0;
+const exitPromise = new Promise<void>((resolve) => {
+  child.on("exit", (code) => {
+    exitCode = code ?? 0;
+    resolve();
+  });
+});
+
+// Process stdout line-by-line through stream-formatter
+const rl = readline.createInterface({
+  input: child.stdout as NodeJS.ReadableStream,
+  crlfDelay: Infinity,
+});
+let state = initialState();
+rl.on("line", (line) => {
+  const { output, nextState } = processLine(line, state);
+  state = nextState;
+  if (output) process.stdout.write(output);
+});
+await new Promise<void>((resolve) => rl.on("close", resolve));
+const flush = flushState(state);
+if (flush) process.stdout.write(flush);
+await exitPromise;
+
+currentPid = undefined;
+
+if (exitCode !== 0) {
+  log.warn(`claude exited with code ${exitCode}`);
+}
+
+// REPLACE with:
+// Track exit code
+let exitCode = 0;
+const exitPromise = new Promise<void>((resolve) => {
+  child.on("exit", (code) => {
+    exitCode = code ?? 0;
+    resolve();
+  });
+});
+
+await stream.message(sessionStream(child));
+await exitPromise;
+
+currentPid = undefined;
+
+if (exitCode !== 0) {
+  log.warn(`claude exited with code ${exitCode}`);
+}
 ```
 
-Expected: "No heartbeat tasks registered." (or only pre-existing tasks, none from the test run).
-
-- [ ] **Step 4: Commit scenario-runs reports (optional)**
-
-If the reports are worth keeping:
+- [x] **Step 4: Build to verify TypeScript compiles**
 
 ```bash
-git add scenario-runs/
-git commit -m "chore: add initial scenario run reports for heartbeat and meditate-create"
+cd /Users/josu/Documents/projects/ralph-cli && npm run build 2>&1 | head -30
+```
+
+Expected: build succeeds with no TypeScript errors.
+
+- [x] **Step 5: Run loop tests and confirm they pass**
+
+```bash
+cd /Users/josu/Documents/projects/ralph-cli && npx vitest run src/cli/tests/loop.test.ts
+```
+
+Expected: all tests pass.
+
+- [x] **Step 6: Run the full test suite**
+
+```bash
+cd /Users/josu/Documents/projects/ralph-cli && npm test
+```
+
+Expected: all tests pass.
+
+- [x] **Step 7: Smoke test — run `ralph implement ralph-cli` manually and verify the `│` gutter frames the entire session**
+
+Check the terminal output matches the expected format:
+```
+│  ▶ MAIN AGENT
+│  → [tool] ToolSearch
+│  ◈ ctx: N tokens
+│  ◀ MAIN AGENT
+│  ▶ SUBAGENT: ...
+│  ◀ SUBAGENT
+│  ▶ MAIN AGENT
+│  ◀ MAIN AGENT
+```
+
+- [x] **Step 8: Commit**
+
+```bash
+cd /Users/josu/Documents/projects/ralph-cli && git add src/cli/lib/loop.ts src/cli/tests/loop.test.ts && git commit -m "feat: route claude session output through clack stream.message() for unified gutter"
 ```
