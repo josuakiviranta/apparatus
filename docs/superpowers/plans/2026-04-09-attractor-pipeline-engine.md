@@ -2107,7 +2107,9 @@ import { ManagerLoopHandler } from "./manager-loop.js";
 // Add inside registerBuiltinHandlers():
 registerHandler("parallel",          new ParallelHandler());
 registerHandler("parallel.fan_in",   new FanInHandler());
-registerHandler("stack.manager_loop", new ManagerLoopHandler(async () => ({ status: "success" })));
+// manager_loop requires a pollChild function wired at runtime by the engine — not registered here.
+// The engine creates ManagerLoopHandler with a real pollChild when executing a house node.
+// Registering a stub would silently pass all manager_loop nodes in production.
 ```
 
 - [ ] **Step 5: Run handler tests**
@@ -2117,11 +2119,33 @@ cd /Users/josu/Documents/projects/ralph-cli && npm test -- src/attractor/tests/h
 ```
 Expected: all passing
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 6: Update engine.ts to wire ManagerLoopHandler with a real pollChild**
+
+In `src/attractor/core/engine.ts`, in `buildHandlerMap`, add after the other handler registrations:
+
+```typescript
+import { ManagerLoopHandler } from "../handlers/manager-loop.js";
+import { ParallelHandler, FanInHandler } from "../handlers/parallel.js";
+
+// In buildHandlerMap():
+m.set("parallel",          new ParallelHandler());
+m.set("parallel.fan_in",   new FanInHandler());
+// manager_loop: pollChild polls the child pipeline state from logsRoot
+m.set("stack.manager_loop", new ManagerLoopHandler(async () => {
+  // v1: child is ralph.implement running in same process — status derived from checkpoint
+  const cp = await import("../checkpoint.js").then(m => m.loadCheckpoint(opts.logsRoot));
+  if (!cp) return { status: "running" };
+  const exitNode = [...graph.nodes.values()].find(n => n.shape === "Msquare" || n.id === "exit" || n.id === "end");
+  if (exitNode && cp.completedNodes.includes(exitNode.id)) return { status: "success" };
+  return { status: "running", currentNode: cp.currentNode };
+}));
+```
+
+- [ ] **Step 7: Commit**
 
 ```bash
-git add src/attractor/handlers/parallel.ts src/attractor/handlers/manager-loop.ts src/attractor/tests/handlers.test.ts src/attractor/handlers/registry.ts
-git commit -m "feat(attractor): parallel, fan-in, manager-loop handlers"
+git add src/attractor/handlers/parallel.ts src/attractor/handlers/manager-loop.ts src/attractor/tests/handlers.test.ts src/attractor/handlers/registry.ts src/attractor/core/engine.ts
+git commit -m "feat(attractor): parallel, fan-in, manager-loop handlers; wire into engine"
 ```
 
 ---
