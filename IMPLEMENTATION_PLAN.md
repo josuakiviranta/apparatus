@@ -1,6 +1,8 @@
 # Ink Unified Output Migration Implementation Plan
 
-> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Status (2026-04-09):** ALL CHUNKS COMPLETE. All tasks implemented and tested. @clack/prompts removed. Tagged 0.0.28.
+
+> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Migrate all ralph command output to a unified Ink-based system via helper functions in `output.ts`, replacing Clack and raw `console.log` across all command files.
 
@@ -19,14 +21,14 @@
 **Files:**
 - Modify: `package.json`
 
-- [ ] **Step 1: Add ink-spinner and ink-testing-library**
+- [x] **Step 1: Add ink-spinner and ink-testing-library**
 
 ```bash
 npm install ink-spinner
 npm install --save-dev ink-testing-library
 ```
 
-- [ ] **Step 2: Verify install**
+- [x] **Step 2: Verify install**
 
 ```bash
 npm ls ink-spinner ink-testing-library
@@ -34,7 +36,7 @@ npm ls ink-spinner ink-testing-library
 
 Expected: both listed without errors.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add package.json package-lock.json
@@ -51,7 +53,7 @@ git commit -m "chore: add ink-spinner and ink-testing-library"
 
 The `processLine` return type changes from `{ output: string; nextState }` to `{ events: StreamEvent[]; nextState }`. `flushState` changes from returning `string` to `StreamEvent[]`. The standalone CLI path (bottom of the file) serializes events back to plain text for debugging.
 
-- [ ] **Step 1: Update stream-formatter tests first (TDD)**
+- [x] **Step 1: Update stream-formatter tests first (TDD)**
 
 Replace every `result.output` assertion with `result.events` assertions. Map each expected string to its equivalent event array. Full updated test file:
 
@@ -611,7 +613,7 @@ describe("flushState", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests — verify they all fail**
+- [x] **Step 2: Run tests — verify they all fail**
 
 ```bash
 npm test -- src/cli/tests/stream-formatter.test.ts
@@ -619,7 +621,7 @@ npm test -- src/cli/tests/stream-formatter.test.ts
 
 Expected: many failures (`events` property does not exist on result).
 
-- [ ] **Step 3: Update stream-formatter.ts**
+- [x] **Step 3: Update stream-formatter.ts**
 
 Change `FormatterState.subagentBuffers` from `Map<string, string>` to `Map<string, StreamEvent[]>`. Change `processLine` return from `{ output: string }` to `{ events: StreamEvent[] }`. Change `flushState` return from `string` to `StreamEvent[]`.
 
@@ -671,7 +673,7 @@ rl.on("close", () => {
 });
 ```
 
-- [ ] **Step 4: Run tests — verify they all pass**
+- [x] **Step 4: Run tests — verify they all pass**
 
 ```bash
 npm test -- src/cli/tests/stream-formatter.test.ts
@@ -679,7 +681,7 @@ npm test -- src/cli/tests/stream-formatter.test.ts
 
 Expected: all green.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/cli/lib/stream-formatter.ts src/cli/tests/stream-formatter.test.ts
@@ -696,7 +698,7 @@ git commit -m "feat: stream-formatter emits StreamEvent[] instead of plain text"
 - Create: `src/cli/components/ui.tsx`
 - Create: `src/cli/tests/ui.test.tsx`
 
-- [ ] **Step 1: Write failing tests for Step, Info, Warn, Error, Success**
+- [x] **Step 1: Write failing tests for Step, Info, Warn, Error, Success**
 
 Create `src/cli/tests/ui.test.tsx`:
 
@@ -744,7 +746,7 @@ describe("Success", () => {
 });
 ```
 
-- [ ] **Step 2: Run — verify all fail**
+- [x] **Step 2: Run — verify all fail**
 
 ```bash
 npm test -- src/cli/tests/ui.test.tsx
@@ -752,7 +754,7 @@ npm test -- src/cli/tests/ui.test.tsx
 
 Expected: FAIL (module not found).
 
-- [ ] **Step 3: Create `src/cli/components/ui.tsx` with basic output components**
+- [x] **Step 3: Create `src/cli/components/ui.tsx` with basic output components**
 
 ```tsx
 import React, { useEffect, useState } from "react";
@@ -781,7 +783,7 @@ export function Success({ text }: { text: string }) {
 }
 ```
 
-- [ ] **Step 4: Run — verify basic component tests pass**
+- [x] **Step 4: Run — verify basic component tests pass**
 
 ```bash
 npm test -- src/cli/tests/ui.test.tsx
@@ -789,7 +791,7 @@ npm test -- src/cli/tests/ui.test.tsx
 
 Expected: all green.
 
-- [ ] **Step 5: Write failing tests for Header**
+- [x] **Step 5: Write failing tests for Header**
 
 Add to `src/cli/tests/ui.test.tsx`:
 
@@ -815,7 +817,7 @@ describe("Header", () => {
 });
 ```
 
-- [ ] **Step 6: Run — verify Header tests fail**
+- [x] **Step 6: Run — verify Header tests fail**
 
 ```bash
 npm test -- src/cli/tests/ui.test.tsx
@@ -823,7 +825,7 @@ npm test -- src/cli/tests/ui.test.tsx
 
 Expected: FAIL (Header not exported).
 
-- [ ] **Step 7: Add Header to ui.tsx**
+- [x] **Step 7: Add Header to ui.tsx**
 
 ```tsx
 export function Header({ mode, project, branch, pid }: {
@@ -843,7 +845,7 @@ export function Header({ mode, project, branch, pid }: {
 }
 ```
 
-- [ ] **Step 8: Run — verify Header tests pass**
+- [x] **Step 8: Run — verify Header tests pass**
 
 ```bash
 npm test -- src/cli/tests/ui.test.tsx
@@ -851,7 +853,7 @@ npm test -- src/cli/tests/ui.test.tsx
 
 Expected: all green.
 
-- [ ] **Step 9: Write failing tests for StreamLine**
+- [x] **Step 9: Write failing tests for StreamLine**
 
 Add to `src/cli/tests/ui.test.tsx`:
 
@@ -907,7 +909,7 @@ describe("StreamLine", () => {
 });
 ```
 
-- [ ] **Step 10: Run — verify StreamLine tests fail**
+- [x] **Step 10: Run — verify StreamLine tests fail**
 
 ```bash
 npm test -- src/cli/tests/ui.test.tsx
@@ -915,7 +917,7 @@ npm test -- src/cli/tests/ui.test.tsx
 
 Expected: FAIL (StreamLine not exported).
 
-- [ ] **Step 11: Add StreamLine and StreamOutput to ui.tsx**
+- [x] **Step 11: Add StreamLine and StreamOutput to ui.tsx**
 
 ```tsx
 export function StreamLine({ event }: { event: StreamEvent }) {
@@ -958,7 +960,7 @@ export function StreamOutput({ iter }: { iter: AsyncIterable<StreamEvent> }) {
 }
 ```
 
-- [ ] **Step 12: Run — verify all ui tests pass**
+- [x] **Step 12: Run — verify all ui tests pass**
 
 ```bash
 npm test -- src/cli/tests/ui.test.tsx
@@ -966,7 +968,7 @@ npm test -- src/cli/tests/ui.test.tsx
 
 Expected: all green.
 
-- [ ] **Step 13: Add SpinnerLine to ui.tsx** (no separate test — tested indirectly via output.ts tests)
+- [x] **Step 13: Add SpinnerLine to ui.tsx** (no separate test — tested indirectly via output.ts tests)
 
 ```tsx
 export function SpinnerLine({ label, fn }: {
@@ -992,7 +994,7 @@ export function SpinnerLine({ label, fn }: {
 }
 ```
 
-- [ ] **Step 14: Commit**
+- [x] **Step 14: Commit**
 
 ```bash
 git add src/cli/components/ui.tsx src/cli/tests/ui.test.tsx
@@ -1009,7 +1011,7 @@ git commit -m "feat: add shared Ink UI components (Step, Info, Warn, Error, Succ
 - Create: `src/cli/lib/output.ts`
 - Create: `src/cli/tests/output.test.ts`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Create `src/cli/tests/output.test.ts`:
 
@@ -1070,7 +1072,7 @@ describe("output.stream", () => {
 });
 ```
 
-- [ ] **Step 2: Run — verify all fail**
+- [x] **Step 2: Run — verify all fail**
 
 ```bash
 npm test -- src/cli/tests/output.test.ts
@@ -1078,7 +1080,7 @@ npm test -- src/cli/tests/output.test.ts
 
 Expected: FAIL (module not found).
 
-- [ ] **Step 3: Create `src/cli/lib/output.ts`**
+- [x] **Step 3: Create `src/cli/lib/output.ts`**
 
 ```ts
 import React from "react";
@@ -1157,7 +1159,7 @@ export async function stream(iter: AsyncIterable<StreamEvent>): Promise<void> {
 }
 ```
 
-- [ ] **Step 4: Run — verify output tests pass**
+- [x] **Step 4: Run — verify output tests pass**
 
 ```bash
 npm test -- src/cli/tests/output.test.ts
@@ -1165,7 +1167,7 @@ npm test -- src/cli/tests/output.test.ts
 
 Expected: all green.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/cli/lib/output.ts src/cli/tests/output.test.ts
@@ -1182,7 +1184,7 @@ git commit -m "feat: add output.ts — unified Ink output API"
 - Modify: `src/cli/lib/loop.ts`
 - Modify: `src/cli/tests/loop.test.ts`
 
-- [ ] **Step 1: Update loop.test.ts mocks first**
+- [x] **Step 1: Update loop.test.ts mocks first**
 
 Replace the `@clack/prompts` mock and `stream-formatter` mock. The test now mocks `../lib/output.js` instead of `@clack/prompts`, and the formatter mock returns `events` instead of `output`.
 
@@ -1389,7 +1391,7 @@ describe("runLoop", () => {
 });
 ```
 
-- [ ] **Step 2: Run — verify tests fail**
+- [x] **Step 2: Run — verify tests fail**
 
 ```bash
 npm test -- src/cli/tests/loop.test.ts
@@ -1397,7 +1399,7 @@ npm test -- src/cli/tests/loop.test.ts
 
 Expected: failures (loop.ts still uses Clack, and `out.header` / `out.stream` not called).
 
-- [ ] **Step 3: Update loop.ts**
+- [x] **Step 3: Update loop.ts**
 
 Replace all Clack imports and calls with `output.ts`. Change `sessionStream()` to `AsyncGenerator<StreamEvent>`. Key changes:
 
@@ -1464,7 +1466,7 @@ try {
 }
 ```
 
-- [ ] **Step 4: Run — verify loop tests pass**
+- [x] **Step 4: Run — verify loop tests pass**
 
 ```bash
 npm test -- src/cli/tests/loop.test.ts
@@ -1472,7 +1474,7 @@ npm test -- src/cli/tests/loop.test.ts
 
 Expected: all green.
 
-- [ ] **Step 5: Run full test suite**
+- [x] **Step 5: Run full test suite**
 
 ```bash
 npm test
@@ -1480,7 +1482,7 @@ npm test
 
 Expected: all green.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/cli/lib/loop.ts src/cli/tests/loop.test.ts
@@ -1500,7 +1502,7 @@ git commit -m "feat: migrate loop.ts from Clack to output.ts (Ink-based)"
 
 All three follow the same pattern: `console.error` → `output.error()` + `process.exit(1)`, `console.log` status messages → `output.step()`. The `process.stdout/stderr.write` streaming passthrough is unchanged.
 
-- [ ] **Step 1: Update plan.ts**
+- [x] **Step 1: Update plan.ts**
 
 ```ts
 import * as output from "../lib/output.js";
@@ -1517,7 +1519,7 @@ import * as output from "../lib/output.js";
 // (same for other console.log calls)
 ```
 
-- [ ] **Step 2: Update new.ts**
+- [x] **Step 2: Update new.ts**
 
 ```ts
 import * as output from "../lib/output.js";
@@ -1558,7 +1560,7 @@ import * as output from "../lib/output.js";
 //   await output.step("Kickoff complete. Opening interactive session...");
 ```
 
-- [ ] **Step 3: Build — verify no TypeScript errors after new.ts**
+- [x] **Step 3: Build — verify no TypeScript errors after new.ts**
 
 ```bash
 npm run build
@@ -1566,7 +1568,7 @@ npm run build
 
 Expected: successful build, no errors.
 
-- [ ] **Step 4: Update meditate-create.ts**
+- [x] **Step 4: Update meditate-create.ts**
 
 ```ts
 import * as output from "../lib/output.js";
@@ -1597,7 +1599,7 @@ import * as output from "../lib/output.js";
 //   await output.step("Ready. Opening interactive session...");
 ```
 
-- [ ] **Step 5: Build and verify no TypeScript errors**
+- [x] **Step 5: Build and verify no TypeScript errors**
 
 ```bash
 npm run build
@@ -1605,7 +1607,7 @@ npm run build
 
 Expected: successful build, no errors.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/cli/commands/plan.ts src/cli/commands/new.ts src/cli/commands/meditate-create.ts
@@ -1619,7 +1621,7 @@ git commit -m "feat: migrate plan, new, meditate-create commands to output.ts"
 **Files:**
 - Modify: `src/cli/commands/meditate.ts`
 
-- [ ] **Step 1: Update meditate.ts**
+- [x] **Step 1: Update meditate.ts**
 
 Replace:
 - `━━━` border block → `output.header({ mode: "meditate", project: absPath, pid: process.pid })`
@@ -1629,7 +1631,7 @@ Replace:
 
 Streaming passthrough (`process.stdout.write`, `process.stderr.write` for child output) unchanged.
 
-- [ ] **Step 2: Build**
+- [x] **Step 2: Build**
 
 ```bash
 npm run build
@@ -1637,7 +1639,7 @@ npm run build
 
 Expected: success.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/cli/commands/meditate.ts
@@ -1653,7 +1655,7 @@ git commit -m "feat: migrate meditate command to output.ts"
 
 Per the spec: pre-prompt output (scenario list) stays as `console.log` to avoid Ink/readline stdin conflict. Only post-selection output migrates to `output.ts`.
 
-- [ ] **Step 1: Update run-scenarios.ts**
+- [x] **Step 1: Update run-scenarios.ts**
 
 Keep as `console.log` (pre-prompt, before readline):
 - `console.log("\nScenario tests found...")`
@@ -1667,13 +1669,13 @@ Migrate to `output.ts` (post-selection):
 
 Streaming passthrough unchanged.
 
-- [ ] **Step 2: Build**
+- [x] **Step 2: Build**
 
 ```bash
 npm run build
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/cli/commands/run-scenarios.ts
@@ -1689,7 +1691,7 @@ git commit -m "feat: partially migrate run-scenarios to output.ts (post-selectio
 
 Per the spec: `formatTable()` stays as plain `console.log` (deferred). `heartbeat logs --follow` callback stays as `console.log` (high-frequency streaming, deferred).
 
-- [ ] **Step 1: Update heartbeat.ts**
+- [x] **Step 1: Update heartbeat.ts**
 
 For each subcommand (`meditate`, `list`, `stop`, `pause`, `resume`, `kill`):
 - `console.error(...)` → `output.error()` + `process.exit(1)`
@@ -1698,13 +1700,13 @@ For each subcommand (`meditate`, `list`, `stop`, `pause`, `resume`, `kill`):
 `formatTable()`: unchanged.
 `logs --follow` callback `console.log`: unchanged.
 
-- [ ] **Step 2: Build**
+- [x] **Step 2: Build**
 
 ```bash
 npm run build
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/cli/commands/heartbeat.ts
@@ -1723,7 +1725,7 @@ git commit -m "feat: migrate heartbeat subcommand confirmations to output.ts"
 
 **Precondition:** All `@clack/prompts` imports must be gone from both production and test files.
 
-- [ ] **Step 1: Remove Clack mock from loop.test.ts**
+- [x] **Step 1: Remove Clack mock from loop.test.ts**
 
 Remove the `vi.mock("@clack/prompts", ...)` block (lines ~21–56) and the `import * as clack from "@clack/prompts"` import (line ~57). These were replaced by the `output.ts` mock in Chunk 4, Task 5, Step 1.
 
@@ -1734,7 +1736,7 @@ grep -r "@clack/prompts" src/cli/tests/
 
 Expected: no output.
 
-- [ ] **Step 2: Verify no Clack imports remain in production code**
+- [x] **Step 2: Verify no Clack imports remain in production code**
 
 ```bash
 grep -r "@clack/prompts" src/
@@ -1742,13 +1744,13 @@ grep -r "@clack/prompts" src/
 
 Expected: no output.
 
-- [ ] **Step 3: Remove @clack/prompts**
+- [x] **Step 3: Remove @clack/prompts**
 
 ```bash
 npm uninstall @clack/prompts
 ```
 
-- [ ] **Step 4: Build — verify no errors**
+- [x] **Step 4: Build — verify no errors**
 
 ```bash
 npm run build
@@ -1756,7 +1758,7 @@ npm run build
 
 Expected: success.
 
-- [ ] **Step 5: Run full test suite**
+- [x] **Step 5: Run full test suite**
 
 ```bash
 npm test
@@ -1764,7 +1766,7 @@ npm test
 
 Expected: all green.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add package.json package-lock.json src/cli/tests/loop.test.ts
@@ -1775,7 +1777,7 @@ git commit -m "chore: remove @clack/prompts — fully replaced by Ink output.ts"
 
 ## Final Smoke Test
 
-- [ ] Link locally and run a real `ralph implement` invocation on a test project to verify visual output.
+- [x] Link locally and run a real `ralph implement` invocation on a test project to verify visual output.
 
 ```bash
 npm run build
