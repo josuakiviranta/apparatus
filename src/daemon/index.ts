@@ -69,11 +69,11 @@ for (const task of readTasks()) {
 const server = createSocketServer(sockPath, {
   list_tasks: () => readTasks(),
 
-  register_task: (command, args, interval) => {
-    const id = `${command}:${basename(args[0])}`;
-    const existing = getTask(id);
+  register_task: (command, args, interval, id) => {
+    const taskId = id ?? `${command}:${basename(args[0])}`;
+    const existing = getTask(taskId);
     const task: Task = {
-      id,
+      id: taskId,
       command,
       args,
       interval,

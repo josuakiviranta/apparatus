@@ -10,7 +10,30 @@ Registers a recurring meditation task. The daemon runs `ralph meditate <project-
 
 - `--every <n>` is **required**
 - The daemon auto-starts if not already running (via `daemon-client.ts`)
-- Task ID format: `meditate:<project-folder>`
+- Task ID format: `meditate:<basename-of-folder>`
+
+### `ralph heartbeat implement <project-folder> --every <n>`
+
+Registers a recurring implement task. The daemon runs `ralph implement <project-folder>` every `<n>` minutes.
+
+- `--every <n>` is **required**
+- Task ID format: `implement:<basename-of-folder>`
+
+### `ralph heartbeat run-scenarios <project-folder> --every <n>`
+
+Registers a recurring scenario-test task. The daemon runs `ralph run-scenarios <project-folder>` every `<n>` minutes.
+
+- `--every <n>` is **required**
+- Task ID format: `run-scenarios:<basename-of-folder>`
+
+### `ralph heartbeat pipeline <dotfile> --every <n> [--project <folder>]`
+
+Registers a recurring pipeline task. The daemon runs `ralph pipeline run <dotfile> [--project <folder>]` every `<n>` minutes.
+
+- `--every <n>` is **required**
+- `--project <folder>` is optional — passed through to the pipeline run command
+- Task ID format: `pipeline:<dotfile-stem>` (e.g. `pipeline:smoke` for `smoke.dot`)
+- The client computes and sends the task ID explicitly via the `id` field in `register_task`, because the daemon's default ID generation (`command:basename(args[0])`) would produce `pipeline:run` for all pipeline tasks
 
 ### `ralph heartbeat list`
 

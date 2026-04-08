@@ -7,7 +7,7 @@ const testHome = join(tmpdir(), `ralph-runner-test-${process.pid}`);
 process.env.HOME = testHome;
 
 import { runTask, isSessionRunning, killSession, getRalphCliPath } from "../runner";
-import { ensureDirs, readRunLogs } from "../state";
+import { ensureDirs, readRunLogs, getPidFilePath } from "../state";
 import type { Task } from "../state";
 
 beforeEach(() => {
@@ -98,7 +98,24 @@ describe("isSessionRunning / killSession", () => {
   });
 
   it("returns false when pid file has dead pid", () => {
-    writeFileSync(join(testHome, ".meditate.pid"), "99999999");
+    writeFileSync(getPidFilePath("meditate:proj"), "99999999");
     expect(isSessionRunning(makeTask())).toBe(false);
+  });
+
+  it("runTask writes pid file during execution and cleans up after", async () => {
+    const task = makeTask();
+    vi.stubEnv(
+      "RALPH_TEST_CMD",
+      `${process.execPath} -e "setTimeout(() => process.exit(0), 50)"`,
+    );
+    const runPromise = runTask(task);
+    // Give child a moment to spawn
+    await new Promise((r) => setTimeout(r, 20));
+    // PID file should exist while running
+    expect(existsSync(getPidFilePath(task.id))).toBe(true);
+    await runPromise;
+    // PID file should be gone after exit
+    expect(existsSync(getPidFilePath(task.id))).toBe(false);
+    vi.unstubAllEnvs();
   });
 });

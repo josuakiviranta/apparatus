@@ -1,6 +1,6 @@
 // src/cli/commands/heartbeat.ts
 import { Command } from "commander";
-import { resolve } from "path";
+import { resolve, basename } from "path";
 import { request, stream } from "../../lib/daemon-client";
 import type { Task } from "../../daemon/state";
 import * as output from "../lib/output.js";
@@ -55,6 +55,86 @@ Examples:
         const res = await request("register_task", {
           command: "meditate",
           args: [absPath],
+          interval: opts.every,
+        });
+        await output.success(`Registered: ${res.taskId} (every ${opts.every} min)`);
+      } catch (err: any) {
+        await output.error(`Error: ${err.message}`);
+        process.exit(1);
+      }
+    });
+
+  hb
+    .command("implement <folder>")
+    .description("Schedule the agentic build loop to run on a project folder at a fixed interval")
+    .addHelpText("after", "\nExamples:\n  ralph heartbeat implement my-app --every 60\n")
+    .requiredOption("--every <n>", "interval in minutes", (v) => {
+      const n = parseInt(v, 10);
+      if (isNaN(n) || n < 1) throw new Error("--every must be a positive integer");
+      return n;
+    })
+    .action(async (folder: string, opts: { every: number }) => {
+      const absPath = resolve(folder);
+      try {
+        const res = await request("register_task", {
+          command: "implement",
+          args: [absPath],
+          interval: opts.every,
+        });
+        await output.success(`Registered: ${res.taskId} (every ${opts.every} min)`);
+      } catch (err: any) {
+        await output.error(`Error: ${err.message}`);
+        process.exit(1);
+      }
+    });
+
+  hb
+    .command("run-scenarios <folder>")
+    .description("Schedule scenario tests to run on a project folder at a fixed interval")
+    .addHelpText("after", "\nExamples:\n  ralph heartbeat run-scenarios my-app --every 120\n")
+    .requiredOption("--every <n>", "interval in minutes", (v) => {
+      const n = parseInt(v, 10);
+      if (isNaN(n) || n < 1) throw new Error("--every must be a positive integer");
+      return n;
+    })
+    .action(async (folder: string, opts: { every: number }) => {
+      const absPath = resolve(folder);
+      try {
+        const res = await request("register_task", {
+          command: "run-scenarios",
+          args: [absPath],
+          interval: opts.every,
+        });
+        await output.success(`Registered: ${res.taskId} (every ${opts.every} min)`);
+      } catch (err: any) {
+        await output.error(`Error: ${err.message}`);
+        process.exit(1);
+      }
+    });
+
+  hb
+    .command("pipeline <dotfile>")
+    .description("Schedule a DOT-graph pipeline to run at a fixed interval")
+    .addHelpText("after", "\nExamples:\n  ralph heartbeat pipeline workflow.dot --project my-app --every 60\n")
+    .option("--project <folder>", "project folder passed to the pipeline")
+    .requiredOption("--every <n>", "interval in minutes", (v) => {
+      const n = parseInt(v, 10);
+      if (isNaN(n) || n < 1) throw new Error("--every must be a positive integer");
+      return n;
+    })
+    .action(async (dotfile: string, opts: { project?: string; every: number }) => {
+      const absDotFile = resolve(dotfile);
+      const stem = basename(absDotFile).replace(/\.dot$/i, "");
+      const id = `pipeline:${stem}`;
+      const args: string[] = ["run", absDotFile];
+      if (opts.project) {
+        args.push("--project", resolve(opts.project));
+      }
+      try {
+        const res = await request("register_task", {
+          id,
+          command: "pipeline",
+          args,
           interval: opts.every,
         });
         await output.success(`Registered: ${res.taskId} (every ${opts.every} min)`);

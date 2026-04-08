@@ -35,6 +35,12 @@ export function getRalphDir(): string {
 
 export function ensureDirs(): void {
   mkdirSync(join(getRalphDir(), "logs"), { recursive: true });
+  mkdirSync(join(getRalphDir(), "pids"), { recursive: true });
+}
+
+export function getPidFilePath(taskId: string): string {
+  const safeId = taskId.replace(/[^a-zA-Z0-9]/g, "-");
+  return join(getRalphDir(), "pids", `${safeId}.pid`);
 }
 
 function getTasksPath(): string {

@@ -1,11 +1,11 @@
 import { spawn } from "child_process";
-import { existsSync, readFileSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, unlinkSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 import { randomUUID } from "crypto";
-import { createRun, appendLogLine, closeRun } from "./state";
+import { createRun, appendLogLine, closeRun, getPidFilePath } from "./state";
 import type { Task } from "./state";
 
 export function getRalphCliPath(): { command: string; args: string[]; shell: boolean } {
@@ -23,14 +23,8 @@ export function getRalphCliPath(): { command: string; args: string[]; shell: boo
   return { command: "tsx", args: [join(__dirname, "..", "cli", "index.ts")], shell: false };
 }
 
-// PID file lives inside the project folder -- matches meditate.ts convention.
-// task.args[0] is always the absolute project folder path.
-function getPidPath(projectFolder: string): string {
-  return join(projectFolder, ".meditate.pid");
-}
-
 export function isSessionRunning(task: Task): boolean {
-  const pidPath = getPidPath(task.args[0]);
+  const pidPath = getPidFilePath(task.id);
   if (!existsSync(pidPath)) return false;
   const pid = parseInt(readFileSync(pidPath, "utf8").trim(), 10);
   if (isNaN(pid)) return false;
@@ -43,12 +37,13 @@ export function isSessionRunning(task: Task): boolean {
 }
 
 export function killSession(task: Task): boolean {
-  const pidPath = getPidPath(task.args[0]);
+  const pidPath = getPidFilePath(task.id);
   if (!existsSync(pidPath)) return false;
   const pid = parseInt(readFileSync(pidPath, "utf8").trim(), 10);
   if (isNaN(pid)) return false;
   try {
     process.kill(pid, "SIGTERM");
+    try { unlinkSync(pidPath); } catch {}
     return true;
   } catch {
     return false;
@@ -78,6 +73,11 @@ export async function runTask(task: Task): Promise<{ runId: string; exitCode: nu
       shell: cliPath.shell,
     });
 
+    const pidPath = getPidFilePath(task.id);
+    if (child.pid) {
+      writeFileSync(pidPath, String(child.pid));
+    }
+
     child.stdout.on("data", (chunk: Buffer) => {
       for (const line of chunk.toString().split("\n").filter(Boolean)) {
         appendLogLine(task.id, runId, { ts: Date.now(), stream: "stdout", content: line });
@@ -91,6 +91,7 @@ export async function runTask(task: Task): Promise<{ runId: string; exitCode: nu
     });
 
     child.on("close", (code) => {
+      try { unlinkSync(pidPath); } catch {}
       const exitCode = code ?? 1;
       const endedAt = Date.now();
       appendLogLine(task.id, runId, {

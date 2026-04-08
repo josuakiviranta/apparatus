@@ -3,7 +3,7 @@ import type { Task } from "./state";
 
 export interface RequestHandlers {
   list_tasks(): Task[];
-  register_task(command: string, args: string[], interval: number): Task;
+  register_task(command: string, args: string[], interval: number, id?: string): Task;
   stop_task(taskId: string): void;
   pause_task(taskId: string): void;
   resume_task(taskId: string): void;
@@ -25,7 +25,7 @@ function handleRequest(socket: net.Socket, req: any, handlers: RequestHandlers):
         return null;
 
       case "register_task": {
-        const task = handlers.register_task(req.command, req.args, req.interval);
+        const task = handlers.register_task(req.command, req.args, req.interval, req.id);
         send(socket, { type: "ok", taskId: task.id });
         return null;
       }

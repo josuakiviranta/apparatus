@@ -7,7 +7,7 @@
 ### Startup (`src/daemon/index.ts`)
 
 1. Check `~/.ralph/daemon.pid` — if process alive, exit; if stale, clear
-2. Call `ensureDirs()` to create `~/.ralph/logs/`
+2. Call `ensureDirs()` to create `~/.ralph/logs/` and `~/.ralph/pids/`
 3. Remove stale `~/.ralph/daemon.sock` if present
 4. Write own PID to `~/.ralph/daemon.pid`
 5. Create a `Scheduler` instance
@@ -30,6 +30,7 @@ SIGTERM/SIGINT handlers:
 | `~/.ralph/daemon.sock` | Unix domain socket for IPC |
 | `~/.ralph/tasks.json` | Persisted task registry (JSON array) |
 | `~/.ralph/logs/<taskId>/<runId>.log` | Per-run log files (JSON-lines) |
+| `~/.ralph/pids/<safe-id>.pid` | Child process PID files (written by runner, cleaned on exit) |
 
 ## Unix Socket IPC (`src/daemon/socket.ts`)
 
@@ -46,7 +47,7 @@ JSON-lines protocol over Unix domain socket.
 | Action | Purpose | Response |
 |--------|---------|----------|
 | `list_tasks` | List all tasks | `{ type: "tasks", data: Task[] }` |
-| `register_task` | Register a new recurring task | `{ type: "ok", taskId }` |
+| `register_task` | Register a new recurring task (optional `id` field overrides auto-generated ID) | `{ type: "ok", taskId }` |
 | `stop_task` | Stop and remove a task | `{ type: "ok" }` |
 | `pause_task` | Pause a task (keep registration) | `{ type: "ok" }` |
 | `resume_task` | Resume a paused task | `{ type: "ok" }` |
@@ -115,8 +116,8 @@ The `onFire` callback includes a skip-if-running guard via the optional `isRunni
 Spawns task commands as child processes.
 
 - `runTask(task)` — spawns `ralph <command> <args>`, pipes stdout/stderr through `appendLogLine`, writes system log lines for start/end
-- `isSessionRunning(task)` — checks for `.ralph-meditate.pid` in the project folder and verifies the process is alive
-- `killSession(task)` — sends SIGTERM to the session PID
+- `isSessionRunning(task)` — checks `~/.ralph/pids/<safe-id>.pid` and verifies the process is alive
+- `killSession(task)` — sends SIGTERM to the session PID and cleans up the PID file
 - `getRalphCliPath()` — resolves the ralph binary path; respects `RALPH_TEST_CMD` env var for testing
 
 ## Client (`src/lib/daemon-client.ts`)

@@ -14,7 +14,7 @@ export function createProgram(): Command {
   program
     .name("ralph")
     .description("Agentic loop runner for AI-assisted project development")
-    .version("0.1.0");
+    .version("0.1.1");
 
   program.addHelpText(
     "after",
@@ -27,13 +27,16 @@ Getting started (typical workflow):
   ralph run-scenarios my-app              Discover and run scenario tests
 
 Background scheduling (heartbeat):
-  ralph heartbeat meditate my-app --every 30        Run meditate on my-app every 30 min
-  ralph heartbeat list                              Show all scheduled tasks
-  ralph heartbeat logs meditate:my-app --follow     Stream live logs for a task
-  ralph heartbeat watch                             Live TUI dashboard
-  ralph heartbeat pause meditate:my-app             Suspend scheduling without removing
-  ralph heartbeat resume meditate:my-app            Re-enable a paused task
-  ralph heartbeat stop meditate:my-app              Remove task and kill any running session
+  ralph heartbeat meditate my-app --every 30            Run meditate on my-app every 30 min
+  ralph heartbeat implement my-app --every 60           Run implement on my-app every 60 min
+  ralph heartbeat run-scenarios my-app --every 120      Run scenario tests every 2 hours
+  ralph heartbeat pipeline workflow.dot --project my-app --every 60   Run a pipeline every 60 min
+  ralph heartbeat list                                  Show all scheduled tasks
+  ralph heartbeat logs meditate:my-app --follow         Stream live logs for a task
+  ralph heartbeat watch                                 Live TUI dashboard
+  ralph heartbeat pause meditate:my-app                 Suspend scheduling without removing
+  ralph heartbeat resume meditate:my-app                Re-enable a paused task
+  ralph heartbeat stop meditate:my-app                  Remove task and kill any running session
 
 Pipeline engine (DOT-graph workflows):
   ralph pipeline validate workflow.dot             Check a pipeline file for errors
