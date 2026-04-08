@@ -1,0 +1,11 @@
+digraph gate_test {
+  goal="Human-gated workflow"
+  start   [shape=Mdiamond]
+  check   [shape=hexagon, label="Continue?"]
+  work    [shape=box, prompt="Add a comment to README.md"]
+  done    [shape=Msquare]
+  start -> check
+  check -> work [label="Yes"]
+  check -> done [label="No"]
+  work  -> done
+}

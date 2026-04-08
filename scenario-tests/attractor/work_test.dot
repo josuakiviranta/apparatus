@@ -1,0 +1,7 @@
+digraph work_test {
+  goal="Add a comment to README"
+  start   [shape=Mdiamond]
+  write   [shape=box, prompt="Add one line comment to README.md"]
+  done    [shape=Msquare]
+  start -> write -> done
+}
