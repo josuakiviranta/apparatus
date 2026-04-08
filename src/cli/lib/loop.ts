@@ -1,16 +1,9 @@
 import { spawnSync, spawn } from "child_process";
 import { existsSync, createReadStream } from "fs";
 import readline from "readline";
-import {
-  intro,
-  outro,
-  cancel,
-  spinner,
-  log,
-  note,
-  stream,
-} from "@clack/prompts";
-import { processLine, initialState, flushState, serializeEvent } from "./stream-formatter.js";
+import * as output from "./output.js";
+import { processLine, initialState, flushState } from "./stream-formatter.js";
+import type { StreamEvent } from "./stream-formatter.js";
 
 export interface LoopOptions {
   promptFile: string; // absolute path to PROMPT_build.md
@@ -24,14 +17,14 @@ export async function runLoop(options: LoopOptions): Promise<void> {
 
   // Pre-flight: prompt file
   if (!existsSync(promptFile)) {
-    cancel(`Prompt file not found: ${promptFile}`);
+    await output.error(`Prompt file not found: ${promptFile}`);
     process.exit(1);
   }
 
   // Pre-flight: claude CLI
   const which = spawnSync("which", ["claude"], { encoding: "utf8" });
   if (which.status !== 0) {
-    cancel("claude CLI not found. Install: npm install -g @anthropic-ai/claude-code");
+    await output.error("claude CLI not found. Install: npm install -g @anthropic-ai/claude-code");
     process.exit(1);
   }
 
@@ -42,8 +35,7 @@ export async function runLoop(options: LoopOptions): Promise<void> {
   });
   const branch = branchResult.stdout.trim() || "main";
 
-  intro(`ralph implement  |  branch: ${branch}  |  prompt: ${promptFile}`);
-  log.step(`PID: ${process.pid}  (Ctrl+C or: kill ${process.pid})`);
+  await output.header({ mode: "implement", project: cwd, branch, pid: process.pid });
 
   let iteration = 0;
   let currentPid: number | undefined;
@@ -58,7 +50,6 @@ export async function runLoop(options: LoopOptions): Promise<void> {
 
   const onSignal = () => {
     killCurrent();
-    outro("Stopped.");
     process.exit(0);
   };
   process.on("SIGINT", onSignal);
@@ -67,7 +58,7 @@ export async function runLoop(options: LoopOptions): Promise<void> {
   try {
     while (true) {
       if (max !== undefined && iteration >= max) {
-        outro(`Reached max iterations: ${max}`);
+        await output.info(`Reached max iterations: ${max}`);
         break;
       }
 
@@ -99,8 +90,8 @@ export async function runLoop(options: LoopOptions): Promise<void> {
         });
       });
 
-      // Stream session output through clack
-      async function* sessionStream(): AsyncGenerator<string> {
+      // Stream session output through output.stream (Ink-based)
+      async function* sessionStream(): AsyncGenerator<StreamEvent> {
         const readStream = createReadStream(promptFile);
         readStream.pipe(child.stdin as NodeJS.WritableStream);
 
@@ -113,51 +104,38 @@ export async function runLoop(options: LoopOptions): Promise<void> {
         for await (const line of rl) {
           const { events, nextState } = processLine(line, state);
           state = nextState;
-          // TODO: replace with Ink render pipeline (Task 3+)
-          for (const ev of events) {
-            yield serializeEvent(ev);
-          }
+          for (const e of events) yield e;
         }
 
-        const flushEvents = flushState(state);
-        for (const ev of flushEvents) {
-          yield serializeEvent(ev);
-        }
+        for (const e of flushState(state)) yield e;
       }
 
-      await stream.message(sessionStream());
+      await output.stream(sessionStream());
       await exitPromise;
 
       currentPid = undefined;
 
       if (exitCode !== 0) {
-        log.warn(`claude exited with code ${exitCode}`);
+        await output.warn(`claude exited with code ${exitCode}`);
       }
 
       // Git push (retry with -u on failure, matching loop.sh behavior)
-      const s = spinner();
-      s.start("git push...");
       const push = spawnSync("git", ["push", "origin", branch], {
         cwd,
         encoding: "utf8",
       });
       if (push.status !== 0) {
-        s.stop("git push failed, retrying with -u...");
         const retry = spawnSync("git", ["push", "-u", "origin", branch], {
           cwd,
           encoding: "utf8",
         });
         if (retry.status !== 0) {
-          log.warn(`git push failed: ${retry.stderr ?? "unknown error"}`);
-        } else {
-          log.step("git push done (set upstream)");
+          await output.warn(`git push failed: ${retry.stderr ?? "unknown error"}`);
         }
-      } else {
-        s.stop("git push done");
       }
 
       iteration++;
-      note(`LOOP ${iteration}`, "");
+      await output.step(`LOOP ${iteration}`);
     }
   } finally {
     process.off("SIGINT", onSignal);
