@@ -103,6 +103,12 @@ export function parseDot(src: string): Graph {
     return "[" + body.replace(/\s*\n\s*/g, " ") + "]";
   });
 
+  // Collapse multi-line quoted graph-attribute values (e.g., model_stylesheet="...\n...")
+  normalized = normalized.replace(/(\w+)\s*=\s*"([^"]*)"/gs, (match, key, val) => {
+    if (!val.includes("\n")) return match;
+    return key + '="' + val.replace(/\s*\n\s*/g, " ").trim() + '"';
+  });
+
   const lines = normalized.split("\n").map(l => l.trim()).filter(l => l.length > 0);
 
   for (const line of lines) {

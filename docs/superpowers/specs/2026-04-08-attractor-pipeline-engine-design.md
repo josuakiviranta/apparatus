@@ -332,6 +332,8 @@ Backoff schedule: base 1s, multiplier 2x, max 30s, jitter ±20%.
 
 **`allow_partial` (v1 not supported):** The upstream spec defines a node attribute `allow_partial=true` that causes retry exhaustion to emit `PARTIAL_SUCCESS` instead of `fail`, allowing a pipeline to continue past a partially-successful node. This attribute is recognized by the parser in v1 but has no effect — retry exhaustion always yields `fail`. `allow_partial` support is deferred to v2.
 
+> **Note:** `allow_partial` is NOT supported in v1. Retry exhaustion always yields `fail`, never `PARTIAL_SUCCESS`. There is no pathway in the v1 engine to produce a `PARTIAL_SUCCESS` outcome.
+
 Traversal of an edge with `loop_restart=true` terminates the current run, clears all context and retry counters, creates a fresh run directory, and re-launches the pipeline from the start node — equivalent to a full pipeline restart.
 
 ### 4.5 Error Handling

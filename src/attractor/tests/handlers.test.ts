@@ -114,6 +114,30 @@ describe("CodergenHandler", () => {
     expect(outcome.status).toBe("success");
     expect(outcome.contextUpdates?.["implement.sessionId"]).toBe("s1");
   });
+
+  it("passes llmModel from node to runLoop as model", async () => {
+    const fakeRunLoop = vi.fn().mockResolvedValue({
+      success: true, iterations: 1, exitReason: "completed"
+    });
+    const h = new CodergenHandler(fakeRunLoop);
+    const node = { id: "work", shape: "box", prompt: "Do work", llmModel: "claude-haiku-4-5-20251001" };
+    await h.execute(node, baseCtx(), { logsRoot: "/tmp", cwd: "/proj" });
+    expect(fakeRunLoop).toHaveBeenCalledWith(
+      expect.objectContaining({ model: "claude-haiku-4-5-20251001" })
+    );
+  });
+
+  it("defaults model to opus when llmModel is not set", async () => {
+    const fakeRunLoop = vi.fn().mockResolvedValue({
+      success: true, iterations: 1, exitReason: "completed"
+    });
+    const h = new CodergenHandler(fakeRunLoop);
+    const node = { id: "work", shape: "box", prompt: "Do work" };
+    await h.execute(node, baseCtx(), { logsRoot: "/tmp", cwd: "/proj" });
+    expect(fakeRunLoop).toHaveBeenCalledWith(
+      expect.objectContaining({ model: "opus" })
+    );
+  });
 });
 
 describe("ParallelHandler", () => {

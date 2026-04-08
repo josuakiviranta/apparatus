@@ -161,6 +161,78 @@ describe("parseDot", () => {
     const graph = parseDot(dot);
     expect(graph.nodes.get("work")?.class).toBe("fast");
   });
+
+  it("applies shape selector from model_stylesheet", () => {
+    const dot = `digraph g {
+      model_stylesheet="
+        box { llm_model: claude-haiku-4-5-20251001 }
+      "
+      start [shape=Mdiamond]
+      done [shape=Msquare]
+      work [shape=box]
+      start -> work -> done
+    }`;
+    const graph = parseDot(dot);
+    expect(graph.nodes.get("work")?.llmModel).toBe("claude-haiku-4-5-20251001");
+    // Shape selector should not affect nodes of different shapes
+    expect(graph.nodes.get("start")?.llmModel).toBeUndefined();
+  });
+
+  it("applies id selector from model_stylesheet", () => {
+    const dot = `digraph g {
+      model_stylesheet="
+        #priority { llm_model: claude-opus-4-6 }
+      "
+      start [shape=Mdiamond]
+      done [shape=Msquare]
+      priority [shape=box]
+      start -> priority -> done
+    }`;
+    const graph = parseDot(dot);
+    expect(graph.nodes.get("priority")?.llmModel).toBe("claude-opus-4-6");
+  });
+
+  it("applies universal selector from model_stylesheet", () => {
+    const dot = `digraph g {
+      model_stylesheet="
+        * { llm_model: claude-sonnet-4-6 }
+      "
+      start [shape=Mdiamond]
+      done [shape=Msquare]
+      work [shape=box]
+      start -> work -> done
+    }`;
+    const graph = parseDot(dot);
+    // Universal applies to all nodes
+    expect(graph.nodes.get("work")?.llmModel).toBe("claude-sonnet-4-6");
+    expect(graph.nodes.get("start")?.llmModel).toBe("claude-sonnet-4-6");
+  });
+
+  it("respects specificity: id > class > shape > universal", () => {
+    const dot = `digraph g {
+      model_stylesheet="
+        * { llm_model: universal-model }
+        box { llm_model: shape-model }
+        .premium { llm_model: class-model }
+        #special { llm_model: id-model }
+      "
+      start [shape=Mdiamond]
+      done [shape=Msquare]
+      special [shape=box, class=premium]
+      regular [shape=box, class=premium]
+      basic [shape=box]
+      start -> special -> regular -> basic -> done
+    }`;
+    const graph = parseDot(dot);
+    // #special matches by id — highest specificity wins
+    expect(graph.nodes.get("special")?.llmModel).toBe("id-model");
+    // .premium matches by class — higher than shape
+    expect(graph.nodes.get("regular")?.llmModel).toBe("class-model");
+    // box matches by shape — higher than universal
+    expect(graph.nodes.get("basic")?.llmModel).toBe("shape-model");
+    // start has no matching shape/class/id rule, universal applies
+    expect(graph.nodes.get("start")?.llmModel).toBe("universal-model");
+  });
 });
 
 describe("validateGraph", () => {

@@ -129,6 +129,32 @@ export async function runPipeline(graph: Graph, opts: EngineOptions): Promise<Pi
     }
 
     if (isExitNode(node)) {
+      // Goal gate enforcement: before allowing exit, verify all goal_gate=true nodes succeeded
+      const goalGateNodes = [...nodes.values()].filter(n => n.goalGate === true);
+      const unsatisfiedGates = goalGateNodes.filter(n => !completedNodes.includes(n.id));
+
+      if (unsatisfiedGates.length > 0) {
+        // Cascade through retry targets: node → node fallback → graph → graph fallback
+        const firstUnsatisfied = unsatisfiedGates[0];
+        const retryTarget = firstUnsatisfied.retryTarget
+          ?? firstUnsatisfied.fallbackRetryTarget
+          ?? graph.retryTarget
+          ?? graph.fallbackRetryTarget;
+
+        if (retryTarget && nodes.has(retryTarget)) {
+          currentNodeId = retryTarget;
+          continue;
+        }
+
+        const gateNames = unsatisfiedGates.map(n => n.id).join(", ");
+        return {
+          status: "fail",
+          completedNodes,
+          context,
+          failureReason: `Goal gate(s) not satisfied: ${gateNames}`,
+        };
+      }
+
       completedNodes = [...completedNodes, node.id];
       await saveCheckpoint(opts.logsRoot, {
         timestamp: new Date().toISOString(),
