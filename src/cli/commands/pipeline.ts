@@ -1,11 +1,15 @@
-import { readFileSync, existsSync } from "fs";
-import { resolve, join } from "path";
+import { readFileSync, existsSync, readdirSync, mkdirSync } from "fs";
+import { resolve, join, basename } from "path";
 import { homedir } from "os";
 import { parseDot, validateGraph, validateOrRaise } from "../../attractor/core/graph.js";
 import { runPipeline } from "../../attractor/core/engine.js";
 import { runLoop } from "../lib/loop.js";
 import { variableExpansionTransform } from "../../attractor/transforms/variable-expansion.js";
 import { ConsoleInterviewer } from "../../attractor/interviewer/console.js";
+import { getPipelinesDir, resolvePipelineArg, isNameShorthand } from "../lib/pipeline-resolver.js";
+import { spawn, spawnSync } from "child_process";
+import { streamEvents } from "../lib/stream-formatter.js";
+import { getPipelineCreatePromptPath } from "../lib/assets.js";
 import * as output from "../lib/output.js";
 
 export interface PipelineRunOptions {
@@ -14,8 +18,15 @@ export interface PipelineRunOptions {
   logsRoot?: string;
 }
 
-export async function pipelineValidateCommand(dotFile: string): Promise<number> {
-  const absPath = resolve(dotFile);
+export interface PipelineValidateOptions {
+  project?: string;
+}
+
+export async function pipelineValidateCommand(dotFile: string, opts: PipelineValidateOptions = {}): Promise<number> {
+  const project = resolve(opts.project ?? process.cwd());
+  const absPath = isNameShorthand(dotFile)
+    ? resolvePipelineArg(dotFile, project)
+    : resolve(dotFile);
   if (!existsSync(absPath)) {
     await output.error(`Dot file not found: ${absPath}`);
     return 1;
@@ -40,7 +51,10 @@ export async function pipelineValidateCommand(dotFile: string): Promise<number> 
 }
 
 export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptions = {}): Promise<void> {
-  const absPath = resolve(dotFile);
+  const project = opts.project ? resolve(opts.project) : process.cwd();
+  const absPath = isNameShorthand(dotFile)
+    ? resolvePipelineArg(dotFile, project)
+    : resolve(dotFile);
   if (!existsSync(absPath)) {
     await output.error(`Dot file not found: ${absPath}`);
     process.exit(1);
@@ -84,4 +98,124 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
     process.off("SIGINT", onSignal);
     process.off("SIGTERM", onSignal);
   }
+}
+
+export interface PipelineListOptions {
+  project?: string;
+}
+
+export async function pipelineListCommand(opts: PipelineListOptions = {}): Promise<void> {
+  const project = resolve(opts.project ?? process.cwd());
+  const pipelinesDir = getPipelinesDir(project);
+
+  if (!existsSync(pipelinesDir)) {
+    await output.info(`No pipelines/ folder found in ${project}.\nCreate one with: ralph pipeline create <name> --project ${project}`);
+    return;
+  }
+
+  const dotFiles = readdirSync(pipelinesDir).filter(f => f.endsWith(".dot"));
+
+  if (dotFiles.length === 0) {
+    await output.info(`No workflows found in ${pipelinesDir}.\nCreate one with: ralph pipeline create <name> --project ${project}`);
+    return;
+  }
+
+  await output.info(`Pipelines in ${pipelinesDir}/`);
+  for (const file of dotFiles.sort()) {
+    const name = basename(file, ".dot");
+    const absFile = join(pipelinesDir, file);
+    let goal = "(no goal defined)";
+    try {
+      const src = readFileSync(absFile, "utf8");
+      const graph = parseDot(src);
+      if (graph.goal) goal = `"${graph.goal}"`;
+    } catch {
+      goal = "(unreadable)";
+    }
+    await output.info(`  ${name.padEnd(20)} ${goal}`);
+  }
+}
+
+export interface PipelineCreateOptions {
+  project?: string;
+}
+
+export async function pipelineCreateCommand(name: string, opts: PipelineCreateOptions = {}): Promise<void> {
+  const project = resolve(opts.project ?? process.cwd());
+  const pipelinesDir = getPipelinesDir(project);
+  const dotPath = join(pipelinesDir, `${name}.dot`);
+
+  // Validate name via resolvePipelineArg (checks alphanumeric/hyphens/underscores)
+  try {
+    resolvePipelineArg(name, project);
+  } catch (err) {
+    await output.error((err as Error).message);
+    process.exit(1);
+  }
+
+  // Conflict check
+  if (existsSync(dotPath)) {
+    await output.error(`Pipeline already exists: ${dotPath}\nDelete or rename it before running create.`);
+    process.exit(1);
+  }
+
+  // Create pipelines/ dir
+  if (!existsSync(pipelinesDir)) {
+    try {
+      mkdirSync(pipelinesDir, { recursive: true });
+    } catch (err) {
+      await output.error(`Failed to create pipelines/ directory: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  }
+
+  // Read prompt
+  const promptPath = getPipelineCreatePromptPath();
+  const promptContent = readFileSync(promptPath, "utf8");
+
+  const trigger = `${promptContent}\n\n---\nCreate a new pipeline named "${name}". Write it to: ${dotPath}`;
+
+  await output.step(`Creating pipeline: ${name}`);
+  await output.step(`Target: ${dotPath}`);
+
+  // Phase 1: non-interactive kickoff to get session ID
+  let sessionId: string | null = null;
+  const child = spawn(
+    "claude",
+    ["-p", trigger, "--output-format", "stream-json", "--dangerously-skip-permissions"],
+    { cwd: project, env: process.env, stdio: ["ignore", "pipe", "pipe"] }
+  );
+  const exitPromise = new Promise<void>(res => child.on("close", () => res()));
+  await output.stream(
+    streamEvents(child.stdout as NodeJS.ReadableStream, {
+      onSessionId: id => { sessionId = id; },
+    })
+  );
+  await exitPromise;
+
+  // Phase 2: interactive resume
+  await output.step("━━━ Launching interactive session ━━━");
+  const resumeArgs = [
+    "--dangerously-skip-permissions",
+    ...(sessionId ? ["--resume", sessionId] : []),
+  ];
+  const result = spawnSync("claude", resumeArgs, {
+    cwd: project,
+    stdio: "inherit",
+    env: process.env,
+  });
+
+  // Post-session: validate
+  if ((result.status ?? 1) !== 0) {
+    process.exit(result.status ?? 1);
+  }
+
+  if (!existsSync(dotPath)) {
+    await output.warn(`Session ended but ${dotPath} was not created.`);
+    process.exit(1);
+  }
+
+  await output.step("Validating pipeline...");
+  const exitCode = await pipelineValidateCommand(dotPath);
+  process.exit(exitCode);
 }
