@@ -41,6 +41,10 @@ export function getMeditateCreatePromptPath(): string {
   return getAssetPath(join("prompts", "PROMPT_meditate_create.md"));
 }
 
+export function getPipelineCreatePromptPath(): string {
+  return getAssetPath(join("prompts", "PROMPT_pipeline_create.md"));
+}
+
 export function getMetaMeditationsDir(): string {
   // prod: dist/cli/ → up two → package root
   // dev:  src/cli/lib/ → up three → package root
