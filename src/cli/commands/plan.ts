@@ -1,6 +1,7 @@
 import { spawn, spawnSync } from "child_process";
 import { existsSync } from "fs";
 import { resolve } from "path";
+import * as output from "../lib/output.js";
 
 const BRAINSTORM_TRIGGER = `\
 Study specs/*.md and src/* in parallel using subagents to understand the project. \
@@ -10,26 +11,26 @@ export async function planCommand(projectFolder: string): Promise<void> {
   const absPath = resolve(projectFolder);
 
   if (!existsSync(absPath)) {
-    console.error(`Error: project folder not found: ${absPath}`);
+    await output.error(`Error: project folder not found: ${absPath}`);
     process.exit(1);
   }
 
   const which = spawnSync("which", ["claude"], { encoding: "utf8" });
   if (which.status !== 0) {
-    console.error(
+    await output.error(
       "Error: claude CLI not found.\nInstall it: npm install -g @anthropic-ai/claude-code"
     );
     process.exit(1);
   }
 
-  console.log(`Starting brainstorm session in ${absPath}...`);
-  console.log(`Brainstorming in progress — this may take a moment...\n`);
+  await output.step(`Starting brainstorm session in ${absPath}...`);
+  await output.step(`Brainstorming in progress — this may take a moment...`);
 
   // Phase 1: kick off brainstorming non-interactively, stream output to user
   const sessionId = await runBrainstormKickoff(absPath);
 
   // Phase 2: resume the same session interactively
-  console.log("\n\nBrainstorm complete. Opening interactive session...\n");
+  await output.step("Brainstorm complete. Opening interactive session...");
 
   const resumeArgs = [
     "--dangerously-skip-permissions",

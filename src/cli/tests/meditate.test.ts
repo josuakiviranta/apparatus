@@ -2,6 +2,20 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtempSync, rmSync, existsSync, readFileSync, chmodSync, writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
+
+vi.mock("../lib/output.js", () => ({
+  header: vi.fn(async () => {}),
+  step: vi.fn(async () => {}),
+  info: vi.fn(async () => {}),
+  warn: vi.fn(async () => {}),
+  error: vi.fn(async () => {}),
+  success: vi.fn(async () => {}),
+  spinner: vi.fn(async (_label: string, fn: () => Promise<unknown>) => fn()),
+  stream: vi.fn(async () => {}),
+}));
+
+import * as output from "../lib/output.js";
+
 import {
   pidPath,
   writePid,
@@ -230,6 +244,8 @@ describe("runMeditationSession — subprocess behavior", () => {
     stderrSpy.mockRestore();
     stdoutSpy.mockRestore();
     delete process.env.RALPH_TEST_CMD;
+    vi.mocked(output.warn).mockClear();
+    vi.mocked(output.header).mockClear();
   });
 
   function makeStub(script: string): string {
@@ -239,18 +255,16 @@ describe("runMeditationSession — subprocess behavior", () => {
     return stubPath;
   }
 
-  it("emits warning to stderr when claude exits with non-zero code", async () => {
+  it("emits warning via output.warn when claude exits with non-zero code", async () => {
     process.env.RALPH_TEST_CMD = makeStub("exit 1");
     await runMeditationSession(sessionDir);
-    const written = stderrSpy.mock.calls.map((c) => String(c[0])).join("");
-    expect(written).toContain("Warning: claude exited with code 1");
+    expect(output.warn).toHaveBeenCalledWith(expect.stringContaining("exited with code 1"));
   }, 15000);
 
   it("does not emit warning when claude exits with code 0", async () => {
     process.env.RALPH_TEST_CMD = makeStub("exit 0");
     await runMeditationSession(sessionDir);
-    const written = stderrSpy.mock.calls.map((c) => String(c[0])).join("");
-    expect(written).not.toContain("Warning:");
+    expect(output.warn).not.toHaveBeenCalled();
   }, 15000);
 
   it("emits tool-use indicator for tool_use stream events", async () => {

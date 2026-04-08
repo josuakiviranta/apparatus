@@ -27,7 +27,7 @@ export function initialState(): FormatterState {
   };
 }
 
-function formatToolUse(name: string, input: Record<string, unknown>): StreamEvent {
+function formatToolUse(name: string, input: Record<string, unknown>): Extract<StreamEvent, { type: "tool" }> {
   switch (name) {
     case "Read":
       return { type: "tool", name: "read", label: String(input.file_path) };

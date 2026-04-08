@@ -61,9 +61,10 @@ export async function spinner<T>(label: string, fn: () => Promise<T>): Promise<T
   );
   await waitUntilExit();
 
-  if (!capturedResult) throw new Error("spinner: fn never resolved");
-  if (!capturedResult.ok) throw capturedResult.error;
-  return capturedResult.value;
+  const result = capturedResult as { ok: true; value: T } | { ok: false; error: unknown } | null;
+  if (!result) throw new Error("spinner: fn never resolved");
+  if (!result.ok) throw result.error;
+  return result.value;
 }
 
 export async function stream(iter: AsyncIterable<StreamEvent>): Promise<void> {

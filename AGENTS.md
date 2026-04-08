@@ -15,18 +15,20 @@
 ## Operational Notes
 
 - `implement.ts` calls `runLoop()` from `src/cli/lib/loop.ts` (no longer spawns loop.sh)
-- `loop.ts` spawns `claude -p --dangerously-skip-permissions --output-format=stream-json`, pipes stdout through `stream-formatter.processLine()`, uses `@clack/prompts` for UI
+- `loop.ts` spawns `claude -p --dangerously-skip-permissions --output-format=stream-json`, pipes stdout through `stream-formatter.processLine()`, uses `output.ts` (Ink-based) for UI
+- All command output goes through `src/cli/lib/output.ts` — unified Ink output API (`step`, `info`, `warn`, `error`, `success`, `header`, `spinner`, `stream`)
 - Prod/dev detection uses `__RALPH_PROD__` constant injected by tsup `define` at build time. Ambient type in `src/types/globals.d.ts`.
 
 ### Codebase Patterns
 
 - CLI entry: `src/cli/index.ts` → commander setup
 - Commands: `src/cli/commands/{plan,implement,new,meditate,meditate-create,run-scenarios}.ts`
-- Lib: `src/cli/lib/{assets,loop,prompts,stream-formatter}.ts`
+- Lib: `src/cli/lib/{assets,loop,output,prompts,stream-formatter}.ts`
 - Tests: `src/cli/tests/*.test.ts` (vitest)
 - Bundled prompts: `src/cli/prompts/PROMPT_{plan,build,kickoff}.md`
 - Daemon: `src/daemon/{state,scheduler,runner,socket,index}.ts`
 - Shared lib: `src/lib/daemon-client.ts`
+- Ink UI components: `src/cli/components/ui.tsx` (Step, Info, Warn, Error, Success, Header, StreamLine, StreamOutput, SpinnerLine)
 - TUI components: `src/cli/components/HeartbeatWatch.tsx`
 
 ### Daemon

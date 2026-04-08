@@ -89,9 +89,9 @@ export function SpinnerLine({ label, fn }: {
   useEffect(() => {
     fn()
       .then(() => { setMsg(`${label} done`); setState("done"); exit(); })
-      .catch((err: unknown) => {
-        const errMsg = err instanceof Error ? err.message : String(err);
-        setMsg(errMsg); setState("failed"); exit();
+      .catch((err) => {
+        const e = err as Error | undefined;
+        setMsg(e?.message ?? String(err)); setState("failed"); exit();
       });
   }, []);
 

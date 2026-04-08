@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync, mkdirSync, writeFileSync } from 
 import { join, resolve } from "path";
 import { createInterface } from "readline";
 import { spawn } from "child_process";
+import * as output from "../lib/output.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -176,13 +177,13 @@ export async function runScenariosCommand(
 ): Promise<void> {
   const absPath = resolve(projectFolder);
   if (!existsSync(absPath)) {
-    console.error(`Error: project folder not found: ${absPath}`);
+    await output.error(`Error: project folder not found: ${absPath}`);
     process.exit(1);
   }
 
   const scenarios = discoverScenarios(absPath);
   if (scenarios.length === 0) {
-    console.log(
+    await output.info(
       `No scenario-tests/ folder found in ${absPath}.\n` +
         `Run \`ralph new ${projectFolder}\` to scaffold the ralph structure, or create scenario-tests/ manually.`
     );
@@ -197,7 +198,7 @@ export async function runScenariosCommand(
   } else {
     selected = await promptSelection(scenarios);
     if (selected.length === 0) {
-      console.log("No scenarios selected.");
+      await output.info("No scenarios selected.");
       process.exit(0);
     }
   }
@@ -211,8 +212,8 @@ export async function runScenariosCommand(
     const outFile = `${ts}-${slug}.md`;
     const outPath = join(runsDir, outFile);
 
-    console.log(`\nRunning: ${scenario.name}...`);
+    await output.step(`Running: ${scenario.name}...`);
     await runScenarioScript(scenario, outPath);
-    console.log(`Done: ${outPath}`);
+    await output.success(`Done: ${outPath}`);
   }
 }

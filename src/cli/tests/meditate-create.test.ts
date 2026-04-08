@@ -3,6 +3,16 @@ import { buildMeditateCreateKickoffArgs, meditateCreateCommand } from "../comman
 import { join } from "path";
 import { tmpdir } from "os";
 
+vi.mock("../lib/output.js", () => ({
+  error: vi.fn(async () => {}),
+  step: vi.fn(async () => {}),
+  info: vi.fn(async () => {}),
+  warn: vi.fn(async () => {}),
+  success: vi.fn(async () => {}),
+}));
+
+import * as output from "../lib/output.js";
+
 describe("buildMeditateCreateKickoffArgs", () => {
   it("includes -p with the prompt text", () => {
     const args = buildMeditateCreateKickoffArgs("my prompt");
@@ -31,9 +41,8 @@ describe("meditateCreateCommand", () => {
 
   it("exits with error if project folder does not exist", async () => {
     const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     await meditateCreateCommand(join(tmpdir(), "ralph-nonexistent-" + Date.now()));
-    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("project folder not found"));
+    expect(output.error).toHaveBeenCalledWith(expect.stringContaining("project folder not found"));
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
 });

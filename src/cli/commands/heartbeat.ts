@@ -3,6 +3,7 @@ import { Command } from "commander";
 import { resolve } from "path";
 import { request, stream } from "../../lib/daemon-client";
 import type { Task } from "../../daemon/state";
+import * as output from "../lib/output.js";
 
 function formatTable(tasks: Task[]): void {
   if (tasks.length === 0) {
@@ -56,9 +57,9 @@ Examples:
           args: [absPath],
           interval: opts.every,
         });
-        console.log(`Registered: ${res.taskId} (every ${opts.every} min)`);
+        await output.success(`Registered: ${res.taskId} (every ${opts.every} min)`);
       } catch (err: any) {
-        console.error(`Error: ${err.message}`);
+        await output.error(`Error: ${err.message}`);
         process.exit(1);
       }
     });
@@ -71,7 +72,7 @@ Examples:
         const res = await request("list_tasks");
         formatTable(res.data);
       } catch (err: any) {
-        console.error(`Error: ${err.message}`);
+        await output.error(`Error: ${err.message}`);
         process.exit(1);
       }
     });
@@ -83,9 +84,9 @@ Examples:
     .action(async (id: string) => {
       try {
         await request("stop_task", { taskId: id });
-        console.log(`Stopped and removed: ${id}`);
+        await output.success(`Stopped and removed: ${id}`);
       } catch (err: any) {
-        console.error(`Error: ${err.message}`);
+        await output.error(`Error: ${err.message}`);
         process.exit(1);
       }
     });
@@ -97,9 +98,9 @@ Examples:
     .action(async (id: string) => {
       try {
         await request("pause_task", { taskId: id });
-        console.log(`Paused: ${id}`);
+        await output.success(`Paused: ${id}`);
       } catch (err: any) {
-        console.error(`Error: ${err.message}`);
+        await output.error(`Error: ${err.message}`);
         process.exit(1);
       }
     });
@@ -111,9 +112,9 @@ Examples:
     .action(async (id: string) => {
       try {
         await request("resume_task", { taskId: id });
-        console.log(`Resumed: ${id}`);
+        await output.success(`Resumed: ${id}`);
       } catch (err: any) {
-        console.error(`Error: ${err.message}`);
+        await output.error(`Error: ${err.message}`);
         process.exit(1);
       }
     });
@@ -125,9 +126,9 @@ Examples:
     .action(async (id: string) => {
       try {
         await request("kill_session", { taskId: id });
-        console.log(`Session killed: ${id}`);
+        await output.success(`Session killed: ${id}`);
       } catch (err: any) {
-        console.error(`Error: ${err.message}`);
+        await output.error(`Error: ${err.message}`);
         process.exit(1);
       }
     });
@@ -153,7 +154,7 @@ Examples:
           console.log(res);
         }
       } catch (err: any) {
-        console.error(`Error: ${err.message}`);
+        await output.error(`Error: ${err.message}`);
         process.exit(1);
       }
     });

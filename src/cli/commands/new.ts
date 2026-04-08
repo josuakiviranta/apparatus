@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync, existsSync, readFileSync, copyFileSync } from
 import { join, resolve } from "path";
 import { spawnSync, spawn } from "child_process";
 import { getKickoffPromptPath, getPromptPath } from "../lib/assets";
+import * as output from "../lib/output.js";
 
 const BRAINSTORM_TRIGGER = `\
 Study specs/*.md and src/* in parallel using subagents to understand the project. \
@@ -11,36 +12,36 @@ export async function newCommand(projectName: string): Promise<void> {
   const targetPath = resolve(process.cwd(), projectName);
 
   if (existsSync(targetPath)) {
-    console.error(`Error: directory already exists: ${targetPath}`);
+    await output.error(`Error: directory already exists: ${targetPath}`);
     process.exit(1);
   }
 
   const which = spawnSync("which", ["claude"], { encoding: "utf8" });
   if (which.status !== 0) {
-    console.error(
+    await output.error(
       "Error: claude CLI not found.\nInstall it: npm install -g @anthropic-ai/claude-code"
     );
     process.exit(1);
   }
 
-  console.log(`Creating project: ${projectName}`);
+  await output.step(`Creating project: ${projectName}`);
   scaffoldProject(targetPath, projectName);
 
-  console.log("Initializing git repository...");
+  await output.step("Initializing git repository...");
   const gitResult = spawnSync("git", ["init", "-b", "main"], {
     cwd: targetPath,
     stdio: "inherit",
     encoding: "utf8",
   });
   if (gitResult.status !== 0) {
-    console.error("Error: git init failed");
+    await output.error("Error: git init failed");
     process.exit(1);
   }
 
-  console.log("\nStarting project kickoff session...\n");
+  await output.step("Starting project kickoff session...");
   const sessionId = await runKickoffSession(targetPath, projectName);
 
-  console.log("\n\nKickoff complete. Opening interactive session...\n");
+  await output.step("Kickoff complete. Opening interactive session...");
   const resumeArgs = [
     "--dangerously-skip-permissions",
     ...(sessionId ? ["--resume", sessionId] : []),

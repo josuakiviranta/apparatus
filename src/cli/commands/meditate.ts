@@ -5,6 +5,7 @@ import { fileURLToPath } from "url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 import { spawnSync, spawn } from "child_process";
 import { getMeditationPromptPath, getIlluminationServerPath, getMetaMeditationsDir } from "../lib/assets";
+import * as output from "../lib/output.js";
 
 // ─── PID lock utilities ───────────────────────────────────────────────────────
 
@@ -108,13 +109,7 @@ export async function runMeditationSession(absPath: string): Promise<void> {
   const prompt = readFileSync(getMeditationPromptPath(), "utf8");
   const mcpConfigPath = writeMcpConfig(absPath);
 
-  const border = "\u2501".repeat(40);
-  console.log(border);
-  console.log(`Mode:    meditate`);
-  console.log(`Project: ${absPath}`);
-  console.log(`PID:     ${process.pid} (ralph meditate kill <folder> to stop)`);
-  console.log(border);
-  console.log();
+  await output.header({ mode: "meditate", project: absPath, pid: process.pid });
 
   const args = buildMeditationArgs(absPath, prompt, mcpConfigPath);
 
@@ -157,8 +152,8 @@ export async function runMeditationSession(absPath: string): Promise<void> {
 
   child.stderr.on("data", (chunk: Buffer) => process.stderr.write(chunk));
 
-  await new Promise<void>((res) => child.on("close", (code) => {
-    if (code !== 0) process.stderr.write(`Warning: claude exited with code ${code}\n`);
+  await new Promise<void>((res) => child.on("close", async (code) => {
+    if (code !== 0) await output.warn(`claude exited with code ${code}`);
     try { cleanupMcpConfig(mcpConfigPath); } catch {}
     res();
   }));
@@ -173,17 +168,17 @@ export async function runMeditationSession(absPath: string): Promise<void> {
 export async function meditateCommand(projectFolder: string): Promise<void> {
   const absPath = resolve(projectFolder);
   if (!existsSync(absPath)) {
-    console.error(`Error: project folder not found: ${absPath}`);
+    await output.error(`Error: project folder not found: ${absPath}`);
     process.exit(1);
   }
   const which = spawnSync("which", ["claude"], { encoding: "utf8" });
   if (which.status !== 0) {
-    console.error("Error: claude CLI not found.\nInstall it: npm install -g @anthropic-ai/claude-code");
+    await output.error("Error: claude CLI not found.\nInstall it: npm install -g @anthropic-ai/claude-code");
     process.exit(1);
   }
   const runningPid = readPid(absPath);
   if (runningPid !== null && isPidAlive(runningPid)) {
-    console.log(`Meditation session already running (PID ${runningPid}). Skipping.`);
+    await output.info(`Meditation session already running (PID ${runningPid}). Skipping.`);
     process.exit(0);
   }
   ensureMeditationDirs(absPath);
