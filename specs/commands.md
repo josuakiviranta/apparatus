@@ -58,7 +58,7 @@ Launches a sandboxed meditation Claude session.
    - `Write` — restricted to `meditations/illuminations/` only
 5. Claude runs as an interactive session with MCP illumination server access
 
-**Stopping:** `ralph meditate kill <project-folder>` sends SIGTERM to the PID in the lock file.
+**Stopping:** Press `Ctrl-C` on the running session, or use `ralph heartbeat stop meditate:<project>` for scheduled sessions. Signal handlers clean up the PID lock file and MCP config automatically.
 
 ## `ralph meditate create <project-folder>`
 
@@ -88,17 +88,41 @@ Discovers and runs scenario tests.
 
 Schedules recurring tasks via the background daemon. Communicates via RPC (no direct Claude invocation).
 
-### `ralph heartbeat meditate <project-folder> --every <n>`
+### `ralph heartbeat meditate <folder> --every <n>`
 
 Registers a recurring meditation task to run every `<n>` minutes. The daemon auto-starts if not already running.
 
+### `ralph heartbeat implement <folder> --every <n>`
+
+Registers a recurring implement loop to run every `<n>` minutes.
+
+### `ralph heartbeat run-scenarios <folder> --every <n>`
+
+Registers recurring scenario tests to run every `<n>` minutes.
+
+### `ralph heartbeat pipeline <dotfile> --every <n> [--project <folder>]`
+
+Registers a recurring DOT-graph pipeline. Task ID is computed as `pipeline:<dotfile-stem>` (e.g. `pipeline:smoke` for `smoke.dot`). The optional `--project` flag passes a project folder to the pipeline.
+
 ### `ralph heartbeat list`
 
-Lists all registered heartbeat tasks with their status.
+Lists all registered heartbeat tasks with their status and last run time.
 
 ### `ralph heartbeat stop <task-id>`
 
-Stops and removes a registered heartbeat task.
+Stops and removes a registered heartbeat task, killing any running session.
+
+### `ralph heartbeat pause <task-id>`
+
+Suspends scheduling for a task without removing it.
+
+### `ralph heartbeat resume <task-id>`
+
+Re-enables scheduling for a paused task.
+
+### `ralph heartbeat kill <task-id>`
+
+Kills a currently running session for a task (schedule is preserved).
 
 ### `ralph heartbeat logs <task-id> [--follow]`
 
@@ -106,7 +130,7 @@ Shows logs for a heartbeat task. `--follow` streams new log lines in real-time.
 
 ### `ralph heartbeat watch`
 
-Real-time TUI dashboard of all heartbeat tasks. **Known issue:** Currently broken due to ink ESM/top-level-await incompatibility with tsup ESM output.
+Real-time TUI dashboard of all heartbeat tasks.
 
 ## Git Push Behavior
 
@@ -121,8 +145,8 @@ After each loop iteration, `loop.ts` pushes changes:
 |-----------|---------|----------|
 | Project folder missing | `implement`, `meditate`, `run-scenarios` | Exit with error |
 | Project folder already exists | `new` | Warn and exit |
-| Prompt file missing | `implement` (via loop) | `cancel()` + exit |
-| `claude` not in PATH | `implement` (via loop) | `cancel()` + exit |
+| Prompt file missing | `implement` (via loop) | Throws error |
+| `claude` not in PATH | `implement` (via loop) | Throws error |
 | Claude exits non-zero | `implement` (via loop) | `log.warn()`, loop continues |
 | `git push` fails twice | `implement` (via loop) | `log.warn()`, loop continues |
 | No scenarios found | `run-scenarios` | Exit with message |

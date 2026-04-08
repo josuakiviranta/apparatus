@@ -16,7 +16,7 @@ Validates `projectRoot` exists; exits with code 1 if missing.
 - Version: `"1.0.0"`
 - Transport: `StdioServerTransport` (stdin/stdout)
 
-## MCP Tools (6)
+## MCP Tools (7)
 
 ### `write_illumination`
 
@@ -55,6 +55,15 @@ Recursive directory tree of the project or a subdirectory.
 - **Params:** `{ path?: string }` (defaults to `projectRoot`)
 - **Skips** noise directories: `node_modules`, `dist`, `.git`, etc.
 
+### `glob_files`
+
+Finds files matching a glob pattern within the project.
+
+- **Params:** `{ pattern: string }`
+- **Pattern** is relative to `projectRoot`
+- **Restricted** to files inside `projectRoot`
+- **Returns** list of matching file paths
+
 ### `list_meta_meditations`
 
 Lists available meditation lens files.
@@ -76,6 +85,7 @@ Reads a specific meditation lens file.
 | `write_illumination` | `<projectRoot>/meditations/illuminations/` only |
 | `list_illuminations` | `<projectRoot>/meditations/illuminations/` (read-only) |
 | `read_file` | Anywhere inside `projectRoot` |
+| `glob_files` | Anywhere inside `projectRoot` |
 | `project_tree` | Anywhere inside `projectRoot` |
 | `list_meta_meditations` | `meditationsDir` (read-only) |
 | `read_meta_meditation` | `meditationsDir` (read-only) |

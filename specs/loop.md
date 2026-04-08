@@ -10,12 +10,18 @@ export interface LoopOptions {
   cwd: string;         // project folder (claude cwd + git ops)
   max?: number;        // max iterations; undefined = unlimited
   model?: string;      // passed to --model flag; defaults to "opus"
+  signal?: AbortSignal; // optional abort signal for external cancellation
+  onSessionId?: (id: string) => void; // callback when session ID is captured
 }
 
-export async function runLoop(options: LoopOptions): Promise<void>
+export interface LoopResult {
+  exitReason: "completed" | "maxReached" | "aborted" | "error";
+}
+
+export async function runLoop(options: LoopOptions): Promise<LoopResult>
 ```
 
-Called by `implement.ts`. Checks `claude` availability before starting.
+Called by `implement.ts` and `ralph-implement` pipeline handler. Checks `claude` availability before starting.
 
 ## Each Iteration
 
@@ -38,13 +44,13 @@ Called by `implement.ts`. Checks `claude` availability before starting.
 
 ## Signal Handling
 
-`SIGINT`/`SIGTERM` kills the claude child process group (`process.kill(-child.pid!, "SIGTERM")`). Requires `detached: true` on spawn. Calls `outro()` before exit. Signal listeners are removed in the `finally` block.
+Uses `AbortSignal` for external cancellation. Registers an abort listener that kills the current child process group (`process.kill(-currentPid, "SIGTERM")`). Checks `signal?.aborted` before each iteration. Listeners are cleaned up in a `finally` block via `signal?.removeEventListener`.
 
 ## Error Handling
 
 | Condition | Behavior |
 |-----------|----------|
-| `promptFile` not found | `cancel()` + exit before loop starts |
-| `claude` not in PATH | `cancel()` + exit before loop starts |
+| `promptFile` not found | Throws `Error` before loop starts |
+| `claude` not in PATH | Throws `Error` before loop starts |
 | `git push` fails | `log.warn()` with error; loop continues |
 | Claude exits non-zero | `log.warn()` with exit code; loop continues |

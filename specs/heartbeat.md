@@ -41,7 +41,19 @@ Lists all registered heartbeat tasks with their status, interval, last run time,
 
 ### `ralph heartbeat stop <task-id>`
 
-Stops and removes a registered heartbeat task from the daemon's schedule.
+Stops and removes a registered heartbeat task from the daemon's schedule, killing any running session.
+
+### `ralph heartbeat pause <task-id>`
+
+Suspends scheduling for a task without removing it. The task remains in the registry with status `paused`.
+
+### `ralph heartbeat resume <task-id>`
+
+Re-enables scheduling for a paused task.
+
+### `ralph heartbeat kill <task-id>`
+
+Kills a currently running session for a task. The schedule is preserved — the task will run again at its next interval.
 
 ### `ralph heartbeat logs <task-id> [--follow]`
 
@@ -52,9 +64,7 @@ Shows logs for a specific heartbeat task.
 
 ### `ralph heartbeat watch`
 
-Real-time TUI dashboard showing all heartbeat tasks and their status.
-
-**Known issue:** Currently broken — ink's ESM/top-level-await is incompatible with tsup's ESM output.
+Real-time TUI dashboard showing all heartbeat tasks and their status. Uses Ink-based React TUI with keyboard navigation (up/down to select task, q to quit).
 
 ## Daemon Auto-Start
 
