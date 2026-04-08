@@ -10,7 +10,7 @@ import {
   note,
   stream,
 } from "@clack/prompts";
-import { processLine, initialState, flushState } from "./stream-formatter.js";
+import { processLine, initialState, flushState, serializeEvent } from "./stream-formatter.js";
 
 export interface LoopOptions {
   promptFile: string; // absolute path to PROMPT_build.md
@@ -111,13 +111,18 @@ export async function runLoop(options: LoopOptions): Promise<void> {
 
         let state = initialState();
         for await (const line of rl) {
-          const { output, nextState } = processLine(line, state);
+          const { events, nextState } = processLine(line, state);
           state = nextState;
-          if (output) yield output;
+          // TODO: replace with Ink render pipeline (Task 3+)
+          for (const ev of events) {
+            yield serializeEvent(ev);
+          }
         }
 
-        const flush = flushState(state);
-        if (flush) yield flush;
+        const flushEvents = flushState(state);
+        for (const ev of flushEvents) {
+          yield serializeEvent(ev);
+        }
       }
 
       await stream.message(sessionStream());

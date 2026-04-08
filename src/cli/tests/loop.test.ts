@@ -36,7 +36,7 @@ vi.mock("@clack/prompts", () => ({
 
 vi.mock("../lib/stream-formatter.js", () => ({
   processLine: vi.fn(() => ({
-    output: "",
+    events: [],
     nextState: { pendingSubagentIds: new Set(), subagentBuffers: new Map(), subagentDescriptions: new Map(), mainAgentOpen: false, lastMainCtxTotal: 0 },
   })),
   initialState: vi.fn(() => ({
@@ -46,7 +46,19 @@ vi.mock("../lib/stream-formatter.js", () => ({
     mainAgentOpen: false,
     lastMainCtxTotal: 0,
   })),
-  flushState: vi.fn(() => ""),
+  flushState: vi.fn(() => []),
+  serializeEvent: vi.fn((ev: any) => {
+    switch (ev.type) {
+      case "main_agent_open": return "\u25b6\u25b6\u25b6 MAIN AGENT\n";
+      case "main_agent_close": return "\u25c0\u25c0\u25c0 MAIN AGENT\n\n";
+      case "subagent_open": return `\u25b6 SUBAGENT: ${ev.description}\n`;
+      case "subagent_close": return "\u25c0 SUBAGENT\n";
+      case "text": return (ev.indented ? "  " : "") + ev.content + "\n";
+      case "tool": return (ev.indented ? "  " : "") + `\u2192 [${ev.name}] ${ev.label}\n`;
+      case "ctx": return `\u25c8 ctx: ${ev.tokens.toLocaleString("en-US")} tokens\n`;
+      default: return "";
+    }
+  }),
 }));
 
 // --- Imports after mocks ---
@@ -143,9 +155,9 @@ describe("runLoop", () => {
   it("calls processLine for each line and passes generator to stream.message", async () => {
     const testLine = '{"type":"assistant","message":{"content":[]}}';
     vi.mocked(formatter.processLine).mockReturnValue({
-      output: "→ [read] file.ts\n",
+      events: [{ type: "tool", name: "read", label: "file.ts" }],
       nextState: { pendingSubagentIds: new Set(), subagentBuffers: new Map(), subagentDescriptions: new Map(), mainAgentOpen: false, lastMainCtxTotal: 0 },
-    });
+    } as any);
 
     makeMockChild(0, [testLine]);
     mockGitBranch("main");
