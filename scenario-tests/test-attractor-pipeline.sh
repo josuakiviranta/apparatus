@@ -23,11 +23,13 @@ run_scenario() {
   tmpout=$(mktemp)
   TMPFILES+=("$tmpout")
 
-  if ralph pipeline run "$dotfile" "${extra_args[@]}" 2>&1 | tee "$tmpout"; then
+  ralph pipeline run "$dotfile" "${extra_args[@]}" 2>&1 | tee "$tmpout"
+  local exit_code="${PIPESTATUS[0]}"
+  if [[ "$exit_code" -eq 0 ]]; then
     echo "PASS: $name"
     PASS=$((PASS + 1))
   else
-    echo "FAIL: $name (output saved: $tmpout)"
+    echo "FAIL: $name (exit $exit_code, output saved: $tmpout)"
     FAIL=$((FAIL + 1))
   fi
 }

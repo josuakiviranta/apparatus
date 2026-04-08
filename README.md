@@ -59,3 +59,4 @@ npm link           # test ralph binary locally
 - [Commands](specs/commands.md)
 - [Prompt Bootstrap](specs/bootstrap.md)
 - [Loop Script](specs/loop.md)
+attractor-test-comment
