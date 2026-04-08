@@ -1,4 +1,4 @@
-import type { Graph, Node, Edge } from "../types.js";
+import type { Graph, Node, Edge, Diagnostic } from "../types.js";
 
 // Convert snake_case to camelCase
 function toCamel(s: string): string {
@@ -178,4 +178,92 @@ export function parseDot(src: string): Graph {
     nodes,
     edges,
   };
+}
+
+const KNOWN_TYPES = new Set([
+  "codergen", "tool", "wait.human", "conditional", "parallel", "parallel.fan_in",
+  "stack.manager_loop", "start", "exit",
+  "ralph.implement", "ralph.meditate", "ralph.run-scenarios",
+]);
+
+const SHAPE_TO_TYPE: Record<string, string> = {
+  Mdiamond: "start", Msquare: "exit", box: "codergen",
+  hexagon: "wait.human", diamond: "conditional", component: "parallel",
+  tripleoctagon: "parallel.fan_in", parallelogram: "tool", house: "stack.manager_loop",
+  circle: "ralph.implement", octagon: "ralph.meditate", square: "ralph.run-scenarios",
+};
+
+export function resolveHandlerType(node: Node): string {
+  if (node.type) return node.type;
+  if (node.shape && SHAPE_TO_TYPE[node.shape]) return SHAPE_TO_TYPE[node.shape];
+  return "codergen";
+}
+
+export function validateGraph(graph: Graph): Diagnostic[] {
+  const diags: Diagnostic[] = [];
+  const { nodes, edges } = graph;
+
+  const isStart = (n: Node) => n.shape === "Mdiamond" || n.id === "start" || n.id === "Start";
+  const isExit  = (n: Node) => n.shape === "Msquare"  || n.id === "exit"  || n.id === "end";
+
+  const startNodes = [...nodes.values()].filter(isStart);
+  const exitNodes  = [...nodes.values()].filter(isExit);
+
+  if (startNodes.length !== 1) diags.push({ rule: "start_node", severity: "error", message: `Expected exactly 1 start node, found ${startNodes.length}` });
+  if (exitNodes.length !== 1)  diags.push({ rule: "terminal_node", severity: "error", message: `Expected exactly 1 exit node, found ${exitNodes.length}` });
+
+  // Reachability BFS from start
+  if (startNodes.length === 1) {
+    const reachable = new Set<string>();
+    const queue = [startNodes[0].id];
+    while (queue.length) {
+      const cur = queue.shift()!;
+      if (reachable.has(cur)) continue;
+      reachable.add(cur);
+      for (const e of edges.filter(e => e.from === cur)) queue.push(e.to);
+    }
+    for (const id of nodes.keys()) {
+      if (!reachable.has(id)) diags.push({ rule: "reachability", severity: "error", message: `Node "${id}" is unreachable from start` });
+    }
+
+    // start has no incoming
+    if (edges.some(e => e.to === startNodes[0].id)) {
+      diags.push({ rule: "start_no_incoming", severity: "error", message: "Start node must not have incoming edges" });
+    }
+  }
+
+  // exit has no outgoing
+  if (exitNodes.length === 1 && edges.some(e => e.from === exitNodes[0].id)) {
+    diags.push({ rule: "exit_no_outgoing", severity: "error", message: "Exit node must not have outgoing edges" });
+  }
+
+  // Edge targets exist
+  for (const e of edges) {
+    if (!nodes.has(e.to)) diags.push({ rule: "edge_target_exists", severity: "error", message: `Edge target "${e.to}" not declared` });
+    if (!nodes.has(e.from)) diags.push({ rule: "edge_source_exists", severity: "error", message: `Edge source "${e.from}" not declared` });
+  }
+
+  // Condition syntax (basic: only allow key=value and key!=value with &&)
+  for (const e of edges) {
+    if (e.condition) {
+      const valid = /^[\w.'= !&\s]+$/.test(e.condition) && !/==|=>|<=/.test(e.condition);
+      if (!valid) diags.push({ rule: "condition_syntax", severity: "error", message: `Invalid condition syntax: "${e.condition}"` });
+    }
+  }
+
+  // type_known warning
+  for (const node of nodes.values()) {
+    const t = resolveHandlerType(node);
+    if (!KNOWN_TYPES.has(t)) diags.push({ rule: "type_known", severity: "warning", message: `Unknown handler type "${t}" on node "${node.id}"` });
+  }
+
+  return diags;
+}
+
+export function validateOrRaise(graph: Graph): void {
+  const diags = validateGraph(graph);
+  const errors = diags.filter(d => d.severity === "error");
+  if (errors.length > 0) {
+    throw new Error("Pipeline validation failed:\n" + errors.map(e => `  [${e.rule}] ${e.message}`).join("\n"));
+  }
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseDot } from "../core/graph.js";
+import { parseDot, validateGraph } from "../core/graph.js";
 
 describe("parseDot", () => {
   it("parses a minimal digraph with start and exit nodes", () => {
@@ -160,5 +160,78 @@ describe("parseDot", () => {
     }`;
     const graph = parseDot(dot);
     expect(graph.nodes.get("work")?.class).toBe("fast");
+  });
+});
+
+describe("validateGraph", () => {
+  function makeValid() {
+    return parseDot(`digraph g {
+      start [shape=Mdiamond]
+      done  [shape=Msquare]
+      start -> done
+    }`);
+  }
+
+  it("returns no errors for a valid graph", () => {
+    const diags = validateGraph(makeValid());
+    expect(diags.filter(d => d.severity === "error")).toHaveLength(0);
+  });
+
+  it("errors when no start node", () => {
+    const g = makeValid();
+    g.nodes.delete("start");
+    g.edges = [];
+    const diags = validateGraph(g);
+    expect(diags.some(d => d.rule === "start_node")).toBe(true);
+  });
+
+  it("errors when no exit node", () => {
+    const g = makeValid();
+    g.nodes.delete("done");
+    g.edges = [];
+    const diags = validateGraph(g);
+    expect(diags.some(d => d.rule === "terminal_node")).toBe(true);
+  });
+
+  it("errors on orphan node (unreachable from start)", () => {
+    const g = makeValid();
+    g.nodes.set("orphan", { id: "orphan", shape: "box" });
+    const diags = validateGraph(g);
+    expect(diags.some(d => d.rule === "reachability")).toBe(true);
+  });
+
+  it("errors on edge targeting unknown node", () => {
+    const g = makeValid();
+    g.edges.push({ from: "start", to: "ghost" });
+    const diags = validateGraph(g);
+    expect(diags.some(d => d.rule === "edge_target_exists")).toBe(true);
+  });
+
+  it("errors when start node has incoming edges", () => {
+    const g = makeValid();
+    g.edges.push({ from: "done", to: "start" });
+    const diags = validateGraph(g);
+    expect(diags.some(d => d.rule === "start_no_incoming")).toBe(true);
+  });
+
+  it("errors when exit node has outgoing edges", () => {
+    const g = makeValid();
+    g.edges.push({ from: "done", to: "start" });
+    const diags = validateGraph(g);
+    expect(diags.some(d => d.rule === "exit_no_outgoing")).toBe(true);
+  });
+
+  it("warns on unknown node type", () => {
+    const g = makeValid();
+    g.nodes.get("start")!.type = "unknown.handler";
+    const diags = validateGraph(g);
+    expect(diags.some(d => d.rule === "type_known" && d.severity === "warning")).toBe(true);
+  });
+
+  it("errors on bad condition expression syntax", () => {
+    const g = makeValid();
+    g.edges[0].condition = "outcome == success";
+    const diags = validateGraph(g);
+    expect(diags.some(d => d.rule === "condition_syntax")).toBe(true);
   });
 });
