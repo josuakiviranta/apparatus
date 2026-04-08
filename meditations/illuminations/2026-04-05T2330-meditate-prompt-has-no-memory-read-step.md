@@ -1,3 +1,8 @@
+---
+date: 2026-04-05
+description: '`PROMPT_meditation.md` directs the agent to survey the project, pick lenses, reflect, and write.'
+---
+
 # Meditate Prompt Has No Memory-Read Step
 
 ## Core Idea

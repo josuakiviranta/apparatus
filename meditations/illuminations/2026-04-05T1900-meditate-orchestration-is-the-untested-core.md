@@ -1,3 +1,8 @@
+---
+date: 2026-04-05
+description: '`meditate.ts` has thorough unit tests for every setup/teardown utility: PID management, gitignore patching, MCP config writing, arg building.'
+---
+
 # Meditate Orchestration Is the Untested Core
 
 ## Core Idea

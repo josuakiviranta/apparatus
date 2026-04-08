@@ -1,3 +1,8 @@
+---
+date: 2026-04-06
+description: 'The plan''s architecture header points at `meditate-create.ts` as the pattern for `runScenarioSession`.'
+---
+
 # Exemplar Mismatch Is a Category Error, Not a Pointer Mistake
 
 ## Core Idea

@@ -1,3 +1,8 @@
+---
+date: 2026-04-06
+description: '`docs/superpowers/plans/2026-04-05-run-scenarios.md` Tasks 1–2 modify `meditate.ts` to add `RALPH_TEST_CMD ?? "claude"`, an exit-code warning, and tool-use indicators.'
+---
+
 # The Plan Creates Its Own Exemplar in Task 2
 
 ## Core Idea

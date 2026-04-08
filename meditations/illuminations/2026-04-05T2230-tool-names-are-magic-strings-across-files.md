@@ -1,3 +1,8 @@
+---
+date: 2026-04-05
+description: '`buildMeditationArgs` in `meditate.ts` contains six hardcoded `"mcp__illumination__*"` strings that must precisely match tool names registered in `illumination-server.ts` and the config key used in `writeMcpConfig`.'
+---
+
 # Tool Names Are Magic Strings Across Files
 
 ## Core Idea

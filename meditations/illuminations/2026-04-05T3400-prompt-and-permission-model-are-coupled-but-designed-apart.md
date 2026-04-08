@@ -1,3 +1,8 @@
+---
+date: 2026-04-05
+description: '`PROMPT_scenario.md` (Task 5) and `buildScenarioArgs` (Task 7) are tightly coupled: the prompt dictates which tools Claude will use, and the args must either permit exactly those tools or grant blanket access.'
+---
+
 # Prompt and Permission Model Are Coupled but Designed Apart
 
 ## Core Idea

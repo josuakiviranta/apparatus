@@ -1,3 +1,8 @@
+---
+date: 2026-04-05
+description: 'Three commands — `plan.ts`, `new.ts`, and `meditate-create.ts` — all implement the same two-phase Claude session pattern: non-interactive kickoff via `--output-format stream-json`, session ID capture from the stream, `→ [tool] tool_name` stdout indicators, then interactive resume with `--dangerously-skip-permissions`.'
+---
+
 # Two-Phase Session Abstraction: Threshold Reached
 
 ## Core Idea

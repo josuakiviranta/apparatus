@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, existsSync, readFileSync, realpathSync, mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { validateFilename, writeIllumination, assertWithinRoot, readFile, validateGlobPattern, globFiles, projectTree, listMetaMeditations, readMetaMeditation } from "../mcp/illumination-server";
+import { validateFilename, writeIllumination, assertWithinRoot, readFile, validateGlobPattern, globFiles, projectTree, listMetaMeditations, readMetaMeditation, listIlluminations } from "../mcp/illumination-server";
 
 let tmpDir: string;
 
@@ -46,25 +46,46 @@ describe("validateFilename", () => {
 
 describe("writeIllumination", () => {
   it("writes content to meditations/illuminations/<filename>", () => {
-    const result = writeIllumination(tmpDir, "2026-04-04T1430-test.md", "# Hello");
+    const result = writeIllumination(tmpDir, "2026-04-04T1430-test.md", "A test insight", "# Hello");
     const expected = join(tmpDir, "meditations", "illuminations", "2026-04-04T1430-test.md");
     expect(result).toBe(expected);
-    expect(readFileSync(expected, "utf8")).toBe("# Hello");
+    expect(readFileSync(expected, "utf8")).toContain("# Hello");
   });
 
   it("overwrites an existing file without error", () => {
-    writeIllumination(tmpDir, "test.md", "v1");
-    const result = writeIllumination(tmpDir, "test.md", "v2");
-    expect(readFileSync(result, "utf8")).toBe("v2");
+    writeIllumination(tmpDir, "test.md", "First version", "v1");
+    const result = writeIllumination(tmpDir, "test.md", "Second version", "v2");
+    expect(readFileSync(result, "utf8")).toContain("v2");
   });
 
   it("creates meditations/illuminations/ directory if absent", () => {
-    writeIllumination(tmpDir, "test.md", "content");
+    writeIllumination(tmpDir, "test.md", "Some description", "content");
     expect(existsSync(join(tmpDir, "meditations", "illuminations"))).toBe(true);
   });
 
   it("throws an error for an invalid filename", () => {
-    expect(() => writeIllumination(tmpDir, "bad/name.md", "content")).toThrow();
+    expect(() => writeIllumination(tmpDir, "bad/name.md", "A description", "content")).toThrow();
+  });
+
+  it("prepends YAML frontmatter with date and description", () => {
+    writeIllumination(tmpDir, "test.md", "My core insight", "# Body");
+    const written = readFileSync(join(tmpDir, "meditations", "illuminations", "test.md"), "utf8");
+    const today = new Date().toISOString().slice(0, 10);
+    expect(written).toMatch(new RegExp(`^---\\ndate: ${today}\\ndescription: My core insight\\n---\\n`));
+  });
+
+  it("places the content body after the frontmatter separator", () => {
+    writeIllumination(tmpDir, "test.md", "Insight here", "# Body\nParagraph");
+    const written = readFileSync(join(tmpDir, "meditations", "illuminations", "test.md"), "utf8");
+    const parts = written.split("---\n");
+    // parts[0] is empty (before first ---), parts[1] is frontmatter fields, rest is body
+    const body = parts.slice(2).join("---\n");
+    expect(body).toBe("\n# Body\nParagraph");
+  });
+
+  it("throws when description is empty", () => {
+    expect(() => writeIllumination(tmpDir, "test.md", "", "content")).toThrow("description is required");
+    expect(() => writeIllumination(tmpDir, "test.md", "   ", "content")).toThrow("description is required");
   });
 });
 
@@ -325,5 +346,53 @@ describe("readMetaMeditation", () => {
     const result = readMetaMeditation(tmpDir, "nonexistent.md");
     expect(result).toMatch(/^Error:/);
     expect(result).toContain("nonexistent.md");
+  });
+});
+
+describe("listIlluminations", () => {
+  it("returns no-illuminations message when directory is missing", () => {
+    const result = listIlluminations(tmpDir);
+    expect(result).toBe("No illuminations found.");
+  });
+
+  it("returns no-illuminations message when directory is empty", () => {
+    mkdirSync(join(tmpDir, "meditations", "illuminations"), { recursive: true });
+    const result = listIlluminations(tmpDir);
+    expect(result).toBe("No illuminations found.");
+  });
+
+  it("returns filename and description for a file with frontmatter", () => {
+    const dir = join(tmpDir, "meditations", "illuminations");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "2026-04-08T0900-my-insight.md"), "---\ndate: 2026-04-08\ndescription: Something important.\n---\n\n# My Insight\n\nBody.");
+    const result = listIlluminations(tmpDir);
+    expect(result).toBe("2026-04-08T0900-my-insight.md — Something important.");
+  });
+
+  it("shows (no description) for a file without frontmatter", () => {
+    const dir = join(tmpDir, "meditations", "illuminations");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "old-insight.md"), "# Old Insight\n\nNo frontmatter here.");
+    const result = listIlluminations(tmpDir);
+    expect(result).toBe("old-insight.md — (no description)");
+  });
+
+  it("shows (no description) for a file with frontmatter missing description field", () => {
+    const dir = join(tmpDir, "meditations", "illuminations");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "partial.md"), "---\ndate: 2026-04-08\n---\n\n# Partial");
+    const result = listIlluminations(tmpDir);
+    expect(result).toBe("partial.md — (no description)");
+  });
+
+  it("lists multiple files sorted by filename", () => {
+    const dir = join(tmpDir, "meditations", "illuminations");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "2026-04-08T1100-second.md"), "---\ndate: 2026-04-08\ndescription: Second insight.\n---\n\n# Second");
+    writeFileSync(join(dir, "2026-04-08T0900-first.md"), "---\ndate: 2026-04-08\ndescription: First insight.\n---\n\n# First");
+    const result = listIlluminations(tmpDir);
+    expect(result).toBe(
+      "2026-04-08T0900-first.md — First insight.\n2026-04-08T1100-second.md — Second insight."
+    );
   });
 });

@@ -1,3 +1,8 @@
+---
+date: 2026-04-05
+description: '`isDevMode()` in `meditate.ts` was returning `true` in production for its entire existence — meaning meditate always launched with `tsx` instead of `node`, which would fail silently on machines without tsx installed.'
+---
+
 # Private Environment-Detection Functions Are Untested Assumptions
 
 ## Core Idea

@@ -1,3 +1,8 @@
+---
+date: 2026-04-05
+description: 'Every time `ralph meditate` runs, it reads the codebase and writes an illumination to `meditations/illuminations/`.'
+---
+
 # Meditation Agent Is Blind to Its Own Outputs
 
 ## Core Idea

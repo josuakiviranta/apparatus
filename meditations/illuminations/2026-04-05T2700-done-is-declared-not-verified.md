@@ -1,3 +1,8 @@
+---
+date: 2026-04-05
+description: 'Every output-producing command in ralph — `meditate`, `meditate-create`, and the planned `run-scenarios` — announces completion based on process exit, not artifact existence.'
+---
+
 # "Done" Is Declared, Not Verified
 
 ## Core Idea

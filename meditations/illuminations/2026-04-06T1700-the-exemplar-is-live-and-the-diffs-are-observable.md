@@ -1,3 +1,8 @@
+---
+date: 2026-04-06
+description: '`meditate.ts` has been read. The four changes needed by Tasks 1 and 2 are not abstract — they are concrete, line-level diffs in a 180-line file.'
+---
+
 # The Exemplar Is Live and the Diffs Are Observable
 
 ## Core Idea

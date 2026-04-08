@@ -1,3 +1,8 @@
+---
+date: 2026-04-05
+description: 'Ralph has two patterns for non-interactive Claude sessions: the constrained pattern (`meditate.ts` — `--permission-mode dontAsk` + explicit `--allowedTools`) and the unconstrained pattern (`meditate-create.ts`, `plan.ts` — `--dangerously-skip-permissions`).'
+---
+
 # Scenario Runner Inherits the Wrong Permission Model
 
 ## Core Idea

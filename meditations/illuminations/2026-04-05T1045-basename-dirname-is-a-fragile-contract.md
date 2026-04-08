@@ -1,3 +1,8 @@
+---
+date: 2026-04-05
+description: 'The prod/dev detection logic throughout ralph-cli — `basename(__dirname) === "cli"`, `basename(__dirname) !== "dist"`, etc. — is implicitly coupled to the tsup bundling topology.'
+---
+
 # `basename(__dirname)` Is a Fragile Contract
 
 ## Core Idea

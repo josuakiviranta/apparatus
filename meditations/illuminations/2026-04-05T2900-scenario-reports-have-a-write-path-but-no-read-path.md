@@ -1,3 +1,8 @@
+---
+date: 2026-04-05
+description: '`ralph run-scenarios` writes structured diagnostic reports to `<project>/scenario-runs/`.'
+---
+
 # Scenario Reports Have a Write Path but No Read Path
 
 ## Core Idea

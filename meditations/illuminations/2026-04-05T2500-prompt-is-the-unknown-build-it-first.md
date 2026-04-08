@@ -1,3 +1,8 @@
+---
+date: 2026-04-05
+description: 'Every component of the `run-scenarios` spec can be unit tested except one: `PROMPT_scenario.md`.'
+---
+
 # Prompt Is the Unknown — Build It First
 
 ## Core Idea

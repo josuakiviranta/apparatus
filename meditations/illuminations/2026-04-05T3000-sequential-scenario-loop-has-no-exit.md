@@ -1,3 +1,8 @@
+---
+date: 2026-04-05
+description: '`runScenariosCommand` runs selected scenarios in a `for-of await` loop with no SIGINT or SIGTERM handling — at either the loop level or inside `runScenarioSession`.'
+---
+
 # The Sequential Scenario Loop Has No Exit
 
 ## Core Idea

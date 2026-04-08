@@ -1,3 +1,8 @@
+---
+date: 2026-04-05
+description: '`docs/superpowers/plans/2026-04-05-run-scenarios.md` was written once and has not changed.'
+---
+
 # The Plan Froze While the Illuminations Piled Up
 
 ## Core Idea

@@ -1,3 +1,8 @@
+---
+date: 2026-04-05
+description: '`meditate-create.ts` is a fully working non-interactive Claude session runner: it buffers stream-json, parses tool-use indicators, pipes stderr, and resolves on close.'
+---
+
 # The Exemplar Is Already Written — Point At It
 
 ## Core Idea

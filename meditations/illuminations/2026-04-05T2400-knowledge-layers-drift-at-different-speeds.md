@@ -1,3 +1,8 @@
+---
+date: 2026-04-05
+description: 'This project represents its own state in at least five layers: code, commit history, design specs (`docs/superpowers/specs/`), memory (`MEMORY.md`), and illuminations (`meditations/illuminations/`).'
+---
+
 # Knowledge Layers Drift at Different Speeds
 
 ## Core Idea

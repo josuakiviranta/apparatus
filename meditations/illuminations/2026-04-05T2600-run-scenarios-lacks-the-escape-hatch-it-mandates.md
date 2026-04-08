@@ -1,3 +1,8 @@
+---
+date: 2026-04-05
+description: 'The run-scenarios implementation plan (Chunk 1, Task 1) adds a `RALPH_TEST_CMD` env-var override to `meditate.ts` specifically to enable subprocess testing without a live Claude session.'
+---
+
 # run-scenarios Lacks the Escape Hatch It Mandates
 
 ## Core Idea

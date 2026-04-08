@@ -17,14 +17,18 @@ export function validateFilename(filename: string): string | null {
 export function writeIllumination(
   projectRoot: string,
   filename: string,
+  description: string,
   content: string,
 ): string {
   const err = validateFilename(filename);
   if (err) throw new Error(err);
+  if (!description || !description.trim()) throw new Error("description is required");
+  const date = new Date().toISOString().slice(0, 10);
+  const frontmatter = `---\ndate: ${date}\ndescription: ${description.trim()}\n---\n\n`;
   const dir = join(projectRoot, "meditations", "illuminations");
   mkdirSync(dir, { recursive: true });
   const filePath = join(dir, filename);
-  writeFileSync(filePath, content, "utf8");
+  writeFileSync(filePath, frontmatter + content, "utf8");
   return filePath;
 }
 
@@ -74,6 +78,37 @@ export function listMetaMeditations(meditationsDir: string): string {
     return files.join("\n");
   } catch {
     return NO_META_MEDITATIONS_MESSAGE;
+  }
+}
+
+const NO_ILLUMINATIONS_MESSAGE = "No illuminations found.";
+
+function parseIlluminationDescription(filePath: string): string {
+  try {
+    const content = readFileSync(filePath, "utf8");
+    if (!content.startsWith("---\n")) return "(no description)";
+    const end = content.indexOf("\n---\n", 4);
+    if (end === -1) return "(no description)";
+    const frontmatter = content.slice(4, end);
+    const match = frontmatter.match(/^description:\s*(.+)$/m);
+    return match ? match[1].trim() : "(no description)";
+  } catch {
+    return "(no description)";
+  }
+}
+
+export function listIlluminations(projectRoot: string): string {
+  const dir = join(projectRoot, "meditations", "illuminations");
+  try {
+    const files = readdirSync(dir)
+      .filter((f) => f.endsWith(".md"))
+      .sort();
+    if (files.length === 0) return NO_ILLUMINATIONS_MESSAGE;
+    return files
+      .map((f) => `${f} — ${parseIlluminationDescription(join(dir, f))}`)
+      .join("\n");
+  } catch {
+    return NO_ILLUMINATIONS_MESSAGE;
   }
 }
 
@@ -169,14 +204,16 @@ if (!isTestEnv) {
     server.tool(
       "write_illumination",
       "Write a meditation illumination file to meditations/illuminations/. " +
-        "Use filename format: YYYY-MM-DDTHHMM-kebab-slug.md (e.g. 2026-04-04T1430-my-insight.md).",
+        "Use filename format: YYYY-MM-DDTHHMM-kebab-slug.md (e.g. 2026-04-04T1430-my-insight.md). " +
+        "Provide a one-sentence description summarizing the core insight — this is required.",
       {
         filename: z.string(),
+        description: z.string(),
         content: z.string(),
       },
-      async ({ filename, content }: { filename: string; content: string }) => {
+      async ({ filename, description, content }: { filename: string; description: string; content: string }) => {
         try {
-          const filePath = writeIllumination(projectRoot, filename, content);
+          const filePath = writeIllumination(projectRoot, filename, description, content);
           return {
             content: [{ type: "text" as const, text: `Written to ${filePath}` }],
           };
@@ -252,6 +289,17 @@ if (!isTestEnv) {
       { filename: z.string() },
       async ({ filename }: { filename: string }) => {
         const result = readMetaMeditation(meditationsDir, filename);
+        return { content: [{ type: "text" as const, text: result }] };
+      },
+    );
+
+    server.tool(
+      "list_illuminations",
+      "List all illuminations written to this project, with descriptions. " +
+        "Call this at the start of a session to orient yourself before writing new insights.",
+      {},
+      async () => {
+        const result = listIlluminations(projectRoot);
         return { content: [{ type: "text" as const, text: result }] };
       },
     );

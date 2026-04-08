@@ -1,3 +1,8 @@
+---
+date: 2026-04-06
+description: 'The run-scenarios plan''s Task 2 adds three subprocess tests to `meditate.test.ts` — stub exits 1 emits a warning, stub exits 0 does not, `tool_use` stream line produces `→ [tool]` output.'
+---
+
 # Task 7 Skips the Validation Suite Task 2 Just Built
 
 ## Core Idea

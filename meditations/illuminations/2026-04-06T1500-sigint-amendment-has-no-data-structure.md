@@ -1,3 +1,8 @@
+---
+date: 2026-04-06
+description: 'T0800 amendment #5 says: "register a cleanup handler inside `runScenarioSession` that sets a shared `cancelled` flag; check `if (state.cancelled) break` in the outer loop." The function signature in the plan is `runScenarioSession(cwd: string, promptText: string): Promise<void>` — it accepts no state and returns nothing.'
+---
+
 # SIGINT Amendment Has No Data Structure
 
 ## Core Idea

@@ -16,16 +16,29 @@ Validates `projectRoot` exists; exits with code 1 if missing.
 - Version: `"1.0.0"`
 - Transport: `StdioServerTransport` (stdin/stdout)
 
-## MCP Tools (5)
+## MCP Tools (6)
 
 ### `write_illumination`
 
 Writes a file to the illuminations output directory.
 
-- **Params:** `{ filename: string, content: string }`
+- **Params:** `{ filename: string, description: string, content: string }`
+- `description` is required — one sentence summarizing the core insight; auto-inserted into frontmatter
+- `date` is auto-generated server-side (`YYYY-MM-DD`); not a param
+- `content` is the markdown body only — frontmatter is prepended automatically
 - **Path:** `<projectRoot>/meditations/illuminations/<filename>`
 - **Creates** the directory if it doesn't exist
 - **Restricted** to that single output directory — no writes elsewhere
+
+### `list_illuminations`
+
+Lists all illuminations written to this project, with descriptions.
+
+- **Params:** none
+- **Reads from** `<projectRoot>/meditations/illuminations/`
+- **Returns** one line per file: `<filename> — <description>` (sorted by filename)
+- Files without frontmatter show `(no description)`
+- Returns `"No illuminations found."` if directory is empty or missing
 
 ### `read_file`
 
@@ -61,6 +74,7 @@ Reads a specific meditation lens file.
 | Tool | Scope |
 |------|-------|
 | `write_illumination` | `<projectRoot>/meditations/illuminations/` only |
+| `list_illuminations` | `<projectRoot>/meditations/illuminations/` (read-only) |
 | `read_file` | Anywhere inside `projectRoot` |
 | `project_tree` | Anywhere inside `projectRoot` |
 | `list_meta_meditations` | `meditationsDir` (read-only) |

@@ -1,3 +1,8 @@
+---
+date: 2026-04-05
+description: '`discoverScenarios` calls `readdirSync` without sorting the result.'
+---
+
 # Scenario Ordinal Selection Assumes Stable Discovery Order
 
 ## Core Idea

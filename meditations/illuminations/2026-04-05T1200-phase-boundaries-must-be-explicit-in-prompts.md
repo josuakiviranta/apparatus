@@ -1,3 +1,8 @@
+---
+date: 2026-04-05
+description: '`ralph new` runs a two-phase Claude session: Phase 1 is non-interactive (headless `claude -p`), Phase 2 is interactive (the user walks in via `--resume`).'
+---
+
 # Phase Boundaries Must Be Explicit in Prompts
 
 ## Core Idea

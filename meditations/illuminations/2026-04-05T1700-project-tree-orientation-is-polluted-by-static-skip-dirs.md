@@ -1,3 +1,8 @@
+---
+date: 2026-04-05
+description: '`projectTree` in `illumination-server.ts` uses a hardcoded `SKIP_DIRS` set to filter noise.'
+---
+
 # Project Tree Orientation Is Polluted by Static SKIP_DIRS
 
 ## Core Idea

@@ -1,3 +1,8 @@
+---
+date: 2026-04-06
+description: '`docs/superpowers/plans/2026-04-05-run-scenarios.md` will be executed today.'
+---
+
 # Six Amendments Before the Plan Executes
 
 ## Core Idea

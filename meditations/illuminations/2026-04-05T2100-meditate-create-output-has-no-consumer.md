@@ -1,3 +1,8 @@
+---
+date: 2026-04-05
+description: '`ralph meditate-create <project>` writes source meditations to `<project>/meditations/<slug>.md`.'
+---
+
 # `meditate-create` Output Has No Consumer
 
 ## Core Idea
