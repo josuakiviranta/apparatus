@@ -55,8 +55,6 @@ DOT is chosen as the pipeline definition format for the same reasons as the upst
 
 - Shipping attractor as a separate npm package (may happen later, not now)
 - Implementing the full Unified LLM SDK spec
-- Supporting the `parallel` / `fan_in` handler types in this version (deferred to v2)
-- Supporting the `stack.manager_loop` (house shape) supervisor handler in this version (deferred to v2)
 - HTTP server mode or WebSocket event streaming (the upstream §9.5/§9.6 server-mode event stream)
 - `full` fidelity mode — requires in-memory LLM session reuse, incompatible with ralph's Claude Code subprocess model (see Section 2.6)
 
@@ -94,7 +92,8 @@ Declared inside the `digraph` block, before any node or edge declarations:
 | `timeout` | int | all | Timeout in seconds for handler execution |
 | `fidelity` | string | codergen | Fidelity level for context carryover (see Section 2.6); `full` not supported in v1 |
 | `class` | string | stylesheet | CSS-like class name; merges in model_stylesheet properties |
-| `loop_restart` | bool | engine | Edge attribute: marks edge as a loop restart (resets retry counter) |
+| `auto_status` | bool | engine | If true, engine auto-generates `success` outcome when handler writes no status — **recognized but no-op in v1**; ralph handlers always return explicit outcomes |
+| `allow_partial` | bool | all | When true, `RETRY` outcome on exhaustion becomes `partial_success` instead of `fail` |
 
 ### 2.3 Edge Attributes
 
@@ -102,8 +101,10 @@ Declared inside the `digraph` block, before any node or edge declarations:
 |---|---|---|
 | `label` | string | Human-readable edge label; also used for preferred_label matching |
 | `condition` | string | Boolean expression gating edge eligibility (see Section 11) |
-| `weight` | int | Priority among unconditioned edges; higher wins |
-| `loop_restart` | bool | If true, engine resets the target node's retry counter on traversal |
+| `weight` | int | Priority among unconditional edges; lower value wins (omitted = lowest priority) |
+| `loop_restart` | bool | When true, fully restarts the pipeline from the start node: clears context, retry counters, and creates a fresh run directory |
+| `fidelity` | string | Fidelity level override for the target node when this edge is traversed; takes highest precedence over node-level and graph-level fidelity settings (see Section 2.6). Valid values: `truncate`, `compact`, `summary:low`, `summary:medium`, `summary:high` |
+| `thread_id` | string | Assigns edge target to a named execution thread for `full` fidelity session reuse — **v1 not supported** (`full` fidelity is a non-goal; see Section 1.4); parser recognizes but ignores |
 
 ### 2.4 Supported DOT Subset
 
@@ -304,10 +305,16 @@ Nodes with `goal_gate=true` are tracked throughout execution. Before the engine 
 When a node completes, the engine selects the next edge in this priority order:
 
 1. Edges whose `condition` expression evaluates to true against the current outcome and context
-2. Edge whose `label` matches `outcome.preferredLabel` (normalized: lowercase, spaces → underscores)
+2. Edge whose `label` matches `outcome.preferredLabel` (see label normalization below)
 3. Edge whose `to` is in `outcome.suggestedNextIds`
 4. Highest `weight` among unconditional edges
 5. Lexical tiebreak on target node ID
+
+**Label normalization for `preferred_label` matching:** Before comparing `outcome.preferredLabel` against edge labels, both sides are normalized by:
+- Stripping leading accelerator prefixes matching the pattern `X `, `X) `, or `X - ` (where X is any single character or digit), e.g. `[Y] Yes` → `Yes`, `1) Approve` → `Approve`, `Y - Confirm` → `Confirm`
+- Case-insensitive comparison after stripping
+
+This ensures that when `wait.human` nodes present choices formatted with keyboard accelerators (e.g. `[Y] Yes`, `1) No`), the handler's `preferred_label` output (the bare word) still matches the full edge label.
 
 ### 4.4 Retry Logic
 
@@ -315,13 +322,17 @@ Per-node `max_retries` attribute (default 0 = no retry). On `status: "retry"` or
 
 1. Increment `nodeRetries[nodeId]`
 2. If retries remaining: wait with exponential backoff + jitter, re-execute the node
-3. If retries exhausted: failure routing cascade — node `retry_target` → node `fallback_retry_target` → graph `retry_target` → graph `fallback_retry_target` → pipeline fail
+3. If retries exhausted: outcome becomes `fail` and normal edge selection runs — the engine selects the next edge using the standard algorithm (Section 4.3) with `outcome=fail`. If the graph has an explicit outgoing edge matching `outcome=fail`, that edge fires. If no matching edge exists, the pipeline fails. **The `retry_target` node attribute is NOT automatically invoked at retry exhaustion for non-terminal nodes.**
+
+**Goal gate enforcement (terminal nodes only):** When a terminal `Msquare` node is reached and a `goal_gate=true` node in the completed path did not reach `success`, the engine cascades: node `retry_target` → node `fallback_retry_target` → graph `retry_target` → graph `fallback_retry_target` → pipeline fail. This is the only path where `retry_target` is automatically invoked by the engine.
 
 Retryable errors: network failures, claude CLI unavailable. Non-retryable: invalid prompt file, auth errors.
 
 Backoff schedule: base 1s, multiplier 2x, max 30s, jitter ±20%.
 
-Traversal of an edge with `loop_restart=true` resets the target node's retry counter to 0.
+**`allow_partial` (v1 not supported):** The upstream spec defines a node attribute `allow_partial=true` that causes retry exhaustion to emit `PARTIAL_SUCCESS` instead of `fail`, allowing a pipeline to continue past a partially-successful node. This attribute is recognized by the parser in v1 but has no effect — retry exhaustion always yields `fail`. `allow_partial` support is deferred to v2.
+
+Traversal of an edge with `loop_restart=true` terminates the current run, clears all context and retry counters, creates a fresh run directory, and re-launches the pipeline from the start node — equivalent to a full pipeline restart.
 
 ### 4.5 Error Handling
 
@@ -362,9 +373,14 @@ Custom handlers can be registered by type string: `registry.register("org.myhand
 | `Msquare` | exit | No-op, engine performs goal gate check |
 | `box` (default) | codergen | Calls `runLoop()` with node prompt via Claude Code |
 | `hexagon` | wait.human | Pauses pipeline for human input via Interviewer |
-| `diamond` | conditional | No-op, engine evaluates edge conditions |
-| `parallelogram` | tool | Executes shell command, exit code → Outcome |
-| `house` | stack.manager_loop | Supervisor polling loop — **v1 deferred**; engine throws validation error if encountered |
+| `diamond` | conditional | No-op pass-through; engine evaluates edge conditions to select outgoing edge |
+| `parallelogram` | tool | Executes shell command (`node.toolCommand`); exit code → Outcome |
+| `component` | parallel | Fan-out across child nodes concurrently with isolated context clones |
+| `tripleoctagon` | parallel.fan_in | Barrier join — waits for all parallel branches to complete |
+| `house` | stack.manager_loop | Child pipeline supervisor loop (observe/steer/wait cycles) |
+| `circle` | ralph.implement | Ralph-native: calls `runLoop()` directly; resolved via `type="ralph.implement"` |
+| `octagon` | ralph.meditate | Ralph-native: calls meditate logic directly; resolved via `type="ralph.meditate"` |
+| `square` | ralph.run-scenarios | Ralph-native: calls run-scenarios logic directly; resolved via `type="ralph.run-scenarios"` |
 
 ### 5.3 Codergen Handler
 
@@ -380,6 +396,8 @@ If `node.prompt` is empty, uses `node.label` as fallback. Writes a temporary pro
 
 ### 5.4 Tool Handler
 
+The tool handler maps to the `parallelogram` shape.
+
 Executes `node.toolCommand` as a shell command:
 
 1. Expands `$goal` and `$project` in the command string
@@ -393,7 +411,19 @@ Executes `node.toolCommand` as a shell command:
 
 See Section 7 (Human-in-the-Loop).
 
-### 5.6 Ralph-Native Handler Types
+### 5.6 Conditional Handler
+
+The `conditional` handler maps to the `diamond` shape. It is a no-op pass-through — the handler returns `success` immediately without executing any LLM call or tool. The engine's edge selection algorithm then evaluates the outgoing edge conditions against the current context to determine the next node. Use conditional nodes to branch on context values without adding an execution step.
+
+### 5.7 Parallel Handler
+
+Maps to `component` shape. Fan-out: spawns all outgoing-edge target nodes as concurrent branches. Each branch receives an **isolated clone** of the current context. Branches run concurrently, bounded by the graph-level `max_parallel` attribute (default: 4). Branch context changes are NOT merged back into the main context; only the handler's `contextUpdates` are applied. Results are stored in `context["parallel.results"]` as an array keyed by branch node ID. Execution continues when all branches complete (join policy: `wait_all`).
+
+### 5.8 Fan-in Handler
+
+Maps to `tripleoctagon` shape. Waits for all parallel branches launched by a preceding `parallel` node to complete, then consolidates results. The handler reads `context["parallel.results"]`, determines an aggregate outcome (`success` if all branches succeeded; `partial_success` if at least one succeeded; `fail` if all failed), and exposes the consolidated results for downstream edge conditions. Returns `success` or `partial_success` or `fail` accordingly.
+
+### 5.9 Ralph-Native Handler Types
 
 Registered automatically when the pipeline engine initializes. Nodes reference them via `type="..."`.
 
@@ -432,6 +462,28 @@ contextUpdates: {
 }
 ```
 
+### 5.10 Manager Loop Handler
+
+Maps to `house` shape. Supervises a child pipeline specified by `stack.child_dotfile` node attribute. The handler runs an observe/steer/wait loop:
+- **observe**: ingests child pipeline telemetry (stdout, checkpoint state) into context under `stack.child.*` keys
+- **steer**: optionally injects an intervention prompt into the child (if guard condition is met)
+- **wait**: sleeps for `manager.poll_interval` seconds (default: 45) before the next cycle
+
+The loop terminates when any of the following is true:
+- `stack.child.*` signals completion (exit node reached)
+- `manager.max_cycles` is exceeded (default: 1000) — returns `fail`
+- A configured stop-condition guard expression evaluates to true
+
+Context keys set by this handler:
+
+| Key | Value |
+|-----|-------|
+| `stack.child.status` | Last observed child pipeline status |
+| `stack.child.current_node` | Child's current node ID |
+| `stack.child.outcome` | Child's final outcome on completion |
+
+**Note:** v1 implementation of the manager loop handler integrates with `ralph implement` (the `circle` shape handler) as the canonical child pipeline runner. Full cross-pipeline DOT file supervision is deferred to v2.
+
 ---
 
 ## 6. State and Context
@@ -446,6 +498,33 @@ Context is a key-value store (string keys, any value) accessible to all handlers
 - On resume, context is restored from the checkpoint before continuing
 
 ### 6.2 Built-In Context Variables
+
+#### Engine-managed keys (set automatically on every node execution)
+
+These keys are written by the engine before each node handler runs and after each handler returns. Condition expressions and edge selectors may reference them.
+
+| Key | Description |
+|---|---|
+| `outcome` | Outcome status of the last completed handler: `success`, `retry`, `fail`, `partial_success` |
+| `preferred_label` | Preferred edge label returned by the last handler; used in edge selection step 2 |
+| `graph.goal` | Mirrored from the graph-level `goal` attribute at pipeline start |
+| `current_node` | ID of the currently executing node |
+| `last_stage` | ID of the last completed stage (set after handler returns) |
+| `last_response` | Truncated text of the last LLM response (codergen nodes only; empty string otherwise) |
+| `internal.retry_count.<node_id>` | Per-node retry counter; incremented on each RETRY outcome, reset to 0 on `loop_restart` edge traversal |
+
+#### Standard context keys (set by engine after each node)
+
+| Key | Set By | Value |
+|-----|--------|-------|
+| `last_stage.<node_id>` | engine | Outcome object of the completed node (`{ status, notes, failureReason }`) |
+| `tool.output` | tool handler | Stdout of the last tool command execution |
+| `parallel.results` | parallel handler | Array of branch outcomes keyed by node ID |
+| `stack.child.status` | manager_loop handler | Last observed child pipeline status |
+| `stack.child.current_node` | manager_loop handler | Child's current node ID |
+| `stack.child.outcome` | manager_loop handler | Child's final outcome on completion |
+
+#### Handler-set keys (written by specific ralph handlers)
 
 | Key | Set By | Value |
 |---|---|---|
@@ -538,22 +617,30 @@ However, if the process is killed while waiting at a hexagon node, the checkpoin
 
 ## 8. Validation and Linting
 
-### 8.1 Error-Severity Violations (block execution)
+### 8.1 Lint Rules
 
-- Exactly one start node (shape=Mdiamond or id matching `start`/`Start`) required
-- Exactly one exit node (shape=Msquare or id matching `exit`/`end`) required
-- Start node must have no incoming edges
-- Exit node must have no outgoing edges
-- All nodes must be reachable from start (no orphans)
-- All edge targets must reference existing node IDs
-- Condition expressions must parse without error
-- `validate_or_raise()` throws on any error-severity violation
+| Rule | Severity | Check |
+|------|----------|-------|
+| `start_node` | ERROR | Exactly one start node (shape=Mdiamond or id matching `start`/`Start`) |
+| `terminal_node` | ERROR | Exactly one exit node (shape=Msquare or id matching `exit`/`end`) |
+| `reachability` | ERROR | All nodes reachable from start (no orphans) |
+| `edge_target_exists` | ERROR | All edge targets exist as declared nodes |
+| `start_no_incoming` | ERROR | Start node has no incoming edges |
+| `exit_no_outgoing` | ERROR | Exit node has no outgoing edges |
+| `condition_syntax` | ERROR | Edge `condition` expressions parse without errors |
+| `stylesheet_syntax` | ERROR | `model_stylesheet` attribute parses without errors |
+| `type_known` | WARNING | Node `type` values are recognized handler names |
+| `fidelity_valid` | WARNING | Node and edge `fidelity` values are valid modes |
+| `retry_target_exists` | WARNING | `retry_target` and `fallback_retry_target` reference existing nodes |
+| `goal_gate_has_retry` | WARNING | Nodes with `goal_gate=true` have at least one retry path configured |
+| `prompt_on_llm_nodes` | WARNING | `codergen`/`box` nodes have a non-empty `prompt` or `label` |
+| `loop_restart_target` | WARNING | Edges with `loop_restart=true` are not also the only exit path |
+
+`validate_or_raise()` throws on any error-severity violation.
 
 ### 8.2 Warning-Severity Violations (logged, do not block)
 
-- Unknown `type` values
-- `codergen` / `box` node with no `prompt` or `label`
-- `goal_gate=true` node without a `retry_target` or graph-level `retry_target`
+See lint rules table above.
 
 ### 8.3 Lint Result Format
 
@@ -734,12 +821,20 @@ Written to `{logsRoot}/checkpoint.json` after each node completes:
 
 ```
 ~/.ralph/runs/<pipeline-slug>-<timestamp>/
-    checkpoint.json
-    manifest.json
-    <node_id>/
-        status.json
-        prompt.md
-        response.md
+├── checkpoint.json          — serialized engine state after each node completes
+├── manifest.json            — pipeline metadata (name, goal, start time, dotfile path)
+├── artifacts/
+│   └── {artifact_id}.json   — file-backed artifacts produced during execution
+└── {node_id}/
+    ├── status.json          — Outcome object (status, notes, failureReason)
+    ├── prompt.md            — Expanded prompt sent to Claude Code (codergen nodes)
+    └── response.md          — LLM or tool output
+```
+
+`manifest.json` schema:
+
+```json
+{ "name": "pipeline-slug", "goal": "...", "startTime": "ISO-8601", "dotfile": "path/to/file.dot" }
 ```
 
 ### 12.5 Resume Behavior
@@ -982,24 +1077,22 @@ This section defines how to validate that this implementation is complete and co
 - [ ] Nodes with `max_retries > 0` are retried on RETRY or FAIL outcomes
 - [ ] Retry count is tracked per-node and respects the configured limit
 - [ ] Backoff between retries works (exponential with jitter)
-- [ ] After retry exhaustion, failure routing cascades: node `retry_target` → node `fallback_retry_target` → graph `retry_target` → graph `fallback_retry_target` → pipeline fail
-- [ ] Traversal of an edge with `loop_restart=true` resets the target node's retry counter
+- [ ] After retry exhaustion at a non-terminal node: outcome becomes `fail` and normal edge selection runs; an explicit `outcome=fail` outgoing edge fires if present, otherwise pipeline fails. The `retry_target` attribute is NOT automatically invoked.
+- [ ] Goal gate enforcement at terminal `Msquare` nodes: if a `goal_gate=true` node did not succeed, cascade fires: node `retry_target` → node `fallback_retry_target` → graph `retry_target` → graph `fallback_retry_target` → pipeline fail
+- [ ] Traversal of an edge with `loop_restart=true` terminates the current run, clears all context and retry counters, creates a fresh run directory, and re-launches from the start node (verified with a new run ID and empty checkpoint state)
 
 ### 17.6 Node Handlers
 
 - [ ] **Start handler:** Returns `success` immediately (no-op)
 - [ ] **Exit handler:** Returns `success` immediately (no-op; engine checks goal gates)
-- [ ] **Codergen handler:** Expands `$goal`/`$project` in prompt, calls `runLoop()` via Claude Code, writes `prompt.md` and `response.md` to node stage dir
-- [ ] **Wait.human handler:** Presents outgoing edge labels as choices to the Interviewer, returns selected label as `preferredLabel`
-- [ ] **Conditional handler:** Passes through; engine evaluates edge conditions against outcome/context
-- [ ] **Parallel handler:** v1 deferred — not implemented; engine throws validation error if a parallel node is encountered
-- [ ] **Fan-in handler:** v1 deferred — not implemented; engine throws validation error if a fan-in node is encountered
-- [ ] **Stack.manager_loop handler (house shape):** v1 deferred — not implemented; engine throws validation error if a house node is encountered
-- [ ] **Tool handler:** Executes configured shell command; non-zero exit code → `fail`, exit 0 → `success`
-- [ ] **ralph.implement handler:** Calls `runLoop()` and writes `implement.*` context keys
-- [ ] **ralph.meditate handler:** Calls meditate logic and writes `meditate.*` context keys
-- [ ] **ralph.run-scenarios handler:** Calls run-scenarios logic and writes `scenarios.*` context keys
-- [ ] Custom handlers can be registered by type string
+- [ ] **Codergen handler:** Expands `$goal`/`$project` in prompt, calls `runLoop()`, writes prompt.md + response.md, returns LoopResult as Outcome
+- [ ] **Wait.human handler:** Presents outgoing edge labels as choices to the Interviewer, returns Outcome with `preferredLabel` set
+- [ ] **Conditional handler:** No-op pass-through for `diamond` nodes; returns `success` immediately; engine evaluates edge conditions
+- [ ] **Tool handler:** Executes `tool_command` via shell for `parallelogram` nodes; non-zero exit = fail; stdout written to response.md
+- [ ] **Parallel handler:** Fan-out for `component` nodes; spawns branches with isolated context clones; stores results in `context["parallel.results"]`
+- [ ] **Fan-in handler:** Aggregates for `tripleoctagon` nodes; consolidates `parallel.results` into aggregate outcome
+- [ ] **Manager loop handler:** Observe/steer/wait supervisor for `house` nodes; sets `stack.child.*` context keys
+- [ ] **Ralph-native handlers:** `ralph.implement`, `ralph.meditate`, `ralph.run-scenarios` work as specified in Section 5.9
 
 ### 17.7 State and Context
 
