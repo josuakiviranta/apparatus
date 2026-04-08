@@ -45,11 +45,12 @@ function formatToolUse(name: string, input: Record<string, unknown>): string {
 export function flushState(state: FormatterState): string {
   let output = "";
   for (const id of state.pendingSubagentIds) {
+    const desc = state.subagentDescriptions.get(id) ?? "";
     const buf = state.subagentBuffers.get(id) ?? "";
-    output += buf + "◀ SUBAGENT\n";
+    output += `▶ SUBAGENT: ${desc}\n${buf}◀ SUBAGENT\n`;
   }
   if (state.mainAgentOpen) {
-    output += "◀ MAIN AGENT\n";
+    output += "◀◀◀ MAIN AGENT\n\n";
   }
   return output;
 }
@@ -86,9 +87,9 @@ export function processLine(
       if (block.type === "tool_result") {
         const id = String(block.tool_use_id ?? "");
         if (nextPending.has(id)) {
+          const desc = nextDescriptions.get(id) ?? "";
           const buf = nextBuffers.get(id) ?? "";
-          output += buf + "◀ SUBAGENT\n▶ MAIN AGENT\n";
-          nextMainAgentOpen = true;
+          output += `▶ SUBAGENT: ${desc}\n${buf}◀ SUBAGENT\n`;
           nextPending.delete(id);
           nextBuffers.delete(id);
           nextDescriptions.delete(id);
@@ -183,7 +184,7 @@ export function processLine(
     return block.type !== "tool_use" || String((block as any).name) !== "Agent";
   });
   if (hasNonAgentContent && !nextMainAgentOpen) {
-    output += "▶ MAIN AGENT\n";
+    output += "▶▶▶ MAIN AGENT\n";
     nextMainAgentOpen = true;
   }
 
@@ -197,10 +198,10 @@ export function processLine(
       if (name === "Agent") {
         const desc = String(input.description ?? input.prompt ?? "");
         if (nextMainAgentOpen) {
-          output += "◀ MAIN AGENT\n";
+          output += "◀◀◀ MAIN AGENT\n\n";
           nextMainAgentOpen = false;
         }
-        output += `▶ SUBAGENT: ${desc}\n`;
+        // ▶ SUBAGENT header is deferred to close time
         nextPending.add(String(b.id));
         nextDescriptions.set(String(b.id), desc);
         nextBuffers.set(String(b.id), "");

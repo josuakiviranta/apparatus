@@ -28,7 +28,7 @@ describe("processLine", () => {
       },
     });
     const { output } = processLine(line, initialState());
-    expect(output).toBe("▶ MAIN AGENT\nHello world\n◈ ctx: 1,234 tokens\n");
+    expect(output).toBe("▶▶▶ MAIN AGENT\nHello world\n◈ ctx: 1,234 tokens\n");
   });
 
   it("renders Read tool_use with file path", () => {
@@ -151,7 +151,8 @@ describe("processLine", () => {
       },
     });
     const { output, nextState } = processLine(line, initialState());
-    expect(output).toBe("▶ SUBAGENT: Explore auth\n");
+    // ▶ SUBAGENT header is deferred to close time — no output at dispatch
+    expect(output).toBe("");
     expect(nextState.pendingSubagentIds.has("agent-1")).toBe(true);
     expect(nextState.subagentDescriptions.get("agent-1")).toBe("Explore auth");
     expect(nextState.subagentBuffers.has("agent-1")).toBe(true);
@@ -179,7 +180,7 @@ describe("processLine", () => {
     expect(nextState.subagentBuffers.get("agent-1")).toBe("  → [glob] **/*.ts\n");
   });
 
-  it("flushes subagent buffer as labeled block on close", () => {
+  it("flushes subagent buffer with header at close, no anticipatory MAIN AGENT", () => {
     const state: FormatterState = {
       pendingSubagentIds: new Set(["agent-1"]),
       subagentBuffers: new Map([["agent-1", "  → [glob] **/*.ts\n"]]),
@@ -194,9 +195,10 @@ describe("processLine", () => {
       },
     });
     const { output, nextState } = processLine(line, state);
-    expect(output).toBe("  → [glob] **/*.ts\n◀ SUBAGENT\n▶ MAIN AGENT\n");
+    // Header printed at close time; no anticipatory ▶▶▶ MAIN AGENT
+    expect(output).toBe("▶ SUBAGENT: Explore auth\n  → [glob] **/*.ts\n◀ SUBAGENT\n");
     expect(nextState.pendingSubagentIds.has("agent-1")).toBe(false);
-    expect(nextState.mainAgentOpen).toBe(true);
+    expect(nextState.mainAgentOpen).toBe(false);
   });
 
   it("ignores tool_result for non-subagent ids (user-wrapped)", () => {
@@ -338,7 +340,7 @@ describe("processLine", () => {
     expect(output).toBe(""); // buffered, not printed — no ctx line emitted
   });
 
-  it("emits ▶ MAIN AGENT on first substantive main agent event", () => {
+  it("emits ▶▶▶ MAIN AGENT on first substantive main agent event", () => {
     const line = JSON.stringify({
       type: "assistant",
       message: {
@@ -347,7 +349,7 @@ describe("processLine", () => {
       },
     });
     const { output, nextState } = processLine(line, initialState());
-    expect(output).toContain("▶ MAIN AGENT\n");
+    expect(output).toContain("▶▶▶ MAIN AGENT\n");
     expect(nextState.mainAgentOpen).toBe(true);
   });
 
@@ -370,7 +372,7 @@ describe("processLine", () => {
     expect(output).not.toContain("▶ MAIN AGENT");
   });
 
-  it("emits ◀ MAIN AGENT before ▶ SUBAGENT when main agent is open", () => {
+  it("emits ◀◀◀ MAIN AGENT when main agent is open and Agent is dispatched", () => {
     const line = JSON.stringify({
       type: "assistant",
       message: {
@@ -386,11 +388,12 @@ describe("processLine", () => {
       lastMainCtxTotal: 0,
     };
     const { output, nextState } = processLine(line, stateWithOpen);
-    expect(output).toBe("◀ MAIN AGENT\n▶ SUBAGENT: Do something\n");
+    // Only ◀◀◀ MAIN AGENT + blank line — ▶ SUBAGENT header is deferred to close time
+    expect(output).toBe("◀◀◀ MAIN AGENT\n\n");
     expect(nextState.mainAgentOpen).toBe(false);
   });
 
-  it("emits only ▶ SUBAGENT when main agent is not open (edge case: first event)", () => {
+  it("produces no output when Agent is dispatched and main agent is not open", () => {
     const line = JSON.stringify({
       type: "assistant",
       message: {
@@ -399,14 +402,155 @@ describe("processLine", () => {
       },
     });
     const { output, nextState } = processLine(line, initialState());
-    expect(output).toBe("▶ SUBAGENT: First thing\n");
-    expect(output).not.toContain("◀ MAIN AGENT");
+    expect(output).toBe("");
     expect(nextState.mainAgentOpen).toBe(false);
+    expect(nextState.pendingSubagentIds.has("a1")).toBe(true);
+  });
+
+  // Parallel subagent scenario tests
+  it("produces no output when multiple parallel Agent calls are dispatched", () => {
+    const line = JSON.stringify({
+      type: "assistant",
+      message: {
+        content: [
+          { type: "tool_use", name: "Agent", id: "a1", input: { description: "Task 1" } },
+          { type: "tool_use", name: "Agent", id: "a2", input: { description: "Task 2" } },
+        ],
+        usage: { input_tokens: 400, output_tokens: 5 },
+      },
+    });
+    const { output, nextState } = processLine(line, initialState());
+    expect(output).toBe("");
+    expect(nextState.pendingSubagentIds.has("a1")).toBe(true);
+    expect(nextState.pendingSubagentIds.has("a2")).toBe(true);
+  });
+
+  it("does not open MAIN AGENT when first of two parallel subagents closes", () => {
+    const state: FormatterState = {
+      pendingSubagentIds: new Set(["a1", "a2"]),
+      subagentBuffers: new Map([["a1", "  → [read] /foo.ts\n"], ["a2", ""]]),
+      subagentDescriptions: new Map([["a1", "Task 1"], ["a2", "Task 2"]]),
+      mainAgentOpen: false,
+      lastMainCtxTotal: 0,
+    };
+    const line = JSON.stringify({
+      type: "user",
+      message: {
+        content: [{ type: "tool_result", tool_use_id: "a1", content: [] }],
+      },
+    });
+    const { output, nextState } = processLine(line, state);
+    expect(output).toBe("▶ SUBAGENT: Task 1\n  → [read] /foo.ts\n◀ SUBAGENT\n");
+    expect(nextState.pendingSubagentIds.has("a1")).toBe(false);
+    expect(nextState.pendingSubagentIds.has("a2")).toBe(true);
+    expect(nextState.mainAgentOpen).toBe(false);
+  });
+
+  it("MAIN AGENT opens lazily when main agent produces content after all subagents closed", () => {
+    // State after both subagents have closed
+    const state: FormatterState = {
+      pendingSubagentIds: new Set(),
+      subagentBuffers: new Map(),
+      subagentDescriptions: new Map(),
+      mainAgentOpen: false,
+      lastMainCtxTotal: 0,
+    };
+    const line = JSON.stringify({
+      type: "assistant",
+      message: {
+        content: [{ type: "text", text: "Done with subagents" }],
+        usage: { input_tokens: 500, output_tokens: 5 },
+      },
+    });
+    const { output, nextState } = processLine(line, state);
+    expect(output).toContain("▶▶▶ MAIN AGENT\n");
+    expect(output).toContain("Done with subagents\n");
+    expect(nextState.mainAgentOpen).toBe(true);
+  });
+
+  it("full round-trip: dispatch 2 parallel agents, both close, main agent continues", () => {
+    let state = initialState();
+
+    // Main agent text + dispatch two subagents
+    const dispatchLine = JSON.stringify({
+      type: "assistant",
+      message: {
+        content: [
+          { type: "text", text: "Running two tasks in parallel." },
+          { type: "tool_use", name: "Agent", id: "a1", input: { description: "Task Alpha" } },
+          { type: "tool_use", name: "Agent", id: "a2", input: { description: "Task Beta" } },
+        ],
+        usage: { input_tokens: 300, output_tokens: 5 },
+      },
+    });
+    const { output: o1, nextState: s1 } = processLine(dispatchLine, state);
+    state = s1;
+    // Main agent text shown, then closed with blank line; ctx suppressed (main agent closed before ctx gate)
+    expect(o1).toBe("▶▶▶ MAIN AGENT\nRunning two tasks in parallel.\n◀◀◀ MAIN AGENT\n\n");
+
+    // Subagent a1 tool call arrives
+    const subA1Line = JSON.stringify({
+      type: "assistant",
+      parent_tool_use_id: "a1",
+      message: {
+        content: [{ type: "tool_use", name: "Read", id: "t1", input: { file_path: "/alpha.ts" } }],
+        usage: { input_tokens: 100, output_tokens: 2 },
+      },
+    });
+    const { output: o2, nextState: s2 } = processLine(subA1Line, state);
+    state = s2;
+    expect(o2).toBe(""); // buffered
+
+    // Subagent a2 tool call arrives
+    const subA2Line = JSON.stringify({
+      type: "assistant",
+      parent_tool_use_id: "a2",
+      message: {
+        content: [{ type: "tool_use", name: "Read", id: "t2", input: { file_path: "/beta.ts" } }],
+        usage: { input_tokens: 100, output_tokens: 2 },
+      },
+    });
+    const { output: o3, nextState: s3 } = processLine(subA2Line, state);
+    state = s3;
+    expect(o3).toBe(""); // buffered
+
+    // a1 closes
+    const closeA1 = JSON.stringify({
+      type: "user",
+      message: { content: [{ type: "tool_result", tool_use_id: "a1", content: [] }] },
+    });
+    const { output: o4, nextState: s4 } = processLine(closeA1, state);
+    state = s4;
+    expect(o4).toBe("▶ SUBAGENT: Task Alpha\n  → [read] /alpha.ts\n◀ SUBAGENT\n");
+    expect(state.mainAgentOpen).toBe(false);
+
+    // a2 closes
+    const closeA2 = JSON.stringify({
+      type: "user",
+      message: { content: [{ type: "tool_result", tool_use_id: "a2", content: [] }] },
+    });
+    const { output: o5, nextState: s5 } = processLine(closeA2, state);
+    state = s5;
+    expect(o5).toBe("▶ SUBAGENT: Task Beta\n  → [read] /beta.ts\n◀ SUBAGENT\n");
+    expect(state.mainAgentOpen).toBe(false);
+    expect(state.pendingSubagentIds.size).toBe(0);
+
+    // Main agent resumes
+    const resumeLine = JSON.stringify({
+      type: "assistant",
+      message: {
+        content: [{ type: "text", text: "All done." }],
+        usage: { input_tokens: 600, output_tokens: 5 },
+      },
+    });
+    const { output: o6 } = processLine(resumeLine, state);
+    expect(o6).toContain("▶▶▶ MAIN AGENT\n");
+    expect(o6).toContain("All done.\n");
   });
 });
 
 describe("flushState", () => {
-  it("returns buffered content + close marker for each pending subagent", () => {
+  it("returns header + buffered content + close marker for each pending subagent", () => {
     const state: FormatterState = {
       pendingSubagentIds: new Set(["agent-1"]),
       subagentBuffers: new Map([["agent-1", "  → [glob] **/*.ts\n"]]),
@@ -415,7 +559,7 @@ describe("flushState", () => {
       lastMainCtxTotal: 0,
     };
     const output = flushState(state);
-    expect(output).toBe("  → [glob] **/*.ts\n◀ SUBAGENT\n");
+    expect(output).toBe("▶ SUBAGENT: Explore auth\n  → [glob] **/*.ts\n◀ SUBAGENT\n");
   });
 
   it("closes main agent block if open", () => {
@@ -426,7 +570,7 @@ describe("flushState", () => {
       mainAgentOpen: true,
       lastMainCtxTotal: 0,
     };
-    expect(flushState(state)).toBe("◀ MAIN AGENT\n");
+    expect(flushState(state)).toBe("◀◀◀ MAIN AGENT\n\n");
   });
 
   it("returns empty string when nothing is open", () => {
