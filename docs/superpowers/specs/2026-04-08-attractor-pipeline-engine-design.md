@@ -56,7 +56,9 @@ DOT is chosen as the pipeline definition format for the same reasons as the upst
 - Shipping attractor as a separate npm package (may happen later, not now)
 - Implementing the full Unified LLM SDK spec
 - Supporting the `parallel` / `fan_in` handler types in this version (deferred to v2)
-- HTTP server mode or WebSocket event streaming
+- Supporting the `stack.manager_loop` (house shape) supervisor handler in this version (deferred to v2)
+- HTTP server mode or WebSocket event streaming (the upstream §9.5/§9.6 server-mode event stream)
+- `full` fidelity mode — requires in-memory LLM session reuse, incompatible with ralph's Claude Code subprocess model (see Section 2.6)
 
 ---
 
@@ -72,8 +74,9 @@ Declared inside the `digraph` block, before any node or edge declarations:
 | `label` | string | Display name for the pipeline |
 | `model_stylesheet` | string | Multi-line CSS-like block controlling Claude Code model selection per node class (see Section 9) |
 | `default_max_retries` | int | Default retry limit for all nodes (overridden per-node) |
-| `retry_target` | node ID | Default retry destination when a node fails and has no explicit `retry_target` |
-| `default_fidelity` | string | Default fidelity level for codergen nodes |
+| `retry_target` | node ID | First-tier fallback when a node fails and has no explicit `retry_target` |
+| `fallback_retry_target` | node ID | Second-tier fallback, tried after `retry_target` is exhausted (goal gate and failure routing) |
+| `default_fidelity` | string | Default fidelity level for codergen nodes (see Section 2.6); defaults to `compact` |
 
 ### 2.2 Node Attributes
 
@@ -85,10 +88,11 @@ Declared inside the `digraph` block, before any node or edge declarations:
 | `prompt` | string | codergen, ralph.* | Prompt text passed to Claude Code; `$goal` and `$project` are substituted |
 | `goal_gate` | bool | engine | If true, engine verifies this node succeeded before allowing exit |
 | `max_retries` | int | engine | Maximum retries on RETRY or FAIL outcome (default 0) |
-| `retry_target` | node ID | engine | Node to route to after retry exhaustion |
+| `retry_target` | node ID | engine | First-tier fallback node after retry exhaustion or goal gate failure |
+| `fallback_retry_target` | node ID | engine | Second-tier fallback node, tried after node `retry_target` is empty |
 | `tool_command` | string | tool | Shell command to execute; `$goal` and `$project` are substituted |
 | `timeout` | int | all | Timeout in seconds for handler execution |
-| `fidelity` | string | codergen | Fidelity level (passed as Claude Code flag) |
+| `fidelity` | string | codergen | Fidelity level for context carryover (see Section 2.6); `full` not supported in v1 |
 | `class` | string | stylesheet | CSS-like class name; merges in model_stylesheet properties |
 | `loop_restart` | bool | engine | Edge attribute: marks edge as a loop restart (resets retry counter) |
 
@@ -119,6 +123,27 @@ Declared inside the `digraph` block, before any node or edge declarations:
 ### 2.5 Attribute Naming Convention
 
 DOT attributes use `snake_case` (e.g. `loop_restart`, `goal_gate`, `tool_command`). The graph parser converts these to camelCase in the TypeScript `Node` and `Edge` types (e.g. `loopRestart`, `goalGate`, `toolCommand`).
+
+### 2.6 Fidelity Levels
+
+Fidelity controls how much prior session context is synthesized and passed to the next Claude Code invocation. All fidelity modes except `full` use fresh Claude Code subprocess invocations with a synthesized preamble string.
+
+| Mode | Context Carried | Notes |
+|---|---|---|
+| `full` | Full conversation history | **Not supported in v1** — requires in-memory LLM session reuse |
+| `truncate` | Minimal (graph goal + run ID only) | Lowest token cost |
+| `compact` | Structured bullet summary of completed stages, outcomes, key context values | **Default** |
+| `summary:low` | Brief textual summary with minimal event counts | ~600 tokens |
+| `summary:medium` | Moderate detail: recent stage outcomes, active context values | ~1500 tokens |
+| `summary:high` | Detailed: many recent events, tool call summaries, comprehensive context | ~3000 tokens |
+
+**Resolution precedence (highest to lowest):**
+1. Edge `fidelity` attribute (on the incoming edge)
+2. Target node `fidelity` attribute
+3. Graph `default_fidelity` attribute
+4. Default when unset: `compact`
+
+The preamble transform (Section 10.3) synthesizes context carryover text at execution time for all non-`full` modes before invoking `runLoop()`.
 
 ---
 
@@ -201,7 +226,7 @@ export interface Context {
 export interface Node {
   id: string;
   shape: string;
-  type?: string;           // explicit handler override
+  type?: string;                 // explicit handler override
   label?: string;
   prompt?: string;
   toolCommand?: string;
@@ -209,8 +234,11 @@ export interface Node {
   goalGate?: boolean;
   maxRetries?: number;
   retryTarget?: string;
+  fallbackRetryTarget?: string;  // second-tier failure routing
   fidelity?: string;
-  model?: string;          // resolved from model_stylesheet
+  llmModel?: string;             // resolved from model_stylesheet llm_model
+  llmProvider?: string;          // resolved from model_stylesheet llm_provider (no-op v1)
+  reasoningEffort?: string;      // resolved from model_stylesheet reasoning_effort
   attrs: Record<string, string>;
 }
 
@@ -230,6 +258,7 @@ export interface Graph {
   edges: Edge[];
   defaultMaxRetries?: number;
   retryTarget?: string;
+  fallbackRetryTarget?: string;  // second-tier graph-level failure routing
   defaultFidelity?: string;
   modelStylesheet?: string;
 }
@@ -266,8 +295,9 @@ The engine traverses the graph node-by-node until it reaches a terminal node (sh
 Nodes with `goal_gate=true` are tracked throughout execution. Before the engine allows exit via a terminal node:
 
 1. All goal-gate nodes must have reached `success` or `partial_success`
-2. If any goal-gate node has not succeeded, the engine routes to `retry_target` (node-level, then graph-level)
-3. If no `retry_target` is configured and goal gates are unsatisfied, pipeline outcome is `fail`
+2. If any goal-gate node has not succeeded, the engine cascades through retry targets:
+   - node `retry_target` → node `fallback_retry_target` → graph `retry_target` → graph `fallback_retry_target`
+3. If no target exists at any level and goal gates are unsatisfied, pipeline outcome is `fail`
 
 ### 4.3 Edge Selection Algorithm
 
@@ -285,7 +315,7 @@ Per-node `max_retries` attribute (default 0 = no retry). On `status: "retry"` or
 
 1. Increment `nodeRetries[nodeId]`
 2. If retries remaining: wait with exponential backoff + jitter, re-execute the node
-3. If retries exhausted: route via node `retry_target` → graph `retry_target` → pipeline fail
+3. If retries exhausted: failure routing cascade — node `retry_target` → node `fallback_retry_target` → graph `retry_target` → graph `fallback_retry_target` → pipeline fail
 
 Retryable errors: network failures, claude CLI unavailable. Non-retryable: invalid prompt file, auth errors.
 
@@ -298,8 +328,8 @@ Traversal of an edge with `loop_restart=true` resets the target node's retry cou
 | Error | Behavior |
 |---|---|
 | Handler throws | Caught by engine, converted to `status: "fail"` Outcome |
-| Node fails with no matching outgoing edge | Routes to node `retry_target`, then graph `retry_target`; if none, pipeline terminates as fail |
-| `goal_gate=true` node did not succeed at exit | Routes to `retry_target`; if none, pipeline fails |
+| Node fails with no matching outgoing edge | Cascade: node `retry_target` → node `fallback_retry_target` → graph `retry_target` → graph `fallback_retry_target` → pipeline fail |
+| `goal_gate=true` node did not succeed at exit | Same cascade as above; pipeline fails if all levels empty |
 | Invalid DOT file | `validate` prints diagnostics; `run` aborts before execution starts |
 | AbortSignal fired (SIGINT) | Engine checkpoints current node state, then exits cleanly |
 
@@ -334,6 +364,7 @@ Custom handlers can be registered by type string: `registry.register("org.myhand
 | `hexagon` | wait.human | Pauses pipeline for human input via Interviewer |
 | `diamond` | conditional | No-op, engine evaluates edge conditions |
 | `parallelogram` | tool | Executes shell command, exit code → Outcome |
+| `house` | stack.manager_loop | Supervisor polling loop — **v1 deferred**; engine throws validation error if encountered |
 
 ### 5.3 Codergen Handler
 
@@ -341,7 +372,7 @@ The default handler for `box` nodes. Translates the attractor "CodergenBackend" 
 
 1. Expands `$goal` and `$project` in `node.prompt`
 2. Writes expanded prompt to `{logsRoot}/{node.id}/prompt.md`
-3. Calls `runLoop({ promptFile, cwd, model: node.model, signal })` from `loop.ts`
+3. Calls `runLoop({ promptFile, cwd, model: node.llmModel, signal })` from `loop.ts`
 4. Writes session output to `{logsRoot}/{node.id}/response.md`
 5. Returns `Outcome` derived from `LoopResult`
 
@@ -534,21 +565,31 @@ Each lint result includes: rule name, severity (`error` | `warning`), node or ed
 
 ### 9.1 Overview
 
-The `model_stylesheet` graph attribute controls which Claude Code model is used for node invocations. It uses a CSS-like syntax where selectors target nodes by shape, class, or ID.
+The `model_stylesheet` graph attribute controls Claude Code invocation options per node class. It uses a CSS-like syntax where selectors target nodes by shape, class, or ID.
 
-In ralph-cli, "model selection" means passing `--model <model-id>` to the `claude` CLI invocation inside `runLoop()`. The resolved model is stored in `node.model` after stylesheet application.
+The upstream attractor spec defines three recognized properties: `llm_model`, `llm_provider`, and `reasoning_effort`. Ralph-cli maps these to Claude Code flags as described in Section 9.4.
 
 ### 9.2 Syntax
 
 ```
 model_stylesheet = "
-  box              { model: claude-opus-4-6 }
-  .fast            { model: claude-haiku-4-5-20251001 }
-  #review          { model: claude-opus-4-6 }
+  box              { llm_model: claude-opus-4-6 }
+  .fast            { llm_model: claude-haiku-4-5-20251001 }
+  #review          { llm_model: claude-opus-4-6; reasoning_effort: high }
 "
 ```
 
-### 9.3 Selectors and Specificity
+### 9.3 Recognized Properties
+
+The grammar is exhaustive — only these three properties are recognized:
+
+| Property | Upstream Type | Ralph-cli Mapping |
+|---|---|---|
+| `llm_model` | model identifier string | Passed as `--model <value>` to Claude Code |
+| `llm_provider` | provider key (`anthropic`, `openai`, etc.) | **No-op in v1** — ralph-cli uses Claude exclusively; recognized for schema compatibility |
+| `reasoning_effort` | `low` \| `medium` \| `high` | Maps to Claude Code extended thinking settings (v1 behavior TBD at implementation time) |
+
+### 9.4 Selectors and Specificity
 
 | Selector | Matches | Specificity |
 |---|---|---|
@@ -557,11 +598,11 @@ model_stylesheet = "
 | `.classname` | nodes with matching `class` attribute | medium |
 | `#node-id` | node with exact ID | highest |
 
-Later declarations of equal specificity override earlier ones. Explicit `model` attributes on nodes override all stylesheet rules.
+Later declarations of equal specificity override earlier ones. Explicit node attributes override all stylesheet rules.
 
-### 9.4 Default
+### 9.5 Default
 
-If no `model_stylesheet` is declared and no node has an explicit `model` attribute, `runLoop()` is called without `--model`, using the claude CLI's default model.
+If no `model_stylesheet` is declared and no node has an explicit `llm_model` attribute, `runLoop()` is called without `--model`, using the claude CLI's default model.
 
 ---
 
@@ -585,7 +626,19 @@ The variable expansion transform replaces `$goal` and `$project` tokens in `node
 
 This runs before validation so that validators see the expanded values.
 
-### 10.3 Registering Custom Transforms
+### 10.3 Built-In Transform: Preamble Synthesis
+
+The preamble transform synthesizes context carryover text for codergen nodes that do not use `full` fidelity. It runs **at execution time** (not at parse time), after a node completes and before the next node is invoked, because it depends on runtime context and completed-stage outcomes.
+
+For each fresh-session fidelity mode, the preamble prepends a synthetic summary to the node's prompt:
+
+- `compact`: structured bullet list of completed stages, their outcomes, and key context values
+- `summary:low/medium/high`: progressively more detailed textual summary
+- `truncate`: minimal (graph goal and run ID only)
+
+The synthesized preamble is appended to the temporary prompt file that `runLoop()` receives.
+
+### 10.4 Registering Custom Transforms
 
 ```typescript
 engine.addTransform((graph) => {
@@ -921,15 +974,15 @@ This section defines how to validate that this implementation is complete and co
 
 - [ ] Nodes with `goal_gate=true` are tracked throughout execution
 - [ ] Before allowing exit via a terminal node, the engine checks all goal gate nodes have status `success` or `partial_success`
-- [ ] If any goal gate node has not succeeded, the engine routes to `retry_target` (if configured) instead of exiting
-- [ ] If no `retry_target` and goal gates unsatisfied, pipeline outcome is "fail"
+- [ ] If any goal gate node has not succeeded, the engine cascades through retry targets: node `retry_target` → node `fallback_retry_target` → graph `retry_target` → graph `fallback_retry_target`
+- [ ] If no target exists at any level and goal gates are unsatisfied, pipeline outcome is "fail"
 
 ### 17.5 Retry Logic
 
 - [ ] Nodes with `max_retries > 0` are retried on RETRY or FAIL outcomes
 - [ ] Retry count is tracked per-node and respects the configured limit
 - [ ] Backoff between retries works (exponential with jitter)
-- [ ] After retry exhaustion, the node's final outcome is used for edge selection
+- [ ] After retry exhaustion, failure routing cascades: node `retry_target` → node `fallback_retry_target` → graph `retry_target` → graph `fallback_retry_target` → pipeline fail
 - [ ] Traversal of an edge with `loop_restart=true` resets the target node's retry counter
 
 ### 17.6 Node Handlers
@@ -941,6 +994,7 @@ This section defines how to validate that this implementation is complete and co
 - [ ] **Conditional handler:** Passes through; engine evaluates edge conditions against outcome/context
 - [ ] **Parallel handler:** v1 deferred — not implemented; engine throws validation error if a parallel node is encountered
 - [ ] **Fan-in handler:** v1 deferred — not implemented; engine throws validation error if a fan-in node is encountered
+- [ ] **Stack.manager_loop handler (house shape):** v1 deferred — not implemented; engine throws validation error if a house node is encountered
 - [ ] **Tool handler:** Executes configured shell command; non-zero exit code → `fail`, exit 0 → `success`
 - [ ] **ralph.implement handler:** Calls `runLoop()` and writes `implement.*` context keys
 - [ ] **ralph.meditate handler:** Calls meditate logic and writes `meditate.*` context keys
@@ -979,18 +1033,21 @@ This section defines how to validate that this implementation is complete and co
 ### 17.10 Model Stylesheet
 
 - [ ] Stylesheet is parsed from the graph's `model_stylesheet` attribute
-- [ ] Selectors by shape name work (e.g. `box { model: claude-opus-4-6 }`)
-- [ ] Selectors by class name work (e.g. `.fast { model: claude-haiku-4-5-20251001 }`)
-- [ ] Selectors by node ID work (e.g. `#review { model: claude-opus-4-6 }`)
+- [ ] Selectors by shape name work (e.g. `box { llm_model: claude-opus-4-6 }`)
+- [ ] Selectors by class name work (e.g. `.fast { llm_model: claude-haiku-4-5-20251001 }`)
+- [ ] Selectors by node ID work (e.g. `#review { llm_model: claude-opus-4-6 }`)
 - [ ] Specificity order: universal < shape < class < ID
-- [ ] Stylesheet properties are overridden by explicit `model` attributes on nodes
-- [ ] Resolved model is passed as `--model` flag to the Claude Code invocation in `runLoop()`
+- [ ] Stylesheet properties are overridden by explicit node attributes
+- [ ] `llm_model` resolves to `--model` flag passed to Claude Code via `runLoop()`
+- [ ] `llm_provider` is recognized and parsed but is a no-op in v1 (ralph-cli uses Claude exclusively)
+- [ ] `reasoning_effort` is recognized and parsed; v1 mapping to Claude Code flags determined at implementation time
 
 ### 17.11 Transforms and Extensibility
 
 - [ ] AST transforms can modify the `Graph` between parsing and validation
 - [ ] Transform interface: `(graph: Graph) => Graph`
 - [ ] Built-in variable expansion transform replaces `$goal` and `$project` in prompts and tool commands
+- [ ] Built-in preamble transform synthesizes context carryover text at execution time for non-`full` fidelity modes
 
 ### 17.12 runLoop() Refactor
 
