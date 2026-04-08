@@ -27,7 +27,7 @@ Launches an interactive Claude TUI session to author a new pipeline workflow.
 - If `<project>/pipelines/` does not exist, ralph creates it; if directory creation fails, ralph prints the OS error and exits
 - The bundled system prompt (`PROMPT_pipeline_create.md`) injects the full attractor scheme: all 11 node types with shapes, required/optional attributes, validation rules, and a complete reference example
 - `PROMPT_pipeline_create.md` is **not** copied to the project folder — the attractor scheme is fixed and not user-customizable
-- The session is a single direct interactive Claude invocation (unlike `ralph plan`, no non-interactive kickoff phase precedes it)
+- The session uses the same two-phase mechanism as `ralph plan`: a non-interactive kickoff injects the attractor scheme prompt and captures a session ID, followed by an interactive `--resume` session where the user designs the workflow
 - If the user cancels (SIGINT/SIGTERM) or Claude exits non-zero, ralph exits with the same status code without running validation
 - On clean session exit, ralph runs `pipeline validate` on the output file; if validation fails, ralph prints the diagnostics and exits non-zero
 - If the file does not exist after a clean session exit, ralph prints a warning and exits non-zero
@@ -75,8 +75,8 @@ ralph pipeline validate review --project my-app
 
 - `PROMPT_pipeline_create.md` is a new bundled asset, co-located with `PROMPT_plan.md` and `PROMPT_build.md` in `src/cli/prompts/`
 - The prompt content should include: all node shapes and their types, required attributes per node type (e.g., `prompt=` for codergen), edge attributes (`condition=`, `label=`, `weight=`), validation rules summary, and a complete reference example
-- The `create` session spawns Claude with `stdio: "inherit"` (same as `plan.ts`) but skips the two-phase kickoff — it is a single direct interactive invocation
-- The system prompt is read from the bundled `PROMPT_pipeline_create.md`; its content must cover: shape→type mapping for all 11 node types, required attributes per type (`prompt=` for codergen, `toolCommand=` for tool nodes), edge attributes (`condition=`, `label=`, `weight=`), the 9 validation rules enforced by `validateGraph()`, and a complete annotated reference example
+- The `create` session uses the same two-phase mechanism as `plan.ts`: a non-interactive kickoff (`-p <prompt> --output-format stream-json`) injects the attractor scheme and captures a session ID, followed by an interactive `--resume` session. This is the only established way to inject system context into a Claude session.
+- The system prompt (injected as the `-p` trigger) is read from the bundled `PROMPT_pipeline_create.md`; its content must cover: shape→type mapping for all 11 node types, required attributes per type (`prompt=` for codergen, `tool_command=` for tool nodes in .dot format), edge attributes (`condition=`, `label=`, `weight=`), the 9 validation rules enforced by `validateGraph()`, and a complete annotated reference example
 - Name resolution logic (shorthand → absolute path) is extracted to a shared helper in `src/cli/lib/pipeline.ts` and used by `create`, `run`, `validate`, and `list`
 - Name shorthand resolution requires `--project` to be known; for `validate` without `--project`, shorthand resolves against cwd
 
