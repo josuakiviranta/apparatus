@@ -1,462 +1,476 @@
-# list_illuminations MCP Tool Implementation Plan
-
-> **Status: COMPLETE** — All tasks implemented and shipped as tag `0.0.26`.
+# Stream Formatter Block Ordering Implementation Plan
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [x]`) syntax for tracking.
 
-**Goal:** Add YAML frontmatter to illumination files and a `list_illuminations` MCP tool so the meditating agent can orient itself before writing new insights.
+**Goal:** Fix stream-formatter so each subagent's `▶ SUBAGENT` header appears at close time (not dispatch time), `▶ MAIN AGENT` only reopens lazily when the main agent produces content, and main agent open/close markers use triple arrows (`▶▶▶` / `◀◀◀`) with a trailing blank line on close to visually separate blocks.
 
-**Architecture:** Modify `writeIllumination()` to prepend auto-generated frontmatter (date + description), add `listIlluminations()` that parses frontmatter from all illumination files, register a new `list_illuminations` MCP tool, and update `PROMPT_meditation.md` to use it.
+**Architecture:** Three targeted changes in `stream-formatter.ts`: (1) defer `▶ SUBAGENT: desc` printing from Agent dispatch to tool_result close, (2) remove the anticipatory `▶ MAIN AGENT` from the user-event handler and let the assistant-event handler open it lazily, (3) replace the single-arrow `▶`/`◀` MAIN AGENT markers with triple-arrow `▶▶▶`/`◀◀◀` and emit a blank line after every close. Tests are updated to match the new contract, plus new tests cover the parallel-subagent scenario.
 
-**Tech Stack:** TypeScript, Node.js `fs` module, Vitest, `@modelcontextprotocol/sdk`, `zod`
-
----
-
-## Chunk 1: Core Logic — `writeIllumination` + `listIlluminations`
-
-### Task 1: Update `writeIllumination` to inject frontmatter
-
-**Files:**
-- Modify: `src/cli/mcp/illumination-server.ts` — `writeIllumination()` function
-- Modify: `src/cli/tests/illumination-server.test.ts` — update existing tests, add new ones
-
-The function gains a `description: string` param. It prepends frontmatter before writing.
-
-- [x] **Step 1: Write failing tests for the new `writeIllumination` signature**
-
-Add to the `describe("writeIllumination", ...)` block in `src/cli/tests/illumination-server.test.ts`. First, update the four existing tests to pass a description argument (they will still fail at compile time once the signature changes):
-
-```typescript
-// Update existing tests: add "Test insight" as the third argument
-it("writes content to meditations/illuminations/<filename>", () => {
-  const result = writeIllumination(tmpDir, "2026-04-04T1430-test.md", "Test insight", "# Hello");
-  const expected = join(tmpDir, "meditations", "illuminations", "2026-04-04T1430-test.md");
-  expect(result).toBe(expected);
-});
-
-it("overwrites an existing file without error", () => {
-  writeIllumination(tmpDir, "test.md", "desc v1", "v1");
-  const result = writeIllumination(tmpDir, "test.md", "desc v2", "v2");
-  const raw = readFileSync(result, "utf8");
-  expect(raw).toContain("desc v2");
-  expect(raw).not.toContain("desc v1");
-});
-
-it("creates meditations/illuminations/ directory if absent", () => {
-  writeIllumination(tmpDir, "test.md", "desc", "content");
-  expect(existsSync(join(tmpDir, "meditations", "illuminations"))).toBe(true);
-});
-
-it("throws an error for an invalid filename", () => {
-  expect(() => writeIllumination(tmpDir, "bad/name.md", "desc", "content")).toThrow();
-});
-```
-
-Then add new tests:
-
-```typescript
-it("prepends YAML frontmatter with date and description", () => {
-  writeIllumination(tmpDir, "2026-04-08T0900-test.md", "A concise insight.", "# Title\n\nBody.");
-  const filePath = join(tmpDir, "meditations", "illuminations", "2026-04-08T0900-test.md");
-  const raw = readFileSync(filePath, "utf8");
-  expect(raw).toMatch(/^---\ndate: \d{4}-\d{2}-\d{2}\ndescription: A concise insight\.\n---\n\n/);
-});
-
-it("places the content body after the frontmatter separator", () => {
-  writeIllumination(tmpDir, "test.md", "desc", "# Title\n\nBody.");
-  const filePath = join(tmpDir, "meditations", "illuminations", "test.md");
-  const raw = readFileSync(filePath, "utf8");
-  expect(raw).toContain("---\n\n# Title\n\nBody.");
-});
-
-it("throws when description is empty", () => {
-  expect(() => writeIllumination(tmpDir, "test.md", "", "content")).toThrow("description");
-});
-```
-
-- [x] **Step 2: Run tests to verify they fail**
-
-```bash
-cd /Users/josu/Documents/projects/ralph-cli && npm test -- --reporter=verbose src/cli/tests/illumination-server.test.ts 2>&1 | grep -E "(FAIL|PASS|✓|×|error)" | head -30
-```
-
-Expected: compile errors or test failures referencing wrong argument count or missing frontmatter.
-
-- [x] **Step 3: Update `writeIllumination` in `src/cli/mcp/illumination-server.ts`**
-
-Replace the existing function:
-
-```typescript
-export function writeIllumination(
-  projectRoot: string,
-  filename: string,
-  description: string,
-  content: string,
-): string {
-  const err = validateFilename(filename);
-  if (err) throw new Error(err);
-  if (!description || !description.trim()) throw new Error("description is required");
-  const date = new Date().toISOString().slice(0, 10);
-  const frontmatter = `---\ndate: ${date}\ndescription: ${description.trim()}\n---\n\n`;
-  const dir = join(projectRoot, "meditations", "illuminations");
-  mkdirSync(dir, { recursive: true });
-  const filePath = join(dir, filename);
-  writeFileSync(filePath, frontmatter + content, "utf8");
-  return filePath;
-}
-```
-
-- [x] **Step 4: Run tests to verify they pass**
-
-```bash
-cd /Users/josu/Documents/projects/ralph-cli && npm test -- --reporter=verbose src/cli/tests/illumination-server.test.ts 2>&1 | grep -E "(FAIL|PASS|✓|×)" | head -30
-```
-
-Expected: all `writeIllumination` tests pass. Other describes also pass.
-
-- [x] **Step 5: Commit**
-
-```bash
-cd /Users/josu/Documents/projects/ralph-cli && git add src/cli/mcp/illumination-server.ts src/cli/tests/illumination-server.test.ts && git commit -m "feat: writeIllumination injects YAML frontmatter (date + description)"
-```
+**Tech Stack:** TypeScript, vitest
 
 ---
 
-### Task 2: Add `listIlluminations` function and `list_illuminations` MCP tool
+> **Status:** All tasks complete. Committed as `9fb0ab1`, tagged `0.0.27`.
+
+## Chunk 1: Fix stream-formatter and update tests
+
+### Task 1: Update existing tests to the new expected behavior (write failing tests first)
 
 **Files:**
-- Modify: `src/cli/mcp/illumination-server.ts` — add `listIlluminations()`, private `parseIlluminationDescription()`, register tool, update `write_illumination` tool schema
-- Modify: `src/cli/tests/illumination-server.test.ts` — add `listIlluminations` describe block, update import
+- Modify: `src/cli/tests/stream-formatter.test.ts`
 
-- [x] **Step 1: Write failing tests for `listIlluminations`**
+The following eight tests describe the OLD behavior. Rewrite them before touching the implementation so they fail immediately and confirm coverage.
 
-Add to `src/cli/tests/illumination-server.test.ts`. First update the import to include `listIlluminations`:
+- [x] **Step 1: Update "renders text content with header and token count" test (line ~31)**
 
-```typescript
-import { validateFilename, writeIllumination, assertWithinRoot, readFile, validateGlobPattern, globFiles, projectTree, listMetaMeditations, readMetaMeditation, listIlluminations } from "../mcp/illumination-server";
-```
-
-Then add the describe block:
+Old assertion: `expect(output).toBe("▶ MAIN AGENT\nHello world\n◈ ctx: 1,234 tokens\n")`
 
 ```typescript
-describe("listIlluminations", () => {
-  it("returns no-illuminations message when directory is missing", () => {
-    const result = listIlluminations(tmpDir);
-    expect(result).toBe("No illuminations found.");
+it("renders text content with header and token count", () => {
+  const line = JSON.stringify({
+    type: "assistant",
+    message: {
+      content: [{ type: "text", text: "Hello world" }],
+      usage: { input_tokens: 1234, output_tokens: 10 },
+    },
   });
-
-  it("returns no-illuminations message when directory is empty", () => {
-    mkdirSync(join(tmpDir, "meditations", "illuminations"), { recursive: true });
-    const result = listIlluminations(tmpDir);
-    expect(result).toBe("No illuminations found.");
-  });
-
-  it("returns filename and description for a file with frontmatter", () => {
-    const dir = join(tmpDir, "meditations", "illuminations");
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, "2026-04-08T0900-my-insight.md"), "---\ndate: 2026-04-08\ndescription: Something important.\n---\n\n# My Insight\n\nBody.");
-    const result = listIlluminations(tmpDir);
-    expect(result).toBe("2026-04-08T0900-my-insight.md — Something important.");
-  });
-
-  it("shows (no description) for a file without frontmatter", () => {
-    const dir = join(tmpDir, "meditations", "illuminations");
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, "old-insight.md"), "# Old Insight\n\nNo frontmatter here.");
-    const result = listIlluminations(tmpDir);
-    expect(result).toBe("old-insight.md — (no description)");
-  });
-
-  it("shows (no description) for a file with frontmatter missing description field", () => {
-    const dir = join(tmpDir, "meditations", "illuminations");
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, "partial.md"), "---\ndate: 2026-04-08\n---\n\n# Partial");
-    const result = listIlluminations(tmpDir);
-    expect(result).toBe("partial.md — (no description)");
-  });
-
-  it("lists multiple files sorted by filename", () => {
-    const dir = join(tmpDir, "meditations", "illuminations");
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, "2026-04-08T1100-second.md"), "---\ndate: 2026-04-08\ndescription: Second insight.\n---\n\n# Second");
-    writeFileSync(join(dir, "2026-04-08T0900-first.md"), "---\ndate: 2026-04-08\ndescription: First insight.\n---\n\n# First");
-    const result = listIlluminations(tmpDir);
-    expect(result).toBe(
-      "2026-04-08T0900-first.md — First insight.\n2026-04-08T1100-second.md — Second insight."
-    );
-  });
+  const { output } = processLine(line, initialState());
+  expect(output).toBe("▶▶▶ MAIN AGENT\nHello world\n◈ ctx: 1,234 tokens\n");
 });
 ```
 
-- [x] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Update "emits ▶ MAIN AGENT on first substantive main agent event" test (line ~341)**
 
-```bash
-cd /Users/josu/Documents/projects/ralph-cli && npm test -- --reporter=verbose src/cli/tests/illumination-server.test.ts 2>&1 | grep -E "(FAIL|PASS|✓|×|listIlluminations)" | head -20
-```
-
-Expected: `listIlluminations` tests fail with "not exported" or similar.
-
-- [x] **Step 3: Add `listIlluminations` and helper to `src/cli/mcp/illumination-server.ts`**
-
-Add after the `listMetaMeditations` function (around line 78):
+Old assertion: `expect(output).toContain("▶ MAIN AGENT\n")`
 
 ```typescript
-const NO_ILLUMINATIONS_MESSAGE = "No illuminations found.";
+it("emits ▶▶▶ MAIN AGENT on first substantive main agent event", () => {
+  const line = JSON.stringify({
+    type: "assistant",
+    message: {
+      content: [{ type: "text", text: "Hello" }],
+      usage: { input_tokens: 100, output_tokens: 5 },
+    },
+  });
+  const { output, nextState } = processLine(line, initialState());
+  expect(output).toContain("▶▶▶ MAIN AGENT\n");
+  expect(nextState.mainAgentOpen).toBe(true);
+});
+```
 
-function parseIlluminationDescription(filePath: string): string {
-  try {
-    const content = readFileSync(filePath, "utf8");
-    if (!content.startsWith("---\n")) return "(no description)";
-    const end = content.indexOf("\n---\n", 4);
-    if (end === -1) return "(no description)";
-    const frontmatter = content.slice(4, end);
-    const match = frontmatter.match(/^description:\s*(.+)$/m);
-    return match ? match[1].trim() : "(no description)";
-  } catch {
-    return "(no description)";
+- [x] **Step 3: Update "renders Agent tool_use as SUBAGENT START" test (line ~145)**
+
+Old assertion: `expect(output).toBe("▶ SUBAGENT: Explore auth\n")`
+
+Replace the output assertion only — state assertions stay the same:
+
+```typescript
+it("renders Agent tool_use as SUBAGENT START and stores id, description, buffer in state", () => {
+  const line = JSON.stringify({
+    type: "assistant",
+    message: {
+      content: [{ type: "tool_use", name: "Agent", id: "agent-1", input: { description: "Explore auth" } }],
+      usage: { input_tokens: 200, output_tokens: 5 },
+    },
+  });
+  const { output, nextState } = processLine(line, initialState());
+  // ▶ SUBAGENT header is deferred to close time — no output at dispatch
+  expect(output).toBe("");
+  expect(nextState.pendingSubagentIds.has("agent-1")).toBe(true);
+  expect(nextState.subagentDescriptions.get("agent-1")).toBe("Explore auth");
+  expect(nextState.subagentBuffers.has("agent-1")).toBe(true);
+  expect(nextState.mainAgentOpen).toBe(false);
+});
+```
+
+- [x] **Step 4: Update "emits ◀ MAIN AGENT before ▶ SUBAGENT when main agent is open" test (line ~373)**
+
+Old assertion: `expect(output).toBe("◀ MAIN AGENT\n▶ SUBAGENT: Do something\n")`
+
+```typescript
+it("emits ◀◀◀ MAIN AGENT when main agent is open and Agent is dispatched", () => {
+  const line = JSON.stringify({
+    type: "assistant",
+    message: {
+      content: [{ type: "tool_use", name: "Agent", id: "a1", input: { description: "Do something" } }],
+      usage: { input_tokens: 300, output_tokens: 5 },
+    },
+  });
+  const stateWithOpen: FormatterState = {
+    pendingSubagentIds: new Set(),
+    subagentBuffers: new Map(),
+    subagentDescriptions: new Map(),
+    mainAgentOpen: true,
+    lastMainCtxTotal: 0,
+  };
+  const { output, nextState } = processLine(line, stateWithOpen);
+  // Only ◀◀◀ MAIN AGENT + blank line — ▶ SUBAGENT header is deferred to close time
+  expect(output).toBe("◀◀◀ MAIN AGENT\n\n");
+  expect(nextState.mainAgentOpen).toBe(false);
+});
+```
+
+- [x] **Step 5: Update "emits only ▶ SUBAGENT when main agent is not open" test (line ~393)**
+
+Old assertion: `expect(output).toBe("▶ SUBAGENT: First thing\n")`
+
+```typescript
+it("produces no output when Agent is dispatched and main agent is not open", () => {
+  const line = JSON.stringify({
+    type: "assistant",
+    message: {
+      content: [{ type: "tool_use", name: "Agent", id: "a1", input: { description: "First thing" } }],
+      usage: { input_tokens: 300, output_tokens: 5 },
+    },
+  });
+  const { output, nextState } = processLine(line, initialState());
+  expect(output).toBe("");
+  expect(nextState.mainAgentOpen).toBe(false);
+  expect(nextState.pendingSubagentIds.has("a1")).toBe(true);
+});
+```
+
+- [x] **Step 6: Update "flushes subagent buffer as labeled block on close" test (line ~182)**
+
+Old assertion: `expect(output).toBe("  → [glob] **/*.ts\n◀ SUBAGENT\n▶ MAIN AGENT\n")`
+
+```typescript
+it("flushes subagent buffer with header at close, no anticipatory MAIN AGENT", () => {
+  const state: FormatterState = {
+    pendingSubagentIds: new Set(["agent-1"]),
+    subagentBuffers: new Map([["agent-1", "  → [glob] **/*.ts\n"]]),
+    subagentDescriptions: new Map([["agent-1", "Explore auth"]]),
+    mainAgentOpen: false,
+    lastMainCtxTotal: 0,
+  };
+  const line = JSON.stringify({
+    type: "user",
+    message: {
+      content: [{ type: "tool_result", tool_use_id: "agent-1", content: [] }],
+    },
+  });
+  const { output, nextState } = processLine(line, state);
+  // Header printed at close time; no anticipatory ▶▶▶ MAIN AGENT
+  expect(output).toBe("▶ SUBAGENT: Explore auth\n  → [glob] **/*.ts\n◀ SUBAGENT\n");
+  expect(nextState.pendingSubagentIds.has("agent-1")).toBe(false);
+  expect(nextState.mainAgentOpen).toBe(false);
+});
+```
+
+- [x] **Step 7: Update flushState "returns buffered content + close marker" test (line ~409)**
+
+Old assertion: `expect(output).toBe("  → [glob] **/*.ts\n◀ SUBAGENT\n")`
+
+```typescript
+it("returns header + buffered content + close marker for each pending subagent", () => {
+  const state: FormatterState = {
+    pendingSubagentIds: new Set(["agent-1"]),
+    subagentBuffers: new Map([["agent-1", "  → [glob] **/*.ts\n"]]),
+    subagentDescriptions: new Map([["agent-1", "Explore auth"]]),
+    mainAgentOpen: false,
+    lastMainCtxTotal: 0,
+  };
+  const output = flushState(state);
+  expect(output).toBe("▶ SUBAGENT: Explore auth\n  → [glob] **/*.ts\n◀ SUBAGENT\n");
+});
+```
+
+- [x] **Step 8: Update flushState "closes main agent block if open" test (line ~421)**
+
+Old assertion: `expect(flushState(state)).toBe("◀ MAIN AGENT\n")`
+
+```typescript
+it("closes main agent block if open", () => {
+  const state: FormatterState = {
+    pendingSubagentIds: new Set(),
+    subagentBuffers: new Map(),
+    subagentDescriptions: new Map(),
+    mainAgentOpen: true,
+    lastMainCtxTotal: 0,
+  };
+  expect(flushState(state)).toBe("◀◀◀ MAIN AGENT\n\n");
+});
+```
+
+- [x] **Step 9: Run tests to confirm the eight updated tests fail**
+
+```bash
+cd /Users/josu/Documents/projects/ralph-cli
+npm test -- --reporter=verbose 2>&1 | grep -E "(FAIL|PASS|✓|✗|×)" | head -50
+```
+
+Expected: the eight tests above show as failing; all others pass.
+
+---
+
+### Task 2: Add new tests for the parallel-subagent scenario
+
+**Files:**
+- Modify: `src/cli/tests/stream-formatter.test.ts`
+
+Add these tests after the existing suite. They will also fail until the implementation is fixed.
+
+- [x] **Step 1: Add test — multiple parallel agents dispatch produces no output**
+
+```typescript
+it("produces no output when multiple parallel Agent calls are dispatched", () => {
+  const line = JSON.stringify({
+    type: "assistant",
+    message: {
+      content: [
+        { type: "tool_use", name: "Agent", id: "a1", input: { description: "Task 1" } },
+        { type: "tool_use", name: "Agent", id: "a2", input: { description: "Task 2" } },
+      ],
+      usage: { input_tokens: 400, output_tokens: 5 },
+    },
+  });
+  const { output, nextState } = processLine(line, initialState());
+  expect(output).toBe("");
+  expect(nextState.pendingSubagentIds.has("a1")).toBe(true);
+  expect(nextState.pendingSubagentIds.has("a2")).toBe(true);
+});
+```
+
+- [x] **Step 2: Add test — first subagent closes while second is still pending, no MAIN AGENT yet**
+
+```typescript
+it("does not open MAIN AGENT when first of two parallel subagents closes", () => {
+  const state: FormatterState = {
+    pendingSubagentIds: new Set(["a1", "a2"]),
+    subagentBuffers: new Map([["a1", "  → [read] /foo.ts\n"], ["a2", ""]]),
+    subagentDescriptions: new Map([["a1", "Task 1"], ["a2", "Task 2"]]),
+    mainAgentOpen: false,
+    lastMainCtxTotal: 0,
+  };
+  const line = JSON.stringify({
+    type: "user",
+    message: {
+      content: [{ type: "tool_result", tool_use_id: "a1", content: [] }],
+    },
+  });
+  const { output, nextState } = processLine(line, state);
+  expect(output).toBe("▶ SUBAGENT: Task 1\n  → [read] /foo.ts\n◀ SUBAGENT\n");
+  expect(nextState.pendingSubagentIds.has("a1")).toBe(false);
+  expect(nextState.pendingSubagentIds.has("a2")).toBe(true);
+  expect(nextState.mainAgentOpen).toBe(false);
+});
+```
+
+- [x] **Step 3: Add test — MAIN AGENT opens lazily on next assistant event after all subagents close**
+
+```typescript
+it("MAIN AGENT opens lazily when main agent produces content after all subagents closed", () => {
+  // State after both subagents have closed
+  const state: FormatterState = {
+    pendingSubagentIds: new Set(),
+    subagentBuffers: new Map(),
+    subagentDescriptions: new Map(),
+    mainAgentOpen: false,
+    lastMainCtxTotal: 0,
+  };
+  const line = JSON.stringify({
+    type: "assistant",
+    message: {
+      content: [{ type: "text", text: "Done with subagents" }],
+      usage: { input_tokens: 500, output_tokens: 5 },
+    },
+  });
+  const { output, nextState } = processLine(line, state);
+  expect(output).toContain("▶▶▶ MAIN AGENT\n");
+  expect(output).toContain("Done with subagents\n");
+  expect(nextState.mainAgentOpen).toBe(true);
+});
+```
+
+- [x] **Step 4: Add end-to-end round-trip test for two parallel subagents**
+
+```typescript
+it("full round-trip: dispatch 2 parallel agents, both close, main agent continues", () => {
+  let state = initialState();
+
+  // Main agent text + dispatch two subagents
+  const dispatchLine = JSON.stringify({
+    type: "assistant",
+    message: {
+      content: [
+        { type: "text", text: "Running two tasks in parallel." },
+        { type: "tool_use", name: "Agent", id: "a1", input: { description: "Task Alpha" } },
+        { type: "tool_use", name: "Agent", id: "a2", input: { description: "Task Beta" } },
+      ],
+      usage: { input_tokens: 300, output_tokens: 5 },
+    },
+  });
+  const { output: o1, nextState: s1 } = processLine(dispatchLine, state);
+  state = s1;
+  // Main agent text shown, then closed with blank line; ctx suppressed (main agent closed before ctx gate)
+  expect(o1).toBe("▶▶▶ MAIN AGENT\nRunning two tasks in parallel.\n◀◀◀ MAIN AGENT\n\n");
+
+  // Subagent a1 tool call arrives
+  const subA1Line = JSON.stringify({
+    type: "assistant",
+    parent_tool_use_id: "a1",
+    message: {
+      content: [{ type: "tool_use", name: "Read", id: "t1", input: { file_path: "/alpha.ts" } }],
+      usage: { input_tokens: 100, output_tokens: 2 },
+    },
+  });
+  const { output: o2, nextState: s2 } = processLine(subA1Line, state);
+  state = s2;
+  expect(o2).toBe(""); // buffered
+
+  // Subagent a2 tool call arrives
+  const subA2Line = JSON.stringify({
+    type: "assistant",
+    parent_tool_use_id: "a2",
+    message: {
+      content: [{ type: "tool_use", name: "Read", id: "t2", input: { file_path: "/beta.ts" } }],
+      usage: { input_tokens: 100, output_tokens: 2 },
+    },
+  });
+  const { output: o3, nextState: s3 } = processLine(subA2Line, state);
+  state = s3;
+  expect(o3).toBe(""); // buffered
+
+  // a1 closes
+  const closeA1 = JSON.stringify({
+    type: "user",
+    message: { content: [{ type: "tool_result", tool_use_id: "a1", content: [] }] },
+  });
+  const { output: o4, nextState: s4 } = processLine(closeA1, state);
+  state = s4;
+  expect(o4).toBe("▶ SUBAGENT: Task Alpha\n  → [read] /alpha.ts\n◀ SUBAGENT\n");
+  expect(state.mainAgentOpen).toBe(false);
+
+  // a2 closes
+  const closeA2 = JSON.stringify({
+    type: "user",
+    message: { content: [{ type: "tool_result", tool_use_id: "a2", content: [] }] },
+  });
+  const { output: o5, nextState: s5 } = processLine(closeA2, state);
+  state = s5;
+  expect(o5).toBe("▶ SUBAGENT: Task Beta\n  → [read] /beta.ts\n◀ SUBAGENT\n");
+  expect(state.mainAgentOpen).toBe(false);
+  expect(state.pendingSubagentIds.size).toBe(0);
+
+  // Main agent resumes
+  const resumeLine = JSON.stringify({
+    type: "assistant",
+    message: {
+      content: [{ type: "text", text: "All done." }],
+      usage: { input_tokens: 600, output_tokens: 5 },
+    },
+  });
+  const { output: o6 } = processLine(resumeLine, state);
+  expect(o6).toContain("▶▶▶ MAIN AGENT\n");
+  expect(o6).toContain("All done.\n");
+});
+```
+
+- [x] **Step 5: Run tests to confirm all new tests also fail**
+
+```bash
+npm test -- --reporter=verbose 2>&1 | grep -E "(FAIL|PASS|✓|✗|×)" | head -60
+```
+
+Expected: all twelve affected tests fail; remainder pass.
+
+---
+
+### Task 3: Implement the stream-formatter fix
+
+**Files:**
+- Modify: `src/cli/lib/stream-formatter.ts`
+
+Four surgical changes. Do not touch anything else.
+
+- [x] **Step 1: Change MAIN AGENT open marker (line ~185-188)**
+
+Find the line `output += "▶ MAIN AGENT\n"` in the main agent assistant event handler and replace with the triple-arrow marker:
+
+```typescript
+output += "▶▶▶ MAIN AGENT\n";
+```
+
+- [x] **Step 2: Change MAIN AGENT close + remove `▶ SUBAGENT` output from Agent dispatch (lines ~197-210)**
+
+In the `for (const block of content)` loop, find the `if (name === "Agent")` branch. Replace it so it only closes the main agent block (with triple arrows + blank line) and registers the pending subagent — no `▶ SUBAGENT` header emitted here:
+
+```typescript
+if (name === "Agent") {
+  const desc = String(input.description ?? input.prompt ?? "");
+  if (nextMainAgentOpen) {
+    output += "◀◀◀ MAIN AGENT\n\n";
+    nextMainAgentOpen = false;
   }
+  // ▶ SUBAGENT header is deferred to close time
+  nextPending.add(String(b.id));
+  nextDescriptions.set(String(b.id), desc);
+  nextBuffers.set(String(b.id), "");
 }
+```
 
-export function listIlluminations(projectRoot: string): string {
-  const dir = join(projectRoot, "meditations", "illuminations");
-  try {
-    const files = readdirSync(dir)
-      .filter((f) => f.endsWith(".md"))
-      .sort();
-    if (files.length === 0) return NO_ILLUMINATIONS_MESSAGE;
-    return files
-      .map((f) => `${f} — ${parseIlluminationDescription(join(dir, f))}`)
-      .join("\n");
-  } catch {
-    return NO_ILLUMINATIONS_MESSAGE;
+- [x] **Step 3: Move `▶ SUBAGENT` header to close time in user event handler (lines ~86-96)**
+
+Find the `tool_result` handling block inside the `event.type === "user"` branch. Replace it so the header is printed before the buffer, and no `▶▶▶ MAIN AGENT` is opened here:
+
+```typescript
+if (nextPending.has(id)) {
+  const desc = nextDescriptions.get(id) ?? "";
+  const buf = nextBuffers.get(id) ?? "";
+  output += `▶ SUBAGENT: ${desc}\n${buf}◀ SUBAGENT\n`;
+  nextPending.delete(id);
+  nextBuffers.delete(id);
+  nextDescriptions.delete(id);
+}
+```
+
+Remove `nextMainAgentOpen = true;` that was on the line after the old output — MAIN AGENT now opens lazily via the assistant-event handler.
+
+- [x] **Step 4: Update flushState (lines ~45-55)**
+
+Replace the loop body and the main agent close to use triple arrows + blank line:
+
+```typescript
+export function flushState(state: FormatterState): string {
+  let output = "";
+  for (const id of state.pendingSubagentIds) {
+    const desc = state.subagentDescriptions.get(id) ?? "";
+    const buf = state.subagentBuffers.get(id) ?? "";
+    output += `▶ SUBAGENT: ${desc}\n${buf}◀ SUBAGENT\n`;
   }
+  if (state.mainAgentOpen) {
+    output += "◀◀◀ MAIN AGENT\n\n";
+  }
+  return output;
 }
 ```
 
-- [x] **Step 4: Run tests to verify they pass**
-
-```bash
-cd /Users/josu/Documents/projects/ralph-cli && npm test -- --reporter=verbose src/cli/tests/illumination-server.test.ts 2>&1 | grep -E "(FAIL|PASS|✓|×)" | head -30
-```
-
-Expected: all tests pass.
-
-- [x] **Step 5: Update MCP tool registrations in `src/cli/mcp/illumination-server.ts`**
-
-**Update `write_illumination` tool** — add `description` to schema and handler. Find the existing `write_illumination` tool block and replace it:
-
-```typescript
-server.tool(
-  "write_illumination",
-  "Write a meditation illumination file to meditations/illuminations/. " +
-    "Use filename format: YYYY-MM-DDTHHMM-kebab-slug.md (e.g. 2026-04-04T1430-my-insight.md). " +
-    "Provide a one-sentence description summarizing the core insight — this is required.",
-  {
-    filename: z.string(),
-    description: z.string(),
-    content: z.string(),
-  },
-  async ({ filename, description, content }: { filename: string; description: string; content: string }) => {
-    try {
-      const filePath = writeIllumination(projectRoot, filename, description, content);
-      return {
-        content: [{ type: "text" as const, text: `Written to ${filePath}` }],
-      };
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      return {
-        content: [{ type: "text" as const, text: `Error: ${msg}` }],
-      };
-    }
-  },
-);
-```
-
-**Add `list_illuminations` tool** — insert after the updated `write_illumination` block:
-
-```typescript
-server.tool(
-  "list_illuminations",
-  "List all illuminations written to this project, with descriptions. " +
-    "Call this at the start of a session to orient yourself before writing new insights.",
-  {},
-  async () => {
-    const result = listIlluminations(projectRoot);
-    return { content: [{ type: "text" as const, text: result }] };
-  },
-);
-```
-
-- [x] **Step 6: Build to verify no TypeScript errors**
-
-```bash
-cd /Users/josu/Documents/projects/ralph-cli && npm run build 2>&1 | tail -20
-```
-
-Expected: clean build with no errors.
-
-- [x] **Step 7: Run full test suite**
-
-```bash
-cd /Users/josu/Documents/projects/ralph-cli && npm test 2>&1 | tail -20
-```
-
-Expected: all tests pass.
-
-- [x] **Step 8: Commit**
-
-```bash
-cd /Users/josu/Documents/projects/ralph-cli && git add src/cli/mcp/illumination-server.ts src/cli/tests/illumination-server.test.ts && git commit -m "feat: add list_illuminations MCP tool with frontmatter parsing"
-```
-
 ---
 
-## Chunk 2: Prompt + Backfill + Docs
-
-### Task 3: Update `PROMPT_meditation.md`
+### Task 4: Verify and commit
 
 **Files:**
-- Modify: `src/cli/prompts/PROMPT_meditation.md`
+- No new files
 
-Two additions:
-1. Before step 1, add a step 0 to call `list_illuminations`
-2. Update the `write_illumination` instruction to require `description`
-
-- [x] **Step 1: Read the current prompt**
-
-Open `src/cli/prompts/PROMPT_meditation.md` and locate:
-- The numbered task list (steps 1–6)
-- The `write_illumination` instruction near step 6
-
-- [x] **Step 2: Add `list_illuminations` step at the start of the task list**
-
-Insert as the new step 1, shifting all existing steps up by one:
-
-```markdown
-1. Call `list_illuminations` with no arguments to see what has already been written. Review the
-   list before exploring — your illumination should build on, contradict, or deepen prior
-   observations rather than restate them.
-```
-
-So the task list becomes steps 1–7 (new `list_illuminations` → existing `project_tree` → existing
-`glob_files`/`read_file` → ... → `write_illumination`).
-
-- [x] **Step 3: Update the `write_illumination` instruction**
-
-Find the block describing how to call `write_illumination` (around step 6/7 after the shift). Update
-it to include `description`:
-
-```markdown
-- When you are ready to record the illumination, call `write_illumination` with:
-  - `filename`: use the format `YYYY-MM-DDTHHMM-kebab-slug.md` (example: `2026-04-04T1430-the-thing-i-noticed.md`). No colons in the filename.
-  - `description`: a single sentence summarizing the core insight. This will appear in `list_illuminations` for future sessions — write it as if orienting someone who will read only this line.
-  - `content`: the full markdown content of the illumination (body only — no frontmatter, that is added automatically).
-  Do not use the `Write` tool directly — it is not available in this session.
-```
-
-- [x] **Step 4: Commit**
+- [x] **Step 1: Run the full test suite**
 
 ```bash
-cd /Users/josu/Documents/projects/ralph-cli && git add src/cli/prompts/PROMPT_meditation.md && git commit -m "feat: add list_illuminations step and description requirement to PROMPT_meditation.md"
+npm test -- --reporter=verbose 2>&1 | tail -30
 ```
 
----
+Expected: all tests pass. If any fail, read the error, trace it back to the relevant change, and fix.
 
-### Task 4: Backfill existing illuminations with frontmatter
-
-**Files:**
-- Modify: `meditations/illuminations/*.md` (7 files)
-
-This task is done by a subagent. Launch it with the following instructions — do NOT edit these files manually.
-
-- [x] **Step 1: Dispatch subagent to backfill all 7 files**
-
-Dispatch a `general-purpose` agent with this prompt:
-
-```
-Add YAML frontmatter to 7 existing illumination files in
-/Users/josu/Documents/projects/ralph-cli/meditations/illuminations/.
-
-For each file:
-- Read the file
-- Extract a one-sentence description from the # Title line and opening of ## Core Idea
-  (capture the actual takeaway, not a restatement of the filename)
-- Prepend this frontmatter block (preserving the existing markdown body exactly):
-  ---
-  date: 2026-04-08
-  description: <extracted one-sentence description>
-  ---
-
-  (blank line before the first heading)
-
-Files to process:
-1. 2026-04-05T0900-meditation-agent-is-blind-to-its-own-outputs.md
-2. 2026-04-05T1045-basename-dirname-is-a-fragile-contract.md
-3. 2026-04-05T1200-phase-boundaries-must-be-explicit-in-prompts.md
-4. 2026-04-05T1400-private-env-detection-is-an-untested-assumption.md
-5. 2026-04-05T1530-two-phase-session-abstraction-threshold-reached.md
-6. 2026-04-08T0900-scenario-runs-are-stale-evidence.md
-7. 2026-04-08T1100-ctx-count-is-lost-on-mixed-content-agent-dispatch.md
-
-After editing all 7 files, commit with:
-git -C /Users/josu/Documents/projects/ralph-cli add meditations/illuminations/
-git -C /Users/josu/Documents/projects/ralph-cli commit -m "chore: backfill frontmatter on existing illuminations"
-```
-
-- [x] **Step 2: Verify backfill**
+- [x] **Step 2: Build to catch type errors**
 
 ```bash
-cd /Users/josu/Documents/projects/ralph-cli && for f in meditations/illuminations/*.md; do echo "=== $f ==="; head -4 "$f"; done
+npm run build 2>&1 | tail -20
 ```
 
-Expected: every file starts with `---`, followed by `date: 2026-04-08` and a `description:` line.
+Expected: `dist/` updated, no TypeScript errors.
 
----
-
-### Task 5: Update `specs/mcp-illumination.md`
-
-**Files:**
-- Modify: `specs/mcp-illumination.md`
-
-- [x] **Step 1: Read the current spec**
-
-Open `specs/mcp-illumination.md` and locate the MCP Tools table and the `write_illumination` section.
-
-- [x] **Step 2: Update the tools table**
-
-Add `list_illuminations` as a new row in the MCP Tools table:
-
-```markdown
-| `list_illuminations` | `<projectRoot>/meditations/illuminations/` (read-only) |
-```
-
-- [x] **Step 3: Update `write_illumination` section**
-
-Update the params description to include `description`:
-
-```markdown
-- **Params:** `{ filename: string, description: string, content: string }`
-- `description` is required — one sentence summarizing the core insight; auto-inserted into frontmatter
-- `date` is auto-generated server-side (`YYYY-MM-DD`); not a param
-- `content` is the markdown body only — frontmatter is prepended automatically
-```
-
-- [x] **Step 4: Add `list_illuminations` section**
-
-```markdown
-### `list_illuminations`
-
-Lists all illuminations written to this project, with descriptions.
-
-- **Params:** none
-- **Reads from** `<projectRoot>/meditations/illuminations/`
-- **Returns** one line per file: `<filename> — <description>` (sorted by filename)
-- Files without frontmatter show `(no description)`
-- Returns `"No illuminations found."` if directory is empty or missing
-```
-
-- [x] **Step 5: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
-cd /Users/josu/Documents/projects/ralph-cli && git add specs/mcp-illumination.md && git commit -m "docs: update mcp-illumination spec with list_illuminations and description param"
+git add src/cli/lib/stream-formatter.ts src/cli/tests/stream-formatter.test.ts
+git commit -m "fix: triple-arrow main agent markers, defer subagent header to close time, lazy MAIN AGENT open"
 ```
