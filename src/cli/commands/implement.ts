@@ -31,6 +31,20 @@ export async function implementCommand(
   }
 
   const promptFile = resolve(absPath, "PROMPT_build.md");
-  await runLoop({ promptFile, cwd: absPath, max: options.max });
+
+  const ac = new AbortController();
+  const onSignal = () => ac.abort();
+  process.on("SIGINT", onSignal);
+  process.on("SIGTERM", onSignal);
+
+  try {
+    await runLoop({ promptFile, cwd: absPath, max: options.max, signal: ac.signal });
+  } catch (err) {
+    console.error((err as Error).message);
+    process.exit(1);
+  } finally {
+    process.off("SIGINT", onSignal);
+    process.off("SIGTERM", onSignal);
+  }
   process.exit(0);
 }

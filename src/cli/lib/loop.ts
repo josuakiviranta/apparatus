@@ -8,22 +8,32 @@ export interface LoopOptions {
   cwd: string;        // project folder (claude cwd + git ops)
   max?: number;       // max iterations; undefined = unlimited
   model?: string;     // passed to --model flag; defaults to "opus"
+  signal?: AbortSignal;
+  onSessionId?: (id: string) => void;
 }
 
-export async function runLoop(options: LoopOptions): Promise<void> {
-  const { promptFile, cwd, max, model = "opus" } = options;
+export interface LoopResult {
+  success: boolean;
+  iterations: number;
+  sessionId?: string;
+  exitReason: "completed" | "maxReached" | "aborted" | "error";
+  errorMessage?: string;
+}
+
+export async function runLoop(options: LoopOptions): Promise<LoopResult> {
+  const { promptFile, cwd, max, model = "opus", signal, onSessionId } = options;
 
   // Pre-flight: prompt file
   if (!existsSync(promptFile)) {
     await output.error(`Prompt file not found: ${promptFile}`);
-    process.exit(1);
+    throw new Error(`Prompt file not found: ${promptFile}`);
   }
 
   // Pre-flight: claude CLI
   const which = spawnSync("which", ["claude"], { encoding: "utf8" });
   if (which.status !== 0) {
     await output.error("claude CLI not found. Install: npm install -g @anthropic-ai/claude-code");
-    process.exit(1);
+    throw new Error("claude CLI not found");
   }
 
   // Capture branch once before loop
@@ -37,6 +47,7 @@ export async function runLoop(options: LoopOptions): Promise<void> {
 
   let iteration = 0;
   let currentPid: number | undefined;
+  let capturedSessionId: string | undefined;
 
   const killCurrent = () => {
     if (currentPid !== undefined) {
@@ -46,18 +57,22 @@ export async function runLoop(options: LoopOptions): Promise<void> {
     }
   };
 
-  const onSignal = () => {
-    killCurrent();
-    process.exit(0);
-  };
-  process.on("SIGINT", onSignal);
-  process.on("SIGTERM", onSignal);
+  if (signal?.aborted) {
+    return { success: false, iterations: 0, exitReason: "aborted" };
+  }
+
+  const abortListener = () => { killCurrent(); };
+  signal?.addEventListener("abort", abortListener);
 
   try {
     while (true) {
+      if (signal?.aborted) {
+        return { success: false, iterations: iteration, sessionId: capturedSessionId, exitReason: "aborted" };
+      }
+
       if (max !== undefined && iteration >= max) {
         await output.info(`Reached max iterations: ${max}`);
-        break;
+        return { success: true, iterations: iteration, sessionId: capturedSessionId, exitReason: "maxReached" };
       }
 
       // Spawn claude
@@ -92,7 +107,12 @@ export async function runLoop(options: LoopOptions): Promise<void> {
       const readStream = createReadStream(promptFile);
       readStream.pipe(child.stdin as NodeJS.WritableStream);
 
-      await output.stream(streamEvents(child.stdout as NodeJS.ReadableStream));
+      await output.stream(streamEvents(child.stdout as NodeJS.ReadableStream, {
+        onSessionId: (id) => {
+          capturedSessionId = id;
+          onSessionId?.(id);
+        },
+      }));
       await exitPromise;
 
       currentPid = undefined;
@@ -120,7 +140,6 @@ export async function runLoop(options: LoopOptions): Promise<void> {
       await output.step(`LOOP ${iteration}`);
     }
   } finally {
-    process.off("SIGINT", onSignal);
-    process.off("SIGTERM", onSignal);
+    signal?.removeEventListener("abort", abortListener);
   }
 }

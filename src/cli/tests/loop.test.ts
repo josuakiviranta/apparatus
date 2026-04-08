@@ -104,30 +104,22 @@ describe("runLoop", () => {
     vi.mocked(cp.spawnSync).mockReturnValue({ stdout: "/usr/bin/claude\n", status: 0 } as any);
   });
 
-  it("calls error() and does not loop if promptFile does not exist", async () => {
+  it("throws if promptFile does not exist", async () => {
     vi.mocked(fs.existsSync).mockReturnValue(false);
-    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => {
-      throw new Error("process.exit");
-    });
     await expect(
       runLoop({ promptFile: "/no/such/file.md", cwd: "/proj" })
-    ).rejects.toThrow("process.exit");
+    ).rejects.toThrow("Prompt file not found");
     expect(out.error).toHaveBeenCalled();
     expect(cp.spawn).not.toHaveBeenCalled();
-    exitSpy.mockRestore();
   });
 
-  it("calls error() and does not loop if claude is not in PATH", async () => {
+  it("throws if claude is not in PATH", async () => {
     vi.mocked(cp.spawnSync).mockReturnValue({ stdout: "", status: 1 } as any);
-    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => {
-      throw new Error("process.exit");
-    });
     await expect(
       runLoop({ promptFile: "/proj/PROMPT_build.md", cwd: "/proj" })
-    ).rejects.toThrow("process.exit");
+    ).rejects.toThrow("claude CLI not found");
     expect(out.error).toHaveBeenCalled();
     expect(cp.spawn).not.toHaveBeenCalled();
-    exitSpy.mockRestore();
   });
 
   it("runs exactly max iterations then calls info()", async () => {
@@ -144,7 +136,7 @@ describe("runLoop", () => {
 
     await runLoop({ promptFile: "/proj/PROMPT_build.md", cwd: "/proj", max: 1 });
 
-    expect(formatter.streamEvents).toHaveBeenCalledWith(expect.any(Object));
+    expect(formatter.streamEvents).toHaveBeenCalledWith(expect.any(Object), expect.objectContaining({ onSessionId: expect.any(Function) }));
     expect(out.stream).toHaveBeenCalledTimes(1);
   });
 
@@ -221,5 +213,21 @@ describe("runLoop", () => {
     mockGitBranch("main");
     await runLoop({ promptFile: "/proj/PROMPT_build.md", cwd: "/proj", max: 3 });
     expect(out.stream).toHaveBeenCalledTimes(3);
+  });
+
+  it("returns exitReason=maxReached when max iterations hit", async () => {
+    makeMockChild(0);
+    mockGitBranch("main");
+    const result = await runLoop({ promptFile: "/proj/PROMPT_build.md", cwd: "/proj", max: 1 });
+    expect(result.exitReason).toBe("maxReached");
+    expect(result.iterations).toBe(1);
+  });
+
+  it("returns exitReason=aborted when signal is pre-aborted", async () => {
+    const ac = new AbortController();
+    ac.abort();
+    const result = await runLoop({ promptFile: "/proj/PROMPT_build.md", cwd: "/proj", signal: ac.signal });
+    expect(result.exitReason).toBe("aborted");
+    expect(cp.spawn).not.toHaveBeenCalled();
   });
 });
