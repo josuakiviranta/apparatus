@@ -62,6 +62,36 @@ describe("runTask", () => {
   });
 });
 
+describe("env var stripping", () => {
+  it("does not pass CLAUDECODE to spawned process", async () => {
+    const task = makeTask();
+    // Simulate being inside a Claude Code session
+    process.env.CLAUDECODE = "1";
+    // Spawned command exits 1 if CLAUDECODE is present, 0 if stripped
+    vi.stubEnv(
+      "RALPH_TEST_CMD",
+      `${process.execPath} -e "process.exit(process.env.CLAUDECODE ? 1 : 0)"`,
+    );
+    const result = await runTask(task);
+    expect(result.exitCode).toBe(0);
+    vi.unstubAllEnvs();
+    delete process.env.CLAUDECODE;
+  });
+
+  it("does not pass CLAUDE_CODE_ENTRYPOINT to spawned process", async () => {
+    const task = makeTask();
+    process.env.CLAUDE_CODE_ENTRYPOINT = "cli";
+    vi.stubEnv(
+      "RALPH_TEST_CMD",
+      `${process.execPath} -e "process.exit(process.env.CLAUDE_CODE_ENTRYPOINT ? 1 : 0)"`,
+    );
+    const result = await runTask(task);
+    expect(result.exitCode).toBe(0);
+    vi.unstubAllEnvs();
+    delete process.env.CLAUDE_CODE_ENTRYPOINT;
+  });
+});
+
 describe("isSessionRunning / killSession", () => {
   it("returns false when no pid file", () => {
     expect(isSessionRunning(makeTask())).toBe(false);

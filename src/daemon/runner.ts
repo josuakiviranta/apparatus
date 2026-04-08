@@ -65,10 +65,16 @@ export async function runTask(task: Task): Promise<{ runId: string; exitCode: nu
   // In test mode, the test command replaces the entire invocation (no task args appended).
   const fullArgs = cliPath.shell ? [] : [...cliPath.args, task.command, ...task.args];
 
+  // Strip Claude Code session markers so spawned `claude` processes aren't
+  // blocked by the "nested session" guard.
+  const env = { ...process.env };
+  delete env.CLAUDECODE;
+  delete env.CLAUDE_CODE_ENTRYPOINT;
+
   return new Promise((resolve) => {
     const child = spawn(cliPath.command, fullArgs, {
       stdio: ["ignore", "pipe", "pipe"],
-      env: process.env,
+      env,
       shell: cliPath.shell,
     });
 
