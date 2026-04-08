@@ -6,7 +6,7 @@ import { meditateCommand } from "./commands/meditate";
 import { registerHeartbeatCommand } from "./commands/heartbeat";
 import { meditateCreateCommand } from "./commands/meditate-create";
 import { runScenariosCommand } from "./commands/run-scenarios";
-import { pipelineRunCommand, pipelineValidateCommand } from "./commands/pipeline";
+import { pipelineRunCommand, pipelineValidateCommand, pipelineCreateCommand, pipelineListCommand } from "./commands/pipeline";
 
 export function createProgram(): Command {
   const program = new Command();
@@ -39,10 +39,13 @@ Background scheduling (heartbeat):
   ralph heartbeat stop meditate:my-app                  Remove task and kill any running session
 
 Pipeline engine (DOT-graph workflows):
+  ralph pipeline create review --project my-app    Create a new workflow with Claude
+  ralph pipeline list --project my-app             List workflows in a project
   ralph pipeline validate workflow.dot             Check a pipeline file for errors
-  ralph pipeline run workflow.dot                  Execute a pipeline (start → done, no work nodes)
-  ralph pipeline run workflow.dot --project ./app  Execute with a project folder (required for work nodes)
-  ralph pipeline run workflow.dot --resume         Resume from last checkpoint after interruption
+  ralph pipeline validate review --project my-app  Validate by workflow name
+  ralph pipeline run workflow.dot                  Execute a pipeline
+  ralph pipeline run review --project my-app       Run by workflow name
+  ralph pipeline run workflow.dot --resume         Resume from last checkpoint
 
   DOT file anatomy:
     digraph my_pipeline {
@@ -150,17 +153,52 @@ Add max_iterations=N to cap how many agentic loop iterations a node can run.
 
   pipeline
     .command("validate <dotfile>")
-    .description("Validate a .dot pipeline file")
+    .description("Validate a .dot pipeline file (accepts name shorthand or path)")
     .addHelpText("after", `
 Examples:
   ralph pipeline validate workflow.dot
+  ralph pipeline validate review --project my-app
 
 Checks for: missing start/exit nodes, unknown node shapes, edges referencing
 undeclared nodes, and other structural errors. Exits 0 on success, 1 on errors.
+When a plain name is given (no path separators or .dot extension), resolves to
+<project>/pipelines/<name>.dot.
 `)
-    .action(async (dotFile: string) => {
-      const code = await pipelineValidateCommand(dotFile);
+    .option("--project <folder>", "Project folder (for name shorthand resolution, defaults to cwd)")
+    .action(async (dotFile: string, opts: { project?: string }) => {
+      const code = await pipelineValidateCommand(dotFile, opts);
       process.exit(code);
+    });
+
+  pipeline
+    .command("create <name>")
+    .description("Create a new pipeline workflow with an interactive Claude session")
+    .addHelpText("after", `
+Examples:
+  ralph pipeline create review --project my-app
+  ralph pipeline create deploy
+
+Creates <project>/pipelines/<name>.dot via an interactive Claude session.
+The attractor scheme is injected automatically. Validates the file on exit.
+`)
+    .option("--project <folder>", "Project folder (pipelines/ lives here, defaults to cwd)")
+    .action(async (name: string, opts: { project?: string }) => {
+      await pipelineCreateCommand(name, opts);
+    });
+
+  pipeline
+    .command("list")
+    .description("List pipeline workflows in a project")
+    .addHelpText("after", `
+Examples:
+  ralph pipeline list --project my-app
+  ralph pipeline list
+
+Scans <project>/pipelines/*.dot and prints each workflow's name and goal.
+`)
+    .option("--project <folder>", "Project folder (defaults to cwd)")
+    .action(async (opts: { project?: string }) => {
+      await pipelineListCommand(opts);
     });
 
   registerHeartbeatCommand(program);
