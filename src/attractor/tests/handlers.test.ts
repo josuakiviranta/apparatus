@@ -127,7 +127,7 @@ describe("CodergenHandler", () => {
     );
   });
 
-  it("defaults model to opus when llmModel is not set", async () => {
+  it("defaults model to sonnet when llmModel is not set", async () => {
     const fakeRunLoop = vi.fn().mockResolvedValue({
       success: true, iterations: 1, exitReason: "completed"
     });
@@ -135,7 +135,19 @@ describe("CodergenHandler", () => {
     const node = { id: "work", shape: "box", prompt: "Do work" };
     await h.execute(node, baseCtx(), { logsRoot: "/tmp", cwd: "/proj" });
     expect(fakeRunLoop).toHaveBeenCalledWith(
-      expect.objectContaining({ model: "opus" })
+      expect.objectContaining({ model: "sonnet" })
+    );
+  });
+
+  it("passes maxIterations from node to runLoop as max", async () => {
+    const fakeRunLoop = vi.fn().mockResolvedValue({
+      success: true, iterations: 2, exitReason: "completed"
+    });
+    const h = new CodergenHandler(fakeRunLoop);
+    const node = { id: "work", shape: "box", prompt: "Do work", maxIterations: 2 };
+    await h.execute(node, baseCtx(), { logsRoot: "/tmp", cwd: "/proj" });
+    expect(fakeRunLoop).toHaveBeenCalledWith(
+      expect.objectContaining({ max: 2 })
     );
   });
 });

@@ -26,7 +26,8 @@ export class CodergenHandler implements NodeHandler {
       result = await this.runLoop({
         promptFile,
         cwd,
-        model: (node.llmModel as string | undefined) ?? "opus",
+        model: (node.llmModel as string | undefined) ?? "sonnet",
+        max: (node.maxIterations as number | undefined),
         signal,
       });
     } catch (err) {
