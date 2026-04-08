@@ -6,6 +6,7 @@ import { meditateCommand } from "./commands/meditate";
 import { registerHeartbeatCommand } from "./commands/heartbeat";
 import { meditateCreateCommand } from "./commands/meditate-create";
 import { runScenariosCommand } from "./commands/run-scenarios";
+import { pipelineRunCommand, pipelineValidateCommand } from "./commands/pipeline";
 
 export function createProgram(): Command {
   const program = new Command();
@@ -33,6 +34,10 @@ Background scheduling (heartbeat):
   ralph heartbeat pause meditate:my-app             Suspend scheduling without removing
   ralph heartbeat resume meditate:my-app            Re-enable a paused task
   ralph heartbeat stop meditate:my-app              Remove task and kill any running session
+
+Pipeline engine:
+  ralph pipeline run workflow.dot         Execute a DOT pipeline
+  ralph pipeline validate workflow.dot    Validate a DOT pipeline file
 
 Meditation (restricted insight sessions):
   ralph meditate my-app                   Run a one-shot meditation session
@@ -90,6 +95,25 @@ Meditation (restricted insight sessions):
     .option("--all", "Run all scenarios without interactive selection")
     .action(async (projectFolder: string, options: { all?: boolean }) => {
       await runScenariosCommand(projectFolder, options);
+    });
+
+  const pipeline = program.command("pipeline").description("Pipeline engine commands");
+
+  pipeline
+    .command("run <dotfile>")
+    .description("Run a .dot pipeline file")
+    .option("--project <folder>", "Project folder ($project variable and cwd)")
+    .option("--resume", "Resume from last checkpoint")
+    .action(async (dotFile: string, opts: { project?: string; resume?: boolean }) => {
+      await pipelineRunCommand(dotFile, opts);
+    });
+
+  pipeline
+    .command("validate <dotfile>")
+    .description("Validate a .dot pipeline file")
+    .action(async (dotFile: string) => {
+      const code = await pipelineValidateCommand(dotFile);
+      process.exit(code);
     });
 
   registerHeartbeatCommand(program);
