@@ -93,7 +93,7 @@ Declared inside the `digraph` block, before any node or edge declarations:
 | `fidelity` | string | codergen | Fidelity level for context carryover (see Section 2.6); `full` not supported in v1 |
 | `class` | string | stylesheet | CSS-like class name; merges in model_stylesheet properties |
 | `auto_status` | bool | engine | If true, engine auto-generates `success` outcome when handler writes no status — **recognized but no-op in v1**; ralph handlers always return explicit outcomes |
-| `allow_partial` | bool | all | When true, `RETRY` outcome on exhaustion becomes `partial_success` instead of `fail` |
+| `allow_partial` | bool | all | When true, `RETRY` outcome on exhaustion becomes `partial_success` instead of `fail` — **recognized but no-op in v1** (see Section 4.4); deferred to v2 |
 
 ### 2.3 Edge Attributes
 
@@ -101,7 +101,7 @@ Declared inside the `digraph` block, before any node or edge declarations:
 |---|---|---|
 | `label` | string | Human-readable edge label; also used for preferred_label matching |
 | `condition` | string | Boolean expression gating edge eligibility (see Section 11) |
-| `weight` | int | Priority among unconditional edges; lower value wins (omitted = lowest priority) |
+| `weight` | number | Priority among unconditional edges; lower value wins (omitted = lowest priority) |
 | `loop_restart` | bool | When true, fully restarts the pipeline from the start node: clears context, retry counters, and creates a fresh run directory |
 | `fidelity` | string | Fidelity level override for the target node when this edge is traversed; takes highest precedence over node-level and graph-level fidelity settings (see Section 2.6). Valid values: `truncate`, `compact`, `summary:low`, `summary:medium`, `summary:high` |
 | `thread_id` | string | Assigns edge target to a named execution thread for `full` fidelity session reuse — **v1 not supported** (`full` fidelity is a non-goal; see Section 1.4); parser recognizes but ignores |
@@ -307,7 +307,7 @@ When a node completes, the engine selects the next edge in this priority order:
 1. Edges whose `condition` expression evaluates to true against the current outcome and context
 2. Edge whose `label` matches `outcome.preferredLabel` (see label normalization below)
 3. Edge whose `to` is in `outcome.suggestedNextIds`
-4. Highest `weight` among unconditional edges
+4. Lowest `weight` among unconditional edges (lower value = higher priority; edges with no `weight` set are lowest priority)
 5. Lexical tiebreak on target node ID
 
 **Label normalization for `preferred_label` matching:** Before comparing `outcome.preferredLabel` against edge labels, both sides are normalized by:
@@ -605,7 +605,7 @@ human_gate -> meditate  [label="Redo"]
 4. Handler returns `Outcome { status: "success", preferredLabel: answer.value }`
 5. Engine uses `preferredLabel` to select the matching outgoing edge
 
-Edge `label` values are normalized for matching: lowercase, spaces → underscores.
+Edge `label` values are normalized for `preferredLabel` matching using the same rule as Section 4.3: leading accelerator prefixes (`[X] `, `X) `, `X - `) are stripped, then comparison is case-insensitive. The handler returns the bare answer value (e.g. `"Yes"`); the engine strips any accelerator from the edge label (e.g. `"[Y] Yes"` → `"Yes"`) before comparing.
 
 ### 7.4 CLI Resume Pattern
 
@@ -674,7 +674,7 @@ The grammar is exhaustive — only these three properties are recognized:
 |---|---|---|
 | `llm_model` | model identifier string | Passed as `--model <value>` to Claude Code |
 | `llm_provider` | provider key (`anthropic`, `openai`, etc.) | **No-op in v1** — ralph-cli uses Claude exclusively; recognized for schema compatibility |
-| `reasoning_effort` | `low` \| `medium` \| `high` | Maps to Claude Code extended thinking settings (v1 behavior TBD at implementation time) |
+| `reasoning_effort` | `low` \| `medium` \| `high` | **No-op in v1** — recognized and parsed but not passed to Claude Code; mapping to extended thinking flags is deferred to v2 |
 
 ### 9.4 Selectors and Specificity
 
@@ -1133,7 +1133,7 @@ This section defines how to validate that this implementation is complete and co
 - [ ] Stylesheet properties are overridden by explicit node attributes
 - [ ] `llm_model` resolves to `--model` flag passed to Claude Code via `runLoop()`
 - [ ] `llm_provider` is recognized and parsed but is a no-op in v1 (ralph-cli uses Claude exclusively)
-- [ ] `reasoning_effort` is recognized and parsed; v1 mapping to Claude Code flags determined at implementation time
+- [ ] `reasoning_effort` is recognized and parsed but is a no-op in v1 (mapping to extended thinking flags is deferred to v2)
 
 ### 17.11 Transforms and Extensibility
 
