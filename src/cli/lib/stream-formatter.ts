@@ -66,6 +66,32 @@ export function flushState(state: FormatterState): StreamEvent[] {
   return events;
 }
 
+export async function* streamEvents(
+  readable: NodeJS.ReadableStream,
+  opts?: { onSessionId?: (id: string) => void }
+): AsyncGenerator<StreamEvent> {
+  const rl = readline.createInterface({ input: readable, crlfDelay: Infinity });
+  let state = initialState();
+  let sessionIdEmitted = false;
+
+  for await (const line of rl) {
+    if (!sessionIdEmitted && opts?.onSessionId) {
+      try {
+        const parsed = JSON.parse(line) as Record<string, unknown>;
+        if (typeof parsed.session_id === "string") {
+          opts.onSessionId(parsed.session_id);
+          sessionIdEmitted = true;
+        }
+      } catch {}
+    }
+    const { events, nextState } = processLine(line, state);
+    state = nextState;
+    for (const e of events) yield e;
+  }
+
+  for (const e of flushState(state)) yield e;
+}
+
 type Usage = {
   input_tokens?: number;
   cache_read_input_tokens?: number;

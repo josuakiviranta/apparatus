@@ -3,6 +3,12 @@ import { existsSync, readFileSync } from "fs";
 import { resolve } from "path";
 import { getMeditateCreatePromptPath } from "../lib/assets";
 import * as output from "../lib/output.js";
+import { streamEvents } from "../lib/stream-formatter.js";
+
+function buildTracePath(projectPath: string, sessionId: string): string {
+  const encoded = projectPath.replace(/\//g, "-");
+  return `${process.env.HOME ?? "~"}/.claude/projects/${encoded}/${sessionId}.jsonl`;
+}
 
 export function buildMeditateCreateKickoffArgs(promptText: string): string[] {
   return ["-p", promptText, "--output-format", "stream-json", "--dangerously-skip-permissions"];
@@ -21,43 +27,39 @@ export async function meditateCreateCommand(projectFolder: string): Promise<void
     process.exit(1);
     return;
   }
+
+  const branchResult = spawnSync("git", ["branch", "--show-current"], { cwd: absPath, encoding: "utf8" });
+  const branch = branchResult.stdout.trim() || "main";
+
+  await output.header({ mode: "meditate", project: absPath, branch, pid: process.pid });
+
   const promptPath = getMeditateCreatePromptPath();
   const promptText = readFileSync(promptPath, "utf8");
+  const args = buildMeditateCreateKickoffArgs(promptText);
 
-  await output.step(`Starting meditation session in ${absPath}...`);
-  await output.step("Reading your meditations — this may take a moment...");
-  const sessionId = await runMeditateCreateKickoff(absPath, promptText);
-  await output.step("Ready. Opening interactive session...");
+  let sessionId: string | null = null;
+
+  const child = spawn("claude", args, {
+    cwd: absPath,
+    env: process.env,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+
+  const exitPromise = new Promise<void>(res => child.on("close", () => res()));
+
+  await output.stream(
+    streamEvents(child.stdout as NodeJS.ReadableStream, {
+      onSessionId: id => { sessionId = id; },
+    })
+  );
+  await exitPromise;
+
+  if (sessionId) {
+    await output.info(`trace: ${buildTracePath(absPath, sessionId)}`);
+  }
+  await output.step("━━━ Launching interactive session ━━━");
+
   const resumeArgs = ["--dangerously-skip-permissions", ...(sessionId ? ["--resume", sessionId] : [])];
   const result = spawnSync("claude", resumeArgs, { cwd: absPath, stdio: "inherit", env: process.env });
   process.exit(result.status ?? 0);
-}
-
-async function runMeditateCreateKickoff(cwd: string, promptText: string): Promise<string | null> {
-  return new Promise((resolve) => {
-    let sessionId: string | null = null;
-    let buffer = "";
-    const args = buildMeditateCreateKickoffArgs(promptText);
-    const child = spawn("claude", args, { cwd, env: process.env, stdio: ["ignore", "pipe", "pipe"] });
-    child.stdout.on("data", (chunk: Buffer) => {
-      buffer += chunk.toString();
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-      for (const line of lines) {
-        if (!line.trim()) continue;
-        try {
-          const msg = JSON.parse(line);
-          if (msg.session_id && !sessionId) sessionId = msg.session_id;
-          if (msg.type === "assistant") {
-            for (const block of msg.message?.content ?? []) {
-              if (block.type === "text") process.stdout.write(block.text);
-              else if (block.type === "tool_use") process.stdout.write(`\n→ [tool] ${block.name}\n`);
-            }
-          }
-        } catch {}
-      }
-    });
-    child.stderr.on("data", (chunk: Buffer) => process.stderr.write(chunk));
-    child.on("close", () => resolve(sessionId));
-  });
 }

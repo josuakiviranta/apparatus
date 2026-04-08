@@ -3,10 +3,16 @@ import { join, resolve } from "path";
 import { spawnSync, spawn } from "child_process";
 import { getKickoffPromptPath, getPromptPath } from "../lib/assets";
 import * as output from "../lib/output.js";
+import { streamEvents } from "../lib/stream-formatter.js";
 
 const BRAINSTORM_TRIGGER = `\
 Study specs/*.md and src/* in parallel using subagents to understand the project. \
 Then invoke the Skill tool with skill name "superpowers:brainstorming".`;
+
+function buildTracePath(projectPath: string, sessionId: string): string {
+  const encoded = projectPath.replace(/\//g, "-");
+  return `${process.env.HOME ?? "~"}/.claude/projects/${encoded}/${sessionId}.jsonl`;
+}
 
 export async function newCommand(projectName: string): Promise<void> {
   const targetPath = resolve(process.cwd(), projectName);
@@ -38,10 +44,36 @@ export async function newCommand(projectName: string): Promise<void> {
     process.exit(1);
   }
 
-  await output.step("Starting project kickoff session...");
-  const sessionId = await runKickoffSession(targetPath, projectName);
+  const branchResult = spawnSync("git", ["branch", "--show-current"], { cwd: targetPath, encoding: "utf8" });
+  const branch = branchResult.stdout.trim() || "main";
 
-  await output.step("Kickoff complete. Opening interactive session...");
+  await output.header({ mode: "new", project: targetPath, branch, pid: process.pid });
+
+  const promptTemplate = readFileSync(getKickoffPromptPath(), "utf8");
+  const prompt = buildKickoffPrompt(promptTemplate, projectName);
+
+  let sessionId: string | null = null;
+
+  const child = spawn(
+    "claude",
+    ["-p", prompt, "--output-format", "stream-json", "--dangerously-skip-permissions"],
+    { cwd: targetPath, env: process.env, stdio: ["ignore", "pipe", "pipe"] }
+  );
+
+  const exitPromise = new Promise<void>(res => child.on("close", () => res()));
+
+  await output.stream(
+    streamEvents(child.stdout as NodeJS.ReadableStream, {
+      onSessionId: id => { sessionId = id; },
+    })
+  );
+  await exitPromise;
+
+  if (sessionId) {
+    await output.info(`trace: ${buildTracePath(targetPath, sessionId)}`);
+  }
+  await output.step("━━━ Launching interactive session ━━━");
+
   const resumeArgs = [
     "--dangerously-skip-permissions",
     ...(sessionId ? ["--resume", sessionId] : []),
@@ -84,44 +116,4 @@ export function scaffoldProject(targetPath: string, _projectName: string): void 
 export function buildKickoffPrompt(template: string, projectName: string): string {
   const substituted = template.replace(/\{\{PROJECT_NAME\}\}/g, projectName);
   return `${substituted}\n\n${BRAINSTORM_TRIGGER}`;
-}
-
-async function runKickoffSession(cwd: string, projectName: string): Promise<string | null> {
-  const promptTemplate = readFileSync(getKickoffPromptPath(), "utf8");
-  const prompt = buildKickoffPrompt(promptTemplate, projectName);
-
-  return new Promise((resolve) => {
-    let sessionId: string | null = null;
-    let buffer = "";
-
-    const child = spawn(
-      "claude",
-      ["-p", prompt, "--output-format", "stream-json", "--dangerously-skip-permissions"],
-      { cwd, env: process.env, stdio: ["ignore", "pipe", "pipe"] }
-    );
-
-    child.stdout.on("data", (chunk: Buffer) => {
-      buffer += chunk.toString();
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-
-      for (const line of lines) {
-        if (!line.trim()) continue;
-        try {
-          const msg = JSON.parse(line);
-          if (msg.session_id && !sessionId) sessionId = msg.session_id;
-          if (msg.type === "assistant") {
-            for (const block of msg.message?.content ?? []) {
-              if (block.type === "text") process.stdout.write(block.text);
-              else if (block.type === "tool_use")
-                process.stdout.write(`\n→ [tool] ${block.name}\n`);
-            }
-          }
-        } catch {}
-      }
-    });
-
-    child.stderr.on("data", (chunk: Buffer) => process.stderr.write(chunk));
-    child.on("close", () => resolve(sessionId));
-  });
 }

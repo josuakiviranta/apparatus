@@ -1,5 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { processLine, initialState, flushState, type FormatterState, type StreamEvent } from "../lib/stream-formatter";
+import { Readable } from "stream";
+import { processLine, initialState, flushState, streamEvents, type FormatterState, type StreamEvent } from "../lib/stream-formatter";
+
+function makeReadable(lines: string[]): NodeJS.ReadableStream {
+  const r = new Readable({ read() {} });
+  for (const line of lines) r.push(line + "\n");
+  r.push(null);
+  return r;
+}
 
 /** Serialize StreamEvent[] back to the old string format for compact assertions. */
 function eventsToText(events: StreamEvent[]): string {
@@ -640,5 +648,60 @@ describe("flushState", () => {
 
   it("returns empty array when nothing is open", () => {
     expect(flushState(initialState())).toEqual([]);
+  });
+});
+
+describe("streamEvents", () => {
+  it("yields StreamEvents produced by processLine for each line", async () => {
+    const line = JSON.stringify({
+      type: "assistant",
+      message: {
+        content: [{ type: "text", text: "Hello" }],
+        usage: { input_tokens: 100, output_tokens: 5 },
+      },
+    });
+    const events: StreamEvent[] = [];
+    for await (const e of streamEvents(makeReadable([line]))) {
+      events.push(e);
+    }
+    expect(events.some(e => e.type === "main_agent_open")).toBe(true);
+    expect(events.some(e => e.type === "text" && (e as any).content === "Hello")).toBe(true);
+  });
+
+  it("flushes remaining state at end of stream (emits main_agent_close)", async () => {
+    const line = JSON.stringify({
+      type: "assistant",
+      message: {
+        content: [{ type: "text", text: "Hi" }],
+        usage: { input_tokens: 100, output_tokens: 5 },
+      },
+    });
+    const events: StreamEvent[] = [];
+    for await (const e of streamEvents(makeReadable([line]))) {
+      events.push(e);
+    }
+    expect(events.some(e => e.type === "main_agent_close")).toBe(true);
+  });
+
+  it("calls onSessionId with session_id from first matching event", async () => {
+    const lines = [
+      JSON.stringify({ type: "system", session_id: "abc-123" }),
+      JSON.stringify({ type: "system", session_id: "should-not-appear" }),
+    ];
+    const captured: string[] = [];
+    for await (const _ of streamEvents(makeReadable(lines), { onSessionId: id => captured.push(id) })) {
+      // consume
+    }
+    expect(captured).toEqual(["abc-123"]);
+  });
+
+  it("works without opts (no onSessionId)", async () => {
+    const line = JSON.stringify({ type: "system", session_id: "xyz" });
+    const events: StreamEvent[] = [];
+    for await (const e of streamEvents(makeReadable([line]))) {
+      events.push(e);
+    }
+    // system events produce no StreamEvents — just verifying no crash
+    expect(events).toEqual([]);
   });
 });

@@ -44,6 +44,7 @@ vi.mock("../lib/stream-formatter.js", () => ({
     lastMainCtxTotal: 0,
   })),
   flushState: vi.fn(() => []),
+  streamEvents: vi.fn(async function* () { /* yields nothing */ }),
 }));
 
 // --- Imports after mocks ---
@@ -137,19 +138,13 @@ describe("runLoop", () => {
     expect(out.info).toHaveBeenCalled();
   });
 
-  it("calls processLine for each line and passes generator to output.stream()", async () => {
-    const testLine = '{"type":"assistant","message":{"content":[]}}';
-    vi.mocked(formatter.processLine).mockReturnValue({
-      events: [{ type: "tool", name: "read", label: "file.ts" }],
-      nextState: { pendingSubagentIds: new Set(), subagentBuffers: new Map(), subagentDescriptions: new Map(), mainAgentOpen: false, lastMainCtxTotal: 0 },
-    } as any);
-
-    makeMockChild(0, [testLine]);
+  it("calls streamEvents with child.stdout and passes result to output.stream()", async () => {
+    makeMockChild(0);
     mockGitBranch("main");
 
     await runLoop({ promptFile: "/proj/PROMPT_build.md", cwd: "/proj", max: 1 });
 
-    expect(formatter.processLine).toHaveBeenCalledWith(testLine, expect.any(Object));
+    expect(formatter.streamEvents).toHaveBeenCalledWith(expect.any(Object));
     expect(out.stream).toHaveBeenCalledTimes(1);
   });
 

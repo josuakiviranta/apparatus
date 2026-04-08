@@ -1,9 +1,7 @@
 import { spawnSync, spawn } from "child_process";
 import { existsSync, createReadStream } from "fs";
-import readline from "readline";
 import * as output from "./output.js";
-import { processLine, initialState, flushState } from "./stream-formatter.js";
-import type { StreamEvent } from "./stream-formatter.js";
+import { streamEvents } from "./stream-formatter.js";
 
 export interface LoopOptions {
   promptFile: string; // absolute path to PROMPT_build.md
@@ -90,27 +88,11 @@ export async function runLoop(options: LoopOptions): Promise<void> {
         });
       });
 
-      // Stream session output through output.stream (Ink-based)
-      async function* sessionStream(): AsyncGenerator<StreamEvent> {
-        const readStream = createReadStream(promptFile);
-        readStream.pipe(child.stdin as NodeJS.WritableStream);
+      // Pipe prompt into claude stdin, stream output through formatter
+      const readStream = createReadStream(promptFile);
+      readStream.pipe(child.stdin as NodeJS.WritableStream);
 
-        const rl = readline.createInterface({
-          input: child.stdout as NodeJS.ReadableStream,
-          crlfDelay: Infinity,
-        });
-
-        let state = initialState();
-        for await (const line of rl) {
-          const { events, nextState } = processLine(line, state);
-          state = nextState;
-          for (const e of events) yield e;
-        }
-
-        for (const e of flushState(state)) yield e;
-      }
-
-      await output.stream(sessionStream());
+      await output.stream(streamEvents(child.stdout as NodeJS.ReadableStream));
       await exitPromise;
 
       currentPid = undefined;
