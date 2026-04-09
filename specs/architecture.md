@@ -26,14 +26,25 @@ ralph-cli/
 │   │   │   ├── meditate.ts             # ralph meditate
 │   │   │   ├── meditate-create.ts      # ralph meditate create
 │   │   │   ├── run-scenarios.ts        # ralph run-scenarios
+│   │   │   ├── agent.ts                # ralph agent (list, show, create)
+│   │   │   ├── pipeline.ts             # ralph pipeline (run, list, create)
 │   │   │   └── heartbeat.ts            # ralph heartbeat (subcommands)
 │   │   ├── lib/
+│   │   │   ├── agent.ts                # Agent class — config to claude spawn, stream, result
+│   │   │   ├── agent-registry.ts       # Resolves agent names to AgentConfig from ~/.ralph/agents/
+│   │   │   ├── frontmatter.ts          # Parses markdown frontmatter (YAML header + body)
 │   │   │   ├── prompts.ts              # bootstrap logic
 │   │   │   ├── assets.ts               # asset path resolution (dev vs prod)
-│   │   │   ├── loop.ts                 # agentic loop engine
+│   │   │   ├── output.ts               # unified Ink output API
 │   │   │   └── stream-formatter.ts     # stream-json → human-readable output
 │   │   ├── mcp/
 │   │   │   └── illumination-server.ts  # MCP server for meditate write access
+│   │   ├── agents/                     # bundled agent definition files
+│   │   │   ├── implement.md
+│   │   │   ├── plan.md
+│   │   │   ├── meditate.md
+│   │   │   ├── meditate-create.md
+│   │   │   └── agent-creator.md
 │   │   └── prompts/
 │   │       ├── PROMPT_plan.md          # bundled default
 │   │       └── PROMPT_build.md         # bundled default
@@ -62,4 +73,4 @@ tsup compiles 4 entries:
 
 ## Asset Bundling
 
-`tsup.config.ts` copies bundled prompt files from `src/cli/prompts/` into `dist/prompts/` via an `onSuccess` hook. At runtime, `assets.ts` resolves paths relative to the compiled entry point using a prod/dev detection constant (`__RALPH_PROD__`) injected by tsup's `define` config.
+`tsup.config.ts` copies bundled prompt files from `src/cli/prompts/` and agent definitions from `src/cli/agents/` into `dist/` via an `onSuccess` hook. At runtime, `assets.ts` resolves paths relative to the compiled entry point using a prod/dev detection constant (`__RALPH_PROD__`) injected by tsup's `define` config.

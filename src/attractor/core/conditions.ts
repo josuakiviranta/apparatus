@@ -5,7 +5,8 @@ type ContextMap = Record<string, string>;
 function resolveKey(key: string, outcome: Outcome, ctx: ContextMap): string {
   if (key === "outcome") return outcome.status;
   if (key === "preferred_label") return outcome.preferredLabel ?? "";
-  if (key.startsWith("context.")) return ctx[key] ?? "";
+  // Support both "context.X" (prefixed key) and unprefixed context value lookup
+  if (key.startsWith("context.")) return ctx[key] ?? ctx[key.slice(8)] ?? "";
   return "";
 }
 

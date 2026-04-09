@@ -188,9 +188,14 @@ export function parseDot(src: string): Graph {
 
 const KNOWN_TYPES = new Set([
   "codergen", "tool", "wait.human", "conditional", "parallel", "parallel.fan_in",
-  "stack.manager_loop", "start", "exit",
+  "start", "exit",
   "ralph.implement", "ralph.meditate", "ralph.run-scenarios",
   "agent",
+]);
+
+// Types that pass validation but are not yet implemented — emit errors
+const UNIMPLEMENTED_TYPES = new Set([
+  "parallel", "parallel.fan_in",  // fan-out execution not yet implemented
 ]);
 
 const SHAPE_TO_TYPE: Record<string, string> = {
@@ -259,10 +264,11 @@ export function validateGraph(graph: Graph): Diagnostic[] {
     }
   }
 
-  // type_known warning
+  // type_known warning + unimplemented type errors
   for (const node of nodes.values()) {
     const t = resolveHandlerType(node);
     if (!KNOWN_TYPES.has(t)) diags.push({ rule: "type_known", severity: "warning", message: `Unknown handler type "${t}" on node "${node.id}"` });
+    if (UNIMPLEMENTED_TYPES.has(t)) diags.push({ rule: "type_unsupported", severity: "error", message: `Node type "${t}" is declared but not yet implemented (node "${node.id}")` });
   }
 
   return diags;

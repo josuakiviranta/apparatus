@@ -154,7 +154,7 @@ export async function runPipeline(graph: Graph, opts: EngineOptions): Promise<Pi
         };
       }
 
-      completedNodes = [...completedNodes, node.id];
+      if (!completedNodes.includes(node.id)) completedNodes = [...completedNodes, node.id];
       await saveCheckpoint(opts.logsRoot, {
         timestamp: new Date().toISOString(),
         currentNode: node.id,
@@ -214,8 +214,8 @@ export async function runPipeline(graph: Graph, opts: EngineOptions): Promise<Pi
       return { status: "fail", completedNodes, context, failureReason: outcome.failureReason ?? `Node "${node.id}" failed` };
     }
 
-    // Advance
-    completedNodes = [...completedNodes, node.id];
+    // Advance — deduplicate completedNodes (set semantics, not bag)
+    if (!completedNodes.includes(node.id)) completedNodes = [...completedNodes, node.id];
     await saveCheckpoint(opts.logsRoot, { timestamp: new Date().toISOString(), currentNode: node.id, completedNodes, nodeRetries, context });
 
     const nextEdge = selectNextEdge(node, outcome, context, edges);
@@ -223,12 +223,11 @@ export async function runPipeline(graph: Graph, opts: EngineOptions): Promise<Pi
       return { status: "fail", completedNodes, context, failureReason: `No outgoing edge from "${node.id}"` };
     }
 
-    // loop_restart: reset and start over
+    // loop_restart: reset traversal state but preserve accumulated context
     if (nextEdge.loopRestart) {
       completedNodes = [];
       nodeRetries = {};
-      context = { "$goal": graph.goal ?? "" };
-      if (opts.project) context["$project"] = opts.project;
+      context["loop.iteration"] = String(Number(context["loop.iteration"] ?? "0") + 1);
       currentNodeId = startNode.id;
       continue;
     }

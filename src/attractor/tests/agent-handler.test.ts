@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { AgentHandler } from "../handlers/agent-handler.js";
 import type { Node, PipelineContext } from "../types.js";
+import { readFileSync } from "fs";
+import { join } from "path";
+import { mkdtempSync, rmSync } from "fs";
+import { tmpdir } from "os";
 
 const baseCtx = (): PipelineContext => ({ values: {} });
 
@@ -154,6 +158,29 @@ describe("AgentHandler", () => {
         variables: { "$goal": "Ship it", "custom.key": "value" },
       }),
     );
+  });
+
+  it("prepends pipeline context preamble to prompt.md", async () => {
+    mockResolve.mockReturnValue({ ...baseConfig });
+    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null });
+
+    const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-test-"));
+    try {
+      const handler = makeHandler();
+      const ctx: PipelineContext = { values: { "meditate.sessionId": "abc", "meditate.illuminations": "3" } };
+      await handler.execute(
+        makeNode({ prompt: "Build the feature" }),
+        ctx,
+        { logsRoot: logsDir, cwd: "/tmp/project", signal: undefined, outgoingLabels: [] },
+      );
+
+      const writtenPrompt = readFileSync(join(logsDir, "work", "prompt.md"), "utf8");
+      expect(writtenPrompt).toContain("Pipeline Context");
+      expect(writtenPrompt).toContain("meditate.sessionId: abc");
+      expect(writtenPrompt).toContain("Build the feature");
+    } finally {
+      rmSync(logsDir, { recursive: true, force: true });
+    }
   });
 
   it("stops iteration when signal is aborted", async () => {

@@ -4,6 +4,7 @@ import { spawnSync } from "child_process";
 import { bootstrapPrompts } from "../lib/prompts.js";
 import { Agent } from "../lib/agent.js";
 import { resolveAgent } from "../lib/agent-registry.js";
+import { streamEvents } from "../lib/stream-formatter.js";
 import * as output from "../lib/output.js";
 
 export interface ImplementOptions {
@@ -73,6 +74,11 @@ export async function implementCommand(
       const result = await agent.run({
         cwd: absPath,
         signal: ac.signal,
+        onStdout: async (stdout) => {
+          await output.stream(streamEvents(stdout, {
+            onSessionId: () => {},
+          }));
+        },
       });
 
       if (ac.signal.aborted) break;

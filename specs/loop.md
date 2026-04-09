@@ -1,56 +1,67 @@
-# Loop Module
+# Agent-Based Implementation Loop
 
-`src/cli/lib/loop.ts` is the agentic implementation engine. It runs Claude in a headless loop, piping output through the stream formatter and pushing changes after each iteration.
+The agentic implementation loop is now driven by the `Agent` class (`src/cli/lib/agent.ts`) instead of the former `loop.ts` module. The `implement` command creates an `Agent` from the `implement` agent definition and loops `agent.run()` calls with git push between iterations.
 
-## Interface
+## Why Agent replaced loop.ts
+
+`loop.ts` was a monolithic module that duplicated spawn/stream/signal logic present in multiple commands. The `Agent` class unifies Claude session management across all commands — plan, implement, meditate, meditate-create, and pipeline nodes. This eliminates the duplication and makes it possible to define agents as markdown files with YAML frontmatter.
+
+## Agent Class Interface
 
 ```typescript
-export interface LoopOptions {
-  promptFile: string;  // absolute path to PROMPT_build.md
-  cwd: string;         // project folder (claude cwd + git ops)
-  max?: number;        // max iterations; undefined = unlimited
-  model?: string;      // passed to --model flag; defaults to "opus"
-  signal?: AbortSignal; // optional abort signal for external cancellation
-  onSessionId?: (id: string) => void; // callback when session ID is captured
+export class Agent {
+  constructor(config: AgentConfig);
+  expandPrompt(variables?: Record<string, string>): string;
+  buildArgs(options: RunOptions): string[];
+  writeMcpConfig(cwd: string, variables?: Record<string, string>): string | null;
+  cleanupMcpConfig(): void;
+  run(options: RunOptions): Promise<RunResult>;
+  kill(): void;
 }
 
-export interface LoopResult {
-  exitReason: "completed" | "maxReached" | "aborted" | "error";
+export interface RunOptions {
+  cwd: string;
+  signal?: AbortSignal;
+  variables?: Record<string, string>;
+  resume?: string;
+  interactive?: boolean;
+  onSessionId?: (id: string) => void;
+  onStdout?: (stdout: NodeJS.ReadableStream) => Promise<void>;
 }
 
-export async function runLoop(options: LoopOptions): Promise<LoopResult>
+export interface RunResult {
+  exitCode: number;
+  sessionId: string | null;
+  stdout: Readable | null;
+}
 ```
 
-Called by `implement.ts` and `ralph-implement` pipeline handler. Checks `claude` availability before starting.
+## Implement Loop (in implement.ts)
 
-## Each Iteration
-
-1. Spawn `claude -p --dangerously-skip-permissions --output-format=stream-json --model <model>` with `cwd` set to the project folder and the prompt file piped to stdin
-2. Read stdout line-by-line through `processLine()` from `stream-formatter.ts`; write formatted output to `process.stdout`
-3. After claude exits: run `git push origin <branch>` in a clack spinner
+Each iteration:
+1. Call `agent.run({ cwd, signal, onStdout })` — spawns `claude -p --dangerously-skip-permissions --output-format=stream-json --model <model>` with the prompt piped via stdin
+2. `onStdout` pipes stream-json output through `streamEvents()` → `output.stream()` for human-readable display
+3. After claude exits: run `git push origin <branch>`
 4. If push fails, retry with `git push -u origin <branch>`; log warning on second failure and continue
-5. Increment iteration counter; stop if `max` is reached
+5. Increment iteration counter; stop if `--max` is reached
 
-## UI (clack/prompts)
+## UI (Ink components)
 
 | What | Tool |
 |------|------|
-| Startup banner | `intro()` |
-| Iteration separator | `note()` |
-| PID display | `log.step()` |
-| Git push status | `spinner()` |
-| Loop end | `outro()` |
-| Claude stream output | Raw `process.stdout.write()` via stream-formatter |
+| Startup banner | `output.header()` |
+| Iteration separator | `output.step()` |
+| Claude stream output | `output.stream()` via `streamEvents()` |
+| Warnings | `output.warn()` |
 
 ## Signal Handling
 
-Uses `AbortSignal` for external cancellation. Registers an abort listener that kills the current child process group (`process.kill(-currentPid, "SIGTERM")`). Checks `signal?.aborted` before each iteration. Listeners are cleaned up in a `finally` block via `signal?.removeEventListener`.
+Uses `AbortController` for external cancellation. The `implement` command registers SIGINT/SIGTERM handlers that abort and kill the agent's child process group (`process.kill(-pid, "SIGTERM")`). Checks `signal.aborted` before each iteration.
 
 ## Error Handling
 
 | Condition | Behavior |
 |-----------|----------|
-| `promptFile` not found | Throws `Error` before loop starts |
-| `claude` not in PATH | Throws `Error` before loop starts |
-| `git push` fails | `log.warn()` with error; loop continues |
-| Claude exits non-zero | `log.warn()` with exit code; loop continues |
+| `claude` exits non-zero | `output.warn()` with exit code; loop continues |
+| `git push` fails twice | `output.warn()` with error; loop continues |
+| Abort signal | Loop breaks, cleanup runs |

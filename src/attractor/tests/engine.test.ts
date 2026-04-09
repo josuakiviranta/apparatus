@@ -201,6 +201,52 @@ describe("runPipeline", () => {
     expect(result.failureReason).toContain("start");
   });
 
+  it("deduplicates completedNodes when node is visited multiple times", async () => {
+    // A node visited via retry should appear only once in completedNodes
+    let callCount = 0;
+    mockAgentRun.mockImplementation(async () => {
+      callCount++;
+      // First call fails, triggering retry; second call succeeds
+      return { exitCode: callCount === 1 ? 1 : 0, sessionId: null, stdout: null };
+    });
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      work  [shape=box, max_retries=1]
+      done  [shape=Msquare]
+      start -> work -> done
+    }`;
+    const result = await runPipeline(parseDot(dot), makeOpts(dir));
+    expect(result.status).toBe("success");
+    // work should appear exactly once despite being visited twice
+    const workCount = result.completedNodes.filter(n => n === "work").length;
+    expect(workCount).toBe(1);
+  });
+
+  it("preserves context across loop_restart", async () => {
+    // First iteration: agent succeeds with context updates
+    // The loop_restart edge should preserve accumulated context
+    let callCount = 0;
+    mockAgentRun.mockImplementation(async () => {
+      callCount++;
+      return { exitCode: 0, sessionId: `s${callCount}`, stdout: null };
+    });
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      work  [shape=box]
+      check [shape=diamond]
+      done  [shape=Msquare]
+      start -> work -> check
+      check -> done [condition="context.loop.iteration=1"]
+      check -> start [loop_restart=true]
+    }`;
+    const result = await runPipeline(parseDot(dot), makeOpts(dir));
+    expect(result.status).toBe("success");
+    // Context should have loop.iteration preserved
+    expect(result.context["loop.iteration"]).toBe("1");
+    // Agent should have been called twice (once per loop iteration)
+    expect(mockAgentRun).toHaveBeenCalledTimes(2);
+  });
+
   it("returns fail when aborted", async () => {
     const ac = new AbortController();
     ac.abort();

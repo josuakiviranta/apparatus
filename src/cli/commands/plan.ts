@@ -3,6 +3,7 @@ import { existsSync } from "fs";
 import { resolve } from "path";
 import { Agent } from "../lib/agent.js";
 import { resolveAgent } from "../lib/agent-registry.js";
+import { streamEvents } from "../lib/stream-formatter.js";
 import * as output from "../lib/output.js";
 
 function buildTracePath(projectPath: string, sessionId: string): string {
@@ -38,8 +39,10 @@ export async function planCommand(projectFolder: string): Promise<void> {
   let sessionId: string | null = null;
   await agent.run({
     cwd: absPath,
-    onSessionId: (id) => {
-      sessionId = id;
+    onStdout: async (stdout) => {
+      await output.stream(streamEvents(stdout, {
+        onSessionId: (id) => { sessionId = id; },
+      }));
     },
   });
 

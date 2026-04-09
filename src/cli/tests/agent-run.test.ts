@@ -133,6 +133,27 @@ describe("Agent.run", () => {
     expect(capturedId).toBe("sess-xyz-123");
   });
 
+  it("calls onStdout callback with child stdout stream", async () => {
+    const child = createMockChild(0, "some output\n");
+    mockSpawn.mockReturnValue(child);
+
+    let receivedStdout: NodeJS.ReadableStream | undefined;
+    const agent = new Agent(baseConfig);
+    const result = await agent.run({
+      cwd: "/tmp/project",
+      onStdout: async (stdout) => {
+        receivedStdout = stdout;
+        // Consume the stream so it ends
+        for await (const _chunk of stdout) {
+          // drain
+        }
+      },
+    });
+
+    expect(receivedStdout).toBe(child.stdout);
+    expect(result.exitCode).toBe(0);
+  });
+
   it("returns exit code from child process", async () => {
     const child = createMockChild(1);
     mockSpawn.mockReturnValue(child);

@@ -22,7 +22,9 @@ Runs the agentic implementation loop.
 **Behavior:**
 1. Resolves absolute path; exits if folder missing
 2. Calls `bootstrapPrompts()` — if prompts were injected, exits with instructions to review
-3. Delegates to `runLoop({ promptFile: PROMPT_build.md, cwd, max })` from `loop.ts`
+3. Resolves the `implement` agent definition via the agent registry
+4. Loops `agent.run()` calls with `onStdout` piped through `streamEvents()` for display
+5. Git pushes after each iteration; retries once on failure
 
 See [loop.md](loop.md) for iteration details, signal handling, and git push behavior.
 
@@ -132,9 +134,41 @@ Shows logs for a heartbeat task. `--follow` streams new log lines in real-time.
 
 Real-time TUI dashboard of all heartbeat tasks.
 
+## `ralph agent` (subcommands)
+
+Manages agent definitions — markdown files with YAML frontmatter that configure how Claude sessions are spawned.
+
+### `ralph agent list`
+
+Lists all available agents from both user directory (`~/.ralph/agents/`) and bundled defaults. Shows name, model, description, and source (built-in vs custom).
+
+### `ralph agent show <name>`
+
+Displays the full configuration of a named agent including model, permissions, tools, MCP servers, and prompt body.
+
+### `ralph agent create`
+
+Interactive session to collaboratively design a new agent definition. Launches the `agent-creator` agent which guides the user through agent configuration and writes the result to `~/.ralph/agents/<name>.md`.
+
+## `ralph pipeline` (subcommands)
+
+Manages DOT-graph pipelines for multi-step workflows.
+
+### `ralph pipeline <dotfile> [--project <folder>]`
+
+Runs a DOT-graph pipeline. Each node in the graph is executed by a handler resolved from node attributes (shape, agent, type). The `agent` attribute routes to named agents via the AgentHandler.
+
+### `ralph pipeline list [folder]`
+
+Lists available pipeline DOT files in a folder.
+
+### `ralph pipeline create <name>`
+
+Interactive session to create a new pipeline DOT file.
+
 ## Git Push Behavior
 
-After each loop iteration, `loop.ts` pushes changes:
+After each loop iteration, `implement.ts` pushes changes:
 1. `git push origin <branch>` (via `spawnSync`)
 2. On failure: retry with `git push -u origin <branch>`
 3. On second failure: log warning, continue looping

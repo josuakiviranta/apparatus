@@ -3,6 +3,9 @@ import type { Interviewer, Question, Answer } from "./index.js";
 
 export class ConsoleInterviewer implements Interviewer {
   async ask(q: Question): Promise<Answer> {
+    if (!process.stdin.isTTY) {
+      throw new Error("wait.human node requires an interactive TTY — cannot prompt in non-interactive context");
+    }
     const rl = createInterface({ input: process.stdin, output: process.stdout });
     return new Promise((resolve) => {
       let prompt = q.prompt;

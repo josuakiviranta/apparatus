@@ -14,9 +14,31 @@
 
 ## Status
 
-**Chunks 1-4 complete (Tasks 1-21).** All 384 tests pass, typecheck clean, build succeeds.
+**Chunks 1-4 complete (Tasks 1-21). Chunk 5 (pipeline bug fixes) complete.** All 389 tests pass, typecheck clean, build succeeds.
 
-Chunk 4 changes: AgentHandler replaces CodergenHandler for attractor pipeline. Agent attribute (`agent="name"`) in DOT files routes to named agents via AgentHandler. Backward compatibility: `shape=box` nodes (codergen handler type) now fall back to "implement" agent. CodergenHandler, RalphImplementHandler, loop.ts, and loop.test.ts deleted. Engine no longer requires `runLoop` in its options. Agent-based DOT validation scenario test added.
+### Chunk 5: Pipeline Engine Bug Fixes (0.0.39)
+
+Five inert pipeline features identified by meditation illuminations, fixed in one batch:
+
+1. **Agent.run() race condition** — `close` event listener now registered before awaiting `onStdout` callback, preventing hang when child exits during stream consumption.
+2. **onStdout callback** — Agent class supports `onStdout` for callers to consume stdout (e.g., `implement` command piping through `streamEvents`). Test added.
+3. **completedNodes deduplication** — `engine.ts` now uses set semantics for `completedNodes` (deduplicates on append), preventing unbounded checkpoint growth in looping pipelines.
+4. **loopRestart context preservation** — `engine.ts` `loop_restart` edges now preserve accumulated context instead of wiping it. Increments `loop.iteration` counter so retry loops can learn from prior iterations.
+5. **buildPreamble wired into AgentHandler** — Pipeline context preamble (completed stages + context values) is now prepended to agent prompts, making nodes context-aware of prior pipeline state.
+6. **ConsoleInterviewer TTY detection** — `ConsoleInterviewer.ask()` now throws immediately if stdin is not a TTY, preventing indefinite hang in non-interactive contexts.
+7. **Unsupported types disabled in validator** — `parallel`, `parallel.fan_in` node types now produce validation errors ("not yet implemented"). `stack.manager_loop` removed from KNOWN_TYPES.
+8. **Condition resolver fix** — `evaluateCondition` now resolves `context.X` conditions by checking both `ctx["context.X"]` and `ctx["X"]`, enabling conditions to reference engine-stored context keys.
+9. **Specs updated** — `specs/loop.md`, `specs/architecture.md`, `specs/commands.md` updated to reflect Agent class architecture (loop.ts removed, agent commands documented).
+
+### Chunk 4 (prior)
+
+AgentHandler replaces CodergenHandler for attractor pipeline. Agent attribute (`agent="name"`) in DOT files routes to named agents via AgentHandler. Backward compatibility: `shape=box` nodes (codergen handler type) now fall back to "implement" agent. CodergenHandler, RalphImplementHandler, loop.ts, and loop.test.ts deleted. Engine no longer requires `runLoop` in its options.
+
+### Known Issues
+
+- **Pipeline resume (`--resume`) has no stable address** — `logsRoot` is timestamp-based and freshly computed on every invocation. The checkpoint from an interrupted run is never found. Fix: use deterministic `~/.ralph/runs/<slug>/` path.
+- **Pipeline resume test proves wrong checkpoint** — The engine's resume test uses a synthetic checkpoint where currentNode is not yet in completedNodes, a state the success path never produces.
+- **variableExpansionTransform limited** — Only substitutes `$goal` and `$project`, not arbitrary context keys. Should expand all `context.*` keys for full composability.
 
 ## File Structure
 

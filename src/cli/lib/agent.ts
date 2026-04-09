@@ -27,6 +27,9 @@ export interface RunOptions {
   resume?: string;
   interactive?: boolean;
   onSessionId?: (id: string) => void;
+  /** When provided, the caller consumes stdout (e.g. via streamEvents).
+   *  The internal readline session-id extractor is skipped. */
+  onStdout?: (stdout: NodeJS.ReadableStream) => Promise<void>;
 }
 
 export interface RunResult {
@@ -171,7 +174,18 @@ export class Agent {
       // Capture session ID from stream-json output
       let sessionId: string | null = null;
 
-      if (!isInteractive && child.stdout) {
+      // Register close handler BEFORE consuming stdout to avoid race condition:
+      // if onStdout awaits stream consumption and close fires before we listen, we'd hang.
+      const closePromise = new Promise<number>((resolve) => {
+        child.on("close", (code) => {
+          resolve(code ?? 1);
+        });
+      });
+
+      if (!isInteractive && child.stdout && options.onStdout) {
+        // Caller consumes stdout (e.g. streamEvents → output.stream)
+        await options.onStdout(child.stdout);
+      } else if (!isInteractive && child.stdout) {
         const rl = readline.createInterface({ input: child.stdout });
         rl.on("line", (line) => {
           try {
@@ -186,11 +200,7 @@ export class Agent {
         });
       }
 
-      const exitCode = await new Promise<number>((resolve) => {
-        child.on("close", (code) => {
-          resolve(code ?? 1);
-        });
-      });
+      const exitCode = await closePromise;
 
       return {
         exitCode,

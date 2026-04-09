@@ -1,9 +1,10 @@
 import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import type { NodeHandler } from "./registry.js";
-import type { Node, Outcome, PipelineContext } from "../types.js";
+import type { Node, Outcome, PipelineContext, CheckpointState } from "../types.js";
 import { Agent, type AgentConfig } from "../../cli/lib/agent.js";
 import { resolveAgent as defaultResolveAgent } from "../../cli/lib/agent-registry.js";
+import { buildPreamble } from "../transforms/preamble.js";
 
 export interface AgentHandlerDeps {
   resolveAgent?: (name: string) => AgentConfig;
@@ -39,10 +40,16 @@ export class AgentHandler implements NodeHandler {
     const cwd = meta["cwd"] as string;
     const signal = meta["signal"] as AbortSignal | undefined;
 
-    // Write prompt to logs
+    // Build prompt with pipeline context preamble
     const nodeDir = join(logsRoot, node.id);
     mkdirSync(nodeDir, { recursive: true });
-    const prompt = node.prompt ?? node.label ?? config.prompt;
+    const rawPrompt = node.prompt ?? node.label ?? config.prompt;
+    const fidelity = (node.fidelity as string | undefined) ?? "compact";
+    const preamble = buildPreamble(
+      { timestamp: "", currentNode: node.id, completedNodes: [], nodeRetries: {}, context: ctx.values } as CheckpointState,
+      fidelity,
+    );
+    const prompt = preamble + rawPrompt;
     writeFileSync(join(nodeDir, "prompt.md"), prompt);
 
     const agent = this.create(config);
