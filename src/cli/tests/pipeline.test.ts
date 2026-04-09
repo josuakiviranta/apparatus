@@ -27,7 +27,17 @@ vi.mock("child_process", () => ({
     stderr: { on: vi.fn() },
     on: vi.fn((event: string, cb: () => void) => { if (event === "close") cb(); }),
   })),
-  spawnSync: vi.fn(() => ({ status: 0 })),
+  spawnSync: vi.fn(() => ({ status: 0, stdout: "main\n" })),
+}));
+vi.mock("../components/PipelineDisplay.js", () => ({
+  renderPipelineDisplay: vi.fn(async () => ({
+    callbacks: {
+      push: vi.fn(),
+      setStatus: vi.fn(),
+      done: vi.fn(),
+    },
+    waitUntilExit: vi.fn(async () => {}),
+  })),
 }));
 vi.mock("../lib/assets.js", () => ({
   getPipelineCreatePromptPath: vi.fn(() => "/fake/PROMPT_pipeline_create.md"),
@@ -95,7 +105,13 @@ describe("pipelineRunCommand", () => {
     writeFileSync(dotFile, VALID_DOT);
     await pipelineRunCommand(dotFile, { logsRoot: dir });
     expect(engine.runPipeline).toHaveBeenCalledTimes(1);
-    expect(out.success).toHaveBeenCalled();
+    // Success is now communicated via PipelineDisplay callbacks, not output.success
+    const { renderPipelineDisplay } = await import("../components/PipelineDisplay.js");
+    const mockDisplay = renderPipelineDisplay as ReturnType<typeof vi.fn>;
+    const result = await mockDisplay.mock.results[0].value;
+    expect(result.callbacks.push).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "success" }),
+    );
   });
 
   it("exits 1 if dotFile does not exist", async () => {

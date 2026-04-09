@@ -10,6 +10,7 @@ import { spawn, spawnSync } from "child_process";
 import { streamEvents } from "../lib/stream-formatter.js";
 import { getPipelineCreatePromptPath } from "../lib/assets.js";
 import * as output from "../lib/output.js";
+import { renderPipelineDisplay } from "../components/PipelineDisplay.js";
 
 export interface PipelineRunOptions {
   project?: string;
@@ -49,6 +50,15 @@ export async function pipelineValidateCommand(dotFile: string, opts: PipelineVal
   return 1;
 }
 
+function shapeToType(shape?: string): string {
+  switch (shape) {
+    case "box": return "agent";
+    case "hexagon": return "gate";
+    case "diamond": return "cond";
+    default: return shape ?? "node";
+  }
+}
+
 export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptions = {}): Promise<void> {
   const project = opts.project ? resolve(opts.project) : process.cwd();
   const absPath = isNameShorthand(dotFile)
@@ -75,6 +85,26 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
     rmSync(logsRoot, { recursive: true, force: true });
   }
 
+  const branchResult = spawnSync("git", ["branch", "--show-current"], { cwd: project, encoding: "utf8" });
+  const branch = branchResult.stdout.trim() || "main";
+
+  // Mount long-lived Ink display
+  const { callbacks, waitUntilExit } = await renderPipelineDisplay({
+    pipelineName: graph.name,
+    pid: process.pid,
+    goal: graph.goal,
+  });
+  const { push, setStatus, done } = callbacks;
+
+  // Show pipeline overview
+  push({ kind: "info", text: `${graph.name}  ·  ${branch}  ·  ${project}` });
+  if (graph.goal) push({ kind: "info", text: `goal: ${graph.goal}` });
+  const overviewNodes = [...graph.nodes.values()]
+    .filter(n => n.shape !== "Mdiamond" && n.shape !== "Msquare")
+    .map(n => `${n.label ?? n.id} [${shapeToType(n.shape)}]`)
+    .join(" → ");
+  if (overviewNodes) push({ kind: "info", text: `nodes: ${overviewNodes}` });
+
   const ac = new AbortController();
   const onSignal = () => ac.abort();
   process.on("SIGINT", onSignal);
@@ -83,22 +113,38 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
   try {
     const result = await runPipeline(graph, {
       logsRoot,
-      cwd: opts.project ? resolve(opts.project) : process.cwd(),
+      cwd: project,
       interviewer: new ConsoleInterviewer(),
       signal: ac.signal,
       project: opts.project,
       resume: opts.resume,
+      onNodeStart: (node) => {
+        const type = shapeToType(node.shape);
+        const interactiveTag = node.interactive === true || node.interactive === "true"
+          ? "  (interactive)" : "";
+        const label = `[${node.id}] [${type}]  ${node.label ?? ""}${interactiveTag}`.trim();
+        push({ kind: "step", text: label });
+        setStatus(label);
+      },
+      onStdout: async (stdout) => {
+        for await (const event of streamEvents(stdout, {})) {
+          push({ kind: "stream", event });
+        }
+      },
     });
 
     if (result.status === "success") {
-      await output.success(`Pipeline completed (${result.completedNodes.length} nodes)`);
+      push({ kind: "success", text: `Pipeline complete: ${graph.name}  (${result.completedNodes.length} nodes)` });
+      setStatus("done");
     } else {
-      await output.error(`Pipeline failed: ${result.failureReason}`);
-      process.exit(1);
+      push({ kind: "warn", text: `Pipeline failed: ${result.failureReason}` });
+      setStatus("failed");
     }
   } finally {
     process.off("SIGINT", onSignal);
     process.off("SIGTERM", onSignal);
+    done();
+    await waitUntilExit();
   }
 }
 

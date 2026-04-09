@@ -39,6 +39,9 @@ export class AgentHandler implements NodeHandler {
     const logsRoot = meta["logsRoot"] as string;
     const cwd = meta["cwd"] as string;
     const signal = meta["signal"] as AbortSignal | undefined;
+    const onStdout = meta["onStdout"] as ((s: NodeJS.ReadableStream) => Promise<void>) | undefined;
+    // DOT attributes parse as strings; coerce explicitly to boolean
+    const interactive = node.interactive === true || node.interactive === "true";
 
     // Build prompt with pipeline context preamble
     const nodeDir = join(logsRoot, node.id);
@@ -68,6 +71,9 @@ export class AgentHandler implements NodeHandler {
         cwd,
         signal,
         variables: ctx.values,
+        // interactive nodes use stdio:inherit — no stdout stream to pipe
+        onStdout: interactive ? undefined : onStdout,
+        interactive: interactive ? true : undefined,
       });
 
       iteration++;

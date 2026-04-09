@@ -22,6 +22,8 @@ export interface EngineOptions {
   signal?: AbortSignal;
   project?: string;
   resume?: boolean;
+  onNodeStart?: (node: Node) => void;
+  onStdout?: (stdout: NodeJS.ReadableStream) => Promise<void>;
 }
 
 export interface PipelineResult {
@@ -173,6 +175,8 @@ export async function runPipeline(graph: Graph, opts: EngineOptions): Promise<Pi
       return { status: "fail", completedNodes, context, failureReason: `No handler for type "${handlerType}"` };
     }
 
+    opts.onNodeStart?.(node);
+
     // Gather outgoing labels for wait.human
     const outgoingLabels = edges.filter(e => e.from === node.id).map(e => e.label ?? e.to).filter(Boolean);
 
@@ -184,6 +188,7 @@ export async function runPipeline(graph: Graph, opts: EngineOptions): Promise<Pi
       outgoingLabels,
       completedNodes,
       nodeRetries,
+      onStdout: opts.onStdout,
     });
 
     // Merge context updates

@@ -300,6 +300,37 @@ describe("runPipeline", () => {
     expect(cp.currentNode).toBe("done");
   });
 
+  it("calls onNodeStart for each node (exit node skipped — handled before handler dispatch)", async () => {
+    const started: string[] = [];
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      work  [shape=box]
+      done  [shape=Msquare]
+      start -> work -> done
+    }`;
+    await runPipeline(parseDot(dot), makeOpts(dir, {
+      onNodeStart: (node) => { started.push(node.id); },
+    }));
+    expect(started).toContain("start");
+    expect(started).toContain("work");
+    // Exit node is processed before handler dispatch, so onNodeStart is not called for it
+    expect(started).not.toContain("done");
+  });
+
+  it("passes onStdout in meta to handlers without error", async () => {
+    const onStdout = async (_s: NodeJS.ReadableStream) => {};
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      work  [shape=box]
+      done  [shape=Msquare]
+      start -> work -> done
+    }`;
+    // Verifies the engine accepts onStdout and threads it to handlers via meta.
+    // The agent-handler test suite verifies actual forwarding to agent.run().
+    const result = await runPipeline(parseDot(dot), makeOpts(dir, { onStdout }));
+    expect(result.status).toBe("success");
+  });
+
   it("warns when --resume finds no checkpoint", async () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const dot = `digraph g {

@@ -218,6 +218,43 @@ describe("AgentHandler", () => {
     }
   });
 
+  it("passes meta.onStdout to agent.run()", async () => {
+    mockResolve.mockReturnValue({ ...baseConfig });
+    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null });
+
+    const handler = makeHandler();
+    const onStdout = async (_s: NodeJS.ReadableStream) => {};
+    await handler.execute(
+      makeNode(),
+      baseCtx(),
+      { logsRoot: "/tmp/logs", cwd: "/tmp/project", signal: undefined, outgoingLabels: [], completedNodes: [], nodeRetries: {}, onStdout },
+    );
+
+    expect(mockAgentRun).toHaveBeenCalledWith(
+      expect.objectContaining({ onStdout }),
+    );
+  });
+
+  it("passes interactive:true to agent.run() when node.interactive is truthy", async () => {
+    mockResolve.mockReturnValue({ ...baseConfig });
+    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null });
+
+    const handler = makeHandler();
+    await handler.execute(
+      makeNode({ interactive: "true" } as any),
+      baseCtx(),
+      { logsRoot: "/tmp/logs", cwd: "/tmp/project", signal: undefined, outgoingLabels: [], completedNodes: [], nodeRetries: {} },
+    );
+
+    expect(mockAgentRun).toHaveBeenCalledWith(
+      expect.objectContaining({ interactive: true }),
+    );
+    // interactive nodes should NOT pass onStdout
+    expect(mockAgentRun).toHaveBeenCalledWith(
+      expect.objectContaining({ onStdout: undefined }),
+    );
+  });
+
   it("stops iteration when signal is aborted", async () => {
     mockResolve.mockReturnValue({ ...baseConfig });
     const ac = new AbortController();
