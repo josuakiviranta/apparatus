@@ -21,6 +21,11 @@ export default defineConfig({
     for (const file of readdirSync("src/cli/prompts")) {
       copyFileSync(`src/cli/prompts/${file}`, `dist/prompts/${file}`);
     }
+    // Copy agent definition files
+    mkdirSync("dist/agents", { recursive: true });
+    for (const file of readdirSync("src/cli/agents")) {
+      copyFileSync(`src/cli/agents/${file}`, `dist/agents/${file}`);
+    }
     console.log("Assets copied to dist/");
   },
 });
