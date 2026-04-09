@@ -14,7 +14,14 @@
 
 ## Status
 
-**Chunks 1-4 complete (Tasks 1-21). Chunks 5-6 (pipeline bug fixes) complete.** All 396 tests pass, typecheck clean, build succeeds.
+**Chunks 1-4 complete (Tasks 1-21). Chunks 5-7 (pipeline bug fixes + docs) complete.** All 397 tests pass, typecheck clean, build succeeds.
+
+### Chunk 7: Pipeline Authoring Prompt & Preflight Guard (0.0.41)
+
+Two Known Issues resolved:
+
+1. **PROMPT_pipeline_create.md rewritten** — Corrected `goal_gate` description (pipeline-level completion gate, not node-level enforcement). Added `loop_restart` edge attribute documentation. Added `agent="name"` node attribute. Removed `parallel`/`parallel.fan_in`/`house` from available types table with explicit "not yet implemented" warning. Updated reference example to demonstrate `goal_gate`, `loop_restart`, and named agents.
+2. **pipelineCreateCommand `which claude` guard** — Added preflight check matching plan/new/meditate/meditate-create commands. Test added.
 
 ### Chunk 6: Resume, Checkpoint & Variable Expansion Fixes (0.0.40)
 
@@ -46,8 +53,7 @@ AgentHandler replaces CodergenHandler for attractor pipeline. Agent attribute (`
 
 ### Known Issues
 
-- **Pipeline authoring prompt misdescribes features** — `PROMPT_pipeline_create.md` misdescribes `goal_gate` semantics and omits `loop_restart`. Should be updated after engine fixes are stable.
-- **pipelineCreateCommand missing `which claude` guard** — Fourth copy of session pattern lacks the preflight check for claude binary.
+- No known issues at this time.
 
 ## File Structure
 

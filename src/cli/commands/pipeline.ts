@@ -143,6 +143,12 @@ export interface PipelineCreateOptions {
 }
 
 export async function pipelineCreateCommand(name: string, opts: PipelineCreateOptions = {}): Promise<void> {
+  const which = spawnSync("which", ["claude"], { encoding: "utf8" });
+  if (which.status !== 0) {
+    await output.error("Error: claude CLI not found.\nInstall it: npm install -g @anthropic-ai/claude-code");
+    process.exit(1);
+  }
+
   const project = resolve(opts.project ?? process.cwd());
   const pipelinesDir = getPipelinesDir(project);
   const dotPath = join(pipelinesDir, `${name}.dot`);

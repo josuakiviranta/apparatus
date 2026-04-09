@@ -164,6 +164,14 @@ describe("pipelineCreateCommand", () => {
   });
   afterEach(() => { rmSync(dir, { recursive: true }); });
 
+  it("errors if claude CLI not found", async () => {
+    (childProcess.spawnSync as ReturnType<typeof vi.fn>).mockReturnValueOnce({ status: 1 });
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("exit"); });
+    await expect(pipelineCreateCommand("review", { project: dir })).rejects.toThrow();
+    expect(out.error).toHaveBeenCalledWith(expect.stringContaining("claude CLI not found"));
+    exitSpy.mockRestore();
+  });
+
   it("errors if pipelines/name.dot already exists", async () => {
     mkdirSync(join(dir, "pipelines"));
     writeFileSync(join(dir, "pipelines", "review.dot"), VALID_DOT);
@@ -185,8 +193,10 @@ describe("pipelineCreateCommand", () => {
     writeFileSync(promptFile, "# Fake prompt");
     (getPipelineCreatePromptPath as ReturnType<typeof vi.fn>).mockReturnValue(promptFile);
     const dotPath = join(dir, "pipelines", "review.dot");
-    // Mock spawnSync to create the .dot file as a side effect (simulating Claude writing it)
-    (childProcess.spawnSync as ReturnType<typeof vi.fn>).mockImplementation(() => {
+    // Mock spawnSync: first call is `which claude` (just pass), second is the actual claude spawn
+    (childProcess.spawnSync as ReturnType<typeof vi.fn>).mockImplementation((cmd: string) => {
+      if (cmd === "which") return { status: 0 };
+      // Simulate Claude writing the .dot file during the interactive session
       writeFileSync(dotPath, VALID_DOT);
       return { status: 0 };
     });
@@ -196,5 +206,6 @@ describe("pipelineCreateCommand", () => {
     expect(existsSync(join(dir, "pipelines"))).toBe(true);
     expect(childProcess.spawnSync).toHaveBeenCalled();
     exitSpy.mockRestore();
+    (childProcess.spawnSync as ReturnType<typeof vi.fn>).mockImplementation(() => ({ status: 0 }));
   });
 });

@@ -34,12 +34,12 @@ digraph my_pipeline {
 | `box` | codergen | Agentic loop node — runs a Claude session on the project |
 | `hexagon` | wait.human | Human decision gate — pauses and asks for input, routes on edge labels |
 | `diamond` | conditional | Automatic branch — evaluates a condition on edges, no human input |
-| `component` | parallel | Fan-out — launches child nodes in parallel |
-| `tripleoctagon` | parallel.fan_in | Fan-in — waits for all parallel branches to complete |
 | `parallelogram` | tool | Runs an external shell command |
 | `circle` | ralph.implement | Invokes `ralph implement` on the project |
 | `octagon` | ralph.meditate | Invokes `ralph meditate` on the project |
 | `square` | ralph.run-scenarios | Invokes `ralph run-scenarios` on the project |
+
+> **Not yet implemented:** `component` (parallel fan-out), `tripleoctagon` (parallel fan-in), and `house` (stack.manager_loop) shapes exist in the grammar but are not supported by the engine. Do **not** use them — the validator will reject them.
 
 ### Node attributes
 
@@ -47,7 +47,8 @@ digraph my_pipeline {
 - `prompt="..."` — (required) instruction passed to the Claude session
 - `max_iterations=N` — cap on agentic loop iterations (recommended)
 - `fidelity="draft"|"fast"|"accurate"` — model speed/quality tradeoff
-- `goal_gate=true` — enforce goal completion before exiting the node
+- `goal_gate=true` — marks this node as a **pipeline-level completion gate**. The pipeline cannot exit (reach the exit node) unless every `goal_gate=true` node has been completed. If the exit is reached with unsatisfied gates, the engine cascades to `retry_target` (node, then graph-level). Use this on critical nodes whose completion is mandatory for the pipeline goal.
+- `agent="name"` — routes execution to a named agent from the agent registry (e.g., `agent="reviewer"`). Any node with an `agent` attribute uses the AgentHandler regardless of its shape.
 
 **tool (parallelogram):**
 - `tool_command="shell command"` — (required) command to execute
@@ -62,6 +63,7 @@ digraph my_pipeline {
 - `label="..."` — used for routing from hexagon (wait.human) nodes; the edge whose label matches the human's answer is taken
 - `condition="key=value"` — used for routing from diamond (conditional) nodes; evaluated as a boolean expression (use `=` not `==`, e.g. `condition="result=success"`)
 - `weight=N` — priority when multiple unconditional edges exist; higher weight wins
+- `loop_restart=true` — when this edge is taken, the engine resets traversal state (clears completedNodes and retries) but **preserves accumulated context**, increments `loop.iteration`, and jumps back to the start node. Use this to build retry/improvement loops where the pipeline re-runs from the beginning with knowledge of prior iterations. The edge target should be the start node.
 
 ### Validation rules (enforced by `ralph pipeline validate`)
 
@@ -85,14 +87,17 @@ digraph review_pipeline {
   start  [shape=Mdiamond]
   done   [shape=Msquare]
 
-  // Run scenario tests on the project
-  scenarios [shape=square, label="Run scenarios"]
+  // Run scenario tests on the project — goal_gate ensures this always completes
+  scenarios [shape=square, label="Run scenarios", goal_gate=true]
 
   // Meditation session — Claude reviews results and writes insights
   meditate [shape=octagon, label="Review insights"]
 
-  // Human decision gate — routes on edge labels
-  gate [shape=hexagon, label="Push to main?"]
+  // Automatic check — did meditate find issues?
+  check [shape=diamond, label="Issues found?"]
+
+  // Named agent from registry — runs code review
+  review [agent="reviewer", prompt="Review the latest changes"]
 
   // Agentic loop — applies fixes, capped at 3 iterations
   fix [shape=box, prompt="Apply the fixes recommended in the latest meditation illumination.", max_iterations=3]
@@ -100,10 +105,13 @@ digraph review_pipeline {
   // Wire it up
   start     -> scenarios
   scenarios -> meditate
-  meditate  -> gate
-  gate      -> fix  [label="Fix first"]   // edge label matches human answer
-  gate      -> done [label="Push now"]
-  fix       -> done
+  meditate  -> check
+  check     -> fix    [condition="result=fail"]
+  check     -> review [condition="result=success"]
+  review    -> done
+
+  // After fix, loop back to re-run the whole pipeline with preserved context
+  fix -> start [loop_restart=true]
 }
 ```
 
