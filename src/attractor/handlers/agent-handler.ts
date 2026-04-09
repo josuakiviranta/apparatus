@@ -114,19 +114,51 @@ export class AgentHandler implements NodeHandler {
     let structuredUpdates: Record<string, string> = {};
     let preferredLabel: string | undefined;
 
-    if (jsonSchema && lastResult?.output) {
-      try {
-        const raw = JSON.parse(lastResult.output.trim());
-        // Claude CLI --output-format json returns an array of event objects.
-        // Find the {type:"result"} entry and extract its .result field.
-        const wrapper = Array.isArray(raw)
-          ? raw.find((item: any) => item?.type === "result") ?? raw[raw.length - 1]
-          : raw;
-        const resultText = typeof wrapper === "object" && wrapper !== null && "result" in wrapper
-          ? wrapper.result
-          : lastResult.output.trim();
-        const parsed = typeof resultText === "string" ? JSON.parse(resultText) : resultText;
+    // Fail explicitly if jsonSchema was set but agent produced no output
+    if (jsonSchema && !lastResult?.output) {
+      return {
+        status: "fail",
+        failureReason: "Structured output: agent produced no output (possible timeout or token limit)",
+        contextUpdates: {
+          "agent.iterations": String(iteration),
+          "agent.success": "false",
+        },
+      };
+    }
 
+    if (jsonSchema && lastResult?.output) {
+      writeFileSync(join(nodeDir, "raw-output.txt"), lastResult.output);
+      try {
+        // Claude CLI emits newline-delimited JSON events.
+        // Find the last {type:"result"} line and extract its .result field.
+        const lines = lastResult.output.trim().split("\n");
+        let resultPayload: string | undefined;
+
+        for (const line of lines) {
+          try {
+            const event = JSON.parse(line);
+            if (event?.type === "result" && event.result != null) {
+              resultPayload = typeof event.result === "string"
+                ? event.result
+                : JSON.stringify(event.result);
+            }
+          } catch {
+            // Skip non-JSON lines
+          }
+        }
+
+        if (!resultPayload) {
+          return {
+            status: "fail",
+            failureReason: `Structured output: no {type:"result"} event found in ${lines.length} output lines`,
+            contextUpdates: {
+              "agent.iterations": String(iteration),
+              "agent.success": "false",
+            },
+          };
+        }
+
+        const parsed = JSON.parse(resultPayload);
         for (const [key, value] of Object.entries(parsed)) {
           structuredUpdates[key] = String(value);
         }
@@ -137,6 +169,10 @@ export class AgentHandler implements NodeHandler {
         return {
           status: "fail",
           failureReason: `Structured output parsing failed: ${(err as Error).message}`,
+          contextUpdates: {
+            "agent.iterations": String(iteration),
+            "agent.success": "false",
+          },
         };
       }
     }

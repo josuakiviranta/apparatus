@@ -8,7 +8,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { AgentHandler } from "../handlers/agent-handler.js";
 import type { Node, PipelineContext } from "../types.js";
-import { writeFileSync, mkdirSync } from "fs";
+import { writeFileSync, mkdirSync, existsSync } from "fs";
 import { join } from "path";
 import { mkdtempSync, rmSync } from "fs";
 import { tmpdir } from "os";
@@ -168,7 +168,170 @@ describe("AgentHandler – JSON constraint injection", () => {
 
       // Must surface as failure, not silently repair
       expect(outcome.status).toBe("fail");
-      expect(outcome.failureReason).toContain("Structured output parsing failed");
+      expect(outcome.failureReason).toContain("no {type:\"result\"} event found");
+    } finally {
+      rmSync(logsDir, { recursive: true, force: true });
+    }
+  });
+
+  it("parses NDJSON output and extracts {type:'result'} event", async () => {
+    const schema = JSON.stringify({ type: "object", properties: { verdict: { type: "string" } } });
+    const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-json-constraint-"));
+    const schemaDir = join(logsDir, "schemas");
+    mkdirSync(schemaDir, { recursive: true });
+    writeFileSync(join(schemaDir, "test.json"), schema);
+
+    mockResolve.mockReturnValue({ ...baseConfig });
+    // Simulate NDJSON output: multiple event lines, result is last
+    const ndjson = [
+      JSON.stringify({ type: "assistant", message: { content: "thinking..." } }),
+      JSON.stringify({ type: "tool_use", tool: "Read", input: { path: "/tmp/x" } }),
+      JSON.stringify({ type: "result", result: JSON.stringify({ verdict: "pass", notes: "all good" }) }),
+    ].join("\n");
+    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: ndjson });
+
+    const handler = new AgentHandler({
+      resolveAgent: mockResolve,
+      createAgent: () => ({ run: mockAgentRun, kill: mockAgentKill, config: {} } as any),
+    });
+
+    try {
+      const outcome = await handler.execute(
+        makeNode({ jsonSchemaFile: "schemas/test.json" } as any),
+        baseCtx(),
+        { logsRoot: logsDir, cwd: logsDir, signal: undefined, outgoingLabels: [], completedNodes: [], nodeRetries: {} },
+      );
+
+      expect(outcome.status).toBe("success");
+      expect(outcome.contextUpdates?.verdict).toBe("pass");
+      expect(outcome.contextUpdates?.notes).toBe("all good");
+    } finally {
+      rmSync(logsDir, { recursive: true, force: true });
+    }
+  });
+
+  it("returns descriptive failure when NDJSON has no {type:'result'} event", async () => {
+    const schema = JSON.stringify({ type: "object", properties: { verdict: { type: "string" } } });
+    const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-json-constraint-"));
+    const schemaDir = join(logsDir, "schemas");
+    mkdirSync(schemaDir, { recursive: true });
+    writeFileSync(join(schemaDir, "test.json"), schema);
+
+    mockResolve.mockReturnValue({ ...baseConfig });
+    // Simulate truncated session: events but no result
+    const ndjson = [
+      JSON.stringify({ type: "assistant", message: { content: "working..." } }),
+      JSON.stringify({ type: "tool_use", tool: "Bash", input: { command: "ls" } }),
+    ].join("\n");
+    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: ndjson });
+
+    const handler = new AgentHandler({
+      resolveAgent: mockResolve,
+      createAgent: () => ({ run: mockAgentRun, kill: mockAgentKill, config: {} } as any),
+    });
+
+    try {
+      const outcome = await handler.execute(
+        makeNode({ jsonSchemaFile: "schemas/test.json" } as any),
+        baseCtx(),
+        { logsRoot: logsDir, cwd: logsDir, signal: undefined, outgoingLabels: [], completedNodes: [], nodeRetries: {} },
+      );
+
+      expect(outcome.status).toBe("fail");
+      expect(outcome.failureReason).toContain("no {type:\"result\"} event found");
+    } finally {
+      rmSync(logsDir, { recursive: true, force: true });
+    }
+  });
+
+  it("parses NDJSON when result is a raw object (not stringified)", async () => {
+    const schema = JSON.stringify({ type: "object", properties: { verdict: { type: "string" } } });
+    const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-json-constraint-"));
+    const schemaDir = join(logsDir, "schemas");
+    mkdirSync(schemaDir, { recursive: true });
+    writeFileSync(join(schemaDir, "test.json"), schema);
+
+    mockResolve.mockReturnValue({ ...baseConfig });
+    // result is a raw object, not a JSON string — exercises the non-string branch
+    const ndjson = [
+      JSON.stringify({ type: "assistant", message: { content: "done" } }),
+      JSON.stringify({ type: "result", result: { verdict: "pass" } }),
+    ].join("\n");
+    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: ndjson });
+
+    const handler = new AgentHandler({
+      resolveAgent: mockResolve,
+      createAgent: () => ({ run: mockAgentRun, kill: mockAgentKill, config: {} } as any),
+    });
+
+    try {
+      const outcome = await handler.execute(
+        makeNode({ jsonSchemaFile: "schemas/test.json" } as any),
+        baseCtx(),
+        { logsRoot: logsDir, cwd: logsDir, signal: undefined, outgoingLabels: [], completedNodes: [], nodeRetries: {} },
+      );
+
+      expect(outcome.status).toBe("success");
+      expect(outcome.contextUpdates?.verdict).toBe("pass");
+    } finally {
+      rmSync(logsDir, { recursive: true, force: true });
+    }
+  });
+
+  it("writes raw-output.txt to nodeDir when jsonSchema output is present", async () => {
+    const schema = JSON.stringify({ type: "object", properties: { verdict: { type: "string" } } });
+    const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-json-constraint-"));
+    const schemaDir = join(logsDir, "schemas");
+    mkdirSync(schemaDir, { recursive: true });
+    writeFileSync(join(schemaDir, "test.json"), schema);
+
+    mockResolve.mockReturnValue({ ...baseConfig });
+    const ndjson = JSON.stringify({ type: "result", result: JSON.stringify({ verdict: "pass" }) });
+    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: ndjson });
+
+    const handler = new AgentHandler({
+      resolveAgent: mockResolve,
+      createAgent: () => ({ run: mockAgentRun, kill: mockAgentKill, config: {} } as any),
+    });
+
+    try {
+      await handler.execute(
+        makeNode({ jsonSchemaFile: "schemas/test.json" } as any),
+        baseCtx(),
+        { logsRoot: logsDir, cwd: logsDir, signal: undefined, outgoingLabels: [], completedNodes: [], nodeRetries: {} },
+      );
+
+      expect(existsSync(join(logsDir, "work", "raw-output.txt"))).toBe(true);
+    } finally {
+      rmSync(logsDir, { recursive: true, force: true });
+    }
+  });
+
+  it("returns descriptive failure when agent produces no output", async () => {
+    const schema = JSON.stringify({ type: "object", properties: { verdict: { type: "string" } } });
+    const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-json-constraint-"));
+    const schemaDir = join(logsDir, "schemas");
+    mkdirSync(schemaDir, { recursive: true });
+    writeFileSync(join(schemaDir, "test.json"), schema);
+
+    mockResolve.mockReturnValue({ ...baseConfig });
+    // Simulate timeout: agent exits without producing output
+    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: undefined });
+
+    const handler = new AgentHandler({
+      resolveAgent: mockResolve,
+      createAgent: () => ({ run: mockAgentRun, kill: mockAgentKill, config: {} } as any),
+    });
+
+    try {
+      const outcome = await handler.execute(
+        makeNode({ jsonSchemaFile: "schemas/test.json" } as any),
+        baseCtx(),
+        { logsRoot: logsDir, cwd: logsDir, signal: undefined, outgoingLabels: [], completedNodes: [], nodeRetries: {} },
+      );
+
+      expect(outcome.status).toBe("fail");
+      expect(outcome.failureReason).toContain("agent produced no output");
     } finally {
       rmSync(logsDir, { recursive: true, force: true });
     }

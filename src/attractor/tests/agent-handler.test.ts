@@ -320,7 +320,8 @@ describe("AgentHandler", () => {
     writeFileSync(join(schemaDir, "test.json"), schema);
 
     mockResolve.mockReturnValue({ ...baseConfig });
-    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: "s1", stdout: null, output: '{"verdict":"true","path":"/foo.md"}' });
+    const ndjsonOutput = JSON.stringify({ type: "result", result: JSON.stringify({ verdict: "true", path: "/foo.md" }) });
+    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: "s1", stdout: null, output: ndjsonOutput });
 
     const handler = new AgentHandler({
       resolveAgent: mockResolve,
@@ -351,14 +352,14 @@ describe("AgentHandler", () => {
     writeFileSync(join(schemaDir, "test.json"), schema);
 
     mockResolve.mockReturnValue({ ...baseConfig });
-    // Simulate Claude CLI --output-format json: array with system, assistant, result entries
+    // Simulate Claude CLI NDJSON output: system, assistant, result events on separate lines
     const innerJson = JSON.stringify({ verdict: "true", path: "/foo.md" });
-    const arrayOutput = JSON.stringify([
-      { type: "system", subtype: "init", session_id: "s1" },
-      { type: "assistant", message: { content: [{ type: "text", text: "thinking..." }] } },
-      { type: "result", subtype: "success", result: innerJson, session_id: "s1" },
-    ]);
-    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: "s1", stdout: null, output: arrayOutput });
+    const ndjsonOutput = [
+      JSON.stringify({ type: "system", subtype: "init", session_id: "s1" }),
+      JSON.stringify({ type: "assistant", message: { content: [{ type: "text", text: "thinking..." }] } }),
+      JSON.stringify({ type: "result", subtype: "success", result: innerJson, session_id: "s1" }),
+    ].join("\n");
+    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: "s1", stdout: null, output: ndjsonOutput });
 
     const handler = new AgentHandler({
       resolveAgent: mockResolve,
@@ -422,7 +423,8 @@ describe("AgentHandler", () => {
     writeFileSync(join(schemaDir, "test.json"), schema);
 
     mockResolve.mockReturnValue({ ...baseConfig });
-    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: '{"preferred_label":"false"}' });
+    const ndjsonLabel = JSON.stringify({ type: "result", result: JSON.stringify({ preferred_label: "false" }) });
+    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: ndjsonLabel });
 
     const handler = new AgentHandler({
       resolveAgent: mockResolve,
@@ -465,7 +467,7 @@ describe("AgentHandler", () => {
       );
 
       expect(outcome.status).toBe("fail");
-      expect(outcome.failureReason).toContain("Structured output parsing failed");
+      expect(outcome.failureReason).toContain("no {type:\"result\"} event found");
     } finally {
       rmSync(logsDir, { recursive: true, force: true });
     }
