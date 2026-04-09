@@ -59,7 +59,7 @@ export async function agentCreateAction(): Promise<void> {
   await output.step("Launching agent designer...");
 
   let sessionId: string | null = null;
-  const result = await agent.run({
+  await agent.run({
     cwd: process.cwd(),
     onSessionId: (id) => {
       sessionId = id;
