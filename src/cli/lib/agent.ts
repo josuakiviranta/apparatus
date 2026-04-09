@@ -99,14 +99,19 @@ export class Agent {
     return args;
   }
 
-  writeMcpConfig(cwd: string): string | null {
+  writeMcpConfig(cwd: string, variables?: Record<string, string>): string | null {
     if (this.config.mcp.length === 0) return null;
+
+    const expand = (s: string): string => {
+      if (!variables) return s;
+      return s.replace(/\{\{(\w+)\}\}/g, (match, key) => variables[key] ?? match);
+    };
 
     const mcpServers: Record<string, { command: string; args: string[] }> = {};
     for (const server of this.config.mcp) {
       mcpServers[server.name] = {
-        command: server.command,
-        args: server.args,
+        command: expand(server.command),
+        args: server.args.map(expand),
       };
     }
 
@@ -130,8 +135,8 @@ export class Agent {
   async run(options: RunOptions): Promise<RunResult> {
     const expandedPrompt = this.expandPrompt(options.variables);
 
-    // Write MCP config if needed
-    this.writeMcpConfig(options.cwd);
+    // Write MCP config if needed (expand variables in server args)
+    this.writeMcpConfig(options.cwd, options.variables);
 
     try {
       const args = this.buildArgs(options);

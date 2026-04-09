@@ -1,12 +1,9 @@
-import { spawn, spawnSync } from "child_process";
+import { spawnSync } from "child_process";
 import { existsSync } from "fs";
 import { resolve } from "path";
+import { Agent } from "../lib/agent.js";
+import { resolveAgent } from "../lib/agent-registry.js";
 import * as output from "../lib/output.js";
-import { streamEvents } from "../lib/stream-formatter.js";
-
-const BRAINSTORM_TRIGGER = `\
-Study specs/*.md and src/* in parallel using subagents to understand the project. \
-Then invoke the Skill tool with skill name "superpowers:brainstorming".`;
 
 function buildTracePath(projectPath: string, sessionId: string): string {
   const encoded = projectPath.replace(/\//g, "-");
@@ -34,37 +31,29 @@ export async function planCommand(projectFolder: string): Promise<void> {
 
   await output.header({ mode: "plan", project: absPath, branch, pid: process.pid });
 
+  const config = resolveAgent("plan");
+  const agent = new Agent(config);
+
+  // Phase 1: non-interactive kickoff
   let sessionId: string | null = null;
-
-  const child = spawn(
-    "claude",
-    ["-p", BRAINSTORM_TRIGGER, "--output-format", "stream-json", "--dangerously-skip-permissions"],
-    { cwd: absPath, env: process.env, stdio: ["ignore", "pipe", "pipe"] }
-  );
-
-  const exitPromise = new Promise<void>(res => child.on("close", () => res()));
-
-  await output.stream(
-    streamEvents(child.stdout as NodeJS.ReadableStream, {
-      onSessionId: id => { sessionId = id; },
-    })
-  );
-  await exitPromise;
+  await agent.run({
+    cwd: absPath,
+    onSessionId: (id) => {
+      sessionId = id;
+    },
+  });
 
   if (sessionId) {
     await output.info(`trace: ${buildTracePath(absPath, sessionId)}`);
   }
   await output.step("━━━ Launching interactive session ━━━");
 
-  const resumeArgs = [
-    "--dangerously-skip-permissions",
-    ...(sessionId ? ["--resume", sessionId] : []),
-  ];
-  const result = spawnSync("claude", resumeArgs, {
+  // Phase 2: interactive resume
+  const resumeResult = await agent.run({
     cwd: absPath,
-    stdio: "inherit",
-    env: process.env,
+    resume: sessionId ?? undefined,
+    interactive: true,
   });
 
-  process.exit(result.status ?? 0);
+  process.exit(resumeResult.exitCode);
 }

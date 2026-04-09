@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtempSync, rmSync, existsSync, readFileSync, chmodSync, writeFileSync } from "fs";
+import { mkdtempSync, rmSync, existsSync, readFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 
@@ -14,8 +14,6 @@ vi.mock("../lib/output.js", () => ({
   stream: vi.fn(async () => {}),
 }));
 
-import * as output from "../lib/output.js";
-
 import {
   pidPath,
   writePid,
@@ -24,10 +22,6 @@ import {
   isPidAlive,
   ensureMeditationDirs,
   appendMeditateGitignore,
-  buildMeditationArgs,
-  writeMcpConfig,
-  cleanupMcpConfig,
-  runMeditationSession,
 } from "../commands/meditate";
 
 let tmpDir: string;
@@ -117,165 +111,5 @@ describe("isPidAlive", () => {
   it("returns false for a PID that is not running", () => {
     expect(isPidAlive(999999999)).toBe(false);
   });
-});
-
-describe("writeMcpConfig", () => {
-  it("writes a .mcp.ralph-<pid>.json file in the project folder", () => {
-    const configPath = writeMcpConfig(tmpDir);
-    expect(existsSync(configPath)).toBe(true);
-    expect(configPath).toMatch(/\.mcp\.ralph-\d+\.json$/);
-  });
-
-  it("config JSON contains illumination mcpServer entry with correct projectRoot", () => {
-    const configPath = writeMcpConfig(tmpDir);
-    const config = JSON.parse(readFileSync(configPath, "utf8"));
-    expect(config.mcpServers.illumination).toBeDefined();
-    const args: string[] = config.mcpServers.illumination.args;
-    expect(args[1]).toBe(tmpDir);           // projectRoot is second arg
-    expect(args[2]).toMatch(/meditations$/); // meditationsDir is third arg
-  });
-});
-
-describe("cleanupMcpConfig", () => {
-  it("removes the config file if it exists", () => {
-    const configPath = writeMcpConfig(tmpDir);
-    cleanupMcpConfig(configPath);
-    expect(existsSync(configPath)).toBe(false);
-  });
-
-  it("does not throw if the file does not exist", () => {
-    expect(() => cleanupMcpConfig(join(tmpDir, "nonexistent.json"))).not.toThrow();
-  });
-});
-
-describe("buildMeditationArgs", () => {
-  const absPath = "/fake/project";
-  const prompt = "test prompt";
-  const mcpConfigPath = "/fake/project/.mcp.ralph-12345.json";
-
-  it("does not include native Read or Glob in allowedTools", () => {
-    const args = buildMeditationArgs(absPath, prompt, mcpConfigPath);
-    const allowed = args
-      .map((a, i) => (args[i - 1] === "--allowedTools" ? a : null))
-      .filter(Boolean);
-    expect(allowed).not.toContain("Read");
-    expect(allowed).not.toContain("Glob");
-  });
-
-  it("allows the three MCP read/glob/tree tools", () => {
-    const args = buildMeditationArgs(absPath, prompt, mcpConfigPath);
-    const allowed = args
-      .map((a, i) => (args[i - 1] === "--allowedTools" ? a : null))
-      .filter(Boolean);
-    expect(allowed).toContain("mcp__illumination__read_file");
-    expect(allowed).toContain("mcp__illumination__glob_files");
-    expect(allowed).toContain("mcp__illumination__project_tree");
-  });
-
-  it("allows the MCP illumination tool", () => {
-    const args = buildMeditationArgs(absPath, prompt, mcpConfigPath);
-    const allowed = args
-      .map((a, i) => (args[i - 1] === "--allowedTools" ? a : null))
-      .filter(Boolean);
-    expect(allowed).toContain("mcp__illumination__write_illumination");
-  });
-
-  it("does not allow Write tool", () => {
-    const args = buildMeditationArgs(absPath, prompt, mcpConfigPath);
-    const allowed = args
-      .map((a, i) => (args[i - 1] === "--allowedTools" ? a : null))
-      .filter(Boolean);
-    expect(allowed.some((a) => a?.startsWith("Write"))).toBe(false);
-  });
-
-  it("does not disallow ToolSearch explicitly (not in allowedTools is sufficient)", () => {
-    const args = buildMeditationArgs(absPath, prompt, mcpConfigPath);
-    expect(args).not.toContain("--disallowedTools");
-  });
-
-  it("passes --mcp-config with the config path", () => {
-    const args = buildMeditationArgs(absPath, prompt, mcpConfigPath);
-    const idx = args.indexOf("--mcp-config");
-    expect(args[idx + 1]).toBe(mcpConfigPath);
-  });
-
-  it("sets permission-mode to dontAsk", () => {
-    const args = buildMeditationArgs(absPath, prompt, mcpConfigPath);
-    const modeIdx = args.indexOf("--permission-mode");
-    expect(args[modeIdx + 1]).toBe("dontAsk");
-  });
-
-  it("sets --add-dir to absPath", () => {
-    const args = buildMeditationArgs(absPath, prompt, mcpConfigPath);
-    const dirIdx = args.indexOf("--add-dir");
-    expect(args[dirIdx + 1]).toBe(absPath);
-  });
-
-  it("passes prompt text via -p flag", () => {
-    const args = buildMeditationArgs(absPath, prompt, mcpConfigPath);
-    const pIdx = args.indexOf("-p");
-    expect(args[pIdx + 1]).toBe(prompt);
-  });
-
-  it("includes mcp__illumination__list_meta_meditations in allowedTools", () => {
-    const args = buildMeditationArgs(absPath, prompt, mcpConfigPath);
-    expect(args).toContain("mcp__illumination__list_meta_meditations");
-  });
-
-  it("includes mcp__illumination__read_meta_meditation in allowedTools", () => {
-    const args = buildMeditationArgs(absPath, prompt, mcpConfigPath);
-    expect(args).toContain("mcp__illumination__read_meta_meditation");
-  });
-});
-
-describe("runMeditationSession — subprocess behavior", () => {
-  let sessionDir: string;
-  let stderrSpy: ReturnType<typeof vi.spyOn>;
-  let stdoutSpy: ReturnType<typeof vi.spyOn>;
-
-  beforeEach(() => {
-    sessionDir = mkdtempSync(join(tmpdir(), "ralph-session-test-"));
-    stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
-  });
-
-  afterEach(() => {
-    rmSync(sessionDir, { recursive: true, force: true });
-    stderrSpy.mockRestore();
-    stdoutSpy.mockRestore();
-    delete process.env.RALPH_TEST_CMD;
-    vi.mocked(output.warn).mockClear();
-    vi.mocked(output.header).mockClear();
-  });
-
-  function makeStub(script: string): string {
-    const stubPath = join(sessionDir, "stub.sh");
-    writeFileSync(stubPath, `#!/bin/bash\n${script}\n`);
-    chmodSync(stubPath, 0o755);
-    return stubPath;
-  }
-
-  it("emits warning via output.warn when claude exits with non-zero code", async () => {
-    process.env.RALPH_TEST_CMD = makeStub("exit 1");
-    await runMeditationSession(sessionDir);
-    expect(output.warn).toHaveBeenCalledWith(expect.stringContaining("exited with code 1"));
-  }, 15000);
-
-  it("does not emit warning when claude exits with code 0", async () => {
-    process.env.RALPH_TEST_CMD = makeStub("exit 0");
-    await runMeditationSession(sessionDir);
-    expect(output.warn).not.toHaveBeenCalled();
-  }, 15000);
-
-  it("emits tool-use indicator for tool_use stream events", async () => {
-    const streamLine = JSON.stringify({
-      type: "assistant",
-      message: { content: [{ type: "tool_use", name: "read_file" }] },
-    });
-    process.env.RALPH_TEST_CMD = makeStub(`echo '${streamLine}'`);
-    await runMeditationSession(sessionDir);
-    const written = stdoutSpy.mock.calls.map((c) => String(c[0])).join("");
-    expect(written).toContain("→ [tool] read_file");
-  }, 15000);
 });
 

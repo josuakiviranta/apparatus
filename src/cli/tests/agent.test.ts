@@ -208,4 +208,59 @@ describe("Agent MCP config lifecycle", () => {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });
+
+  it("writeMcpConfig expands variables in server args", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "agent-mcp-"));
+    try {
+      const varConfig: AgentConfig = {
+        ...mcpConfig,
+        mcp: [
+          {
+            name: "illumination",
+            command: "node",
+            args: ["{{SERVER_PATH}}", "{{PROJECT_ROOT}}", "{{META_DIR}}"],
+          },
+        ],
+      };
+      const agent = new Agent(varConfig);
+      const configPath = agent.writeMcpConfig(tmpDir, {
+        SERVER_PATH: "/usr/bin/server.js",
+        PROJECT_ROOT: "/my/project",
+        META_DIR: "/my/meditations",
+      });
+      expect(configPath).not.toBeNull();
+      const content = JSON.parse(fs.readFileSync(configPath!, "utf-8"));
+      expect(content.mcpServers.illumination.args).toEqual([
+        "/usr/bin/server.js",
+        "/my/project",
+        "/my/meditations",
+      ]);
+      agent.cleanupMcpConfig();
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("writeMcpConfig expands variables in command", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "agent-mcp-"));
+    try {
+      const varConfig: AgentConfig = {
+        ...mcpConfig,
+        mcp: [
+          {
+            name: "test",
+            command: "{{CMD}}",
+            args: ["arg1"],
+          },
+        ],
+      };
+      const agent = new Agent(varConfig);
+      const configPath = agent.writeMcpConfig(tmpDir, { CMD: "tsx" });
+      const content = JSON.parse(fs.readFileSync(configPath!, "utf-8"));
+      expect(content.mcpServers.test.command).toBe("tsx");
+      agent.cleanupMcpConfig();
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
 });

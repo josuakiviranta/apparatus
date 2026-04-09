@@ -1,17 +1,13 @@
-import { spawn, spawnSync } from "child_process";
-import { existsSync, readFileSync } from "fs";
+import { spawnSync } from "child_process";
+import { existsSync } from "fs";
 import { resolve } from "path";
-import { getMeditateCreatePromptPath } from "../lib/assets";
+import { Agent } from "../lib/agent.js";
+import { resolveAgent } from "../lib/agent-registry.js";
 import * as output from "../lib/output.js";
-import { streamEvents } from "../lib/stream-formatter.js";
 
 function buildTracePath(projectPath: string, sessionId: string): string {
   const encoded = projectPath.replace(/\//g, "-");
   return `${process.env.HOME ?? "~"}/.claude/projects/${encoded}/${sessionId}.jsonl`;
-}
-
-export function buildMeditateCreateKickoffArgs(promptText: string): string[] {
-  return ["-p", promptText, "--output-format", "stream-json", "--dangerously-skip-permissions"];
 }
 
 export async function meditateCreateCommand(projectFolder: string): Promise<void> {
@@ -33,33 +29,30 @@ export async function meditateCreateCommand(projectFolder: string): Promise<void
 
   await output.header({ mode: "meditate", project: absPath, branch, pid: process.pid });
 
-  const promptPath = getMeditateCreatePromptPath();
-  const promptText = readFileSync(promptPath, "utf8");
-  const args = buildMeditateCreateKickoffArgs(promptText);
+  const config = resolveAgent("meditate-create");
+  const agent = new Agent(config);
 
+  // Phase 1: non-interactive kickoff
   let sessionId: string | null = null;
-
-  const child = spawn("claude", args, {
+  await agent.run({
     cwd: absPath,
-    env: process.env,
-    stdio: ["ignore", "pipe", "pipe"],
+    onSessionId: (id) => {
+      sessionId = id;
+    },
   });
-
-  const exitPromise = new Promise<void>(res => child.on("close", () => res()));
-
-  await output.stream(
-    streamEvents(child.stdout as NodeJS.ReadableStream, {
-      onSessionId: id => { sessionId = id; },
-    })
-  );
-  await exitPromise;
 
   if (sessionId) {
     await output.info(`trace: ${buildTracePath(absPath, sessionId)}`);
   }
+
   await output.step("━━━ Launching interactive session ━━━");
 
-  const resumeArgs = ["--dangerously-skip-permissions", ...(sessionId ? ["--resume", sessionId] : [])];
-  const result = spawnSync("claude", resumeArgs, { cwd: absPath, stdio: "inherit", env: process.env });
-  process.exit(result.status ?? 0);
+  // Phase 2: interactive resume
+  const resumeResult = await agent.run({
+    cwd: absPath,
+    resume: sessionId ?? undefined,
+    interactive: true,
+  });
+
+  process.exit(resumeResult.exitCode);
 }

@@ -1,10 +1,9 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, rmSync } from "fs";
-import { join, resolve, dirname } from "path";
-import { fileURLToPath } from "url";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-import { spawnSync, spawn } from "child_process";
-import { getMeditationPromptPath, getIlluminationServerPath, getMetaMeditationsDir } from "../lib/assets";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from "fs";
+import { join, resolve } from "path";
+import { spawnSync } from "child_process";
+import { Agent } from "../lib/agent.js";
+import { resolveAgent } from "../lib/agent-registry.js";
+import { getIlluminationServerPath, getMetaMeditationsDir } from "../lib/assets.js";
 import * as output from "../lib/output.js";
 
 // ─── PID lock utilities ───────────────────────────────────────────────────────
@@ -53,114 +52,55 @@ export function appendMeditateGitignore(projectFolder: string): void {
   writeFileSync(gitignorePath, existing + sep + toAdd.join("\n") + "\n");
 }
 
-// ─── MCP config management ────────────────────────────────────────────────────
+// ─── Dev/prod detection ──────────────────────────────────────────────────────
 
 function isDevMode(): boolean {
   return typeof __RALPH_PROD__ === "undefined";
 }
 
-export function writeMcpConfig(projectRoot: string): string {
-  const configPath = join(projectRoot, `.mcp.ralph-${process.pid}.json`);
-  const serverPath = getIlluminationServerPath();
-  const command = isDevMode() ? "tsx" : "node";
-  const config = {
-    mcpServers: {
-      illumination: {
-        type: "stdio",
-        command,
-        args: [serverPath, projectRoot, getMetaMeditationsDir()],
-      },
-    },
-  };
-  writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
-  return configPath;
-}
-
-export function cleanupMcpConfig(configPath: string): void {
-  rmSync(configPath, { force: true });
-}
-
 // ─── Session runner ───────────────────────────────────────────────────────────
-
-export function buildMeditationArgs(
-  absPath: string,
-  promptText: string,
-  mcpConfigPath: string
-): string[] {
-  return [
-    "--print",
-    "--output-format", "stream-json",
-    "--permission-mode", "dontAsk",
-    "--allowedTools", "mcp__illumination__read_file",
-    "--allowedTools", "mcp__illumination__glob_files",
-    "--allowedTools", "mcp__illumination__project_tree",
-    "--allowedTools", "mcp__illumination__write_illumination",
-    "--allowedTools", "mcp__illumination__list_meta_meditations",
-    "--allowedTools", "mcp__illumination__read_meta_meditation",
-    "--mcp-config", mcpConfigPath,
-    "--add-dir", absPath,
-    "-p", promptText,
-  ];
-}
 
 export async function runMeditationSession(absPath: string): Promise<void> {
   writePid(absPath, process.pid);
 
-  const prompt = readFileSync(getMeditationPromptPath(), "utf8");
-  const mcpConfigPath = writeMcpConfig(absPath);
-
   await output.header({ mode: "meditate", project: absPath, pid: process.pid });
 
-  const args = buildMeditationArgs(absPath, prompt, mcpConfigPath);
+  const config = resolveAgent("meditate");
 
-  const cmd = process.env.RALPH_TEST_CMD ?? "claude";
-  const child = spawn(cmd, args, {
-    cwd: absPath,
-    stdio: ["ignore", "pipe", "pipe"],
-    env: process.env,
-  });
+  // Override MCP command for dev mode (tsx instead of node)
+  if (isDevMode()) {
+    for (const mcp of config.mcp) {
+      if (mcp.command === "node") mcp.command = "tsx";
+    }
+  }
+
+  const agent = new Agent(config);
 
   const cleanup = () => {
-    child.kill("SIGTERM");
+    agent.kill();
     removePid(absPath);
-    cleanupMcpConfig(mcpConfigPath);
   };
   process.once("SIGTERM", cleanup);
   process.once("SIGINT", cleanup);
 
-  let buffer = "";
-  child.stdout.on("data", (chunk: Buffer) => {
-    buffer += chunk.toString();
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? "";
-    for (const line of lines) {
-      if (!line.trim()) continue;
-      try {
-        const msg = JSON.parse(line);
-        if (msg.type === "assistant") {
-          for (const block of (msg.message?.content ?? [])) {
-            if (block.type === "text") {
-              process.stdout.write(block.text);
-            } else if (block.type === "tool_use") {
-              process.stdout.write(`\n→ [tool] ${block.name}\n`);
-            }
-          }
-        }
-      } catch {}
+  try {
+    const result = await agent.run({
+      cwd: absPath,
+      variables: {
+        ILLUMINATION_SERVER_PATH: getIlluminationServerPath(),
+        PROJECT_ROOT: absPath,
+        META_MEDITATIONS_DIR: getMetaMeditationsDir(),
+      },
+    });
+
+    if (result.exitCode !== 0) {
+      await output.warn(`claude exited with code ${result.exitCode}`);
     }
-  });
-
-  child.stderr.on("data", (chunk: Buffer) => process.stderr.write(chunk));
-
-  await new Promise<void>((res) => child.on("close", async (code) => {
-    if (code !== 0) await output.warn(`claude exited with code ${code}`);
-    try { cleanupMcpConfig(mcpConfigPath); } catch {}
-    res();
-  }));
-
-  process.off("SIGTERM", cleanup);
-  process.off("SIGINT", cleanup);
-  removePid(absPath);
+  } finally {
+    process.off("SIGTERM", cleanup);
+    process.off("SIGINT", cleanup);
+    removePid(absPath);
+  }
 }
 
 // ─── Command entry point ──────────────────────────────────────────────────────

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { buildMeditateCreateKickoffArgs, meditateCreateCommand } from "../commands/meditate-create";
+import { meditateCreateCommand } from "../commands/meditate-create";
 import { join } from "path";
 import { tmpdir } from "os";
 
@@ -9,30 +9,11 @@ vi.mock("../lib/output.js", () => ({
   info: vi.fn(async () => {}),
   warn: vi.fn(async () => {}),
   success: vi.fn(async () => {}),
+  header: vi.fn(async () => {}),
+  stream: vi.fn(async () => {}),
 }));
 
 import * as output from "../lib/output.js";
-
-describe("buildMeditateCreateKickoffArgs", () => {
-  it("includes -p with the prompt text", () => {
-    const args = buildMeditateCreateKickoffArgs("my prompt");
-    const idx = args.indexOf("-p");
-    expect(idx).not.toBe(-1);
-    expect(args[idx + 1]).toBe("my prompt");
-  });
-
-  it("includes --output-format stream-json", () => {
-    const args = buildMeditateCreateKickoffArgs("x");
-    const idx = args.indexOf("--output-format");
-    expect(idx).not.toBe(-1);
-    expect(args[idx + 1]).toBe("stream-json");
-  });
-
-  it("includes --dangerously-skip-permissions", () => {
-    const args = buildMeditateCreateKickoffArgs("x");
-    expect(args).toContain("--dangerously-skip-permissions");
-  });
-});
 
 describe("meditateCreateCommand", () => {
   afterEach(() => {
