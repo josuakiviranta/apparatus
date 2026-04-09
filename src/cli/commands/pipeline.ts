@@ -102,7 +102,7 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
   if (graph.goal) push({ kind: "info", text: `goal: ${graph.goal}` });
   const overviewNodes = [...graph.nodes.values()]
     .filter(n => n.shape !== "Mdiamond" && n.shape !== "Msquare")
-    .map(n => `${n.label ?? n.id} [${shapeToType(n.shape)}]`)
+    .map(n => `${n.id} [${shapeToType(n.shape)}]`)
     .join(" → ");
   if (overviewNodes) push({ kind: "info", text: `nodes: ${overviewNodes}` });
 

@@ -152,6 +152,33 @@ describe("pipelineRunCommand", () => {
     expect(opts.logsRoot).toContain(join(".ralph", "runs", "g"));
     expect(opts.logsRoot).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
   });
+
+  it("nodes overview uses node IDs, not raw labels", async () => {
+    const dot = `digraph my_pipeline {
+      start [shape=Mdiamond]
+      worker [shape=box]
+      approval [shape=hexagon, label="Approve?\\n$some_var\\n$other_var"]
+      done [shape=Msquare]
+      start -> worker -> approval -> done
+    }`;
+    const dotFile = join(dir, "test-labels.dot");
+    writeFileSync(dotFile, dot);
+    await pipelineRunCommand(dotFile, { logsRoot: dir });
+
+    const { renderPipelineDisplay } = await import("../components/PipelineDisplay.js");
+    const mockDisplay = renderPipelineDisplay as ReturnType<typeof vi.fn>;
+    const result = await mockDisplay.mock.results[0].value;
+    const pushCalls: Array<{ kind: string; text?: string }> = (result.callbacks.push as ReturnType<typeof vi.fn>).mock.calls.map((c: any[]) => c[0]);
+    const overviewCall = pushCalls.find(c => c.kind === "info" && c.text?.startsWith("nodes:"));
+
+    expect(overviewCall).toBeDefined();
+    expect(overviewCall!.text).toContain("worker");
+    expect(overviewCall!.text).toContain("approval");
+    // Must NOT contain raw label content
+    expect(overviewCall!.text).not.toContain("Approve?");
+    expect(overviewCall!.text).not.toContain("\\n");
+    expect(overviewCall!.text).not.toContain("$some_var");
+  });
 });
 
 describe("pipelineListCommand", () => {
