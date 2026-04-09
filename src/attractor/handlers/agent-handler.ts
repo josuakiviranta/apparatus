@@ -67,7 +67,10 @@ export class AgentHandler implements NodeHandler {
       { timestamp: "", currentNode: node.id, completedNodes, nodeRetries, context: ctx.values } as CheckpointState,
       fidelity,
     );
-    const prompt = preamble + expandedRawPrompt;
+    const jsonWrappedPrompt = jsonSchema
+      ? `IMPORTANT: Your FINAL response MUST be valid JSON matching this schema. No markdown, no preamble, output ONLY the JSON object.\nSchema: ${jsonSchema}\n\n${expandedRawPrompt}\n\nREMINDER: Output MUST be valid JSON matching the schema above. No markdown, no explanation.`
+      : expandedRawPrompt;
+    const prompt = preamble + jsonWrappedPrompt;
     writeFileSync(join(nodeDir, "prompt.md"), prompt);
 
     // Override config.prompt so Agent.run() delivers the assembled preamble + node prompt
