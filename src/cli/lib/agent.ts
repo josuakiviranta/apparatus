@@ -1,3 +1,9 @@
+import { spawn, type ChildProcess } from "node:child_process";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { Readable } from "node:stream";
+import * as readline from "node:readline";
+
 export interface McpServerConfig {
   name: string;
   command: string;
@@ -35,6 +41,173 @@ const DEFAULTS: Partial<AgentConfig> = {
   tools: [],
   mcp: [],
 };
+
+export class Agent {
+  private _mcpConfigPath: string | null = null;
+  private _child: ChildProcess | null = null;
+
+  constructor(public readonly config: AgentConfig) {}
+
+  get mcpConfigPath(): string | null {
+    return this._mcpConfigPath;
+  }
+
+  expandPrompt(variables?: Record<string, string>): string {
+    if (!variables) return this.config.prompt;
+    let result = this.config.prompt;
+    for (const [key, value] of Object.entries(variables)) {
+      result = result.replace(new RegExp(`\\{\\{${key}\\}\\}`, "g"), value);
+    }
+    return result;
+  }
+
+  buildArgs(options: RunOptions): string[] {
+    const args: string[] = [];
+
+    // Model
+    args.push("--model", this.config.model);
+
+    // Permission mode
+    if (this.config.permissionMode === "dangerouslySkipPermissions") {
+      args.push("--dangerously-skip-permissions");
+    } else {
+      args.push("--permission-mode", this.config.permissionMode);
+    }
+
+    // Tools
+    if (this.config.tools.length > 0) {
+      for (const tool of this.config.tools) {
+        args.push("--allowedTools", tool);
+      }
+    }
+
+    // MCP config
+    if (this._mcpConfigPath) {
+      args.push("--mcp-config", this._mcpConfigPath);
+    }
+
+    // Output format (non-interactive only)
+    if (!options.interactive) {
+      args.push("--output-format", "stream-json");
+    }
+
+    // Resume or prompt
+    if (options.resume) {
+      args.push("--resume", options.resume);
+    }
+
+    return args;
+  }
+
+  writeMcpConfig(cwd: string): string | null {
+    if (this.config.mcp.length === 0) return null;
+
+    const mcpServers: Record<string, { command: string; args: string[] }> = {};
+    for (const server of this.config.mcp) {
+      mcpServers[server.name] = {
+        command: server.command,
+        args: server.args,
+      };
+    }
+
+    const configPath = path.join(cwd, `.mcp-${this.config.name}-${Date.now()}.json`);
+    fs.writeFileSync(configPath, JSON.stringify({ mcpServers }, null, 2));
+    this._mcpConfigPath = configPath;
+    return configPath;
+  }
+
+  cleanupMcpConfig(): void {
+    if (this._mcpConfigPath) {
+      try {
+        fs.unlinkSync(this._mcpConfigPath);
+      } catch {
+        // File may already be removed
+      }
+      this._mcpConfigPath = null;
+    }
+  }
+
+  async run(options: RunOptions): Promise<RunResult> {
+    const expandedPrompt = this.expandPrompt(options.variables);
+
+    // Write MCP config if needed
+    this.writeMcpConfig(options.cwd);
+
+    try {
+      const args = this.buildArgs(options);
+      const isInteractive = !!options.interactive;
+      const isResume = !!options.resume;
+
+      // Add -p for non-interactive, non-resume runs (prompt piped via stdin)
+      if (!isInteractive && !isResume) {
+        args.unshift("-p");
+      }
+
+      const spawnOptions: any = {
+        cwd: options.cwd,
+        detached: true,
+      };
+
+      if (isInteractive) {
+        spawnOptions.stdio = "inherit";
+      } else {
+        spawnOptions.stdio = ["pipe", "pipe", "inherit"];
+      }
+
+      const child = spawn("claude", args, spawnOptions);
+      this._child = child;
+
+      // Pipe prompt to stdin for non-interactive, non-resume
+      if (!isInteractive && !isResume && child.stdin) {
+        child.stdin.write(expandedPrompt);
+        child.stdin.end();
+      }
+
+      // Capture session ID from stream-json output
+      let sessionId: string | null = null;
+
+      if (!isInteractive && child.stdout) {
+        const rl = readline.createInterface({ input: child.stdout });
+        rl.on("line", (line) => {
+          try {
+            const parsed = JSON.parse(line);
+            if (parsed.session_id && !sessionId) {
+              sessionId = parsed.session_id;
+              options.onSessionId?.(sessionId!);
+            }
+          } catch {
+            // Not JSON, ignore
+          }
+        });
+      }
+
+      const exitCode = await new Promise<number>((resolve) => {
+        child.on("close", (code) => {
+          resolve(code ?? 1);
+        });
+      });
+
+      return {
+        exitCode,
+        sessionId,
+        stdout: isInteractive ? null : (child.stdout as Readable | null),
+      };
+    } finally {
+      this.cleanupMcpConfig();
+      this._child = null;
+    }
+  }
+
+  kill(): void {
+    if (this._child?.pid) {
+      try {
+        process.kill(-this._child.pid, "SIGTERM");
+      } catch {
+        // Process may already be dead
+      }
+    }
+  }
+}
 
 export function validateAgentConfig(
   config: Partial<AgentConfig> & { prompt?: string },
