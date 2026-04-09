@@ -1,0 +1,15 @@
+digraph structured_output_test {
+  goal="Debug structured JSON output and context propagation at three complexity levels"
+
+  start [shape=Mdiamond]
+
+  trivial [agent="implement", json_schema_file="pipelines/schemas/structured-output-test.json", prompt="You are the FIRST node in a debug pipeline. There is no prior context.\n\nReturn structured JSON with these exact values:\n- level: \"trivial\"\n- works: true\n- message: \"trivial-says-hello\"\n- received_context: \"none\"\n\nDo NOT use any tools. Do NOT read any files. Just return the JSON."]
+
+  light [agent="implement", json_schema_file="pipelines/schemas/structured-output-test.json", prompt="You are the SECOND node in a debug pipeline.\n\nThe previous node sent you this message: $message\n\n1. Read the file README.md and count its lines.\n2. Return structured JSON with these exact values:\n- level: \"light\"\n- works: true\n- message: \"light-confirms-trivial\"\n- received_context: whatever you received in the $message variable above (copy it exactly)"]
+
+  heavy [agent="implement", json_schema_file="pipelines/schemas/structured-output-test.json", prompt="You are the THIRD and final node in a debug pipeline.\n\nThe previous node sent you this message: $message\n\n1. Read package.json and note the project name.\n2. Read tsconfig.json and note the target.\n3. Read README.md and note the first heading.\n4. Return structured JSON with these exact values:\n- level: \"heavy\"\n- works: true\n- message: \"heavy-confirms-light\"\n- received_context: whatever you received in the $message variable above (copy it exactly)"]
+
+  done [shape=Msquare]
+
+  start -> trivial -> light -> heavy -> done
+}
