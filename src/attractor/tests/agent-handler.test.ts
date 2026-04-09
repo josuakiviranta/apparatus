@@ -291,7 +291,7 @@ describe("AgentHandler", () => {
     writeFileSync(join(schemaDir, "test.json"), schema);
 
     mockResolve.mockReturnValue({ ...baseConfig });
-    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: '{"verdict":"true"}' });
+    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: JSON.stringify([{ type: "result", result: "", structured_output: { verdict: "true" } }]) });
 
     let capturedConfig: any = null;
     const handler = new AgentHandler({
@@ -320,8 +320,10 @@ describe("AgentHandler", () => {
     writeFileSync(join(schemaDir, "test.json"), schema);
 
     mockResolve.mockReturnValue({ ...baseConfig });
-    const ndjsonOutput = JSON.stringify({ type: "result", result: JSON.stringify({ verdict: "true", path: "/foo.md" }) });
-    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: "s1", stdout: null, output: ndjsonOutput });
+    const jsonArrayOutput = JSON.stringify([
+      { type: "result", result: "", structured_output: { verdict: "true", path: "/foo.md" }, session_id: "s1" },
+    ]);
+    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: "s1", stdout: null, output: jsonArrayOutput });
 
     const handler = new AgentHandler({
       resolveAgent: mockResolve,
@@ -352,14 +354,13 @@ describe("AgentHandler", () => {
     writeFileSync(join(schemaDir, "test.json"), schema);
 
     mockResolve.mockReturnValue({ ...baseConfig });
-    // Simulate Claude CLI NDJSON output: system, assistant, result events on separate lines
-    const innerJson = JSON.stringify({ verdict: "true", path: "/foo.md" });
-    const ndjsonOutput = [
-      JSON.stringify({ type: "system", subtype: "init", session_id: "s1" }),
-      JSON.stringify({ type: "assistant", message: { content: [{ type: "text", text: "thinking..." }] } }),
-      JSON.stringify({ type: "result", subtype: "success", result: innerJson, session_id: "s1" }),
-    ].join("\n");
-    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: "s1", stdout: null, output: ndjsonOutput });
+    // Real Claude CLI --output-format json: single-line JSON array of events
+    const jsonArrayOutput = JSON.stringify([
+      { type: "system", subtype: "init", session_id: "s1" },
+      { type: "assistant", message: { content: [{ type: "text", text: "thinking..." }] } },
+      { type: "result", subtype: "success", result: "", structured_output: { verdict: "true", path: "/foo.md" }, session_id: "s1" },
+    ]);
+    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: "s1", stdout: null, output: jsonArrayOutput });
 
     const handler = new AgentHandler({
       resolveAgent: mockResolve,
@@ -383,7 +384,7 @@ describe("AgentHandler", () => {
     }
   });
 
-  it("unwraps Claude CLI single object wrapper before parsing", async () => {
+  it("extracts structured_output from result event (real CLI format)", async () => {
     const schema = JSON.stringify({ type: "object", properties: { preferred_label: { type: "string" } } });
     const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-test-"));
     const schemaDir = join(logsDir, "schemas");
@@ -391,8 +392,11 @@ describe("AgentHandler", () => {
     writeFileSync(join(schemaDir, "test.json"), schema);
 
     mockResolve.mockReturnValue({ ...baseConfig });
-    const innerJson = JSON.stringify({ preferred_label: "false" });
-    const wrapper = JSON.stringify({ type: "result", subtype: "success", result: innerJson, session_id: "s2" });
+    // Real CLI: result="" with structured_output containing the data
+    const wrapper = JSON.stringify([
+      { type: "system", subtype: "init", session_id: "s2" },
+      { type: "result", subtype: "success", result: "", structured_output: { preferred_label: "false" }, session_id: "s2" },
+    ]);
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: "s2", stdout: null, output: wrapper });
 
     const handler = new AgentHandler({
@@ -423,8 +427,10 @@ describe("AgentHandler", () => {
     writeFileSync(join(schemaDir, "test.json"), schema);
 
     mockResolve.mockReturnValue({ ...baseConfig });
-    const ndjsonLabel = JSON.stringify({ type: "result", result: JSON.stringify({ preferred_label: "false" }) });
-    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: ndjsonLabel });
+    const jsonArrayOutput = JSON.stringify([
+      { type: "result", result: "", structured_output: { preferred_label: "false" } },
+    ]);
+    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: jsonArrayOutput });
 
     const handler = new AgentHandler({
       resolveAgent: mockResolve,

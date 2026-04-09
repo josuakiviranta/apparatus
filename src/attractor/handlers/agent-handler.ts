@@ -129,28 +129,49 @@ export class AgentHandler implements NodeHandler {
     if (jsonSchema && lastResult?.output) {
       writeFileSync(join(nodeDir, "raw-output.txt"), lastResult.output);
       try {
-        // Claude CLI emits newline-delimited JSON events.
-        // Find the last {type:"result"} line and extract its .result field.
-        const lines = lastResult.output.trim().split("\n");
+        // Claude CLI --output-format json emits a JSON array of events on one line.
+        // Claude CLI --output-format stream-json emits NDJSON (one event per line).
+        // Handle both: try JSON array first, fall back to NDJSON line-by-line.
+        const trimmed = lastResult.output.trim();
+        const events: unknown[] = [];
+
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (Array.isArray(parsed)) {
+            events.push(...parsed);
+          } else {
+            events.push(parsed);
+          }
+        } catch {
+          // Not a single JSON value — try NDJSON line-by-line
+          for (const line of trimmed.split("\n")) {
+            try { events.push(JSON.parse(line)); } catch { /* skip non-JSON */ }
+          }
+        }
+
+        // Find the last {type:"result"} event.
+        // structured_output (json-schema mode) takes priority over result field.
         let resultPayload: string | undefined;
 
-        for (const line of lines) {
-          try {
-            const event = JSON.parse(line);
-            if (event?.type === "result" && event.result != null) {
-              resultPayload = typeof event.result === "string"
-                ? event.result
-                : JSON.stringify(event.result);
-            }
-          } catch {
-            // Skip non-JSON lines
+        for (const evt of events) {
+          const event = evt as Record<string, unknown>;
+          if (event?.type !== "result") continue;
+
+          if (event.structured_output != null) {
+            resultPayload = typeof event.structured_output === "string"
+              ? event.structured_output
+              : JSON.stringify(event.structured_output);
+          } else if (event.result != null && event.result !== "") {
+            resultPayload = typeof event.result === "string"
+              ? event.result
+              : JSON.stringify(event.result);
           }
         }
 
         if (!resultPayload) {
           return {
             status: "fail",
-            failureReason: `Structured output: no {type:"result"} event found in ${lines.length} output lines`,
+            failureReason: `Structured output: no {type:"result"} event found in ${events.length} events`,
             contextUpdates: {
               "agent.iterations": String(iteration),
               "agent.success": "false",

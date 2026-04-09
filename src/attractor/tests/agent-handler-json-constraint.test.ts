@@ -52,7 +52,7 @@ describe("AgentHandler – JSON constraint injection", () => {
     writeFileSync(join(schemaDir, "test.json"), schema);
 
     mockResolve.mockReturnValue({ ...baseConfig });
-    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: '{"verdict":"pass"}' });
+    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: JSON.stringify([{ type: "result", result: "", structured_output: { verdict: "pass" } }]) });
 
     let capturedConfig: any = null;
     const handler = new AgentHandler({
@@ -86,7 +86,7 @@ describe("AgentHandler – JSON constraint injection", () => {
     writeFileSync(join(schemaDir, "test.json"), schema);
 
     mockResolve.mockReturnValue({ ...baseConfig });
-    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: '{"verdict":"pass"}' });
+    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: JSON.stringify([{ type: "result", result: "", structured_output: { verdict: "pass" } }]) });
 
     let capturedConfig: any = null;
     const handler = new AgentHandler({
@@ -174,7 +174,7 @@ describe("AgentHandler – JSON constraint injection", () => {
     }
   });
 
-  it("parses NDJSON output and extracts {type:'result'} event", async () => {
+  it("parses JSON array output and extracts structured_output from result event", async () => {
     const schema = JSON.stringify({ type: "object", properties: { verdict: { type: "string" } } });
     const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-json-constraint-"));
     const schemaDir = join(logsDir, "schemas");
@@ -182,13 +182,13 @@ describe("AgentHandler – JSON constraint injection", () => {
     writeFileSync(join(schemaDir, "test.json"), schema);
 
     mockResolve.mockReturnValue({ ...baseConfig });
-    // Simulate NDJSON output: multiple event lines, result is last
-    const ndjson = [
-      JSON.stringify({ type: "assistant", message: { content: "thinking..." } }),
-      JSON.stringify({ type: "tool_use", tool: "Read", input: { path: "/tmp/x" } }),
-      JSON.stringify({ type: "result", result: JSON.stringify({ verdict: "pass", notes: "all good" }) }),
-    ].join("\n");
-    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: ndjson });
+    // Real Claude CLI --output-format json: JSON array with structured_output
+    const jsonArray = JSON.stringify([
+      { type: "assistant", message: { content: "thinking..." } },
+      { type: "tool_use", tool: "Read", input: { path: "/tmp/x" } },
+      { type: "result", result: "", structured_output: { verdict: "pass", notes: "all good" } },
+    ]);
+    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: jsonArray });
 
     const handler = new AgentHandler({
       resolveAgent: mockResolve,
@@ -210,7 +210,7 @@ describe("AgentHandler – JSON constraint injection", () => {
     }
   });
 
-  it("returns descriptive failure when NDJSON has no {type:'result'} event", async () => {
+  it("returns descriptive failure when output has no {type:'result'} event", async () => {
     const schema = JSON.stringify({ type: "object", properties: { verdict: { type: "string" } } });
     const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-json-constraint-"));
     const schemaDir = join(logsDir, "schemas");
@@ -218,12 +218,12 @@ describe("AgentHandler – JSON constraint injection", () => {
     writeFileSync(join(schemaDir, "test.json"), schema);
 
     mockResolve.mockReturnValue({ ...baseConfig });
-    // Simulate truncated session: events but no result
-    const ndjson = [
-      JSON.stringify({ type: "assistant", message: { content: "working..." } }),
-      JSON.stringify({ type: "tool_use", tool: "Bash", input: { command: "ls" } }),
-    ].join("\n");
-    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: ndjson });
+    // Truncated session: JSON array with events but no result
+    const jsonArray = JSON.stringify([
+      { type: "assistant", message: { content: "working..." } },
+      { type: "tool_use", tool: "Bash", input: { command: "ls" } },
+    ]);
+    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: jsonArray });
 
     const handler = new AgentHandler({
       resolveAgent: mockResolve,
@@ -244,7 +244,7 @@ describe("AgentHandler – JSON constraint injection", () => {
     }
   });
 
-  it("parses NDJSON when result is a raw object (not stringified)", async () => {
+  it("parses structured_output when it is a raw object", async () => {
     const schema = JSON.stringify({ type: "object", properties: { verdict: { type: "string" } } });
     const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-json-constraint-"));
     const schemaDir = join(logsDir, "schemas");
@@ -252,12 +252,12 @@ describe("AgentHandler – JSON constraint injection", () => {
     writeFileSync(join(schemaDir, "test.json"), schema);
 
     mockResolve.mockReturnValue({ ...baseConfig });
-    // result is a raw object, not a JSON string — exercises the non-string branch
-    const ndjson = [
-      JSON.stringify({ type: "assistant", message: { content: "done" } }),
-      JSON.stringify({ type: "result", result: { verdict: "pass" } }),
-    ].join("\n");
-    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: ndjson });
+    // structured_output as raw object (not stringified) — exercises the non-string branch
+    const jsonArray = JSON.stringify([
+      { type: "assistant", message: { content: "done" } },
+      { type: "result", result: "", structured_output: { verdict: "pass" } },
+    ]);
+    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: jsonArray });
 
     const handler = new AgentHandler({
       resolveAgent: mockResolve,
@@ -286,8 +286,10 @@ describe("AgentHandler – JSON constraint injection", () => {
     writeFileSync(join(schemaDir, "test.json"), schema);
 
     mockResolve.mockReturnValue({ ...baseConfig });
-    const ndjson = JSON.stringify({ type: "result", result: JSON.stringify({ verdict: "pass" }) });
-    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: ndjson });
+    const jsonArray = JSON.stringify([
+      { type: "result", result: "", structured_output: { verdict: "pass" } },
+    ]);
+    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: jsonArray });
 
     const handler = new AgentHandler({
       resolveAgent: mockResolve,
