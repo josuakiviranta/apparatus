@@ -18,6 +18,7 @@ export interface AgentConfig {
   tools: string[];
   mcp: McpServerConfig[];
   prompt: string;
+  jsonSchema?: string;
 }
 
 export interface RunOptions {
@@ -36,6 +37,8 @@ export interface RunResult {
   exitCode: number;
   sessionId: string | null;
   stdout: import("stream").Readable | null;
+  /** Buffered stdout content — populated when config.jsonSchema is set */
+  output?: string;
 }
 
 const DEFAULTS: Partial<AgentConfig> = {
@@ -91,7 +94,12 @@ export class Agent {
 
     // Output format (non-interactive only)
     if (!options.interactive) {
-      args.push("--output-format", "stream-json");
+      if (this.config.jsonSchema) {
+        args.push("--output-format", "json");
+        args.push("--json-schema", this.config.jsonSchema);
+      } else {
+        args.push("--output-format", "stream-json");
+      }
     }
 
     // Resume or prompt
@@ -182,7 +190,25 @@ export class Agent {
         });
       });
 
-      if (!isInteractive && child.stdout && options.onStdout) {
+      let capturedOutput = "";
+
+      if (this.config.jsonSchema && !isInteractive && child.stdout) {
+        // Structured output: buffer stdout for JSON parsing.
+        // Skip onStdout — structured nodes produce a single JSON blob, not a stream.
+        const rl = readline.createInterface({ input: child.stdout });
+        rl.on("line", (line) => {
+          capturedOutput += line + "\n";
+          try {
+            const parsed = JSON.parse(line);
+            if (parsed.session_id && !sessionId) {
+              sessionId = parsed.session_id;
+              options.onSessionId?.(sessionId!);
+            }
+          } catch {
+            // Not JSON line, still captured
+          }
+        });
+      } else if (!isInteractive && child.stdout && options.onStdout) {
         // Caller consumes stdout (e.g. streamEvents → output.stream)
         await options.onStdout(child.stdout);
       } else if (!isInteractive && child.stdout) {
@@ -205,7 +231,8 @@ export class Agent {
       return {
         exitCode,
         sessionId,
-        stdout: isInteractive ? null : (child.stdout as Readable | null),
+        stdout: (isInteractive || this.config.jsonSchema) ? null : (child.stdout as Readable | null),
+        output: capturedOutput || undefined,
       };
     } finally {
       this.cleanupMcpConfig();

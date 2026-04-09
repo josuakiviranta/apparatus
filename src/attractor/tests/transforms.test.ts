@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { variableExpansionTransform } from "../transforms/variable-expansion.js";
+import { variableExpansionTransform, expandVariables } from "../transforms/variable-expansion.js";
 import { buildPreamble } from "../transforms/preamble.js";
 import type { Graph, CheckpointState } from "../types.js";
 
@@ -55,6 +55,33 @@ describe("variableExpansionTransform", () => {
     g.nodes.get("work")!.prompt = "Value: $unknown.key";
     const result = variableExpansionTransform(g, { project: "/proj", context: {} });
     expect(result.nodes.get("work")?.prompt).toBe("Value: $unknown.key");
+  });
+});
+
+describe("expandVariables", () => {
+  it("expands $key references from context", () => {
+    const result = expandVariables(
+      "File at $illumination_path has $summary",
+      { illumination_path: "/meditations/foo.md", summary: "a bug" },
+    );
+    expect(result).toBe("File at /meditations/foo.md has a bug");
+  });
+
+  it("leaves $goal and $project unexpanded (handled by graph transform)", () => {
+    const result = expandVariables("Goal: $goal, Path: $illumination_path", {
+      illumination_path: "/foo.md",
+    });
+    expect(result).toBe("Goal: $goal, Path: /foo.md");
+  });
+
+  it("leaves unknown variables as-is", () => {
+    const result = expandVariables("Value: $missing.key", {});
+    expect(result).toBe("Value: $missing.key");
+  });
+
+  it("returns input unchanged when context is empty", () => {
+    const result = expandVariables("No vars here", {});
+    expect(result).toBe("No vars here");
   });
 });
 

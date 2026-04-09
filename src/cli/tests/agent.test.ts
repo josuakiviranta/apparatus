@@ -111,6 +111,23 @@ describe("Agent.buildArgs", () => {
     expect(args).toContain("--output-format");
     expect(args).toContain("stream-json");
   });
+
+  it("includes --json-schema and --output-format json when jsonSchema is set", () => {
+    const agent = new Agent({ ...baseConfig, jsonSchema: '{"type":"object"}' });
+    const args = agent.buildArgs({ cwd: "/tmp" });
+    expect(args).toContain("--json-schema");
+    expect(args).toContain('{"type":"object"}');
+    expect(args).toContain("--output-format");
+    expect(args).toContain("json");
+    expect(args).not.toContain("stream-json");
+  });
+
+  it("uses stream-json when jsonSchema is not set", () => {
+    const agent = new Agent(baseConfig);
+    const args = agent.buildArgs({ cwd: "/tmp" });
+    expect(args).toContain("stream-json");
+    expect(args).not.toContain("--json-schema");
+  });
 });
 
 describe("Agent.expandPrompt", () => {

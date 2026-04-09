@@ -24,7 +24,14 @@ export async function agentShowAction(
   name: string,
   opts?: RegistryOptions,
 ): Promise<AgentConfig> {
-  const config = resolveAgent(name, opts);
+  let config: AgentConfig;
+  try {
+    config = resolveAgent(name, opts);
+  } catch {
+    const msg = `Unknown agent: "${name}"`;
+    await output.error(msg);
+    throw new Error(msg);
+  }
 
   const toolsStr = config.tools.length > 0 ? config.tools.join(", ") : "(unrestricted)";
   const mcpStr = config.mcp.length > 0

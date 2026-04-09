@@ -1,0 +1,15 @@
+{
+  "type": "object",
+  "properties": {
+    "refinements": {
+      "type": "string",
+      "description": "Summary of what was refined or changed during the interactive chat session"
+    },
+    "scope_changed": {
+      "type": "boolean",
+      "description": "Whether the scope of the proposed change was materially altered"
+    }
+  },
+  "required": ["refinements", "scope_changed"],
+  "additionalProperties": false
+}

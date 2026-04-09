@@ -1,0 +1,24 @@
+{
+  "type": "object",
+  "properties": {
+    "preferred_label": {
+      "type": "string",
+      "enum": ["true", "false", "empty"],
+      "description": "Verification verdict: true (valid), false (invalid), empty (no illuminations found)"
+    },
+    "illumination_path": {
+      "type": "string",
+      "description": "Absolute or relative path to the selected illumination file"
+    },
+    "summary": {
+      "type": "string",
+      "description": "One-paragraph summary of what the illumination proposes"
+    },
+    "explanation": {
+      "type": "string",
+      "description": "Verification findings: why the illumination is or isn't valid"
+    }
+  },
+  "required": ["preferred_label", "illumination_path", "summary", "explanation"],
+  "additionalProperties": false
+}
