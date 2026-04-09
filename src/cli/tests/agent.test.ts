@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   validateAgentConfig,
   Agent,
@@ -7,6 +7,19 @@ import {
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
+
+// Allow spawn to be mocked for the readline completion test
+const { mockSpawn } = vi.hoisted(() => {
+  return { mockSpawn: vi.fn() };
+});
+vi.mock("node:child_process", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:child_process")>();
+  return { ...actual, spawn: (...args: any[]) => {
+    const override = mockSpawn();
+    if (override) return override;
+    return actual.spawn(...(args as Parameters<typeof actual.spawn>));
+  }};
+});
 
 describe("validateAgentConfig", () => {
   const validConfig: AgentConfig = {
@@ -279,5 +292,53 @@ describe("Agent MCP config lifecycle", () => {
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("Agent.run readline completion", () => {
+  it("captures all output lines before returning", async () => {
+    // Verifies that agent.run() awaits readline close before returning
+    // capturedOutput, preventing data loss from the child process closing
+    // before readline finishes processing buffered data.
+    const { Readable } = await import("node:stream");
+    const { EventEmitter } = await import("node:events");
+
+    const config: AgentConfig = {
+      name: "test",
+      description: "test",
+      model: "opus",
+      permissionMode: "dangerouslySkipPermissions",
+      tools: [],
+      mcp: [],
+      prompt: "test prompt",
+      jsonSchema: '{"type":"object"}',
+    };
+
+    // Create a mock child process that emits lines then closes
+    const mockStdout = new Readable({ read() {} });
+    const mockChild = Object.assign(new EventEmitter(), {
+      pid: 12345,
+      stdin: { write: vi.fn(), end: vi.fn() },
+      stdout: mockStdout,
+      stderr: null,
+    });
+
+    // Activate mock spawn for this test only
+    mockSpawn.mockReturnValueOnce(mockChild);
+
+    const agent = new Agent(config);
+    const runPromise = agent.run({ cwd: "/tmp" });
+
+    // Push data then close — simulate child exiting
+    const jsonLine = JSON.stringify({ result: '{"answer":"42"}', session_id: "s1" });
+    mockStdout.push(jsonLine + "\n");
+    mockStdout.push(null); // EOF
+    // Emit close after a tick to simulate real child process timing
+    setTimeout(() => mockChild.emit("close", 0), 5);
+
+    const result = await runPromise;
+    expect(result.output).toContain('"result"');
+    expect(result.output!.trim().length).toBeGreaterThan(0);
+    expect(result.sessionId).toBe("s1");
   });
 });
