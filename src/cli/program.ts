@@ -7,6 +7,7 @@ import { registerHeartbeatCommand } from "./commands/heartbeat";
 import { meditateCreateCommand } from "./commands/meditate-create";
 import { runScenariosCommand } from "./commands/run-scenarios";
 import { pipelineRunCommand, pipelineValidateCommand, pipelineCreateCommand, pipelineListCommand } from "./commands/pipeline";
+import { agentListAction, agentShowAction, agentCreateAction } from "./commands/agent";
 
 export function createProgram(): Command {
   const program = new Command();
@@ -75,7 +76,12 @@ Pipeline engine (DOT-graph workflows):
 
 Meditation (restricted insight sessions):
   ralph meditate my-app                   Run a one-shot meditation session
-  ralph meditate create my-app            Create a new meditation script`
+  ralph meditate create my-app            Create a new meditation script
+
+Agent management:
+  ralph agent list                        List all available agents
+  ralph agent show <name>                 Show details of a specific agent
+  ralph agent create                      Interactively create a new agent definition`
   );
 
   program
@@ -199,6 +205,29 @@ Scans <project>/pipelines/*.dot and prints each workflow's name and goal.
     .option("--project <folder>", "Project folder (defaults to cwd)")
     .action(async (opts: { project?: string }) => {
       await pipelineListCommand(opts);
+    });
+
+  const agent = program.command("agent").description("Manage agent definitions");
+
+  agent
+    .command("list")
+    .description("List all available agents")
+    .action(async () => {
+      await agentListAction();
+    });
+
+  agent
+    .command("show <name>")
+    .description("Show details of a specific agent")
+    .action(async (name: string) => {
+      await agentShowAction(name);
+    });
+
+  agent
+    .command("create")
+    .description("Interactively create a new agent definition")
+    .action(async () => {
+      await agentCreateAction();
     });
 
   registerHeartbeatCommand(program);
