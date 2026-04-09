@@ -127,6 +127,21 @@ describe("pipelineRunCommand", () => {
     expect(engine.runPipeline).toHaveBeenCalledTimes(1);
   });
 
+  it("uses AutoApproveInterviewer when stdin is not a TTY", async () => {
+    const originalIsTTY = process.stdin.isTTY;
+    Object.defineProperty(process.stdin, "isTTY", { value: undefined, configurable: true });
+    try {
+      const dotFile = join(dir, "test.dot");
+      writeFileSync(dotFile, VALID_DOT);
+      await pipelineRunCommand(dotFile, { logsRoot: dir });
+      const call = (engine.runPipeline as ReturnType<typeof vi.fn>).mock.calls[0];
+      const opts = call[1];
+      expect(opts.interviewer.constructor.name).toBe("AutoApproveInterviewer");
+    } finally {
+      Object.defineProperty(process.stdin, "isTTY", { value: originalIsTTY, configurable: true });
+    }
+  });
+
   it("uses stable slug-based logsRoot when none provided", async () => {
     const dotFile = join(dir, "test.dot");
     writeFileSync(dotFile, VALID_DOT);

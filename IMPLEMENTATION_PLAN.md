@@ -1,50 +1,35 @@
-# Pipeline Observability Implementation Plan
+# Scenario Test Bugfixes Implementation Plan
 
-**Goal:** Make `ralph pipeline run` show live output — which node is running, what Claude is doing, and a persistent sticky status bar at the bottom of the terminal throughout the run.
+**Status:** COMPLETED
 
-**Status:** ✅ COMPLETE (all 3 chunks implemented and tested, 408 tests passing)
+**Goal:** Fix two bugs exposed by `ralph run-scenarios`: (1) pipeline TTY crash on `wait.human` nodes in non-interactive contexts, (2) heartbeat task reappearing after stop due to async race condition.
+
+**Architecture:** Bug 1 is a one-line caller fix — auto-detect TTY before choosing interviewer. Bug 2 is a small in-memory guard — track deleted task IDs and skip stale async callbacks.
+
+**Tech Stack:** TypeScript, vitest
 
 ---
 
-## Summary of Changes
+## Chunk 1: Pipeline TTY auto-detection — DONE
 
-### Chunk 1: Engine + AgentHandler Hooks ✅
+- [x] Added `AutoApproveInterviewer` import to `src/cli/commands/pipeline.ts`
+- [x] Changed interviewer selection to `process.stdin.isTTY ? new ConsoleInterviewer() : new AutoApproveInterviewer()`
+- [x] Added test "uses AutoApproveInterviewer when stdin is not a TTY" in `src/cli/tests/pipeline.test.ts`
 
-**Task 1:** Added `onNodeStart` and `onStdout` callbacks to `EngineOptions` in `engine.ts`.
-- `onNodeStart?(node)` is called before each handler dispatch (exit nodes are processed before handler dispatch, so they don't trigger this callback)
-- `onStdout` is threaded through to handlers via the meta object
+**Why:** In non-interactive contexts (CI, piped stdin, heartbeat), `ConsoleInterviewer` crashes because it tries to read from a TTY that doesn't exist. Auto-detecting TTY ensures pipelines with `wait.human` gates auto-approve in non-interactive mode.
 
-**Task 2:** `AgentHandler` reads `meta.onStdout` and `node.interactive` from meta/node.
-- `onStdout` is forwarded to `agent.run()` for non-interactive nodes
-- `interactive: true` is passed to `agent.run()` when `node.interactive === "true"` (DOT attributes are strings)
-- Interactive nodes suppress `onStdout` since they use `stdio: "inherit"`
+## Chunk 2: Heartbeat race condition guard — DONE
 
-### Chunk 2: PipelineDisplay Component ✅
+- [x] Added `deletedTasks` Set in `src/daemon/index.ts`
+- [x] Guarded `.then()` callback in `dispatchTask` with `if (deletedTasks.has(task.id)) return;`
+- [x] Added `deletedTasks.add(taskId)` in `stop_task` handler before `deleteTask()`
+- [x] Added `deletedTasks.delete(taskId)` in `register_task` handler for re-registration
+- [x] Added documenting test "upsertTask re-inserts a deleted task" in `src/daemon/tests/state.test.ts`
 
-Created `PipelineDisplay.tsx` — a long-lived Ink component with:
-- `Static` scrolling history for `DisplayLine` items (stream, step, info, warn, success)
-- Fixed bottom status bar showing pipeline name, current node, PID, and Ctrl+C hint
-- `onReady` callback pattern providing `{ push, setStatus, done }` to the caller
-- `renderPipelineDisplay()` helper for mounting from non-React code
+**Why:** When `stop_task` deletes a task while `runTask()` is still in-flight, the `.then()` callback calls `upsertTask()` after deletion, causing the task to reappear. The `deletedTasks` guard prevents stale callbacks from resurrecting stopped tasks.
 
-### Chunk 3: Pipeline Command Wiring ✅
+## Chunk 3: Verification — DONE
 
-Rewrote `pipelineRunCommand` in `pipeline.ts` to:
-- Mount `PipelineDisplay` before running the pipeline
-- Show overview (name, branch, project, goal, node list) via `push()`
-- Wire `onNodeStart` → `push({ kind: "step" })` + `setStatus()`
-- Wire `onStdout` → `streamEvents()` → `push({ kind: "stream" })`
-- Show success/failure via `push()` and clean up with `done()` + `waitUntilExit()`
-
-### Files Modified/Created
-
-| File | Action |
-|------|--------|
-| `src/attractor/core/engine.ts` | Modified — added `onNodeStart`, `onStdout` to EngineOptions |
-| `src/attractor/handlers/agent-handler.ts` | Modified — reads `onStdout`, `interactive` from meta/node |
-| `src/cli/components/PipelineDisplay.tsx` | Created — Ink component with Static history + sticky bar |
-| `src/cli/components/PipelineDisplay.test.tsx` | Created — 3 unit tests |
-| `src/cli/commands/pipeline.ts` | Modified — rewrote pipelineRunCommand to use PipelineDisplay |
-| `src/attractor/tests/engine.test.ts` | Modified — 2 new tests for callbacks |
-| `src/attractor/tests/agent-handler.test.ts` | Modified — 2 new tests for onStdout/interactive |
-| `src/cli/tests/pipeline.test.ts` | Modified — added PipelineDisplay mock, updated assertions |
+- [x] All 410 tests pass
+- [x] TypeScript typecheck clean
+- [x] Build succeeds

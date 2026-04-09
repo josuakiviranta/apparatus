@@ -5,6 +5,7 @@ import { parseDot, validateGraph, validateOrRaise } from "../../attractor/core/g
 import { runPipeline } from "../../attractor/core/engine.js";
 import { variableExpansionTransform } from "../../attractor/transforms/variable-expansion.js";
 import { ConsoleInterviewer } from "../../attractor/interviewer/console.js";
+import { AutoApproveInterviewer } from "../../attractor/interviewer/auto-approve.js";
 import { getPipelinesDir, resolvePipelineArg, isNameShorthand } from "../lib/pipeline-resolver.js";
 import { spawn, spawnSync } from "child_process";
 import { streamEvents } from "../lib/stream-formatter.js";
@@ -114,7 +115,7 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
     const result = await runPipeline(graph, {
       logsRoot,
       cwd: project,
-      interviewer: new ConsoleInterviewer(),
+      interviewer: process.stdin.isTTY ? new ConsoleInterviewer() : new AutoApproveInterviewer(),
       signal: ac.signal,
       project: opts.project,
       resume: opts.resume,

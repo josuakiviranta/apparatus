@@ -33,6 +33,7 @@ const scheduler = new Scheduler();
 
 // Watch connections for push-streaming
 const watchListeners = new Set<(event: object) => void>();
+const deletedTasks = new Set<string>();
 function broadcast(event: object): void {
   for (const fn of watchListeners) fn(event);
 }
@@ -49,6 +50,7 @@ function dispatchTask(task: Task): void {
   broadcast({ type: "task_update", data: updated });
 
   runTask(task).then(({ exitCode }) => {
+    if (deletedTasks.has(task.id)) return;
     const finished: Task = { ...updated, lastRunAt: Date.now() };
     upsertTask(finished);
     broadcast({ type: "task_update", data: finished });
@@ -71,6 +73,7 @@ const server = createSocketServer(sockPath, {
 
   register_task: (command, args, interval, id) => {
     const taskId = id ?? `${command}:${basename(args[0])}`;
+    deletedTasks.delete(taskId);
     const existing = getTask(taskId);
     const task: Task = {
       id: taskId,
@@ -94,6 +97,7 @@ const server = createSocketServer(sockPath, {
     if (!task) throw new Error(`Task not found: ${taskId}. Run 'ralph heartbeat list' to see active tasks.`);
     scheduler.unregister(taskId);
     if (isSessionRunning(task)) killSession(task);
+    deletedTasks.add(taskId);
     deleteTask(taskId);
     broadcast({ type: "task_update", data: { ...task, status: "stopped" } });
   },

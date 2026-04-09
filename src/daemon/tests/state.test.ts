@@ -101,6 +101,16 @@ describe("task CRUD", () => {
   it("deleteTask is a no-op for unknown id", () => {
     deleteTask("unknown:id"); // no error
   });
+
+  it("upsertTask re-inserts a deleted task (documents race condition vector)", () => {
+    const task = makeTask();
+    upsertTask(task);
+    deleteTask(task.id);
+    expect(readTasks()).toHaveLength(0);
+    // This is the race: a stale .then() callback calls upsertTask after delete
+    upsertTask({ ...task, lastRunAt: Date.now() });
+    expect(readTasks()).toHaveLength(1); // task is back — this is the bug vector
+  });
 });
 
 describe("run log operations", () => {
