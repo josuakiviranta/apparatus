@@ -3,7 +3,6 @@ import { registerHandler, lookupHandler, clearHandlers } from "../handlers/regis
 import { ConditionalHandler } from "../handlers/conditional.js";
 import { WaitHumanHandler } from "../handlers/wait-human.js";
 import { ToolHandler } from "../handlers/tool.js";
-import { CodergenHandler } from "../handlers/codergen.js";
 import { StartHandler, ExitHandler } from "../handlers/start-exit.js";
 import { ParallelHandler, FanInHandler } from "../handlers/parallel.js";
 import { ManagerLoopHandler } from "../handlers/manager-loop.js";
@@ -91,64 +90,6 @@ describe("ToolHandler", () => {
     const outcome = await h.execute(node, baseCtx(), {});
     expect(outcome.status).toBe("fail");
     expect(outcome.failureReason).toContain("tool_command");
-  });
-});
-
-describe("CodergenHandler", () => {
-  it("returns fail if runLoop throws", async () => {
-    const fakeRunLoop = vi.fn().mockRejectedValue(new Error("claude not found"));
-    const h = new CodergenHandler(fakeRunLoop);
-    const node = { id: "work", shape: "box", prompt: "Do the work" };
-    const outcome = await h.execute(node, baseCtx(), { logsRoot: "/tmp", cwd: "/proj" });
-    expect(outcome.status).toBe("fail");
-    expect(outcome.failureReason).toContain("claude not found");
-  });
-
-  it("returns success when runLoop returns success=true", async () => {
-    const fakeRunLoop = vi.fn().mockResolvedValue({
-      success: true, iterations: 1, exitReason: "completed", sessionId: "s1"
-    });
-    const h = new CodergenHandler(fakeRunLoop);
-    const node = { id: "work", shape: "box", prompt: "Do the work" };
-    const outcome = await h.execute(node, baseCtx(), { logsRoot: "/tmp", cwd: "/proj" });
-    expect(outcome.status).toBe("success");
-    expect(outcome.contextUpdates?.["implement.sessionId"]).toBe("s1");
-  });
-
-  it("passes llmModel from node to runLoop as model", async () => {
-    const fakeRunLoop = vi.fn().mockResolvedValue({
-      success: true, iterations: 1, exitReason: "completed"
-    });
-    const h = new CodergenHandler(fakeRunLoop);
-    const node = { id: "work", shape: "box", prompt: "Do work", llmModel: "claude-haiku-4-5-20251001" };
-    await h.execute(node, baseCtx(), { logsRoot: "/tmp", cwd: "/proj" });
-    expect(fakeRunLoop).toHaveBeenCalledWith(
-      expect.objectContaining({ model: "claude-haiku-4-5-20251001" })
-    );
-  });
-
-  it("defaults model to sonnet when llmModel is not set", async () => {
-    const fakeRunLoop = vi.fn().mockResolvedValue({
-      success: true, iterations: 1, exitReason: "completed"
-    });
-    const h = new CodergenHandler(fakeRunLoop);
-    const node = { id: "work", shape: "box", prompt: "Do work" };
-    await h.execute(node, baseCtx(), { logsRoot: "/tmp", cwd: "/proj" });
-    expect(fakeRunLoop).toHaveBeenCalledWith(
-      expect.objectContaining({ model: "sonnet" })
-    );
-  });
-
-  it("passes maxIterations from node to runLoop as max", async () => {
-    const fakeRunLoop = vi.fn().mockResolvedValue({
-      success: true, iterations: 2, exitReason: "completed"
-    });
-    const h = new CodergenHandler(fakeRunLoop);
-    const node = { id: "work", shape: "box", prompt: "Do work", maxIterations: 2 };
-    await h.execute(node, baseCtx(), { logsRoot: "/tmp", cwd: "/proj" });
-    expect(fakeRunLoop).toHaveBeenCalledWith(
-      expect.objectContaining({ max: 2 })
-    );
   });
 });
 

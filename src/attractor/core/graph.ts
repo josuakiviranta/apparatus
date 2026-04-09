@@ -190,6 +190,7 @@ const KNOWN_TYPES = new Set([
   "codergen", "tool", "wait.human", "conditional", "parallel", "parallel.fan_in",
   "stack.manager_loop", "start", "exit",
   "ralph.implement", "ralph.meditate", "ralph.run-scenarios",
+  "agent",
 ]);
 
 const SHAPE_TO_TYPE: Record<string, string> = {
@@ -200,6 +201,7 @@ const SHAPE_TO_TYPE: Record<string, string> = {
 };
 
 export function resolveHandlerType(node: Node): string {
+  if (node.agent) return "agent";
   if (node.type) return node.type;
   if (node.shape && SHAPE_TO_TYPE[node.shape]) return SHAPE_TO_TYPE[node.shape];
   return "codergen";

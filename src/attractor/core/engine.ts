@@ -2,7 +2,6 @@ import { mkdir, writeFile } from "fs/promises";
 import { join } from "path";
 import type { Graph, Node, Edge, Outcome, PipelineContext } from "../types.js";
 import type { Interviewer } from "../interviewer/index.js";
-import type { LoopOptions, LoopResult } from "../../cli/lib/loop.js";
 import { evaluateCondition } from "./conditions.js";
 import { resolveHandlerType } from "./graph.js";
 import { saveCheckpoint, loadCheckpoint } from "../checkpoint.js";
@@ -10,16 +9,15 @@ import { ConditionalHandler } from "../handlers/conditional.js";
 import { StartHandler, ExitHandler } from "../handlers/start-exit.js";
 import { WaitHumanHandler } from "../handlers/wait-human.js";
 import { ToolHandler } from "../handlers/tool.js";
-import { CodergenHandler } from "../handlers/codergen.js";
 import { RalphMeditateHandler } from "../handlers/ralph-meditate.js";
 import { RalphScenariosHandler } from "../handlers/ralph-scenarios.js";
 import { ParallelHandler, FanInHandler } from "../handlers/parallel.js";
+import { AgentHandler } from "../handlers/agent-handler.js";
 import type { NodeHandler } from "../handlers/registry.js";
 
 export interface EngineOptions {
   logsRoot: string;
   cwd: string;
-  runLoop: (opts: LoopOptions) => Promise<LoopResult>;
   interviewer: Interviewer;
   signal?: AbortSignal;
   project?: string;
@@ -35,18 +33,19 @@ export interface PipelineResult {
 
 function buildHandlerMap(opts: EngineOptions): Map<string, NodeHandler> {
   const m = new Map<string, NodeHandler>();
-  const cg = new CodergenHandler(opts.runLoop);
+  const agentHandler = new AgentHandler();
   m.set("start", new StartHandler());
   m.set("exit", new ExitHandler());
-  m.set("codergen", cg);
+  m.set("codergen", agentHandler);
   m.set("conditional", new ConditionalHandler());
   m.set("wait.human", new WaitHumanHandler(opts.interviewer));
   m.set("tool", new ToolHandler());
-  m.set("ralph.implement", cg);
+  m.set("ralph.implement", agentHandler);
   m.set("ralph.meditate", new RalphMeditateHandler());
   m.set("ralph.run-scenarios", new RalphScenariosHandler());
   m.set("parallel", new ParallelHandler());
   m.set("parallel.fan_in", new FanInHandler());
+  m.set("agent", agentHandler);
   return m;
 }
 

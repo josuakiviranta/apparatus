@@ -3,7 +3,6 @@ import { resolve, join, basename } from "path";
 import { homedir } from "os";
 import { parseDot, validateGraph, validateOrRaise } from "../../attractor/core/graph.js";
 import { runPipeline } from "../../attractor/core/engine.js";
-import { runLoop } from "../lib/loop.js";
 import { variableExpansionTransform } from "../../attractor/transforms/variable-expansion.js";
 import { ConsoleInterviewer } from "../../attractor/interviewer/console.js";
 import { getPipelinesDir, resolvePipelineArg, isNameShorthand } from "../lib/pipeline-resolver.js";
@@ -81,7 +80,6 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
     const result = await runPipeline(graph, {
       logsRoot,
       cwd: opts.project ? resolve(opts.project) : process.cwd(),
-      runLoop,
       interviewer: new ConsoleInterviewer(),
       signal: ac.signal,
       project: opts.project,

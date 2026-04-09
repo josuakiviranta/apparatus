@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseDot, validateGraph } from "../core/graph.js";
+import { parseDot, validateGraph, resolveHandlerType } from "../core/graph.js";
 
 describe("parseDot", () => {
   it("parses a minimal digraph with start and exit nodes", () => {
@@ -232,6 +232,57 @@ describe("parseDot", () => {
     expect(graph.nodes.get("basic")?.llmModel).toBe("shape-model");
     // start has no matching shape/class/id rule, universal applies
     expect(graph.nodes.get("start")?.llmModel).toBe("universal-model");
+  });
+});
+
+describe("resolveHandlerType with agent attribute", () => {
+  it("resolves agent attribute to 'agent' handler type", () => {
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      review [agent="reviewer"]
+      done [shape=Msquare]
+      start -> review -> done
+    }`;
+    const graph = parseDot(dot);
+    const reviewNode = graph.nodes.get("review")!;
+    expect(reviewNode.agent).toBe("reviewer");
+    expect(resolveHandlerType(reviewNode)).toBe("agent");
+  });
+
+  it("agent attribute takes precedence over shape", () => {
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      work [shape=box, agent="implement"]
+      done [shape=Msquare]
+      start -> work -> done
+    }`;
+    const graph = parseDot(dot);
+    const workNode = graph.nodes.get("work")!;
+    expect(resolveHandlerType(workNode)).toBe("agent");
+  });
+
+  it("agent attribute takes precedence over explicit type", () => {
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      work [type=codergen, agent="implement"]
+      done [shape=Msquare]
+      start -> work -> done
+    }`;
+    const graph = parseDot(dot);
+    const workNode = graph.nodes.get("work")!;
+    expect(resolveHandlerType(workNode)).toBe("agent");
+  });
+
+  it("'agent' is in KNOWN_TYPES (no type_known warning)", () => {
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      work [agent="reviewer"]
+      done [shape=Msquare]
+      start -> work -> done
+    }`;
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph);
+    expect(diags.some(d => d.rule === "type_known" && d.message.includes("work"))).toBe(false);
   });
 });
 

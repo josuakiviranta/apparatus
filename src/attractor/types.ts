@@ -27,6 +27,7 @@ export interface Node {
   reasoningEffort?: string;
   retryTarget?: string;
   fallbackRetryTarget?: string;
+  agent?: string;
   class?: string;
   [key: string]: unknown;
 }

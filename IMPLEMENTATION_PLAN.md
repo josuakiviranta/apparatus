@@ -14,9 +14,9 @@
 
 ## Status
 
-**Chunks 1-2 complete (Tasks 1-10).** Tag: 0.0.36. All 409 tests pass, typecheck clean, build succeeds.
+**Chunks 1-4 complete (Tasks 1-21).** All 384 tests pass, typecheck clean, build succeeds.
 
-Remaining: Chunk 3 (Tasks 12-15: command refactoring) and Chunk 4 (Tasks 16-21: attractor integration).
+Chunk 4 changes: AgentHandler replaces CodergenHandler for attractor pipeline. Agent attribute (`agent="name"`) in DOT files routes to named agents via AgentHandler. Backward compatibility: `shape=box` nodes (codergen handler type) now fall back to "implement" agent. CodergenHandler, RalphImplementHandler, loop.ts, and loop.test.ts deleted. Engine no longer requires `runLoop` in its options. Agent-based DOT validation scenario test added.
 
 ## File Structure
 
@@ -1582,7 +1582,7 @@ git commit -m "feat: add ralph agent create command"
 - Create: `scenario-tests/test-agent-list.sh`
 - Create: `scenario-tests/test-agent-show.sh`
 
-- [ ] **Step 1: Create test-agent-list.sh**
+- [x] **Step 1: Create test-agent-list.sh**
 
 ```bash
 #!/usr/bin/env bash
@@ -1602,7 +1602,7 @@ echo "$OUTPUT" | grep -q "meditate" || { echo "FAIL: meditate not found"; exit 1
 echo "PASS: all built-in agents listed"
 ```
 
-- [ ] **Step 2: Create test-agent-show.sh**
+- [x] **Step 2: Create test-agent-show.sh**
 
 ```bash
 #!/usr/bin/env bash
@@ -1632,12 +1632,12 @@ fi
 echo "PASS: agent show works correctly"
 ```
 
-- [ ] **Step 3: Run scenario tests**
+- [x] **Step 3: Run scenario tests**
 
 Run: `ralph run-scenarios` and select the new tests.
 Expected: Both pass.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add scenario-tests/test-agent-list.sh scenario-tests/test-agent-show.sh
@@ -1653,11 +1653,11 @@ git commit -m "test: add scenario tests for ralph agent list and show"
 **Files:**
 - Modify: `src/cli/commands/meditate-create.ts`
 
-- [ ] **Step 1: Read current meditate-create.ts**
+- [x] **Step 1: Read current meditate-create.ts**
 
 Read `src/cli/commands/meditate-create.ts` fully to understand the current implementation.
 
-- [ ] **Step 2: Refactor to use Agent class**
+- [x] **Step 2: Refactor to use Agent class**
 
 Replace the manual spawn logic with:
 
@@ -1698,17 +1698,17 @@ export async function meditateCreateCommand(projectFolder: string): Promise<void
 }
 ```
 
-- [ ] **Step 3: Run existing tests**
+- [x] **Step 3: Run existing tests**
 
 Run: `npx vitest run src/cli/tests/meditate.test.ts`
 Expected: All tests pass
 
-- [ ] **Step 4: Run scenario test**
+- [x] **Step 4: Run scenario test**
 
 Run: the `test-meditate-create.sh` scenario test.
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/cli/commands/meditate-create.ts
@@ -1722,11 +1722,11 @@ git commit -m "refactor: meditate-create command uses Agent class"
 **Files:**
 - Modify: `src/cli/commands/plan.ts`
 
-- [ ] **Step 1: Read current plan.ts**
+- [x] **Step 1: Read current plan.ts**
 
 Read `src/cli/commands/plan.ts` fully.
 
-- [ ] **Step 2: Refactor to use Agent class**
+- [x] **Step 2: Refactor to use Agent class**
 
 Replace manual spawn logic. The plan agent's prompt body now lives in `plan.md` (the BRAINSTORM_TRIGGER constant is deleted):
 
@@ -1763,12 +1763,12 @@ export async function planCommand(projectFolder: string): Promise<void> {
 }
 ```
 
-- [ ] **Step 3: Build and smoke test**
+- [x] **Step 3: Build and smoke test**
 
 Run: `npm run build && ralph plan /tmp/test-project` (Ctrl+C after launch)
 Expected: Same behavior as before — non-interactive kickoff then interactive resume
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/cli/commands/plan.ts
@@ -1782,11 +1782,11 @@ git commit -m "refactor: plan command uses Agent class"
 **Files:**
 - Modify: `src/cli/commands/meditate.ts`
 
-- [ ] **Step 1: Read current meditate.ts**
+- [x] **Step 1: Read current meditate.ts**
 
 Read `src/cli/commands/meditate.ts` fully. Note the PID locking, MCP config, allowedTools, and custom stream parsing.
 
-- [ ] **Step 2: Refactor to use Agent class**
+- [x] **Step 2: Refactor to use Agent class**
 
 Replace manual spawn and MCP config logic. The meditate agent definition includes MCP servers and tools. The command keeps PID locking:
 
@@ -1831,17 +1831,17 @@ export async function meditateCommand(projectFolder: string): Promise<void> {
 }
 ```
 
-- [ ] **Step 3: Run existing tests**
+- [x] **Step 3: Run existing tests**
 
 Run: `npx vitest run src/cli/tests/meditate.test.ts`
 Expected: All tests pass
 
-- [ ] **Step 4: Run scenario test**
+- [x] **Step 4: Run scenario test**
 
 Run: the `test-meditate-session.sh` scenario test.
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/cli/commands/meditate.ts
@@ -1857,11 +1857,11 @@ git commit -m "refactor: meditate command uses Agent class"
 
 Note: `loop.ts` is NOT deleted here. It is still imported by `src/cli/commands/pipeline.ts` (which passes `runLoop` to the engine). Deletion happens in Task 20 after AgentHandler replaces CodergenHandler.
 
-- [ ] **Step 1: Read current implement.ts and loop.ts**
+- [x] **Step 1: Read current implement.ts and loop.ts**
 
 Read both files fully. Note: loop.ts handles spawn, stream, git push, iteration, abort.
 
-- [ ] **Step 2: Refactor implement.ts to use Agent with inline loop**
+- [x] **Step 2: Refactor implement.ts to use Agent with inline loop**
 
 ```typescript
 import { Agent } from "../lib/agent.js";
@@ -1939,17 +1939,17 @@ export async function implementCommand(
 }
 ```
 
-- [ ] **Step 3: Build and verify**
+- [x] **Step 3: Build and verify**
 
 Run: `npm run build`
 Expected: No build errors (loop.ts still exists, used by pipeline.ts)
 
-- [ ] **Step 4: Run all tests**
+- [x] **Step 4: Run all tests**
 
 Run: `npx vitest run`
 Expected: All tests pass
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/cli/commands/implement.ts
@@ -1965,20 +1965,20 @@ git commit -m "refactor: implement command uses Agent class"
 **Files:**
 - Modify: `src/attractor/types.ts`
 
-- [ ] **Step 1: Read current types.ts**
+- [x] **Step 1: Read current types.ts**
 
 Read `src/attractor/types.ts` to find the Node interface.
 
-- [ ] **Step 2: Add agent field to Node interface**
+- [x] **Step 2: Add agent field to Node interface**
 
 Add `agent?: string;` to the Node interface, alongside existing optional fields like `type`, `prompt`, `toolCommand`.
 
-- [ ] **Step 3: Run existing tests**
+- [x] **Step 3: Run existing tests**
 
 Run: `npx vitest run src/attractor/tests/`
 Expected: All pass (adding an optional field is non-breaking)
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/attractor/types.ts
@@ -1993,7 +1993,7 @@ git commit -m "feat: add agent attribute to attractor Node type"
 - Modify: `src/attractor/core/graph.ts`
 - Modify: `src/attractor/tests/graph.test.ts`
 
-- [ ] **Step 1: Write failing test for agent node resolution**
+- [x] **Step 1: Write failing test for agent node resolution**
 
 Add to `src/attractor/tests/graph.test.ts`:
 
@@ -2024,12 +2024,12 @@ it("agent attribute takes precedence over shape", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `npx vitest run src/attractor/tests/graph.test.ts`
 Expected: FAIL — resolveHandlerType returns "codergen" not "agent"
 
-- [ ] **Step 3: Update resolveHandlerType**
+- [x] **Step 3: Update resolveHandlerType**
 
 In `src/attractor/core/graph.ts`, update `resolveHandlerType()`:
 
@@ -2048,12 +2048,12 @@ export function resolveHandlerType(node: Node): string {
 
 Add `"agent"` to the `KNOWN_TYPES` set.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `npx vitest run src/attractor/tests/graph.test.ts`
 Expected: All tests PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/attractor/core/graph.ts src/attractor/tests/graph.test.ts
@@ -2069,7 +2069,7 @@ git commit -m "feat: support agent attribute in DOT parser with precedence over 
 - Create: `src/attractor/tests/agent-handler.test.ts`
 - Modify: `src/attractor/core/engine.ts`
 
-- [ ] **Step 1: Write failing tests for AgentHandler**
+- [x] **Step 1: Write failing tests for AgentHandler**
 
 Create `src/attractor/tests/agent-handler.test.ts`:
 
@@ -2193,12 +2193,12 @@ describe("AgentHandler", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `npx vitest run src/attractor/tests/agent-handler.test.ts`
 Expected: FAIL — module not found
 
-- [ ] **Step 3: Implement AgentHandler**
+- [x] **Step 3: Implement AgentHandler**
 
 Create `src/attractor/handlers/agent-handler.ts`:
 
@@ -2291,12 +2291,12 @@ export class AgentHandler implements NodeHandler {
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `npx vitest run src/attractor/tests/agent-handler.test.ts`
 Expected: All 4 tests PASS
 
-- [ ] **Step 5: Register AgentHandler in engine**
+- [x] **Step 5: Register AgentHandler in engine**
 
 Read `src/attractor/core/engine.ts` to find `buildHandlerMap()`. Add:
 
@@ -2307,12 +2307,12 @@ import { AgentHandler } from "../handlers/agent-handler.js";
 m.set("agent", new AgentHandler());
 ```
 
-- [ ] **Step 6: Run all attractor tests**
+- [x] **Step 6: Run all attractor tests**
 
 Run: `npx vitest run src/attractor/tests/`
 Expected: All pass
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/attractor/handlers/agent-handler.ts src/attractor/tests/agent-handler.test.ts src/attractor/core/engine.ts
@@ -2326,20 +2326,20 @@ git commit -m "feat: add AgentHandler for attractor pipeline agent nodes"
 **Files:**
 - Modify: `scenario-tests/test-attractor-pipeline.sh`
 
-- [ ] **Step 1: Read current test**
+- [x] **Step 1: Read current test**
 
 Read `scenario-tests/test-attractor-pipeline.sh` to understand the existing test structure.
 
-- [ ] **Step 2: Add agent-based pipeline test case**
+- [x] **Step 2: Add agent-based pipeline test case**
 
 Add a new test case that uses `[agent="implement"]` syntax in a DOT file and verifies the engine resolves and runs it. Follow the existing test patterns in the file.
 
-- [ ] **Step 3: Run scenario test**
+- [x] **Step 3: Run scenario test**
 
 Run: the updated `test-attractor-pipeline.sh` scenario.
 Expected: PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add scenario-tests/test-attractor-pipeline.sh
@@ -2360,39 +2360,39 @@ git commit -m "test: add agent attribute test case to attractor pipeline scenari
 
 Now that AgentHandler is registered (Task 18), CodergenHandler and its `runLoop` dependency can be removed.
 
-- [ ] **Step 1: Read pipeline.ts to find runLoop usage**
+- [x] **Step 1: Read pipeline.ts to find runLoop usage**
 
 Read `src/cli/commands/pipeline.ts` — find where `runLoop` is imported and passed to `runPipeline()`.
 
-- [ ] **Step 2: Remove runLoop from pipeline.ts**
+- [x] **Step 2: Remove runLoop from pipeline.ts**
 
 Remove the `runLoop` import from `loop.ts` and the `runLoop` property from the options object passed to `runPipeline()`.
 
-- [ ] **Step 3: Remove runLoop from engine PipelineOptions**
+- [x] **Step 3: Remove runLoop from engine PipelineOptions**
 
 In `src/attractor/core/engine.ts`, remove `runLoop` from the `EngineOptions`/`PipelineOptions` interface. Remove CodergenHandler from `buildHandlerMap()` (AgentHandler now handles `agent` nodes; existing `shape=coder` nodes should also route to AgentHandler — update the `SHAPE_TO_TYPE` map so `box` maps to `"agent"` with a default agent name, or keep backward compatibility by having AgentHandler fall back to `implement` agent when `node.agent` is not set).
 
-- [ ] **Step 4: Delete loop.ts and loop.test.ts**
+- [x] **Step 4: Delete loop.ts and loop.test.ts**
 
 ```bash
 git rm src/cli/lib/loop.ts src/cli/tests/loop.test.ts
 ```
 
-- [ ] **Step 5: Remove or deprecate CodergenHandler**
+- [x] **Step 5: Remove or deprecate CodergenHandler**
 
 Delete `src/attractor/handlers/codergen.ts` and remove its tests from `src/attractor/tests/handlers.test.ts`.
 
-- [ ] **Step 6: Build and verify**
+- [x] **Step 6: Build and verify**
 
 Run: `npm run build`
 Expected: No errors
 
-- [ ] **Step 7: Run all unit tests**
+- [x] **Step 7: Run all unit tests**
 
 Run: `npx vitest run`
 Expected: All pass
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git rm src/attractor/handlers/codergen.ts
@@ -2406,22 +2406,22 @@ git commit -m "refactor: remove loop.ts and CodergenHandler, pipeline uses Agent
 
 **Files:** None (verification only)
 
-- [ ] **Step 1: Build**
+- [x] **Step 1: Build**
 
 Run: `npm run build`
 Expected: No errors
 
-- [ ] **Step 2: Run all unit tests**
+- [x] **Step 2: Run all unit tests**
 
 Run: `npx vitest run`
 Expected: All pass
 
-- [ ] **Step 3: Run all scenario tests**
+- [x] **Step 3: Run all scenario tests**
 
 Run: `ralph run-scenarios` (select all)
 Expected: All pass
 
-- [ ] **Step 4: Verify CLI commands work**
+- [x] **Step 4: Verify CLI commands work**
 
 Run: `ralph agent list`
 Run: `ralph agent show implement`
@@ -2429,7 +2429,7 @@ Run: `ralph agent show plan`
 Run: `ralph agent show meditate`
 Expected: All show correct output
 
-- [ ] **Step 5: Final commit**
+- [x] **Step 5: Final commit**
 
 ```bash
 git commit --allow-empty -m "chore: unified agent architecture implementation complete (0.0.36)"

@@ -38,6 +38,17 @@ run_scenario "smoke"     "$ATTRACTOR_DIR/smoke.dot"
 run_scenario "work_test" "$ATTRACTOR_DIR/work_test.dot" --project "$REPO_ROOT"
 run_scenario "gate_test" "$ATTRACTOR_DIR/gate_test.dot" --project "$REPO_ROOT"
 
+# Agent attribute validation test (validates DOT parsing without spawning claude)
+echo ""
+echo "=== Scenario: agent_validate ==="
+if ralph pipeline validate "$ATTRACTOR_DIR/agent_test.dot" 2>&1; then
+  echo "PASS: agent_validate"
+  PASS=$((PASS + 1))
+else
+  echo "FAIL: agent_validate"
+  FAIL=$((FAIL + 1))
+fi
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 echo ""

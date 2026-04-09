@@ -1,0 +1,7 @@
+digraph agent_test {
+  goal="Verify agent attribute is parsed and validated"
+  start  [shape=Mdiamond]
+  review [agent="implement", prompt="Echo test"]
+  done   [shape=Msquare]
+  start -> review -> done
+}
