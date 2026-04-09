@@ -182,6 +182,8 @@ export async function runPipeline(graph: Graph, opts: EngineOptions): Promise<Pi
       cwd: opts.cwd,
       signal: opts.signal,
       outgoingLabels,
+      completedNodes,
+      nodeRetries,
     });
 
     // Merge context updates

@@ -14,7 +14,15 @@
 
 ## Status
 
-**Chunks 1-4 complete (Tasks 1-21). Chunks 5-7 (pipeline bug fixes + docs) complete.** All 397 tests pass, typecheck clean, build succeeds.
+**Chunks 1-4 complete (Tasks 1-21). Chunks 5-8 (pipeline bug fixes + docs) complete.** All 398 tests pass, typecheck clean, build succeeds.
+
+### Chunk 8: Preamble Delivery Fix (0.0.42)
+
+Two wiring gaps that made the pipeline context preamble feature structurally inert:
+
+1. **AgentHandler delivers preamble to Agent** — `AgentHandler.execute` was constructing `preamble + rawPrompt` and writing it to disk, but creating the Agent with the original registry config. The assembled prompt never reached Claude. Fixed by passing `{ ...config, prompt }` to `createAgent`, so `Agent.run()` delivers the preamble through stdin.
+2. **Engine forwards completedNodes/nodeRetries in meta** — The engine was passing `{ logsRoot, cwd, signal, outgoingLabels }` to `handler.execute` but not `completedNodes` or `nodeRetries`. AgentHandler was hardcoding empty arrays. Fixed by including both in the meta object, so `buildPreamble` produces accurate pipeline state.
+3. **Test coverage** — Updated AgentHandler tests to capture the config passed to `createAgent` and assert that `config.prompt` contains both the preamble (with completed stages) and the node prompt.
 
 ### Chunk 7: Pipeline Authoring Prompt & Preflight Guard (0.0.41)
 

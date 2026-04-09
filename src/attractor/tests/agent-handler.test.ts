@@ -160,24 +160,59 @@ describe("AgentHandler", () => {
     );
   });
 
-  it("prepends pipeline context preamble to prompt.md", async () => {
+  it("prepends pipeline context preamble to prompt.md and delivers to agent", async () => {
     mockResolve.mockReturnValue({ ...baseConfig });
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null });
 
+    let capturedConfig: any = null;
+    const handler = new AgentHandler({
+      resolveAgent: mockResolve,
+      createAgent: (config) => { capturedConfig = config; return { run: mockAgentRun, kill: mockAgentKill, config } as any; },
+    });
+
     const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-test-"));
     try {
-      const handler = makeHandler();
       const ctx: PipelineContext = { values: { "meditate.sessionId": "abc", "meditate.illuminations": "3" } };
       await handler.execute(
         makeNode({ prompt: "Build the feature" }),
         ctx,
-        { logsRoot: logsDir, cwd: "/tmp/project", signal: undefined, outgoingLabels: [] },
+        { logsRoot: logsDir, cwd: "/tmp/project", signal: undefined, outgoingLabels: [], completedNodes: ["start", "meditate"], nodeRetries: {} },
       );
 
+      // Verify prompt.md on disk
       const writtenPrompt = readFileSync(join(logsDir, "work", "prompt.md"), "utf8");
       expect(writtenPrompt).toContain("Pipeline Context");
       expect(writtenPrompt).toContain("meditate.sessionId: abc");
       expect(writtenPrompt).toContain("Build the feature");
+
+      // Verify preamble is delivered to Agent via config.prompt override
+      expect(capturedConfig.prompt).toContain("Pipeline Context");
+      expect(capturedConfig.prompt).toContain("start, meditate");
+      expect(capturedConfig.prompt).toContain("Build the feature");
+    } finally {
+      rmSync(logsDir, { recursive: true, force: true });
+    }
+  });
+
+  it("includes completedNodes from meta in preamble", async () => {
+    mockResolve.mockReturnValue({ ...baseConfig });
+    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null });
+
+    let capturedConfig: any = null;
+    const handler = new AgentHandler({
+      resolveAgent: mockResolve,
+      createAgent: (config) => { capturedConfig = config; return { run: mockAgentRun, kill: mockAgentKill, config } as any; },
+    });
+
+    const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-test-"));
+    try {
+      await handler.execute(
+        makeNode({ prompt: "Next step" }),
+        baseCtx(),
+        { logsRoot: logsDir, cwd: "/tmp/project", signal: undefined, outgoingLabels: [], completedNodes: ["start", "analyze", "review"], nodeRetries: {} },
+      );
+
+      expect(capturedConfig.prompt).toContain("start, analyze, review");
     } finally {
       rmSync(logsDir, { recursive: true, force: true });
     }

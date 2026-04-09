@@ -45,14 +45,17 @@ export class AgentHandler implements NodeHandler {
     mkdirSync(nodeDir, { recursive: true });
     const rawPrompt = node.prompt ?? node.label ?? config.prompt;
     const fidelity = (node.fidelity as string | undefined) ?? "compact";
+    const completedNodes = (meta["completedNodes"] as string[]) ?? [];
+    const nodeRetries = (meta["nodeRetries"] as Record<string, number>) ?? {};
     const preamble = buildPreamble(
-      { timestamp: "", currentNode: node.id, completedNodes: [], nodeRetries: {}, context: ctx.values } as CheckpointState,
+      { timestamp: "", currentNode: node.id, completedNodes, nodeRetries, context: ctx.values } as CheckpointState,
       fidelity,
     );
     const prompt = preamble + rawPrompt;
     writeFileSync(join(nodeDir, "prompt.md"), prompt);
 
-    const agent = this.create(config);
+    // Override config.prompt so Agent.run() delivers the assembled preamble + node prompt
+    const agent = this.create({ ...config, prompt });
     const maxIterations = (node.maxIterations as number | undefined) ?? 1;
 
     let lastSessionId: string | null = null;
