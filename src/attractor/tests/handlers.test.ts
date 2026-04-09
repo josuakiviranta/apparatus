@@ -8,6 +8,7 @@ import { ParallelHandler, FanInHandler } from "../handlers/parallel.js";
 import { ManagerLoopHandler } from "../handlers/manager-loop.js";
 import { AutoApproveInterviewer } from "../interviewer/auto-approve.js";
 import { QueueInterviewer } from "../interviewer/queue.js";
+import type { Interviewer } from "../interviewer/index.js";
 import type { Node, PipelineContext } from "../types.js";
 
 const baseCtx = (): PipelineContext => ({ values: {} });
@@ -65,6 +66,41 @@ describe("WaitHumanHandler", () => {
     const node: Node = { id: "gate", shape: "hexagon" };
     const outcome = await h.execute(node, baseCtx(), { outgoingLabels: ["Approve", "Reject"] });
     expect(outcome.preferredLabel).toBe("Approve");
+  });
+
+  it("returns fail when signal is already aborted", async () => {
+    const interviewer = new QueueInterviewer(["Yes"]);
+    const h = new WaitHumanHandler(interviewer);
+    const ac = new AbortController();
+    ac.abort();
+    const node: Node = { id: "gate", shape: "hexagon", label: "Accept?" };
+    const outcome = await h.execute(node, baseCtx(), { outgoingLabels: ["Yes", "No"], signal: ac.signal });
+    expect(outcome.status).toBe("fail");
+    expect(outcome.failureReason).toContain("Aborted");
+  });
+
+  it("returns fail when signal aborts during ask", async () => {
+    const ac = new AbortController();
+    const slowInterviewer: Interviewer = {
+      ask: () => new Promise(() => { /* never resolves */ }),
+    };
+    const h = new WaitHumanHandler(slowInterviewer);
+    const node: Node = { id: "gate", shape: "hexagon", label: "Accept?" };
+    const promise = h.execute(node, baseCtx(), { outgoingLabels: ["Yes", "No"], signal: ac.signal });
+    ac.abort();
+    const outcome = await promise;
+    expect(outcome.status).toBe("fail");
+    expect(outcome.failureReason).toContain("Aborted");
+  });
+
+  it("succeeds normally when signal is provided but not aborted", async () => {
+    const interviewer = new QueueInterviewer(["Yes"]);
+    const h = new WaitHumanHandler(interviewer);
+    const ac = new AbortController();
+    const node: Node = { id: "gate", shape: "hexagon", label: "Accept?" };
+    const outcome = await h.execute(node, baseCtx(), { outgoingLabels: ["Yes", "No"], signal: ac.signal });
+    expect(outcome.status).toBe("success");
+    expect(outcome.preferredLabel).toBe("Yes");
   });
 });
 

@@ -14,7 +14,15 @@
 
 ## Status
 
-**Chunks 1-4 complete (Tasks 1-21). Chunks 5-8 (pipeline bug fixes + docs) complete.** All 398 tests pass, typecheck clean, build succeeds.
+**Chunks 1-4 complete (Tasks 1-21). Chunks 5-9 (pipeline bug fixes + docs) complete.** All 401 tests pass, typecheck clean, build succeeds.
+
+### Chunk 9: WaitHumanHandler AbortSignal Race Fix (0.0.43)
+
+`WaitHumanHandler.execute` now races `interviewer.ask()` against the abort signal from `meta["signal"]`. Previously, if the pipeline received Ctrl-C during a `wait.human` node, the readline prompt would hang indefinitely since nothing interrupted the `ask()` call. The handler now:
+1. Returns `fail` immediately if the signal is already aborted before prompting.
+2. Uses `Promise.race()` between `ask()` and the abort signal when a signal is provided.
+3. Returns `fail` with a descriptive reason if aborted during the prompt.
+Three tests added covering pre-aborted, mid-prompt abort, and normal (non-aborted) signal scenarios.
 
 ### Chunk 8: Preamble Delivery Fix (0.0.42)
 
