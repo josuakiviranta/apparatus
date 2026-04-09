@@ -45,6 +45,10 @@ export function getPipelineCreatePromptPath(): string {
   return getAssetPath(join("prompts", "PROMPT_pipeline_create.md"));
 }
 
+export function getBundledAgentsDir(): string {
+  return getAssetPath("agents");
+}
+
 export function getMetaMeditationsDir(): string {
   // prod: dist/cli/ → up two → package root
   // dev:  src/cli/lib/ → up three → package root
