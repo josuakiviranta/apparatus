@@ -39,6 +39,23 @@ describe("variableExpansionTransform", () => {
     variableExpansionTransform(g, { project: "/proj" });
     expect(g.nodes.get("work")?.prompt).toBe(original);
   });
+
+  it("expands arbitrary context keys in prompts", () => {
+    const g = makeGraph();
+    g.nodes.get("work")!.prompt = "Iteration $loop.iteration, prior success: $agent.success";
+    const result = variableExpansionTransform(g, {
+      project: "/proj",
+      context: { "loop.iteration": "2", "agent.success": "true" },
+    });
+    expect(result.nodes.get("work")?.prompt).toBe("Iteration 2, prior success: true");
+  });
+
+  it("leaves unknown context variables as-is", () => {
+    const g = makeGraph();
+    g.nodes.get("work")!.prompt = "Value: $unknown.key";
+    const result = variableExpansionTransform(g, { project: "/proj", context: {} });
+    expect(result.nodes.get("work")?.prompt).toBe("Value: $unknown.key");
+  });
 });
 
 describe("buildPreamble", () => {

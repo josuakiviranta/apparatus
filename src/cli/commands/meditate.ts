@@ -4,6 +4,7 @@ import { spawnSync } from "child_process";
 import { Agent } from "../lib/agent.js";
 import { resolveAgent } from "../lib/agent-registry.js";
 import { getIlluminationServerPath, getMetaMeditationsDir } from "../lib/assets.js";
+import { streamEvents } from "../lib/stream-formatter.js";
 import * as output from "../lib/output.js";
 
 // ─── PID lock utilities ───────────────────────────────────────────────────────
@@ -90,6 +91,9 @@ export async function runMeditationSession(absPath: string): Promise<void> {
         ILLUMINATION_SERVER_PATH: getIlluminationServerPath(),
         PROJECT_ROOT: absPath,
         META_MEDITATIONS_DIR: getMetaMeditationsDir(),
+      },
+      onStdout: async (stdout) => {
+        await output.stream(streamEvents(stdout, {}));
       },
     });
 

@@ -367,4 +367,14 @@ describe("validateGraph", () => {
     expect(diags.some(d => d.rule === "type_unsupported" && d.severity === "error")).toBe(true);
     expect(diags.some(d => d.message.includes("parallel"))).toBe(true);
   });
+
+  it("errors on stack.manager_loop node type (not yet implemented)", () => {
+    const g = makeValid();
+    g.nodes.set("mgr", { id: "mgr", shape: "house" });
+    g.edges.push({ from: "start", to: "mgr" });
+    g.edges.push({ from: "mgr", to: "done" });
+    const diags = validateGraph(g);
+    expect(diags.some(d => d.rule === "type_unsupported" && d.severity === "error")).toBe(true);
+    expect(diags.some(d => d.message.includes("stack.manager_loop"))).toBe(true);
+  });
 });

@@ -1,4 +1,4 @@
-import { readFileSync, existsSync, readdirSync, mkdirSync } from "fs";
+import { readFileSync, existsSync, readdirSync, mkdirSync, rmSync } from "fs";
 import { resolve, join, basename } from "path";
 import { homedir } from "os";
 import { parseDot, validateGraph, validateOrRaise } from "../../attractor/core/graph.js";
@@ -68,8 +68,12 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
   graph = variableExpansionTransform(graph, { project: opts.project });
 
   const slug = graph.name.replace(/\s+/g, "-").toLowerCase();
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const logsRoot = opts.logsRoot ?? join(homedir(), ".ralph", "runs", `${slug}-${timestamp}`);
+  const logsRoot = opts.logsRoot ?? join(homedir(), ".ralph", "runs", slug);
+
+  // For fresh runs (not --resume), clean any previous run directory
+  if (!opts.resume && existsSync(logsRoot) && !opts.logsRoot) {
+    rmSync(logsRoot, { recursive: true, force: true });
+  }
 
   const ac = new AbortController();
   const onSignal = () => ac.abort();

@@ -14,7 +14,17 @@
 
 ## Status
 
-**Chunks 1-4 complete (Tasks 1-21). Chunk 5 (pipeline bug fixes) complete.** All 389 tests pass, typecheck clean, build succeeds.
+**Chunks 1-4 complete (Tasks 1-21). Chunks 5-6 (pipeline bug fixes) complete.** All 396 tests pass, typecheck clean, build succeeds.
+
+### Chunk 6: Resume, Checkpoint & Variable Expansion Fixes (0.0.40)
+
+Five fixes addressing core pipeline reliability:
+
+1. **Stable logsRoot for `--resume`** — Replaced timestamp-based `~/.ralph/runs/<slug>-<timestamp>/` with deterministic `~/.ralph/runs/<slug>/`. Fresh runs clean previous directory; `--resume` finds existing checkpoint. Test added.
+2. **Checkpoint save split** — Advance block split into normal-edge and loop_restart-edge paths. Normal edges save `currentNode: nextEdge.to` (next node to execute). Loop_restart edges save `currentNode: startNode.id` with reset state. Prevents resume from executing phantom sentinel nodes.
+3. **Resume warning on missing checkpoint** — Engine now logs `[ralph] --resume: no checkpoint found` instead of silently starting fresh.
+4. **stack.manager_loop validation** — Added to `UNIMPLEMENTED_TYPES` and `KNOWN_TYPES`, producing a validation error instead of silently crashing at runtime with "No handler for type."
+5. **variableExpansionTransform expanded** — Now substitutes all `$key.name` patterns from a context map, not just `$goal`/`$project`. Enables prompts like `"Iteration $loop.iteration, prior: $agent.success"`.
 
 ### Chunk 5: Pipeline Engine Bug Fixes (0.0.39)
 
@@ -36,9 +46,8 @@ AgentHandler replaces CodergenHandler for attractor pipeline. Agent attribute (`
 
 ### Known Issues
 
-- **Pipeline resume (`--resume`) has no stable address** — `logsRoot` is timestamp-based and freshly computed on every invocation. The checkpoint from an interrupted run is never found. Fix: use deterministic `~/.ralph/runs/<slug>/` path.
-- **Pipeline resume test proves wrong checkpoint** — The engine's resume test uses a synthetic checkpoint where currentNode is not yet in completedNodes, a state the success path never produces.
-- **variableExpansionTransform limited** — Only substitutes `$goal` and `$project`, not arbitrary context keys. Should expand all `context.*` keys for full composability.
+- **Pipeline authoring prompt misdescribes features** — `PROMPT_pipeline_create.md` misdescribes `goal_gate` semantics and omits `loop_restart`. Should be updated after engine fixes are stable.
+- **pipelineCreateCommand missing `which claude` guard** — Fourth copy of session pattern lacks the preflight check for claude binary.
 
 ## File Structure
 

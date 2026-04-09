@@ -259,4 +259,56 @@ describe("runPipeline", () => {
     expect(result.status).toBe("fail");
     expect(result.failureReason).toContain("Aborted");
   });
+
+  it("saves checkpoint with nextEdge.to for normal advance", async () => {
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      work  [shape=box]
+      done  [shape=Msquare]
+      start -> work -> done
+    }`;
+    await runPipeline(parseDot(dot), makeOpts(dir));
+    // Read the final checkpoint — should point to the exit node
+    const { readFile } = await import("fs/promises");
+    const cp = JSON.parse(await readFile(join(dir, "checkpoint.json"), "utf8"));
+    expect(cp.currentNode).toBe("done");
+    expect(cp.completedNodes).toContain("start");
+    expect(cp.completedNodes).toContain("work");
+    expect(cp.completedNodes).toContain("done");
+  });
+
+  it("saves correct checkpoint state after loop_restart", async () => {
+    let callCount = 0;
+    mockAgentRun.mockImplementation(async () => {
+      callCount++;
+      return { exitCode: 0, sessionId: `s${callCount}`, stdout: null };
+    });
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      work  [shape=box]
+      check [shape=diamond]
+      done  [shape=Msquare]
+      start -> work -> check
+      check -> done [condition="context.loop.iteration=1"]
+      check -> start [loop_restart=true]
+    }`;
+    const result = await runPipeline(parseDot(dot), makeOpts(dir));
+    expect(result.status).toBe("success");
+    // Final checkpoint should point to exit node
+    const { readFile } = await import("fs/promises");
+    const cp = JSON.parse(await readFile(join(dir, "checkpoint.json"), "utf8"));
+    expect(cp.currentNode).toBe("done");
+  });
+
+  it("warns when --resume finds no checkpoint", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      done  [shape=Msquare]
+      start -> done
+    }`;
+    await runPipeline(parseDot(dot), makeOpts(dir, { resume: true }));
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("no checkpoint found"));
+    warnSpy.mockRestore();
+  });
 });

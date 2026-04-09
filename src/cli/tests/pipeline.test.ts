@@ -110,6 +110,17 @@ describe("pipelineRunCommand", () => {
     await pipelineRunCommand("review", { project: dir, logsRoot: dir });
     expect(engine.runPipeline).toHaveBeenCalledTimes(1);
   });
+
+  it("uses stable slug-based logsRoot when none provided", async () => {
+    const dotFile = join(dir, "test.dot");
+    writeFileSync(dotFile, VALID_DOT);
+    await pipelineRunCommand(dotFile);
+    const call = (engine.runPipeline as ReturnType<typeof vi.fn>).mock.calls[0];
+    const opts = call[1];
+    // logsRoot should be ~/.ralph/runs/<slug>, not contain a timestamp
+    expect(opts.logsRoot).toContain(join(".ralph", "runs", "g"));
+    expect(opts.logsRoot).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
+  });
 });
 
 describe("pipelineListCommand", () => {

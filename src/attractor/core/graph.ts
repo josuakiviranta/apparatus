@@ -190,12 +190,13 @@ const KNOWN_TYPES = new Set([
   "codergen", "tool", "wait.human", "conditional", "parallel", "parallel.fan_in",
   "start", "exit",
   "ralph.implement", "ralph.meditate", "ralph.run-scenarios",
-  "agent",
+  "agent", "stack.manager_loop",
 ]);
 
 // Types that pass validation but are not yet implemented — emit errors
 const UNIMPLEMENTED_TYPES = new Set([
-  "parallel", "parallel.fan_in",  // fan-out execution not yet implemented
+  "parallel", "parallel.fan_in",     // fan-out execution not yet implemented
+  "stack.manager_loop",              // no handler registered
 ]);
 
 const SHAPE_TO_TYPE: Record<string, string> = {

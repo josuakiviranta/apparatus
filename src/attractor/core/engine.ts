@@ -110,6 +110,8 @@ export async function runPipeline(graph: Graph, opts: EngineOptions): Promise<Pi
       completedNodes = cp.completedNodes;
       context = { ...context, ...cp.context };
       nodeRetries = cp.nodeRetries;
+    } else {
+      console.warn("[ralph] --resume: no checkpoint found, starting from beginning");
     }
   }
 
@@ -216,7 +218,6 @@ export async function runPipeline(graph: Graph, opts: EngineOptions): Promise<Pi
 
     // Advance — deduplicate completedNodes (set semantics, not bag)
     if (!completedNodes.includes(node.id)) completedNodes = [...completedNodes, node.id];
-    await saveCheckpoint(opts.logsRoot, { timestamp: new Date().toISOString(), currentNode: node.id, completedNodes, nodeRetries, context });
 
     const nextEdge = selectNextEdge(node, outcome, context, edges);
     if (!nextEdge) {
@@ -228,10 +229,14 @@ export async function runPipeline(graph: Graph, opts: EngineOptions): Promise<Pi
       completedNodes = [];
       nodeRetries = {};
       context["loop.iteration"] = String(Number(context["loop.iteration"] ?? "0") + 1);
+      // Checkpoint the post-reset state so resume starts from the loop beginning
+      await saveCheckpoint(opts.logsRoot, { timestamp: new Date().toISOString(), currentNode: startNode.id, completedNodes, nodeRetries, context });
       currentNodeId = startNode.id;
       continue;
     }
 
+    // Normal advance — checkpoint records the NEXT node to execute
+    await saveCheckpoint(opts.logsRoot, { timestamp: new Date().toISOString(), currentNode: nextEdge.to, completedNodes, nodeRetries, context });
     currentNodeId = nextEdge.to;
   }
 }
