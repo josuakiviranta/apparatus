@@ -144,6 +144,8 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
   } finally {
     process.off("SIGINT", onSignal);
     process.off("SIGTERM", onSignal);
+    // Yield one macrotask to let Ink flush the final render (matches output.ts renderOnce pattern)
+    await new Promise(resolve => setTimeout(resolve, 0));
     done();
     await waitUntilExit();
   }

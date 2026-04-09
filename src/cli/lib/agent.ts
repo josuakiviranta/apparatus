@@ -196,6 +196,7 @@ export class Agent {
         // Structured output: buffer stdout for JSON parsing.
         // Skip onStdout — structured nodes produce a single JSON blob, not a stream.
         const rl = readline.createInterface({ input: child.stdout });
+        const rlDone = new Promise<void>((resolve) => rl.on("close", resolve));
         rl.on("line", (line) => {
           capturedOutput += line + "\n";
           try {
@@ -208,6 +209,8 @@ export class Agent {
             // Not JSON line, still captured
           }
         });
+        // Ensure all buffered lines are processed before returning
+        await rlDone;
       } else if (!isInteractive && child.stdout && options.onStdout) {
         // Caller consumes stdout (e.g. streamEvents → output.stream)
         await options.onStdout(child.stdout);

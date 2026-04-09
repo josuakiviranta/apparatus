@@ -113,7 +113,17 @@ export class AgentHandler implements NodeHandler {
 
     if (jsonSchema && lastResult?.output) {
       try {
-        const parsed = JSON.parse(lastResult.output.trim());
+        const raw = JSON.parse(lastResult.output.trim());
+        // Claude CLI --output-format json returns an array of event objects.
+        // Find the {type:"result"} entry and extract its .result field.
+        const wrapper = Array.isArray(raw)
+          ? raw.find((item: any) => item?.type === "result") ?? raw[raw.length - 1]
+          : raw;
+        const resultText = typeof wrapper === "object" && wrapper !== null && "result" in wrapper
+          ? wrapper.result
+          : lastResult.output.trim();
+        const parsed = typeof resultText === "string" ? JSON.parse(resultText) : resultText;
+
         for (const [key, value] of Object.entries(parsed)) {
           structuredUpdates[key] = String(value);
         }

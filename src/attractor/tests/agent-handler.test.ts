@@ -343,6 +343,77 @@ describe("AgentHandler", () => {
     }
   });
 
+  it("unwraps Claude CLI --output-format json array wrapper before parsing", async () => {
+    const schema = JSON.stringify({ type: "object", properties: { verdict: { type: "string" }, path: { type: "string" } } });
+    const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-test-"));
+    const schemaDir = join(logsDir, "schemas");
+    mkdirSync(schemaDir, { recursive: true });
+    writeFileSync(join(schemaDir, "test.json"), schema);
+
+    mockResolve.mockReturnValue({ ...baseConfig });
+    // Simulate Claude CLI --output-format json: array with system, assistant, result entries
+    const innerJson = JSON.stringify({ verdict: "true", path: "/foo.md" });
+    const arrayOutput = JSON.stringify([
+      { type: "system", subtype: "init", session_id: "s1" },
+      { type: "assistant", message: { content: [{ type: "text", text: "thinking..." }] } },
+      { type: "result", subtype: "success", result: innerJson, session_id: "s1" },
+    ]);
+    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: "s1", stdout: null, output: arrayOutput });
+
+    const handler = new AgentHandler({
+      resolveAgent: mockResolve,
+      createAgent: () => ({ run: mockAgentRun, kill: mockAgentKill, config: {} } as any),
+    });
+
+    try {
+      const outcome = await handler.execute(
+        makeNode({ jsonSchemaFile: "schemas/test.json" } as any),
+        baseCtx(),
+        { logsRoot: logsDir, cwd: logsDir, signal: undefined, outgoingLabels: [], completedNodes: [], nodeRetries: {} },
+      );
+
+      expect(outcome.status).toBe("success");
+      expect(outcome.contextUpdates?.["verdict"]).toBe("true");
+      expect(outcome.contextUpdates?.["path"]).toBe("/foo.md");
+      // Should NOT have numeric keys from iterating the array
+      expect(outcome.contextUpdates?.["0"]).toBeUndefined();
+    } finally {
+      rmSync(logsDir, { recursive: true, force: true });
+    }
+  });
+
+  it("unwraps Claude CLI single object wrapper before parsing", async () => {
+    const schema = JSON.stringify({ type: "object", properties: { preferred_label: { type: "string" } } });
+    const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-test-"));
+    const schemaDir = join(logsDir, "schemas");
+    mkdirSync(schemaDir, { recursive: true });
+    writeFileSync(join(schemaDir, "test.json"), schema);
+
+    mockResolve.mockReturnValue({ ...baseConfig });
+    const innerJson = JSON.stringify({ preferred_label: "false" });
+    const wrapper = JSON.stringify({ type: "result", subtype: "success", result: innerJson, session_id: "s2" });
+    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: "s2", stdout: null, output: wrapper });
+
+    const handler = new AgentHandler({
+      resolveAgent: mockResolve,
+      createAgent: () => ({ run: mockAgentRun, kill: mockAgentKill, config: {} } as any),
+    });
+
+    try {
+      const outcome = await handler.execute(
+        makeNode({ jsonSchemaFile: "schemas/test.json" } as any),
+        baseCtx(),
+        { logsRoot: logsDir, cwd: logsDir, signal: undefined, outgoingLabels: [], completedNodes: [], nodeRetries: {} },
+      );
+
+      expect(outcome.status).toBe("success");
+      expect(outcome.preferredLabel).toBe("false");
+      expect(outcome.contextUpdates?.["0"]).toBeUndefined();
+    } finally {
+      rmSync(logsDir, { recursive: true, force: true });
+    }
+  });
+
   it("sets preferredLabel from parsed JSON preferred_label key", async () => {
     const schema = JSON.stringify({ type: "object", properties: { preferred_label: { type: "string" } } });
     const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-test-"));
