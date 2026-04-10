@@ -13,6 +13,7 @@ import { RalphMeditateHandler } from "../handlers/ralph-meditate.js";
 import { RalphScenariosHandler } from "../handlers/ralph-scenarios.js";
 import { ParallelHandler, FanInHandler } from "../handlers/parallel.js";
 import { AgentHandler } from "../handlers/agent-handler.js";
+import type { OnInteractiveRequest } from "../handlers/agent-handler.js";
 import type { NodeHandler } from "../handlers/registry.js";
 
 export interface EngineOptions {
@@ -24,6 +25,7 @@ export interface EngineOptions {
   resume?: boolean;
   onNodeStart?: (node: Node) => void;
   onStdout?: (stdout: NodeJS.ReadableStream) => Promise<void>;
+  onInteractiveRequest?: OnInteractiveRequest;
 }
 
 export interface PipelineResult {
@@ -189,6 +191,7 @@ export async function runPipeline(graph: Graph, opts: EngineOptions): Promise<Pi
       completedNodes,
       nodeRetries,
       onStdout: opts.onStdout,
+      onInteractiveRequest: opts.onInteractiveRequest,
     });
 
     // Merge context updates
