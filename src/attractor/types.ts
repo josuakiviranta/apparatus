@@ -6,7 +6,7 @@ export interface Outcome {
   failureReason?: string;
   preferredLabel?: string;
   suggestedNextIds?: string[];
-  contextUpdates?: Record<string, string>;
+  contextUpdates?: Record<string, unknown>;
 }
 
 export interface Node {
@@ -63,11 +63,11 @@ export interface CheckpointState {
   currentNode: string;
   completedNodes: string[];
   nodeRetries: Record<string, number>;
-  context: Record<string, string>;
+  context: Record<string, unknown>;
 }
 
 export interface PipelineContext {
-  values: Record<string, string>;
+  values: Record<string, unknown>;
 }
 
 export type Transform = (graph: Graph) => Graph;

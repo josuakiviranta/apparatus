@@ -24,7 +24,7 @@ export interface AgentConfig {
 export interface RunOptions {
   cwd: string;
   signal?: AbortSignal;
-  variables?: Record<string, string>;
+  variables?: Record<string, unknown>;
   resume?: string;
   interactive?: boolean;
   onSessionId?: (id: string) => void;
@@ -58,11 +58,12 @@ export class Agent {
     return this._mcpConfigPath;
   }
 
-  expandPrompt(variables?: Record<string, string>): string {
+  expandPrompt(variables?: Record<string, unknown>): string {
     if (!variables) return this.config.prompt;
     let result = this.config.prompt;
     for (const [key, value] of Object.entries(variables)) {
-      result = result.replace(new RegExp(`\\{\\{${key}\\}\\}`, "g"), value);
+      const str = typeof value === "string" ? value : String(value ?? "");
+      result = result.replace(new RegExp(`\\{\\{${key}\\}\\}`, "g"), str);
     }
     return result;
   }
@@ -110,12 +111,16 @@ export class Agent {
     return args;
   }
 
-  writeMcpConfig(cwd: string, variables?: Record<string, string>): string | null {
+  writeMcpConfig(cwd: string, variables?: Record<string, unknown>): string | null {
     if (this.config.mcp.length === 0) return null;
 
     const expand = (s: string): string => {
       if (!variables) return s;
-      return s.replace(/\{\{(\w+)\}\}/g, (match, key) => variables[key] ?? match);
+      return s.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+        const v = variables[key];
+        if (v === undefined) return match;
+        return typeof v === "string" ? v : String(v);
+      });
     };
 
     const mcpServers: Record<string, { command: string; args: string[] }> = {};

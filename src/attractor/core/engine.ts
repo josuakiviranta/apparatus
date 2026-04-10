@@ -29,7 +29,7 @@ export interface EngineOptions {
 export interface PipelineResult {
   status: "success" | "fail";
   completedNodes: string[];
-  context: Record<string, string>;
+  context: Record<string, unknown>;
   failureReason?: string;
 }
 
@@ -54,7 +54,7 @@ function buildHandlerMap(opts: EngineOptions): Map<string, NodeHandler> {
 function selectNextEdge(
   node: Node,
   outcome: Outcome,
-  ctx: Record<string, string>,
+  ctx: Record<string, unknown>,
   edges: Edge[]
 ): Edge | null {
   const outgoing = edges.filter(e => e.from === node.id);
@@ -100,7 +100,7 @@ export async function runPipeline(graph: Graph, opts: EngineOptions): Promise<Pi
 
   let currentNodeId = startNode.id;
   let completedNodes: string[] = [];
-  let context: Record<string, string> = { "$goal": graph.goal ?? "" };
+  let context: Record<string, unknown> = { "$goal": graph.goal ?? "" };
   if (opts.project) context["$project"] = opts.project;
   let nodeRetries: Record<string, number> = {};
 

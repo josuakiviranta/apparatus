@@ -105,3 +105,56 @@ describe("buildPreamble", () => {
     expect(preamble).toBe("");
   });
 });
+
+describe("buildPreamble coerces non-string context values", () => {
+  const base = (ctx: Record<string, unknown>): CheckpointState => ({
+    timestamp: "",
+    currentNode: "n1",
+    completedNodes: ["a"],
+    nodeRetries: {},
+    context: ctx,
+  });
+
+  it("coerces numbers via String()", () => {
+    const out = buildPreamble(base({ "k.n": 42 }), "compact");
+    expect(out).toContain("k.n: 42");
+  });
+
+  it("coerces booleans via String()", () => {
+    const out = buildPreamble(base({ "k.b": true }), "compact");
+    expect(out).toContain("k.b: true");
+  });
+
+  it("stringifies objects via JSON.stringify", () => {
+    const out = buildPreamble(base({ "k.o": { a: 1, b: 2 } }), "compact");
+    expect(out).toContain('k.o: {"a":1,"b":2}');
+  });
+
+  it("handles null/undefined", () => {
+    const out = buildPreamble(base({ "k.null": null, "k.undef": undefined }), "compact");
+    expect(out).toContain("k.null: null");
+    expect(out).toContain("k.undef: undefined");
+  });
+});
+
+describe("expandVariables coerces non-string context values", () => {
+  it("expands a numeric context value", () => {
+    const out = expandVariables("turns=$chat.turnsUsed", { "chat.turnsUsed": 7 });
+    expect(out).toBe("turns=7");
+  });
+
+  it("expands a boolean context value", () => {
+    const out = expandVariables("ok=$chat.success", { "chat.success": true });
+    expect(out).toBe("ok=true");
+  });
+
+  it("stringifies an object context value", () => {
+    const out = expandVariables("d=$chat.digest", { "chat.digest": { n: 1 } });
+    expect(out).toBe('d={"n":1}');
+  });
+
+  it("passes through string values unchanged", () => {
+    const out = expandVariables("s=$k", { k: "hello" });
+    expect(out).toBe("s=hello");
+  });
+});

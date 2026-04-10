@@ -59,7 +59,7 @@ export class AgentHandler implements NodeHandler {
     const nodeDir = join(logsRoot, node.id);
     mkdirSync(nodeDir, { recursive: true });
     const rawPrompt = node.prompt ?? node.label ?? config.prompt;
-    const expandedRawPrompt = expandVariables(rawPrompt, ctx.values as Record<string, string>);
+    const expandedRawPrompt = expandVariables(rawPrompt, ctx.values);
     const fidelity = (node.fidelity as string | undefined) ?? "compact";
     const completedNodes = (meta["completedNodes"] as string[]) ?? [];
     const nodeRetries = (meta["nodeRetries"] as Record<string, number>) ?? {};
@@ -111,7 +111,7 @@ export class AgentHandler implements NodeHandler {
     }
 
     // Parse structured output if jsonSchema was set
-    let structuredUpdates: Record<string, string> = {};
+    let structuredUpdates: Record<string, unknown> = {};
     let preferredLabel: string | undefined;
 
     // Fail explicitly if jsonSchema was set but agent produced no output

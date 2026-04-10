@@ -36,4 +36,30 @@ describe("checkpoint", () => {
     const loaded = await loadCheckpoint(dir);
     expect(loaded?.currentNode).toBe("scenarios");
   });
+
+  it("preserves numbers, booleans, and nested objects in context", async () => {
+    const richState: CheckpointState = {
+      timestamp: "2026-04-13T00:00:00.000Z",
+      currentNode: "n1",
+      completedNodes: ["start"],
+      nodeRetries: {},
+      context: {
+        "chat.turnsUsed": 7,
+        "chat.success": true,
+        "chat.digest": { messageCount: 14, usage: { inputTokens: 100, outputTokens: 50 }, tools: [] },
+        "chat.output": "plain string",
+      },
+    };
+    await saveCheckpoint(dir, richState);
+    const loaded = await loadCheckpoint(dir);
+    expect(loaded).not.toBeNull();
+    expect(loaded!.context["chat.turnsUsed"]).toBe(7);
+    expect(loaded!.context["chat.success"]).toBe(true);
+    expect(loaded!.context["chat.digest"]).toEqual({
+      messageCount: 14,
+      usage: { inputTokens: 100, outputTokens: 50 },
+      tools: [],
+    });
+    expect(loaded!.context["chat.output"]).toBe("plain string");
+  });
 });

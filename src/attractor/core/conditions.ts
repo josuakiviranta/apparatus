@@ -1,12 +1,17 @@
 import type { Outcome } from "../types.js";
 
-type ContextMap = Record<string, string>;
+type ContextMap = Record<string, unknown>;
 
 function resolveKey(key: string, outcome: Outcome, ctx: ContextMap): string {
   if (key === "outcome") return outcome.status;
   if (key === "preferred_label") return outcome.preferredLabel ?? "";
-  // Support both "context.X" (prefixed key) and unprefixed context value lookup
-  if (key.startsWith("context.")) return ctx[key] ?? ctx[key.slice(8)] ?? "";
+  if (key.startsWith("context.")) {
+    const v = ctx[key] ?? ctx[key.slice(8)];
+    if (v === undefined || v === null) return "";
+    if (typeof v === "string") return v;
+    if (typeof v === "number" || typeof v === "boolean") return String(v);
+    return JSON.stringify(v);
+  }
   return "";
 }
 

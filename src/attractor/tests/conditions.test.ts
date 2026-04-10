@@ -40,3 +40,19 @@ describe("evaluateCondition", () => {
     expect(evaluateCondition("outcome=success && preferred_label=No", outcome, ctx)).toBe(false);
   });
 });
+
+describe("evaluateCondition handles unknown-typed context values", () => {
+  const success: Outcome = { status: "success" };
+
+  it("compares numeric context value via string coercion", () => {
+    const ctx: Record<string, unknown> = { "chat.turnsUsed": 7 };
+    expect(evaluateCondition("context.chat.turnsUsed=7", success, ctx)).toBe(true);
+    expect(evaluateCondition("context.chat.turnsUsed=8", success, ctx)).toBe(false);
+  });
+
+  it("compares boolean context value via string coercion", () => {
+    const ctx: Record<string, unknown> = { "chat.success": true };
+    expect(evaluateCondition("context.chat.success=true", success, ctx)).toBe(true);
+    expect(evaluateCondition("context.chat.success=false", success, ctx)).toBe(false);
+  });
+});

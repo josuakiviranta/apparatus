@@ -11,7 +11,11 @@ export function buildPreamble(checkpoint: CheckpointState, fidelity: string): st
   if (Object.keys(checkpoint.context).length > 0) {
     lines.push("Key context values:");
     for (const [k, v] of Object.entries(checkpoint.context)) {
-      lines.push(`  ${k}: ${v}`);
+      const rendered =
+        typeof v === "string" || typeof v === "number" || typeof v === "boolean" || v == null
+          ? String(v)
+          : JSON.stringify(v);
+      lines.push(`  ${k}: ${rendered}`);
     }
   }
 

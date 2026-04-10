@@ -28,7 +28,7 @@ vi.mock("../../cli/lib/agent.js", () => ({
     kill: vi.fn(),
     config: {},
     buildArgs: vi.fn(() => []),
-    expandPrompt: vi.fn((v: Record<string, string>) => ""),
+    expandPrompt: vi.fn((_v: Record<string, unknown>) => ""),
     writeMcpConfig: vi.fn(() => null),
     cleanupMcpConfig: vi.fn(),
   })),
