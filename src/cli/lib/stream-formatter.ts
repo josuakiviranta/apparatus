@@ -295,6 +295,110 @@ export function serializeEvent(ev: StreamEvent): string {
   }
 }
 
+// =============================================================================
+// Raw stream-json event iterator for interactive chat (Path 1.5)
+// =============================================================================
+//
+// Lower-level parser than streamEvents() above. Yields a typed union that
+// preserves the raw shape of Claude CLI's stream-json output so ChatUI can
+// display text deltas and inspect stop_reason/usage directly.
+
+import type { ToolCall, Usage as SessionUsage } from "./session.js";
+
+export type StreamJsonEvent =
+  | { type: "system"; sessionId?: string; raw: unknown }
+  | { type: "assistant_delta"; textDelta: string; messageId?: string }
+  | { type: "tool_use"; toolCall: ToolCall; messageId?: string }
+  | { type: "tool_result"; toolCallId: string; content: string; isError: boolean }
+  | {
+      type: "result";
+      stopReason: "end_turn" | "turn_limit" | "abort" | "error" | string;
+      text: string;
+      usage: SessionUsage;
+      raw: unknown;
+    }
+  | { type: "parse_error"; rawLine: string; error: string };
+
+function coerceSessionUsage(u: unknown): SessionUsage {
+  const obj = (u ?? {}) as Record<string, unknown>;
+  const n = (v: unknown) => (typeof v === "number" ? v : 0);
+  return {
+    inputTokens: n(obj.input_tokens),
+    outputTokens: n(obj.output_tokens),
+    cacheReadTokens: typeof obj.cache_read_input_tokens === "number" ? obj.cache_read_input_tokens : undefined,
+    cacheWriteTokens: typeof obj.cache_creation_input_tokens === "number" ? obj.cache_creation_input_tokens : undefined,
+  };
+}
+
+export async function* parseStreamJsonEvents(
+  readable: NodeJS.ReadableStream,
+): AsyncGenerator<StreamJsonEvent> {
+  const rl = readline.createInterface({ input: readable, crlfDelay: Infinity });
+  for await (const line of rl) {
+    if (!line.trim()) continue;
+
+    let event: Record<string, unknown>;
+    try {
+      event = JSON.parse(line) as Record<string, unknown>;
+    } catch (err) {
+      yield { type: "parse_error", rawLine: line, error: (err as Error).message };
+      continue;
+    }
+
+    const t = event.type;
+    if (t === "system") {
+      yield {
+        type: "system",
+        sessionId: typeof event.session_id === "string" ? event.session_id : undefined,
+        raw: event,
+      };
+    } else if (t === "assistant") {
+      const msg = (event.message ?? {}) as Record<string, unknown>;
+      const messageId = typeof msg.id === "string" ? msg.id : undefined;
+      const content = Array.isArray(msg.content) ? (msg.content as unknown[]) : [];
+      for (const block of content) {
+        const b = block as Record<string, unknown>;
+        if (b.type === "text" && typeof b.text === "string") {
+          yield { type: "assistant_delta", textDelta: b.text, messageId };
+        } else if (b.type === "tool_use") {
+          yield {
+            type: "tool_use",
+            toolCall: {
+              id: String(b.id ?? ""),
+              name: String(b.name ?? ""),
+              input: b.input,
+            },
+            messageId,
+          };
+        }
+      }
+    } else if (t === "user") {
+      const msg = (event.message ?? {}) as Record<string, unknown>;
+      const content = Array.isArray(msg.content) ? (msg.content as unknown[]) : [];
+      for (const block of content) {
+        const b = block as Record<string, unknown>;
+        if (b.type === "tool_result") {
+          yield {
+            type: "tool_result",
+            toolCallId: String(b.tool_use_id ?? ""),
+            content: typeof b.content === "string" ? b.content : JSON.stringify(b.content ?? ""),
+            isError: b.is_error === true,
+          };
+        }
+      }
+    } else if (t === "result") {
+      yield {
+        type: "result",
+        stopReason: typeof event.stop_reason === "string" ? event.stop_reason : "end_turn",
+        text: typeof event.result === "string" ? event.result : "",
+        usage: coerceSessionUsage(event.usage),
+        raw: event,
+      };
+    }
+    // unknown event types are silently ignored — forward-compat with CLI updates
+  }
+}
+
 // Only run as main entry point when executed directly.
 // Note: cannot use import.meta.url comparison because tsup moves this code
 // into a shared chunk whose URL differs from process.argv[1].

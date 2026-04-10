@@ -3,6 +3,9 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { Readable } from "node:stream";
 import * as readline from "node:readline";
+import type { Session } from "./session.js";
+import { formatUserTurn } from "./stream-json-input.js";
+import { parseStreamJsonEvents, type StreamJsonEvent } from "./stream-formatter.js";
 
 export interface McpServerConfig {
   name: string;
@@ -31,6 +34,14 @@ export interface RunOptions {
   /** When provided, the caller consumes stdout (e.g. via streamEvents).
    *  The internal readline session-id extractor is skipped. */
   onStdout?: (stdout: NodeJS.ReadableStream) => Promise<void>;
+}
+
+export interface ChildHandle {
+  sessionId: string;
+  events: AsyncGenerator<StreamJsonEvent>;
+  submit: (text: string) => Promise<void>;
+  end: () => Promise<void>;
+  kill: (signal?: NodeJS.Signals) => Promise<void>;
 }
 
 export interface RunResult {
@@ -246,6 +257,116 @@ export class Agent {
       this.cleanupMcpConfig();
       this._child = null;
     }
+  }
+
+  buildInteractiveArgs(opts: { systemPrompt: string; sessionId: string }): string[] {
+    const args: string[] = [];
+
+    // -p flag for prompt mode (initial prompt sent via stdin)
+    args.push("-p");
+
+    // Model
+    args.push("--model", this.config.model);
+
+    // Permission mode
+    if (this.config.permissionMode === "dangerouslySkipPermissions") {
+      args.push("--dangerously-skip-permissions");
+    } else {
+      args.push("--permission-mode", this.config.permissionMode);
+    }
+
+    // Tools
+    for (const tool of this.config.tools) {
+      args.push("--allowedTools", tool);
+    }
+
+    // MCP config
+    if (this._mcpConfigPath) {
+      args.push("--mcp-config", this._mcpConfigPath);
+    }
+
+    // Stream-json bidirectional protocol
+    args.push("--input-format", "stream-json");
+    args.push("--output-format", "stream-json");
+    args.push("--verbose");
+
+    // System prompt appended (not replacing CLI's default)
+    args.push("--append-system-prompt", opts.systemPrompt);
+
+    // Session continuity
+    args.push("--session-id", opts.sessionId);
+
+    return args;
+  }
+
+  runInteractive(opts: {
+    session: Session;
+    systemPrompt: string;
+    cwd: string;
+    variables?: Record<string, unknown>;
+  }): ChildHandle {
+    this.writeMcpConfig(opts.cwd, opts.variables);
+
+    const args = this.buildInteractiveArgs({
+      systemPrompt: opts.systemPrompt,
+      sessionId: opts.session.id,
+    });
+
+    const child = spawn("claude", args, {
+      cwd: opts.cwd,
+      stdio: ["pipe", "pipe", "inherit"],
+    });
+    this._child = child;
+
+    let ended = false;
+
+    const closePromise = new Promise<number>((resolve) => {
+      child.on("close", (code) => {
+        ended = true;
+        this._child = null;
+        this.cleanupMcpConfig();
+        resolve(code ?? 1);
+      });
+    });
+
+    const events = parseStreamJsonEvents(child.stdout!);
+
+    const submit = async (text: string): Promise<void> => {
+      if (ended || !child.stdin || child.stdin.destroyed) {
+        throw new Error("Child process stdin is closed or not writable");
+      }
+      const line = formatUserTurn(text);
+      return new Promise<void>((resolve, reject) => {
+        child.stdin!.write(line, (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+    };
+
+    const end = async (): Promise<void> => {
+      if (!ended && child.stdin && !child.stdin.destroyed) {
+        child.stdin.end();
+      }
+      await closePromise;
+    };
+
+    const killFn = async (signal: NodeJS.Signals = "SIGTERM"): Promise<void> => {
+      child.kill(signal);
+      const escalationTimeout = setTimeout(() => {
+        if (!ended) child.kill("SIGKILL");
+      }, 3000);
+      await closePromise;
+      clearTimeout(escalationTimeout);
+    };
+
+    return {
+      sessionId: opts.session.id,
+      events,
+      submit,
+      end,
+      kill: killFn,
+    };
   }
 
   kill(): void {
