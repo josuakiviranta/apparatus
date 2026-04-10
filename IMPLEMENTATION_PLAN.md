@@ -2175,7 +2175,7 @@ Expected: all green, no type errors.
 
 ---
 
-## Chunk 5: P4 + P5 — TextInput + ChatUI Ink Components
+## Chunk 5: P4 + P5 — TextInput + ChatUI Ink Components ✅ COMPLETE
 
 **Goal:** Create two Ink components under `src/cli/components/`:
 
@@ -2185,9 +2185,9 @@ Expected: all green, no type errors.
 All behavior is unit-testable via `ink-testing-library`.
 
 **Verification after chunk:**
-- [ ] TextInput tests pass.
-- [ ] ChatUI tests pass against a fake `ChildHandle`.
-- [ ] `npm run build` succeeds.
+- [x] TextInput tests pass.
+- [x] ChatUI tests pass against a fake `ChildHandle`.
+- [x] `npm run build` succeeds.
 
 ### Task 5.1: Create `src/cli/components/TextInput.tsx`
 
@@ -2195,11 +2195,11 @@ All behavior is unit-testable via `ink-testing-library`.
 - Create: `src/cli/components/TextInput.tsx`
 - Test: `src/cli/tests/TextInput.test.tsx`
 
-- [ ] **Step 1: Verify `src/cli/components/` exists (create if missing)**
+- [x] **Step 1: Verify `src/cli/components/` exists (create if missing)**
 
 Run: `ls src/cli/components/ 2>/dev/null || mkdir -p src/cli/components`
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 Create `src/cli/tests/TextInput.test.tsx`:
 
@@ -2277,12 +2277,12 @@ describe("TextInput", () => {
 });
 ```
 
-- [ ] **Step 3: Run, verify fail (component missing)**
+- [x] **Step 3: Run, verify fail (component missing)**
 
 Run: `npx vitest run src/cli/tests/TextInput.test.tsx`
 Expected: import fails.
 
-- [ ] **Step 4: Create `src/cli/components/TextInput.tsx`**
+- [x] **Step 4: Create `src/cli/components/TextInput.tsx`**
 
 ```tsx
 import React, { useState } from "react";
@@ -2366,12 +2366,12 @@ export function TextInput({
 }
 ```
 
-- [ ] **Step 5: Run, verify pass**
+- [x] **Step 5: Run, verify pass**
 
 Run: `npx vitest run src/cli/tests/TextInput.test.tsx`
 Expected: all tests pass. If ink-testing-library's `stdin.write` does not translate `\u0008` to backspace, use the raw Ink key sequence — check the existing Ink component tests in the repo (`src/cli/tests/` likely has prior art) for the exact sequence used.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/cli/components/TextInput.tsx src/cli/tests/TextInput.test.tsx
@@ -2395,7 +2395,7 @@ git commit -m "feat(components): add TextInput Ink component"
 
 **Static component note:** Ink's `<Static>` is append-only — it renders newly appended items exactly once and never re-renders existing items. This is intentional for chat history: each turn is immutable once committed. Do NOT mutate existing turns in `session.history`; always `push` new turns and pass a shallow-copied array to `setHistory` so React detects the change.
 
-- [ ] **Step 1: Define the fake `ChildHandle` helper that the tests will use**
+- [x] **Step 1: Define the fake `ChildHandle` helper that the tests will use**
 
 Create `src/cli/tests/helpers/fake-child-handle.ts`:
 
@@ -2487,7 +2487,7 @@ export function createFakeChildHandle(sessionId = "fake-uuid"): FakeChildHandleC
 }
 ```
 
-- [ ] **Step 2: Write ChatUI tests**
+- [x] **Step 2: Write ChatUI tests**
 
 Create `src/cli/tests/ChatUI.test.tsx`:
 
@@ -2746,12 +2746,12 @@ describe("ChatUI", () => {
 });
 ```
 
-- [ ] **Step 3: Run, verify fail**
+- [x] **Step 3: Run, verify fail**
 
 Run: `npx vitest run src/cli/tests/ChatUI.test.tsx`
 Expected: module not found.
 
-- [ ] **Step 4: Create `src/cli/components/ChatUI.tsx`**
+- [x] **Step 4: Create `src/cli/components/ChatUI.tsx`**
 
 ```tsx
 import React, { useEffect, useState, useCallback, useRef } from "react";
@@ -3023,17 +3023,17 @@ function StatusBar({
 }
 ```
 
-- [ ] **Step 5: Run the tests, verify pass**
+- [x] **Step 5: Run the tests, verify pass**
 
 Run: `npx vitest run src/cli/tests/ChatUI.test.tsx`
 Expected: all tests pass. If a test is flaky due to Ink async scheduling, bump `waitForFrames` to 100ms — but do NOT add `setTimeout` loops in the component itself; the test is the thing that flexes for Ink's async.
 
-- [ ] **Step 6: Full suite + build**
+- [x] **Step 6: Full suite + build**
 
 Run: `npm test && npm run build`
 Expected: all green.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/cli/components/ChatUI.tsx src/cli/tests/ChatUI.test.tsx src/cli/tests/helpers/fake-child-handle.ts
@@ -3042,10 +3042,15 @@ git commit -m "feat(components): add ChatUI Ink component with state machine + s
 
 ### Task 5.3: Chunk 5 verification gate
 
-- [ ] **Step 1: Full suite**
+- [x] **Step 1: Full suite**
 
 Run: `npm test && npm run build`
 Expected: all green.
+
+**Implementation notes (Chunk 5):**
+- TextInput uses internal state + refs to handle batched keystrokes from ink-testing-library (stdin writes are synchronous but Ink renders asynchronously — tests need `await delay()` after stdin.write).
+- `ChildHandle.exited` promise was added to `agent.ts` to support ChatUI's child crash detection.
+- `FakeChildHandleController` in `src/cli/tests/helpers/fake-child-handle.ts` provides a controllable async event stream for testing ChatUI without spawning a real Claude process.
 
 ---
 
