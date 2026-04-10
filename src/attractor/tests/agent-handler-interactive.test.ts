@@ -1,12 +1,42 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { AgentHandler, type InkRenderFn } from "../handlers/agent-handler.js";
+import { AgentHandler } from "../handlers/agent-handler.js";
+import type { OnInteractiveRequest } from "../handlers/agent-handler.js";
 import { Session } from "../../cli/lib/session.js";
+import type { ExitReason } from "../../cli/lib/session.js";
 import type { AgentConfig } from "../../cli/lib/agent.js";
 import type { Node, PipelineContext } from "../types.js";
 import { mkdtempSync, rmSync, readFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { createFakeChildHandle } from "../../cli/tests/helpers/fake-child-handle.js";
+
+const makeInteractiveStub = (reason: ExitReason): OnInteractiveRequest =>
+  async ({ session, child }) => {
+    // Drain events in the background, recording history as ChatUI would
+    const drainDone = (async () => {
+      try {
+        for await (const ev of child.events) {
+          if (ev.type === "result") {
+            session.history.push({
+              role: "assistant",
+              text: ev.text,
+              toolCalls: [],
+              usage: ev.usage,
+              at: Date.now(),
+            });
+          }
+        }
+      } catch {
+        /* stream may close abruptly in fakes */
+      }
+    })();
+    // Give events a tick to arrive, then end the session
+    await new Promise((r) => setTimeout(r, 20));
+    session.exitReason = reason;
+    try { await child.end(); } catch {}
+    // Wait briefly for drain to finish (end resolves exited but not the stream)
+    await Promise.race([drainDone, new Promise((r) => setTimeout(r, 50))]);
+  };
 
 function makeFakeAgent(
   controllerSetup: (ctrl: ReturnType<typeof createFakeChildHandle>, session: Session) => void,
@@ -39,12 +69,17 @@ function makeFakeAgent(
 
 const baseCtx = (): PipelineContext => ({ values: {} });
 
-const baseMeta = (cwd: string, logsRoot: string) => ({
+const baseMeta = (
+  cwd: string,
+  logsRoot: string,
+  onInteractiveRequest?: OnInteractiveRequest,
+) => ({
   cwd,
   logsRoot,
   completedNodes: [] as string[],
   nodeRetries: {},
   outgoingLabels: [] as string[],
+  onInteractiveRequest,
 });
 
 describe("AgentHandler — interactive branch", () => {
@@ -112,33 +147,9 @@ describe("AgentHandler — interactive branch", () => {
       }, 5);
     });
 
-    const stubRender: InkRenderFn = (element: any) => {
-      const props = element.props;
-      const { session, child, onExit } = props;
-      (async () => {
-        for await (const ev of child.events) {
-          if (ev.type === "result") {
-            session.history.push({
-              role: "assistant",
-              text: ev.text,
-              toolCalls: [],
-              usage: ev.usage,
-              at: Date.now(),
-            });
-            session.exitReason = "user_end";
-            try { await child.end(); } catch {}
-            onExit("user_end");
-            return;
-          }
-        }
-      })();
-      return { unmount: () => {}, waitUntilExit: async () => {} };
-    };
-
     const handler = new AgentHandler({
       resolveAgent: () => agent.config,
       createAgent: () => agent,
-      render: stubRender,
     });
 
     const tmp = mkdtempSync(join(tmpdir(), "ralph-handler-"));
@@ -148,7 +159,7 @@ describe("AgentHandler — interactive branch", () => {
         prompt: "talk to the user",
         interactive: true,
       };
-      const out = await handler.execute(node, baseCtx(), baseMeta(tmp, tmp));
+      const out = await handler.execute(node, baseCtx(), baseMeta(tmp, tmp, makeInteractiveStub("user_end")));
       expect(out.status).toBe("success");
       expect(out.contextUpdates!["chat_node.output"]).toBe("summary text");
       expect(out.contextUpdates!["chat_node.success"]).toBe(true);
@@ -169,25 +180,15 @@ describe("AgentHandler — interactive branch", () => {
   it("interactive abort path: status='fail', contextUpdates contain partial digest", async () => {
     const agent = makeFakeAgent(() => {});
 
-    const stubRender: InkRenderFn = (element: any) => {
-      const { session, child, onExit } = element.props;
-      setTimeout(() => {
-        session.exitReason = "abort";
-        child.kill("SIGTERM").finally(() => onExit("abort"));
-      }, 5);
-      return { unmount: () => {}, waitUntilExit: async () => {} };
-    };
-
     const handler = new AgentHandler({
       resolveAgent: () => agent.config,
       createAgent: () => agent,
-      render: stubRender,
     });
 
     const tmp = mkdtempSync(join(tmpdir(), "ralph-handler-"));
     try {
       const node: Node = { id: "chat_node", prompt: "p", interactive: true };
-      const out = await handler.execute(node, baseCtx(), baseMeta(tmp, tmp));
+      const out = await handler.execute(node, baseCtx(), baseMeta(tmp, tmp, makeInteractiveStub("abort")));
       expect(out.status).toBe("fail");
       expect(out.contextUpdates!["chat_node.success"]).toBe(false);
       expect(out.contextUpdates!["chat_node.exitReason"]).toBe("abort");
@@ -199,26 +200,16 @@ describe("AgentHandler — interactive branch", () => {
   it("interactive=true with string 'true' is handled (DOT attribute coercion)", async () => {
     const agent = makeFakeAgent(() => {});
 
-    const stubRender: InkRenderFn = (element: any) => {
-      const { session, child, onExit } = element.props;
-      setTimeout(() => {
-        session.exitReason = "user_end";
-        child.end().then(() => onExit("user_end"));
-      }, 5);
-      return { unmount: () => {}, waitUntilExit: async () => {} };
-    };
-
     const handler = new AgentHandler({
       resolveAgent: () => agent.config,
       createAgent: () => agent,
-      render: stubRender,
     });
 
     const tmp = mkdtempSync(join(tmpdir(), "ralph-handler-"));
     try {
       // DOT attributes parse as strings, so interactive="true" is common
       const node: Node = { id: "chat", prompt: "hi", interactive: "true" };
-      const out = await handler.execute(node, baseCtx(), baseMeta(tmp, tmp));
+      const out = await handler.execute(node, baseCtx(), baseMeta(tmp, tmp, makeInteractiveStub("user_end")));
       expect(out.status).toBe("success");
       expect(out.contextUpdates!["chat.exitReason"]).toBe("user_end");
     } finally {
@@ -229,26 +220,16 @@ describe("AgentHandler — interactive branch", () => {
   it("writes prompt.md to nodeDir even for interactive nodes", async () => {
     const agent = makeFakeAgent(() => {});
 
-    const stubRender: InkRenderFn = (element: any) => {
-      const { session, child, onExit } = element.props;
-      setTimeout(() => {
-        session.exitReason = "user_end";
-        child.end().then(() => onExit("user_end"));
-      }, 5);
-      return { unmount: () => {}, waitUntilExit: async () => {} };
-    };
-
     const handler = new AgentHandler({
       resolveAgent: () => agent.config,
       createAgent: () => agent,
-      render: stubRender,
     });
 
     const tmp = mkdtempSync(join(tmpdir(), "ralph-handler-"));
     try {
       const node: Node = { id: "chat", prompt: "talk about $topic", interactive: true };
       const ctx: PipelineContext = { values: { topic: "testing" } };
-      await handler.execute(node, ctx, baseMeta(tmp, tmp));
+      await handler.execute(node, ctx, baseMeta(tmp, tmp, makeInteractiveStub("user_end")));
 
       const promptPath = join(tmp, "chat", "prompt.md");
       const written = readFileSync(promptPath, "utf8");

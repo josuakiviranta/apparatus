@@ -8,7 +8,6 @@ import { resolveAgent as defaultResolveAgent } from "../../cli/lib/agent-registr
 import { buildPreamble } from "../transforms/preamble.js";
 import { expandVariables } from "../transforms/variable-expansion.js";
 import { Session, buildSessionDigest, type ExitReason } from "../../cli/lib/session.js";
-import React from "react";
 
 export interface InteractiveRequest {
   session: Session;
@@ -18,25 +17,18 @@ export interface InteractiveRequest {
 
 export type OnInteractiveRequest = (req: InteractiveRequest) => Promise<void>;
 
-export type InkRenderFn = (
-  element: React.ReactElement,
-) => { unmount: () => void; waitUntilExit: () => Promise<void> };
-
 export interface AgentHandlerDeps {
   resolveAgent?: (name: string) => AgentConfig;
   createAgent?: (config: AgentConfig) => Agent;
-  render?: InkRenderFn;
 }
 
 export class AgentHandler implements NodeHandler {
   private resolve: (name: string) => AgentConfig;
   private create: (config: AgentConfig) => Agent;
-  private render: InkRenderFn | null;
 
   constructor(deps?: AgentHandlerDeps) {
     this.resolve = deps?.resolveAgent ?? defaultResolveAgent;
     this.create = deps?.createAgent ?? ((c) => new Agent(c));
-    this.render = deps?.render ?? null;
   }
 
   async execute(node: Node, ctx: PipelineContext, meta: Record<string, unknown>): Promise<Outcome> {
@@ -114,30 +106,18 @@ export class AgentHandler implements NodeHandler {
         variables: ctx.values,
       });
 
-      // Lazy-load Ink render and ChatUI
-      let renderFn = this.render;
-      let ChatUIComponent: any;
-      if (!renderFn) {
-        const ink = await import("ink");
-        renderFn = ink.render as unknown as InkRenderFn;
-      }
-      const chatUiModule = await import("../../cli/components/ChatUI.js");
-      ChatUIComponent = chatUiModule.ChatUI;
+      const onInteractiveRequest = meta["onInteractiveRequest"] as OnInteractiveRequest | undefined;
 
-      await new Promise<ExitReason>((resolvePromise) => {
-        let handled = false;
-        const handleExit = (reason: ExitReason) => {
-          if (handled) return;
-          handled = true;
-          resolvePromise(reason);
+      if (!onInteractiveRequest) {
+        try { await child.kill("SIGKILL"); } catch {}
+        return {
+          status: "fail",
+          failureReason:
+            "interactive=true node requires onInteractiveRequest in engine options",
         };
-        const instance = renderFn!(
-          React.createElement(ChatUIComponent, { session, child, onExit: handleExit }),
-        );
-        child.exited.finally(() => {
-          try { instance.unmount(); } catch {}
-        });
-      });
+      }
+
+      await onInteractiveRequest({ session, child, tracePath: nodeDir });
 
       // Ensure the child process is actually gone
       try {
