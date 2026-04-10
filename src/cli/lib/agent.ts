@@ -42,6 +42,7 @@ export interface ChildHandle {
   submit: (text: string) => Promise<void>;
   end: () => Promise<void>;
   kill: (signal?: NodeJS.Signals) => Promise<void>;
+  exited: Promise<{ code: number | null; signal: NodeJS.Signals | null }>;
 }
 
 export interface RunResult {
@@ -320,11 +321,19 @@ export class Agent {
 
     let ended = false;
 
+    let exitResult: { code: number | null; signal: NodeJS.Signals | null } | null = null;
+    let resolveExited: (r: { code: number | null; signal: NodeJS.Signals | null }) => void;
+    const exitedPromise = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((res) => {
+      resolveExited = res;
+    });
+
     const closePromise = new Promise<number>((resolve) => {
-      child.on("close", (code) => {
+      child.on("close", (code, signal) => {
         ended = true;
         this._child = null;
         this.cleanupMcpConfig();
+        exitResult = { code: code ?? null, signal: signal ?? null };
+        resolveExited!(exitResult);
         resolve(code ?? 1);
       });
     });
@@ -366,6 +375,7 @@ export class Agent {
       submit,
       end,
       kill: killFn,
+      exited: exitedPromise,
     };
   }
 
