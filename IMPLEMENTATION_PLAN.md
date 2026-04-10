@@ -1086,7 +1086,7 @@ git commit -m "feat(pipelines): add chat-end-to-end smoke pipeline with success/
 
 This task cannot be automated. The executor (human or agent with TTY access) must run each test and check each box. Each failed test is a **blocker** until fixed.
 
-- [ ] **Step 1: Build + link**
+- [x] **Step 1: Build + link**
 
 Run:
 
@@ -1100,7 +1100,7 @@ ralph --version
 claude --version  # must be 2.1.69 or newer
 ```
 
-- [ ] **Step 2: Smoke test 1 — `npm test`**
+- [x] **Step 2: Smoke test 1 — `npm test`**
 
 Run: `npm test`
 Expected: all unit, contract, component, integration tests pass.
@@ -1186,8 +1186,8 @@ Expected: empty (or only the currently-running ralph process, if any).
 ### Task 7.4: Chunk 7 final verification gate (definition of done)
 
 - [ ] **Step 1: All six smoke test groups (1, 2, 3, 4a/4b/4b-2/4d, 5, 6) are green**
-- [ ] **Step 2: `npm test` green**
-- [ ] **Step 3: `npm run build` succeeds**
+- [x] **Step 2: `npm test` green** (538/538 pass, 45 test files)
+- [x] **Step 3: `npm run build` succeeds** (zero type errors, build clean)
 - [ ] **Step 4: `pipelines/illumination-to-plan.dot` runs unchanged**
 - [ ] **Step 5: No orphan `claude` processes after any smoke test**
 - [ ] **Step 6: Commit the smoke test outcome notes (if any changes were made during debugging)**
@@ -1200,6 +1200,13 @@ git commit -m "chore: smoke test verification for Path 1.5"
 - [ ] **Step 7: Mark spec complete**
 
 The spec is implemented when all seven chunks have their verification gates green. Invoke `@superpowers:verification-before-completion` to confirm evidence before declaring done.
+
+**Code Audit Notes (2026-04-10):**
+- All 7 agent-handler interactive branch requirements verified (Session+UUID, runInteractive, ChatUI mount, digest flattening, Outcome mapping, jsonSchemaFile guard, exited timeout+SIGKILL)
+- DOT parser fully supports all smoke pipeline attributes (interactive, json_schema_file, condition=outcome, $chat.output variable expansion)
+- No TODOs, FIXMEs, stubs, or placeholder implementations in src/
+- Both smoke pipelines validate successfully (chat-only: 3 nodes/2 edges, chat-end-to-end: 5 nodes/5 edges)
+- Minor observations (non-blocking): TextInput forward-delete behaves like backspace; ChatUI onExit ref is stable in practice since Ink renders once
 
 ---
 
