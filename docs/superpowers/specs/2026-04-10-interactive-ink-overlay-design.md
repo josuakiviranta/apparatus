@@ -2,366 +2,237 @@
 id: spec-2026-04-10-interactive-ink-overlay
 type: spec
 created: 2026-04-10
+updated: 2026-04-10
 status: draft
-tags: [pipeline, interactive-nodes, ink, terminal-rendering, agent-handler]
+tags: [pipeline, interactive-nodes, ink, agent-handler]
 ---
 
-# Single Ink Tree for Interactive Pipeline Nodes
+# Interactive Chat As A Child Component Of PipelineDisplay
 
 ## Problem
 
-Pipeline runs with `interactive=true` nodes mount **two concurrent Ink instances** that both claim the same stdout:
+Pipeline runs with `interactive=true` nodes currently call `render()` **twice** on the same stdout:
 
-- The long-lived outer `PipelineDisplay` (mounted in `pipeline.ts:93` via `renderPipelineDisplay()`) renders pipeline progress via `<Static>` + a dim status box.
-- The short-lived inner `ChatUI` (mounted in `agent-handler.ts:126` via a lazy `ink.render()` import) renders the interactive chat.
+- `pipeline.ts` calls `renderPipelineDisplay()` once at startup to mount `<PipelineDisplay>`.
+- `agent-handler.ts` lazy-imports `ink` and calls `render(<ChatUI/>)` a second time inside the interactive branch.
 
-Ink 6.8.0 uses `log-update` to own a dynamic region of stdout and patches `console.*` (`patchConsole: true` by default). Running two instances concurrently produces:
-- Competing `log-update` cursor tracking — each instance thinks it owns the dynamic region.
-- Mutually exclusive `patchConsole` — the last instance to unmount restores the *original* console, not the outer instance's intercept.
-- A broken handoff when the inner unmounts: the outer's subsequent `<Static>` re-renders for downstream nodes are rendered but visually lost.
+The Ink docs are explicit about this:
 
-### Observed symptom
+> Reusing the same stdout across multiple `render()` calls without unmounting is unsupported. Call `unmount()` first if you need to change the rendering mode or create a fresh instance.
+> — [ink readme](https://github.com/vadimdemedes/ink)
 
-Running `ralph pipeline run pipelines/smoke/chat-end-to-end.dot`:
-- User types `/end` in the interactive `chat` node.
-- ChatUI prints `status: ended | turns: 3 | in/out: 3/249`.
-- Shell prompt returns immediately with no `summarize` or `done` output.
+The consequence shows up after `/end`: ChatUI unmounts, but the outer `PipelineDisplay` is in an undefined state — its subsequent `<Static>` pushes render but are visually lost. The engine *does* run the downstream nodes (checkpoints at `~/.ralph/runs/chat_end_to_end/` confirm `summarize` and `done` completed with `status: success`), they just don't appear on screen.
 
-### Evidence the engine actually ran
+## Goal
 
-Checkpoint files at `~/.ralph/runs/chat_end_to_end/` prove the engine did execute all downstream nodes:
-- `completedNodes: ["start", "chat", "summarize", "done"]`
-- `summarize/status.json` = `success`, `summarize/raw-output.txt` contains a valid JSON summary.
-- Mtimes match the user's session (±0 seconds), so the checkpoint is fresh, not stale.
-
-The engine ran correctly. The rendering was the failure.
-
-## Goals
-
-1. Interactive nodes and pipeline progress render from a **single Ink instance**.
-2. `chat-end-to-end.dot` completes visibly end-to-end after `/end`.
-3. Chat sessions display a **header with the path to the trace directory** (`<logsRoot>/<node.id>/`).
-4. Generic overlay design: a pipeline may have zero, one, or many interactive nodes in sequence.
-5. No change to non-interactive pipeline behavior or output.
-6. `ChatUI` remains mountable standalone so its unit tests stay simple.
+One `render()` call per pipeline run. `<ChatUI>` mounts as a conditional child of `<PipelineDisplay>` when the engine reaches an interactive node, and unmounts when the user exits. Downstream pipeline output keeps flowing into the same Static tree it always has.
 
 ## Non-goals
 
-- No change to child-process lifecycle (`Agent.runInteractive`, `Session`, `ChildHandle`, `buildSessionDigest`).
-- No change to `<Static>` layout or the outer status box visual style.
-- No attempt to support concurrent interactive nodes (parallel fan-out of chats).
+- Changes to `Agent.runInteractive()`, `Session`, `ChildHandle`, `buildSessionDigest`, or the child-process lifecycle.
+- Concurrent interactive nodes (parallel fan-out).
+- TTY auto-detection / non-TTY fallback. Out of scope; tracked separately.
+- Fix for the interactive-context bug where `Agent.run()` drops the assembled prompt in interactive mode. Out of scope; tracked at `memory/2026-04-13-interactive-pipeline-context-bug.md`. This spec is purely about rendering.
+
+## Preconditions (inherited, not introduced)
+
+These are existing assumptions the rewrite inherits and does not change:
+
+- **`ChatUI` depends on Claude Code's stream-json event shape.** `ChatUI`'s internal state machine transitions on specific events from `child.events` (e.g. `assistant_delta`, `result`). If Claude Code alters its stream-json output, `ChatUI` may stall or misbehave — independent of this spec. The rewrite does not introduce this coupling; it only preserves it.
+- **`session.exitReason` starts `undefined`.** `ChatUI` sets it before invoking `onExit`. `buildSessionDigest(session)` already handles `undefined` as the "no clean exit signal" case. If a future change to `ChatUI` fires `onExit` without setting `exitReason`, the digest will reflect that as a degraded outcome — existing behavior, not new.
 
 ## Design
 
-### Architecture
+This is standard Ink. The canonical pattern for "growing log + dynamic region" is `<Static>` for the log plus regular components for everything else, all under one root. The Ink readme calls this out directly:
+
+> `<Static>` is useful for displaying activity like completed tasks or logs — things that don't change after they're rendered. Gatsby uses it to display a list of generated pages while still displaying a live progress bar.
+
+### Shape
 
 ```
 pipeline.ts
-  └─ renderPipelineDisplay()        ──► single Ink render root
-       PipelineDisplay.tsx
-         ├─ <Static items={lines}>                 (append-only history)
-         ├─ {overlay && <ChatUI {...overlay}/>}    (dynamic chat slot)
-         └─ <StatusBox/>                           (always visible below)
+  └─ renderPipelineDisplay()           // the ONE render() call
+       PipelineDisplay
+         ├─ <Static items={lines}/>    // append-only pipeline log
+         ├─ {chat && <ChatUI {...chat}/>}  // conditional child
+         └─ <StatusBox/>
 
-runPipeline(graph, { ..., onInteractiveRequest })
-  └─ engine meta bag carries onInteractiveRequest
-        └─ AgentHandler.execute → interactive branch:
-             agent.runInteractive()    // spawn child, build Session
+engine.runPipeline(graph, { onInteractiveRequest })
+  └─ meta.onInteractiveRequest carried into handler
+        └─ AgentHandler.execute (interactive branch):
+             const { session, child } = await agent.runInteractive(...)
              await meta.onInteractiveRequest({ session, child, tracePath })
-             buildSessionDigest(session) → Outcome
+             return buildSessionDigest(session)   // unchanged
 ```
 
-**Principle:** the outer `PipelineDisplay` owns the one and only `render()` call for the run. `ChatUI` is mounted as a child component via an `overlay` state slot — never via a second `render()`.
+`onInteractiveRequest` is a callback the pipeline command passes to the engine. Its implementation flips a `chat` state slot on `PipelineDisplay`. When ChatUI calls its `onExit` prop, the slot clears and the promise resolves. The handler then does its existing `buildSessionDigest(session)` work and returns an `Outcome`.
 
-### Data flow
+That's the entire design. Nothing exotic. Nothing "overlay-like." Just a conditional child component.
 
-1. Engine reaches an interactive node → builds `meta` with `onInteractiveRequest` field.
-2. `AgentHandler.execute()` spawns the child via `agent.runInteractive()` (creates `Session` + `ChildHandle`).
-3. Handler calls `await meta.onInteractiveRequest({ session, child, tracePath: nodeDir })`.
-4. `pipeline.ts`'s callback sets `overlay` state → React re-renders `PipelineDisplay` with `<ChatUI ...overlay/>` as a sibling of `<Static>` and above the status box.
-5. User chats; ChatUI writes to `child.stdin` and reads events from `child.events`.
-6. User types `/end` → ChatUI invokes its `onExit(reason)` prop.
-7. `pipeline.ts`'s `onExit` sets `overlay = null` (React re-render removes ChatUI, status box + Static remain) and resolves the promise.
-8. Handler awaits `child.exited` (5-second race, then SIGKILL), builds the session digest, returns `Outcome`.
-9. Engine routes to next edge; pipeline progress continues printing into the already-running Static. All subsequent renders come from the same Ink instance that never unmounted.
+### Why this works (notes on Ink invariants)
+
+- **One render call.** The outer `PipelineDisplay` stays mounted for the whole run. `<ChatUI>` is a React child, not a second Ink instance — so `log-update`, `patchConsole`, the Static reconciler, and cursor tracking all have a single owner.
+- **Multiple `useInput` hooks are allowed.** The Ink docs explicitly support this: `useInput` has an `isActive` option "useful when there are multiple `useInput` hooks used at once." There is no "single consumer rule." `PipelineDisplay` doesn't call `useInput` today anyway; only `TextInput` (inside `ChatUI`) does.
+- **Static + dynamic siblings are the intended pattern.** The existing status box is already a dynamic sibling of `<Static>` and works fine. Adding `<ChatUI>` as another sibling is the same shape.
 
 ### Components
 
 #### `src/cli/components/PipelineDisplay.tsx`
 
-**New imports:**
-```ts
-import { ChatUI } from "./ChatUI.js";
-import type { Session, ExitReason } from "../lib/session.js";
-import type { ChildHandle } from "../lib/agent.js";
-```
+- Add a state slot: `const [chat, setChat] = useState<ChatProps | null>(null);`
+- Render `{chat && <ChatUI {...chat}/>}` between `<Static>` and the status box.
+- Expose `setChat` through the existing `onReady` callbacks bag as a new field.
+- Pass the `setChat` React setter directly — it has a stable reference across renders, so no wrapping is needed.
 
-**New exported type:**
-```ts
-export interface ChatOverlayProps {
-  session: Session;
-  child: ChildHandle;
-  tracePath: string;
-  onExit: (reason: ExitReason) => void;
-}
-```
-
-**New callback exposed via onReady:**
-```ts
-export interface PipelineDisplayCallbacks {
-  push: (line: DisplayLine) => void;
-  setStatus: (nodeLabel: string) => void;
-  setOverlay: (props: ChatOverlayProps | null) => void;   // NEW
-  done: () => void;
-}
-```
-
-**New state declaration inside the `PipelineDisplay` component function:**
-```ts
-const [overlay, setOverlay] = useState<ChatOverlayProps | null>(null);
-```
-
-The `onReady` effect must expose the `useState` setter **directly** (stable reference across renders — React guarantees this). Do not wrap it in a closure:
-
-```ts
-useEffect(() => {
-  onReady({
-    push: (line) => setLines(prev => [...prev, line]),
-    setStatus: (label) => setCurrentNode(label),
-    setOverlay,          // NEW — pass the setter directly
-    done: () => exit(),
-  });
-}, []);   // onReady fires exactly once on mount
-```
-
-**Render tree:**
-
-```tsx
-<>
-  <Static items={lines}>
-    {(line, i) => <Box key={i}><DisplayLineComponent line={line}/></Box>}
-  </Static>
-  {overlay && <ChatUI {...overlay}/>}
-  <Box borderStyle="single" borderColor="cyan">
-    {/* existing status box — retained below overlay per design decision */}
-  </Box>
-</>
-```
-
-The status box is **retained** below the overlay so pipeline progress context stays visible during chat. The overlay object identity is stable across unrelated parent state updates because `pipeline.ts` constructs the `ChatOverlayProps` object exactly once per interactive node invocation (not in render). This prevents accidental `ChatUI` remount when `setLines` or `setCurrentNode` fire.
+`ChatProps` is `{ session, child, tracePath, onExit }`. Constructed once per interactive node in `pipeline.ts` (outside render), so its identity is stable and React won't remount `<ChatUI>` on unrelated parent updates.
 
 #### `src/cli/components/ChatUI.tsx`
 
-New required prop:
-
-```ts
-interface Props {
-  session: Session;
-  child: ChildHandle;
-  tracePath: string;   // NEW — absolute path to node's trace directory
-  onExit: (reason: ExitReason) => void;
-}
-```
-
-New header rendered above the conversation area:
-
-```tsx
-<Box borderStyle="single" borderColor="gray" paddingX={1} marginBottom={1}>
-  <Text dimColor>trace: </Text>
-  <Text>{tracePath}</Text>
-</Box>
-```
-
-No other internal changes. Component remains standalone-mountable for unit tests (tests pass a placeholder `tracePath="/tmp/test-trace"`).
+- Add an optional `tracePath?: string` prop. When present, render a small dim header above the conversation area showing the trace directory. Optional so existing unit tests don't need to change.
+- No other changes. The component remains standalone-mountable for its unit tests.
 
 #### `src/attractor/handlers/agent-handler.ts`
 
-**Remove** (anchored by symbol name, not line number, to avoid drift):
-- `import React from "react"` statement at the top of the file
-- `InkRenderFn` type alias
-- `render?: InkRenderFn` field on `AgentHandlerDeps`
-- `this.render` member declaration and constructor wiring
-- Inside the `if (interactive) { ... }` branch: the lazy Ink import (`await import("ink")`), the lazy ChatUI import (`await import("../../cli/components/ChatUI.js")`), the `new Promise<ExitReason>((resolvePromise) => { ... })` block that calls `renderFn!(React.createElement(ChatUIComponent, ...))` and schedules `instance.unmount()` via `child.exited.finally()`
+- Remove `import React from "react"`, the `InkRenderFn` type, the `render?: InkRenderFn` field on `AgentHandlerDeps`, the `this.render` member, and the constructor wiring for it.
+- Inside the `interactive` branch, delete the lazy `await import("ink")` / `await import("../../cli/components/ChatUI.js")` block and the `new Promise(...)` that calls `renderFn!(...)` and schedules `instance.unmount()`.
+- Replace it with:
 
-**Replace** that removed block with:
+  ```ts
+  const onInteractiveRequest = meta.onInteractiveRequest as
+    | OnInteractiveRequest
+    | undefined;
 
-```ts
-// nodeDir is already in scope from earlier in execute():
-//   const nodeDir = join(logsRoot, node.id);
-// (near the top of the method, before the interactive branch)
+  if (!onInteractiveRequest) {
+    try { await child.kill("SIGKILL"); } catch {}
+    return {
+      status: "fail",
+      failureReason:
+        "interactive=true node requires onInteractiveRequest in engine options",
+    };
+  }
 
-const onInteractiveRequest = meta["onInteractiveRequest"] as
-  | OnInteractiveRequest
-  | undefined;
+  await onInteractiveRequest({ session, child, tracePath: nodeDir });
+  ```
 
-if (!onInteractiveRequest) {
-  try { await child.kill("SIGKILL"); } catch {}
-  return {
-    status: "fail",
-    failureReason: "interactive=true node requires onInteractiveRequest in engine options",
-  };
-}
+- The callback returns `Promise<void>`. The handler does not consume a returned reason — `session.exitReason` is mutated in place by `ChatUI` and read by the existing `buildSessionDigest(session)` call. Single source of truth.
+- Everything after the interactive await — the `Promise.race([child.exited, 5s timeout])` cleanup, `buildSessionDigest`, `contextUpdates` flattening, writing `digest.json`, returning the `Outcome` — stays exactly as-is.
 
-await onInteractiveRequest({ session, child, tracePath: nodeDir });
-```
-
-The callback returns `Promise<void>`. The handler does **not** consume a returned reason — `session.exitReason` is set in place by `ChatUI` via the mutable `Session` object, and `buildSessionDigest(session)` reads it directly. Deriving truth from `session` (single source) avoids drift between the returned reason and the digest.
-
-**New exported types** (add to `src/attractor/handlers/agent-handler.ts`, or extract to a new `src/attractor/handlers/interactive-request.ts` if preferred):
+Export from the same file:
 
 ```ts
-import type { Session } from "../../cli/lib/session.js";
-import type { ChildHandle } from "../../cli/lib/agent.js";
-
 export interface InteractiveRequest {
   session: Session;
   child: ChildHandle;
   tracePath: string;
 }
 
-export type OnInteractiveRequest =
-  (req: InteractiveRequest) => Promise<void>;
+export type OnInteractiveRequest = (req: InteractiveRequest) => Promise<void>;
 ```
-
-**No `InteractiveResult` type** — the callback resolves with `void` when the overlay has been cleared. The handler's existing `Promise.race([child.exited, 5s timeout])` cleanup runs after the callback returns.
-
-Everything else in the interactive branch (child spawn via `agent.runInteractive()`, the `Promise.race` cleanup, `buildSessionDigest`, `contextUpdates` flattening, writing `digest.json`, returning the `Outcome`) stays exactly as-is.
 
 #### `src/attractor/core/engine.ts`
 
 - Add `onInteractiveRequest?: OnInteractiveRequest` to `EngineOptions`.
-- In the meta-record construction site (same place `onStdout` is wired), add:
-  ```ts
-  onInteractiveRequest: opts.onInteractiveRequest,
-  ```
+- Thread it into the meta record at the same place `onStdout` is wired.
 
 #### `src/cli/commands/pipeline.ts`
 
-Destructure new callback from PipelineDisplay callbacks:
-```ts
-const { push, setStatus, setOverlay, done } = callbacks;
-```
+- Destructure `setChat` from the PipelineDisplay callbacks.
+- Pass `onInteractiveRequest` to `runPipeline`:
 
-Pass `onInteractiveRequest` to `runPipeline` (callback returns `Promise<void>`):
-```ts
-onInteractiveRequest: ({ session, child, tracePath }) =>
-  new Promise<void>((resolve) => {
-    let handled = false;
-    // Construct overlayProps object once, outside any render, so its identity
-    // stays stable for the duration of the chat (prevents ChatUI remount).
-    const overlayProps: ChatOverlayProps = {
-      session,
-      child,
-      tracePath,
-      onExit: (_reason) => {
-        if (handled) return;
-        handled = true;
-        setOverlay(null);
-        resolve();
-      },
-    };
-    setOverlay(overlayProps);
-  }),
-```
+  ```ts
+  onInteractiveRequest: ({ session, child, tracePath }) =>
+    new Promise<void>((resolve) => {
+      let handled = false;
+      const props: ChatProps = {
+        session,
+        child,
+        tracePath,
+        onExit: () => {
+          if (handled) return;
+          handled = true;
+          setChat(null);
+          resolve();
+        },
+      };
+      setChat(props);
+    }),
+  ```
 
-Re-entrance (loop back to the same interactive node) is safe: each invocation of the outer callback creates a fresh `handled` flag in its own closure, and `setOverlay` always replaces the previous overlay state.
+The `handled` flag makes `onExit` idempotent (handles the crash/SIGINT race where ChatUI fires exit twice).
 
-### Error handling
+## Error handling
 
 | Scenario | Behavior |
 |---|---|
-| `onInteractiveRequest` undefined in engine options | Handler kills child, returns `fail` with a clear reason. `EngineOptions.onInteractiveRequest` is `?` (optional) — non-pipeline callers (`plan`, `implement`) that never encounter `interactive=true` nodes are not required to pass a stub. The fail path only triggers if an actual interactive node is reached without the callback. |
-| `onExit` called twice (child crash race) | `handled` flag in the pipeline.ts callback closure drops the second call. Overlay cleared once. |
-| Child crash during chat | ChatUI's existing crash-detect path sets `exitReason = "child_crash"` → fires `onExit("child_crash")` → overlay clears → handler's existing `child.exited` race resolves → `buildSessionDigest` produces `success: false` → handler returns `fail` Outcome. |
-| SIGINT during chat | ChatUI's SIGINT handler fires `onExit("abort")`; pipeline.ts's SIGINT handler aborts the AbortController on the engine. Both are idempotent and scoped via useEffect cleanup / `process.off` respectively. |
-| Multiple interactive nodes in sequence | Overlay slot is set and cleared per node. Each `onInteractiveRequest` invocation gets a fresh closure with its own `handled` flag. React remounts ChatUI when the overlay object identity changes between invocations, which is the desired behavior. |
-| `child.exited` never resolves after overlay cleared | Existing 5-second `Promise.race` timeout in the handler kills the child forcibly. |
+| Non-pipeline callers (`plan`, `implement`) run without `onInteractiveRequest` | No problem — it's optional, and these commands never hit `interactive=true` nodes. |
+| Pipeline hits an interactive node but caller forgot to wire `onInteractiveRequest` | Handler kills child, returns `fail` with a clear `failureReason`. |
+| `onExit` fired twice (child crash race) | `handled` flag drops the second call. |
+| Child crashes during chat | ChatUI's existing crash path fires `onExit` → chat state clears → handler's existing `child.exited` race resolves → `buildSessionDigest` returns `success: false` → handler returns `fail` Outcome. |
+| SIGINT during chat | ChatUI's SIGINT handler fires `onExit`; pipeline.ts's SIGINT handler aborts the engine's AbortController. Both idempotent. |
+| Multiple interactive nodes in sequence | Each invocation builds a fresh `ChatProps` with its own `handled` closure. React remounts `<ChatUI>` when identity changes between invocations — the desired behavior. |
+| `child.exited` never resolves after chat closes | Existing 5-second `Promise.race` SIGKILL fallback in the handler. |
 
-### Testing
+## Testing
 
-**Updated:**
+**Migrated** (mechanical API change, not behavioral):
 
-- `src/attractor/tests/agent-handler-interactive.test.ts` — remove `render: stubRender` from every `new AgentHandler(...)` call. Replace with an inline `onInteractiveRequest` stub on the meta bag passed to `execute()`. The stub must preserve equivalent behavior to the removed `stubRender`: it mutates the `Session` object to simulate what `ChatUI` would have done, then resolves.
+- `src/attractor/tests/agent-handler-interactive.test.ts` — replace every `render: stubRender` injected into `new AgentHandler({...})` with an `onInteractiveRequest` stub on the `meta` bag passed to `execute()`. The stub simulates ChatUI: mutate `session.exitReason`, optionally drain `child.events`, then resolve.
 
-  **Shared helper** (add to the test file):
   ```ts
-  // Stub that simulates ChatUI: set session.exitReason, resolve void
-  const makeInteractiveStub = (reason: ExitReason) =>
-    (async ({ session, child }) => {
-      // Drain events to populate session.history as ChatUI would
+  const makeStub = (reason: ExitReason): OnInteractiveRequest =>
+    async ({ session, child }) => {
+      // Drain events as ChatUI would, so session state is populated
       (async () => {
-        try { for await (const _ev of child.events) { /* ChatUI would route here */ } } catch {}
+        try { for await (const _ of child.events) {} } catch {}
       })();
       session.exitReason = reason;
       await child.end();
-    }) satisfies OnInteractiveRequest;
+    };
   ```
 
-  **Usage per test** — tests that assert `status: "success"` pass `makeInteractiveStub("user_end")`; tests that assert `status: "fail"` pass `makeInteractiveStub("abort")`. The `baseMeta(tmp, tmp)` helper gains a third optional parameter for the stub, or each test spreads it inline:
-  ```ts
-  const meta = { ...baseMeta(tmp, tmp), onInteractiveRequest: makeInteractiveStub("user_end") };
-  ```
+  Count to migrate is whatever `grep -c '^  it(' src/attractor/tests/agent-handler-interactive.test.ts` returns; apply the same transform to each.
 
-  Test-by-test migration: the "flattens digest into contextUpdates" test needs the stub to populate enough session state that `buildSessionDigest` returns a non-empty output. If the current `stubRender` pushes specific `session.history` entries, the new stub must do the same — copy those mutations into the stub body.
-
-  Exact test count to migrate: verify via `grep -c '^  it(' src/attractor/tests/agent-handler-interactive.test.ts` before starting. Spec assumes ~6 but any number should be migrated the same way.
-
-- `src/cli/components/PipelineDisplay.test.tsx` — assert `setOverlay` is present in the `onReady` callbacks shape. Add one test: "onReady exposes setOverlay callback" that constructs the display, captures `onReady` args, asserts `typeof cbs.setOverlay === "function"`.
-
-- `src/cli/tests/ChatUI.test.tsx` — add `tracePath="/tmp/test-trace"` to every `<ChatUI ... />` render. Mechanical change, no assertion updates. Exact count: verify via `grep -c '<ChatUI' src/cli/tests/ChatUI.test.tsx` before starting.
-
-**Unaffected:**
-- `src/attractor/tests/agent-handler.test.ts` — non-interactive path only, uses `mockRunInteractive` mock; no `render` coupling.
-- `src/cli/tests/TextInput.test.tsx` — standalone component test.
-- Scenario/smoke tests — operate on .dot files, not component internals.
-- All non-interactive pipeline tests.
+- `src/cli/components/PipelineDisplay.test.tsx` — add one assertion that the `onReady` callbacks bag includes `setChat: function`.
 
 **New:**
-- `src/cli/tests/pipeline-interactive.test.tsx` — integration test using `ink-testing-library` (already used by existing `PipelineDisplay.test.tsx`):
-  1. Render `PipelineDisplay` via the existing `renderPipelineDisplay()` helper pattern.
-  2. Push some Static lines to simulate pipeline progress (e.g. `push({kind:"step", text:"[start]"})`).
-  3. Invoke `setOverlay({ session: fakeSession, child: fakeChild, tracePath: "/tmp/t", onExit })`.
-  4. Assert `<Static>` content still present, ChatUI rendered as child, trace path header visible containing `/tmp/t`.
-  5. Simulate exit: invoke the captured `onExit("user_end")`.
-  6. **Post-fix regression assertion:** after `setOverlay(null)`, push a new `DisplayLine` via `push()` and assert it appears in the rendered output. This directly proves the bug is fixed — subsequent pipeline output is not lost after chat ends.
-  7. Assert the status box is still visible.
 
-- Manual smoke test: `ralph pipeline run pipelines/smoke/chat-end-to-end.dot`, verify `summarize` and `done` outputs appear after `/end`.
+- `src/cli/tests/pipeline-interactive.test.tsx` — integration test using `ink-testing-library`:
+  1. Render `PipelineDisplay`.
+  2. Push a few Static lines via `push()`.
+  3. Call `setChat({ session: fakeSession, child: fakeChild, tracePath: "/tmp/t", onExit })`.
+  4. Assert Static content, ChatUI, and status box are all present in the frame.
+  5. Invoke the captured `onExit`.
+  6. **Regression assertion:** after `setChat(null)`, call `push()` again and assert the new line appears. This proves the original bug is fixed — output is not lost after chat ends.
+
+**Unaffected:**
+
+- `src/cli/tests/ChatUI.test.tsx` — `tracePath` is optional, no changes required.
+- `src/attractor/tests/agent-handler.test.ts` — non-interactive path only.
+- All scenario/smoke tests, all non-interactive pipeline tests.
+
+**Manual:** `ralph pipeline run pipelines/smoke/chat-end-to-end.dot` → after `/end`, verify `summarize` and `done` output actually appear.
 
 ## Implementation order
 
-1. Extend `PipelineDisplay` with `overlay` state + `setOverlay` callback (no runtime effect yet).
-2. Add `OnInteractiveRequest` type and `onInteractiveRequest` to `EngineOptions` + meta construction in `engine.ts`.
-3. Add `tracePath` prop + header to `ChatUI` (update its unit tests in the same step).
-4. Refactor `agent-handler.ts` interactive branch: remove Ink imports, add `onInteractiveRequest` call.
-5. Wire `onInteractiveRequest` callback in `pipeline.ts`.
-6. Update `agent-handler-interactive.test.ts` (6 tests) and `PipelineDisplay.test.tsx` (3 tests).
+1. Add `chat` state slot + `setChat` callback to `PipelineDisplay` (no runtime effect yet).
+2. Add `OnInteractiveRequest` type + optional `onInteractiveRequest` in `EngineOptions` + meta wiring in `engine.ts`.
+3. Add optional `tracePath` prop + header to `ChatUI`.
+4. Rewrite the interactive branch of `agent-handler.ts` to call `meta.onInteractiveRequest`, delete Ink imports.
+5. Wire the `onInteractiveRequest` callback in `pipeline.ts`.
+6. Migrate `agent-handler-interactive.test.ts` to the new stub shape.
 7. Add `pipeline-interactive.test.tsx` integration test.
-8. Manual smoke test via `chat-end-to-end.dot`.
-9. Run full test suite to catch regressions.
+8. Manual smoke-test `chat-end-to-end.dot`.
+9. Full test suite.
 
-## Risks & mitigations
+## Risks
 
 | Risk | Mitigation |
 |---|---|
-| `<Static>` + dynamic overlay layout bugs | Ink 6 explicitly supports Static siblings with dynamic components (the existing status box is already a dynamic sibling). Low risk. |
-| Ink re-renders ChatUI on every parent state change | ChatUI's props are stable (session, child, tracePath, onExit are set once per interactive node). React reconciler won't remount. |
-| SIGINT handler duplication (ChatUI + pipeline.ts) | Both are idempotent and scoped via useEffect cleanup / process.off. Verified in ChatUI source. |
-| TextInput stdin single-consumer rule | `useInput` is called only by TextInput (inside ChatUI). `PipelineDisplay` does not call `useInput` or `useStdin`. Confirmed by source read. |
-| Breaking external consumers of `AgentHandlerDeps.render` | Field is internal-only (used only by tests). Removal is safe. |
+| Removing `AgentHandlerDeps.render` breaks external consumers | Grep confirms only `agent-handler-interactive.test.ts` uses it. ralph-cli is an application, not a library; no external consumers. |
+| ChatUI re-mounts on unrelated parent updates | `ChatProps` is constructed once per invocation outside render, so identity is stable. React's reconciler keeps the same instance. |
+| Bug A (prompt dropped in interactive `Agent.run()`) reintroduced | Out of scope, same behavior as today. Tracked separately. This spec is render-only. |
+| Future handler regresses to a second `render()` call | **Invariant: no handler may call Ink's `render()` directly.** Interactive UI must be mounted as a child of `PipelineDisplay` via `setChat` (or an analogous state slot for future overlays). If a new handler needs its own UI, add a new state slot and a new `onXxxRequest` callback to `EngineOptions` — do not lazy-import `ink` and call `render()`. This rule also precludes extracting the interactive branch of `agent-handler.ts` into a helper that imports `ink` directly. |
 
 ## Rollout
 
-Single PR. No migration. Smoke-test validates the fix end-to-end.
-
-**Backward compatibility:**
-- `AgentHandlerDeps.render` is removed. Grepped the codebase: only `src/attractor/tests/agent-handler-interactive.test.ts` consumes this field. No production callers. The exported `AgentHandlerDeps` type changes shape but has no external consumers (ralph-cli is an application, not a library); removing the field without a deprecation cycle is safe.
-- `EngineOptions.onInteractiveRequest` is a new optional field. Non-additive only — no existing caller needs updating.
-- `PipelineDisplayCallbacks.setOverlay` is a new required field on the callbacks object. `PipelineDisplay.test.tsx` needs a minor update to assert its presence; no production callers outside `pipeline.ts`.
-
-If the user later wants the outer status box hidden during chat (instead of retained), that's a one-line conditional in `PipelineDisplay.tsx` — not in scope for this spec.
-
-## Alternatives considered (brief)
-
-- **Prop-based `overlay` on `PipelineDisplay` instead of `onReady` callback slot.** Rejected: `pipeline.ts` lives outside React and cannot re-render `PipelineDisplay` with new props. The existing `onReady` pattern exposes React setters directly and is the idiomatic way to bridge non-React caller code into Ink state.
-- **Option A (plain stdout for outer) / Option C (pause-resume outer Ink).** Option A sacrifices the live status box; Option C requires fragile Ink remount semantics. Option B (this spec) preserves the status box, keeps the single-render-root invariant, and produces the smallest diff in `pipeline.ts` and `engine.ts`.
+Single PR. No migration, no feature flag. The smoke test validates end-to-end.
