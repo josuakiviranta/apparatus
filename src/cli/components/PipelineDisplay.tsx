@@ -4,6 +4,7 @@ import { StreamLine } from "./ui.js";
 import type { StreamEvent } from "../lib/stream-formatter.js";
 import type { Session, ExitReason } from "../lib/session.js";
 import type { ChildHandle } from "../lib/agent.js";
+import { ChatUI } from "./ChatUI.js";
 
 export type DisplayLine =
   | { kind: "stream"; event: StreamEvent }
@@ -52,7 +53,7 @@ export function PipelineDisplay({ pipelineName, pid, onReady }: Props) {
   const { exit } = useApp();
   const [lines, setLines] = useState<DisplayLine[]>([]);
   const [currentNode, setCurrentNode] = useState<string>("");
-  const [_chat, setChat] = useState<ChatProps | null>(null);
+  const [chat, setChat] = useState<ChatProps | null>(null);
 
   useEffect(() => {
     onReady({
@@ -68,6 +69,14 @@ export function PipelineDisplay({ pipelineName, pid, onReady }: Props) {
       <Static items={lines}>
         {(line, i) => <Box key={i}><DisplayLineComponent line={line} /></Box>}
       </Static>
+      {chat && (
+        <ChatUI
+          session={chat.session}
+          child={chat.child}
+          tracePath={chat.tracePath}
+          onExit={chat.onExit}
+        />
+      )}
       <Box borderStyle="single" borderColor="cyan">
         <Text>
           <Text color="cyan">◆ {pipelineName}</Text>
