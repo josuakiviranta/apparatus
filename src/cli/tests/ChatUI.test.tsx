@@ -226,6 +226,21 @@ describe("ChatUI", () => {
     unmount();
   });
 
+  it("renders the trace path header when tracePath is provided", () => {
+    const session = new Session("s1");
+    const ctrl = createFakeChildHandle("s1");
+    const { lastFrame, unmount } = render(
+      <ChatUI
+        session={session}
+        child={ctrl.handle}
+        onExit={() => {}}
+        tracePath="/tmp/trace/chat-node"
+      />,
+    );
+    expect(lastFrame()).toContain("/tmp/trace/chat-node");
+    unmount();
+  });
+
   it("events iterator termination (endStream) is handled without crashing", async () => {
     const session = new Session("s1");
     const ctrl = createFakeChildHandle("s1");

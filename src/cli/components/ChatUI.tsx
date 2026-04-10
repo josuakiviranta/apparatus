@@ -11,9 +11,10 @@ interface Props {
   session: Session;
   child: ChildHandle;
   onExit: (reason: ExitReason) => void;
+  tracePath?: string;
 }
 
-export function ChatUI({ session, child, onExit }: Props) {
+export function ChatUI({ session, child, onExit, tracePath }: Props) {
   const [history, setHistory] = useState<Turn[]>(() => [...session.history]);
   const [streamingText, setStreamingText] = useState("");
   const [inputBuffer, setInputBuffer] = useState("");
@@ -192,6 +193,12 @@ export function ChatUI({ session, child, onExit }: Props) {
 
   return (
     <Box flexDirection="column">
+      {tracePath && (
+        <Box borderStyle="single" borderColor="gray" paddingX={1} marginBottom={1}>
+          <Text dimColor>trace: </Text>
+          <Text>{tracePath}</Text>
+        </Box>
+      )}
       <Static items={history.map((turn, i) => ({ turn, key: `${turn.at}-${i}` }))}>
         {(item) => <TurnView key={item.key} turn={item.turn} />}
       </Static>
