@@ -12,6 +12,7 @@ import { streamEvents } from "../lib/stream-formatter.js";
 import { getPipelineCreatePromptPath } from "../lib/assets.js";
 import * as output from "../lib/output.js";
 import { renderPipelineDisplay } from "../components/PipelineDisplay.js";
+import type { ChatProps } from "../components/PipelineDisplay.js";
 
 export interface PipelineRunOptions {
   project?: string;
@@ -95,7 +96,7 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
     pid: process.pid,
     goal: graph.goal,
   });
-  const { push, setStatus, done } = callbacks;
+  const { push, setStatus, setChat, done } = callbacks;
 
   // Show pipeline overview
   push({ kind: "info", text: `${graph.name}  ·  ${branch}  ·  ${project}` });
@@ -119,6 +120,22 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
       signal: ac.signal,
       project: opts.project,
       resume: opts.resume,
+      onInteractiveRequest: ({ session, child, tracePath }) =>
+        new Promise<void>((resolve) => {
+          let handled = false;
+          const props: ChatProps = {
+            session,
+            child,
+            tracePath,
+            onExit: () => {
+              if (handled) return;
+              handled = true;
+              setChat(null);
+              resolve();
+            },
+          };
+          setChat(props);
+        }),
       onNodeStart: (node) => {
         const type = shapeToType(node.shape);
         const interactiveTag = node.interactive === true || node.interactive === "true"
