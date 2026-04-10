@@ -235,24 +235,45 @@ describe("AgentHandler", () => {
     );
   });
 
-  it("passes interactive:true to agent.run() when node.interactive is truthy", async () => {
+  it("interactive nodes do not go through legacy agent.run() path", async () => {
+    // Interactive nodes now use the interactive branch (runInteractive + ChatUI).
+    // This test verifies agent.run() is NOT called for interactive nodes.
+    // Full interactive branch coverage is in agent-handler-interactive.test.ts.
     mockResolve.mockReturnValue({ ...baseConfig });
-    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null });
+    let resolveExited: (v: any) => void;
+    const exitedPromise = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((res) => {
+      resolveExited = res;
+    });
+    const mockRunInteractive = vi.fn().mockReturnValue({
+      sessionId: "s1",
+      events: (async function* () { /* empty */ })(),
+      submit: async () => {},
+      end: async () => { resolveExited!({ code: 0, signal: null }); },
+      kill: async () => { resolveExited!({ code: null, signal: "SIGTERM" }); },
+      exited: exitedPromise,
+    });
 
-    const handler = makeHandler();
+    const handler = new AgentHandler({
+      resolveAgent: mockResolve,
+      createAgent: () => ({ run: mockAgentRun, kill: mockAgentKill, config: {}, runInteractive: mockRunInteractive } as any),
+      render: (element: any) => {
+        const { session, child, onExit } = element.props;
+        session.exitReason = "user_end";
+        setTimeout(async () => {
+          await child.end();
+          onExit("user_end");
+        }, 5);
+        return { unmount: () => {}, waitUntilExit: async () => {} };
+      },
+    });
     await handler.execute(
       makeNode({ interactive: "true" } as any),
       baseCtx(),
       { logsRoot: "/tmp/logs", cwd: "/tmp/project", signal: undefined, outgoingLabels: [], completedNodes: [], nodeRetries: {} },
     );
 
-    expect(mockAgentRun).toHaveBeenCalledWith(
-      expect.objectContaining({ interactive: true }),
-    );
-    // interactive nodes should NOT pass onStdout
-    expect(mockAgentRun).toHaveBeenCalledWith(
-      expect.objectContaining({ onStdout: undefined }),
-    );
+    expect(mockAgentRun).not.toHaveBeenCalled();
+    expect(mockRunInteractive).toHaveBeenCalled();
   });
 
   it("expands $variable references in prompt from pipeline context at runtime", async () => {

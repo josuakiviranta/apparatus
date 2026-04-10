@@ -1,24 +1,34 @@
 import { mkdirSync, writeFileSync, readFileSync } from "fs";
 import { join, resolve } from "path";
+import { randomUUID } from "crypto";
 import type { NodeHandler } from "./registry.js";
 import type { Node, Outcome, PipelineContext, CheckpointState } from "../types.js";
-import { Agent, type AgentConfig, type RunResult } from "../../cli/lib/agent.js";
+import { Agent, type AgentConfig, type RunResult, type ChildHandle } from "../../cli/lib/agent.js";
 import { resolveAgent as defaultResolveAgent } from "../../cli/lib/agent-registry.js";
 import { buildPreamble } from "../transforms/preamble.js";
 import { expandVariables } from "../transforms/variable-expansion.js";
+import { Session, buildSessionDigest, type ExitReason } from "../../cli/lib/session.js";
+import React from "react";
+
+export type InkRenderFn = (
+  element: React.ReactElement,
+) => { unmount: () => void; waitUntilExit: () => Promise<void> };
 
 export interface AgentHandlerDeps {
   resolveAgent?: (name: string) => AgentConfig;
   createAgent?: (config: AgentConfig) => Agent;
+  render?: InkRenderFn;
 }
 
 export class AgentHandler implements NodeHandler {
   private resolve: (name: string) => AgentConfig;
   private create: (config: AgentConfig) => Agent;
+  private render: InkRenderFn | null;
 
   constructor(deps?: AgentHandlerDeps) {
     this.resolve = deps?.resolveAgent ?? defaultResolveAgent;
     this.create = deps?.createAgent ?? ((c) => new Agent(c));
+    this.render = deps?.render ?? null;
   }
 
   async execute(node: Node, ctx: PipelineContext, meta: Record<string, unknown>): Promise<Outcome> {
@@ -75,6 +85,85 @@ export class AgentHandler implements NodeHandler {
 
     // Override config.prompt so Agent.run() delivers the assembled preamble + node prompt
     const agent = this.create({ ...config, prompt, ...(jsonSchema ? { jsonSchema } : {}) });
+
+    // --- Path 1.5: interactive branch ---
+    if (interactive) {
+      if (jsonSchema) {
+        return {
+          status: "fail",
+          failureReason: "interactive=true cannot be combined with json_schema_file: structured output is incompatible with live chat streaming",
+        };
+      }
+
+      const sessionId = randomUUID();
+      const session = new Session(sessionId);
+      const systemPrompt = prompt;
+
+      const child: ChildHandle = agent.runInteractive({
+        session,
+        systemPrompt,
+        cwd,
+        variables: ctx.values,
+      });
+
+      // Lazy-load Ink render and ChatUI
+      let renderFn = this.render;
+      let ChatUIComponent: any;
+      if (!renderFn) {
+        const ink = await import("ink");
+        renderFn = ink.render as unknown as InkRenderFn;
+      }
+      const chatUiModule = await import("../../cli/components/ChatUI.js");
+      ChatUIComponent = chatUiModule.ChatUI;
+
+      await new Promise<ExitReason>((resolvePromise) => {
+        let handled = false;
+        const handleExit = (reason: ExitReason) => {
+          if (handled) return;
+          handled = true;
+          resolvePromise(reason);
+        };
+        const instance = renderFn!(
+          React.createElement(ChatUIComponent, { session, child, onExit: handleExit }),
+        );
+        child.exited.finally(() => {
+          try { instance.unmount(); } catch {}
+        });
+      });
+
+      // Ensure the child process is actually gone
+      try {
+        await Promise.race([
+          child.exited,
+          new Promise<void>((_, reject) => setTimeout(() => reject(new Error("timeout")), 5000)),
+        ]);
+      } catch {
+        try { await child.kill("SIGKILL"); } catch {}
+      }
+
+      // Build digest and flatten into contextUpdates
+      const digest = buildSessionDigest(session);
+      const prefix = node.id;
+      const contextUpdates: Record<string, unknown> = {
+        [`${prefix}.output`]: digest.output,
+        [`${prefix}.success`]: digest.success,
+        [`${prefix}.turnsUsed`]: digest.turnsUsed,
+        [`${prefix}.sessionId`]: digest.sessionId,
+        [`${prefix}.exitReason`]: digest.exitReason,
+        [`${prefix}.transcriptPath`]: digest.transcriptPath,
+        [`${prefix}.digest`]: digest.digest,
+      };
+
+      writeFileSync(join(nodeDir, "digest.json"), JSON.stringify(digest, null, 2));
+
+      return {
+        status: digest.success ? "success" : "fail",
+        failureReason: digest.success ? undefined : `Interactive session ended with ${digest.exitReason}`,
+        contextUpdates,
+      };
+    }
+    // --- end interactive branch; legacy path below is unchanged ---
+
     const maxIterations = (node.maxIterations as number | undefined) ?? 1;
 
     let lastResult: RunResult | null = null;
@@ -88,9 +177,7 @@ export class AgentHandler implements NodeHandler {
         cwd,
         signal,
         variables: ctx.values,
-        // interactive nodes use stdio:inherit — no stdout stream to pipe
-        onStdout: interactive ? undefined : onStdout,
-        interactive: interactive ? true : undefined,
+        onStdout,
       });
 
       lastResult = result;
