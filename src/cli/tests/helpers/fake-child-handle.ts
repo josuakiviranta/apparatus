@@ -8,15 +8,16 @@ export interface FakeChildHandleController {
   submitted: string[];
   endCalled: boolean;
   killSignal: NodeJS.Signals | null;
-  exitWith(code: number | null): void;
+  exitWith(code: number | null, stderrTail?: string): void;
 }
 
 export function createFakeChildHandle(sessionId = "fake-uuid"): FakeChildHandleController {
   const submitted: string[] = [];
   let endCalled = false;
   let killSignal: NodeJS.Signals | null = null;
-  let resolveExit: (r: { code: number | null; signal: NodeJS.Signals | null }) => void;
-  const exited = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((res) => {
+  type ExitInfo = { code: number | null; signal: NodeJS.Signals | null; stderrTail: string };
+  let resolveExit: (r: ExitInfo) => void;
+  const exited = new Promise<ExitInfo>((res) => {
     resolveExit = res;
   });
 
@@ -51,11 +52,11 @@ export function createFakeChildHandle(sessionId = "fake-uuid"): FakeChildHandleC
       },
       end: async () => {
         endCalled = true;
-        resolveExit!({ code: 0, signal: null });
+        resolveExit!({ code: 0, signal: null, stderrTail: "" });
       },
       kill: async (sig: NodeJS.Signals = "SIGTERM") => {
         killSignal = sig;
-        resolveExit!({ code: null, signal: sig });
+        resolveExit!({ code: null, signal: sig, stderrTail: "" });
       },
       sessionId,
       exited,
@@ -76,8 +77,8 @@ export function createFakeChildHandle(sessionId = "fake-uuid"): FakeChildHandleC
     get submitted() { return submitted; },
     get endCalled() { return endCalled; },
     get killSignal() { return killSignal; },
-    exitWith(code) {
-      resolveExit!({ code, signal: null });
+    exitWith(code, stderrTail = "") {
+      resolveExit!({ code, signal: null, stderrTail });
     },
   };
 

@@ -42,7 +42,7 @@ export interface ChildHandle {
   submit: (text: string) => Promise<void>;
   end: () => Promise<void>;
   kill: (signal?: NodeJS.Signals) => Promise<void>;
-  exited: Promise<{ code: number | null; signal: NodeJS.Signals | null }>;
+  exited: Promise<{ code: number | null; signal: NodeJS.Signals | null; stderrTail: string }>;
 }
 
 export interface RunResult {
@@ -315,15 +315,28 @@ export class Agent {
 
     const child = spawn("claude", args, {
       cwd: opts.cwd,
-      stdio: ["pipe", "pipe", "inherit"],
+      stdio: ["pipe", "pipe", "pipe"],
     });
     this._child = child;
 
+    // Capture stderr into a rolling tail so crashes are visible to the UI.
+    // Without this, errors like "Claude Code cannot be launched inside another
+    // Claude Code session" would be swallowed silently under the Ink render.
+    const STDERR_TAIL_MAX = 4096;
+    let stderrTail = "";
+    child.stderr?.on("data", (chunk: Buffer) => {
+      stderrTail += chunk.toString("utf8");
+      if (stderrTail.length > STDERR_TAIL_MAX) {
+        stderrTail = stderrTail.slice(-STDERR_TAIL_MAX);
+      }
+    });
+
     let ended = false;
 
-    let exitResult: { code: number | null; signal: NodeJS.Signals | null } | null = null;
-    let resolveExited: (r: { code: number | null; signal: NodeJS.Signals | null }) => void;
-    const exitedPromise = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((res) => {
+    type ExitInfo = { code: number | null; signal: NodeJS.Signals | null; stderrTail: string };
+    let exitResult: ExitInfo | null = null;
+    let resolveExited: (r: ExitInfo) => void;
+    const exitedPromise = new Promise<ExitInfo>((res) => {
       resolveExited = res;
     });
 
@@ -332,7 +345,7 @@ export class Agent {
         ended = true;
         this._child = null;
         this.cleanupMcpConfig();
-        exitResult = { code: code ?? null, signal: signal ?? null };
+        exitResult = { code: code ?? null, signal: signal ?? null, stderrTail };
         resolveExited!(exitResult);
         resolve(code ?? 1);
       });

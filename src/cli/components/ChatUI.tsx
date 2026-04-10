@@ -17,7 +17,10 @@ export function ChatUI({ session, child, onExit }: Props) {
   const [history, setHistory] = useState<Turn[]>(() => [...session.history]);
   const [streamingText, setStreamingText] = useState("");
   const [inputBuffer, setInputBuffer] = useState("");
-  const [status, setStatus] = useState<Status>("streaming");
+  // Start in "awaiting": Claude Code in stream-json mode waits for the first
+  // user turn before producing any response, so the initial state must allow
+  // TextInput to capture input immediately.
+  const [status, setStatus] = useState<Status>("awaiting");
   const [lastUsage, setLastUsage] = useState<Usage | undefined>();
 
   // Accumulate per-turn deltas and tool calls for the in-flight assistant turn
@@ -104,9 +107,13 @@ export function ChatUI({ session, child, onExit }: Props) {
       if (res.code !== 0 && res.code !== null) {
         session.exitReason = "child_crash";
         setStatus("ended");
+        const stderrMsg = res.stderrTail.trim();
+        const text = stderrMsg
+          ? `Child process exited with code ${res.code}:\n${stderrMsg}`
+          : `Child process exited with code ${res.code}`;
         session.history.push({
           role: "system",
-          text: `Child process exited with code ${res.code}`,
+          text,
           at: Date.now(),
         });
         setHistory([...session.history]);
