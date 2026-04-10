@@ -1,9 +1,52 @@
 // src/cli/commands/heartbeat.ts
 import { Command } from "commander";
 import { resolve, basename } from "path";
+import { statSync, Stats } from "fs";
 import { request, stream } from "../../lib/daemon-client";
 import type { Task } from "../../daemon/state";
 import * as output from "../lib/output.js";
+
+/**
+ * Validate that an argument resolves to an existing path of the expected kind.
+ * Writes a clear message to stderr and exits the process before the daemon is
+ * contacted. The error deliberately shows BOTH the original arg and the
+ * resolved absolute path so that the common "double-join" mistake (running
+ * `ralph heartbeat meditate ralph-cli` from inside a folder already named
+ * `ralph-cli`) is obvious at a glance.
+ *
+ * Not using output.error() here because Ink rendering is async and can be
+ * truncated by an immediate process.exit(); errors also belong on stderr.
+ */
+function validatePathArg(
+  originalArg: string,
+  absPath: string,
+  kind: "directory" | "file",
+  label: string,
+): void {
+  const fail = (detail: string): never => {
+    console.error(
+      `${label} not found: ${absPath}\n` +
+      `(argument "${originalArg}" was resolved against cwd ${process.cwd()})\n` +
+      detail
+    );
+    process.exit(1);
+  };
+  let stat: Stats;
+  try {
+    stat = statSync(absPath);
+  } catch {
+    fail("The resolved path does not exist on disk.");
+    return;
+  }
+  if (kind === "directory" && !stat.isDirectory()) {
+    fail(`Expected a directory, but the resolved path is a ${stat.isFile() ? "file" : "non-directory"}.`);
+    return;
+  }
+  if (kind === "file" && !stat.isFile()) {
+    fail(`Expected a file, but the resolved path is a ${stat.isDirectory() ? "directory" : "non-file"}.`);
+    return;
+  }
+}
 
 function formatTable(tasks: Task[]): void {
   if (tasks.length === 0) {
@@ -51,6 +94,7 @@ Examples:
     })
     .action(async (folder: string, opts: { every: number }) => {
       const absPath = resolve(folder);
+      validatePathArg(folder, absPath, "directory", "Project folder");
       try {
         const res = await request("register_task", {
           command: "meditate",
@@ -75,6 +119,7 @@ Examples:
     })
     .action(async (folder: string, opts: { every: number }) => {
       const absPath = resolve(folder);
+      validatePathArg(folder, absPath, "directory", "Project folder");
       try {
         const res = await request("register_task", {
           command: "implement",
@@ -99,6 +144,7 @@ Examples:
     })
     .action(async (folder: string, opts: { every: number }) => {
       const absPath = resolve(folder);
+      validatePathArg(folder, absPath, "directory", "Project folder");
       try {
         const res = await request("register_task", {
           command: "run-scenarios",
@@ -124,11 +170,14 @@ Examples:
     })
     .action(async (dotfile: string, opts: { project?: string; every: number }) => {
       const absDotFile = resolve(dotfile);
+      validatePathArg(dotfile, absDotFile, "file", "Pipeline dotfile");
       const stem = basename(absDotFile).replace(/\.dot$/i, "");
       const id = `pipeline:${stem}`;
       const args: string[] = ["run", absDotFile];
       if (opts.project) {
-        args.push("--project", resolve(opts.project));
+        const absProject = resolve(opts.project);
+        validatePathArg(opts.project, absProject, "directory", "Project folder");
+        args.push("--project", absProject);
       }
       try {
         const res = await request("register_task", {

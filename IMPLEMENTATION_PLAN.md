@@ -967,460 +967,12 @@ Legacy `interactive=false` path is untouched.
 - Existing test "passes interactive:true to agent.run()" updated to verify `agent.run()` is NOT called for interactive nodes (interactive branch calls `runInteractive()` instead).
 - `child.exited` awaited with 5s timeout + SIGKILL fallback for cleanup.
 
-### Task 6.1: Add handler integration tests (fake agent, fake ChildHandle)
-
-**Files:**
-- Test: `src/attractor/tests/agent-handler-interactive.test.ts` (new)
-
-**Prerequisites from earlier chunks** (verify present before starting — if missing, re-run the listed chunk):
-- Chunk 4: `Agent.runInteractive()` + `ChildHandle` type exported from `src/cli/lib/agent.ts`.
-- Chunk 5: `createFakeChildHandle` helper at `src/cli/tests/helpers/fake-child-handle.ts`, exposing `handle.events` as an async iterable matching the `ChildHandle` contract.
-- Chunk 3: `Session`, `buildSessionDigest`, `ExitReason` from `src/cli/lib/session.ts`.
-
-- [ ] **Step 1: Write the failing test file**
-
-```ts
-import { describe, it, expect, vi } from "vitest";
-import { AgentHandler } from "../handlers/agent-handler.js";
-import { Session } from "../../cli/lib/session.js";
-import type { AgentConfig, ChildHandle } from "../../cli/lib/agent.js";
-import type { Node, PipelineContext } from "../types.js";
-import { mkdtempSync, rmSync } from "fs";
-import { tmpdir } from "os";
-import { join } from "path";
-import { createFakeChildHandle } from "../../cli/tests/helpers/fake-child-handle.js";
-
-function makeFakeAgent(controllerSetup: (ctrl: ReturnType<typeof createFakeChildHandle>, session: Session) => void) {
-  return {
-    config: {
-      name: "chat",
-      description: "",
-      model: "opus",
-      permissionMode: "dangerouslySkipPermissions",
-      tools: [],
-      mcp: [],
-      prompt: "",
-    } as AgentConfig,
-    buildArgs: () => [],
-    writeMcpConfig: () => null,
-    cleanupMcpConfig: () => {},
-    kill: () => {},
-    run: async () => ({ exitCode: 0, sessionId: null, stdout: null }),
-    runInteractive: (opts: { session: Session; systemPrompt: string; cwd: string }): ChildHandle => {
-      const ctrl = createFakeChildHandle(opts.session.id);
-      controllerSetup(ctrl, opts.session);
-      return ctrl.handle;
-    },
-    expandPrompt: () => "",
-    buildInteractiveArgs: () => [],
-    mcpConfigPath: null,
-  } as any;
-}
-
-const baseMeta = (cwd: string, logsRoot: string) => ({
-  cwd,
-  logsRoot,
-  completedNodes: [],
-  nodeRetries: {},
-  outgoingLabels: [],
-});
-
-const baseCtx = (): PipelineContext => ({ values: {} });
-
-describe("AgentHandler — interactive branch", () => {
-  it("passes non-interactive nodes through the legacy path unchanged", async () => {
-    const legacyRun = vi.fn().mockResolvedValue({ exitCode: 0, sessionId: "legacy", stdout: null });
-    const agent = {
-      ...makeFakeAgent(() => {}),
-      run: legacyRun,
-    };
-    const handler = new AgentHandler({
-      resolveAgent: () => agent.config,
-      createAgent: () => agent,
-    });
-    const tmp = mkdtempSync(join(tmpdir(), "ralph-handler-"));
-    try {
-      const node: Node = { id: "n1", prompt: "do stuff" };
-      const out = await handler.execute(node, baseCtx(), baseMeta(tmp, tmp));
-      expect(legacyRun).toHaveBeenCalled();
-      expect(out.status).toBe("success");
-    } finally {
-      rmSync(tmp, { recursive: true, force: true });
-    }
-  });
-
-  it("rejects interactive=true combined with jsonSchemaFile", async () => {
-    const agent = makeFakeAgent(() => {});
-    const handler = new AgentHandler({
-      resolveAgent: () => agent.config,
-      createAgent: () => agent,
-    });
-    const tmp = mkdtempSync(join(tmpdir(), "ralph-handler-"));
-    try {
-      // Create a bogus schema file so the read succeeds (we're testing the guard, not missing file)
-      const schemaPath = join(tmp, "schema.json");
-      (await import("fs")).writeFileSync(schemaPath, "{}");
-      const node: Node = {
-        id: "n1",
-        prompt: "chat",
-        interactive: true,
-        jsonSchemaFile: "schema.json",
-      };
-      const out = await handler.execute(node, baseCtx(), baseMeta(tmp, tmp));
-      expect(out.status).toBe("fail");
-      expect(out.failureReason).toMatch(/interactive.*json_schema|json_schema.*interactive/i);
-    } finally {
-      rmSync(tmp, { recursive: true, force: true });
-    }
-  });
-
-  // Completed in Task 6.2 Step 3 once the handler exposes the deps.render hook.
-  // Marked `.skip` here so the omission fails loudly if Task 6.2 is skipped —
-  // a placeholder `expect(true).toBe(true)` would silently pass.
-  it.skip("interactive success path: flattens digest into contextUpdates", async () => {
-    /* implementation added in Task 6.2 Step 3 */
-  });
-});
-```
-
-- [ ] **Step 2: Run, verify partial fail**
-
-Run: `npx vitest run src/attractor/tests/agent-handler-interactive.test.ts`
-Expected: the legacy-passthrough test passes (handler unchanged), the jsonSchema-guard test fails because no guard yet, the skipped "interactive success path" test is reported as skipped.
-
-### Task 6.2: Implement interactive branch with `deps.render` injection hook
-
-**Files:**
-- Modify: `src/attractor/handlers/agent-handler.ts`
-
-**Design note — why a `deps.render` hook:** The handler calls Ink's `render()` at runtime, but tests can't render into a real Ink terminal in Node. The pattern: accept an optional `render` function in `AgentHandlerDeps` defaulted to Ink's `render`. Tests pass a stub that resolves the `onExit` promise synchronously based on canned session state. This keeps the production path equivalent to calling `ink.render` directly while making the branch testable.
-
-**Downstream consumers of the `render` seam:** The `render` dep is consumed only by `AgentHandler` itself. Engine wiring and pipeline execution never see this seam — production just passes no `deps.render`, which lazy-loads Ink's real `render` on first interactive node. Tests construct `new AgentHandler({ render: stubRender })` directly.
-
-- [ ] **Step 0: Preflight read — confirm variable names in the current file**
-
-Run: `grep -n 'const agent\|jsonSchema\|jsonSchemaFile\|interactive\|nodeDir\|onStdout\|signal\|cwd\|config' src/attractor/handlers/agent-handler.ts`
-
-Confirm the following bindings exist at the insertion point (inside the current `execute(node, ctx, meta)` body), and record the line numbers:
-- `const cwd = meta.cwd` (or similar)
-- `const signal = meta.signal` (or similar, optional)
-- `const nodeDir` (the logs directory path)
-- `const config = this.resolve(node.agent ?? ...)` (the resolved `AgentConfig`)
-- `const interactive = node.interactive === true` (add this line if missing)
-- `const jsonSchema = ...` (may currently be derived from `jsonSchemaFile`)
-- `const onStdout = ...` (only used by `agent.run()` loop)
-
-If any of these are missing in the current file, add them above the interactive branch as local constants. The plan assumes each is in scope; this preflight is the ground truth.
-
-- [ ] **Step 1: Extend `AgentHandlerDeps` and the constructor**
-
-Edit `src/attractor/handlers/agent-handler.ts`:
-
-```ts
-// Update imports at top
-import { mkdirSync, writeFileSync, readFileSync } from "fs";
-import { join, resolve } from "path";
-import { randomUUID } from "crypto";
-import type { NodeHandler } from "./registry.js";
-import type { Node, Outcome, PipelineContext, CheckpointState } from "../types.js";
-import { Agent, type AgentConfig, type RunResult, type ChildHandle } from "../../cli/lib/agent.js";
-import { resolveAgent as defaultResolveAgent } from "../../cli/lib/agent-registry.js";
-import { buildPreamble } from "../transforms/preamble.js";
-import { expandVariables } from "../transforms/variable-expansion.js";
-import { Session, buildSessionDigest, type ExitReason } from "../../cli/lib/session.js";
-import React from "react";
-
-// Dependency type for the Ink renderer (so tests can inject a stub)
-export type InkRenderFn = (
-  element: React.ReactElement,
-) => { unmount: () => void; waitUntilExit: () => Promise<void> };
-
-export interface AgentHandlerDeps {
-  resolveAgent?: (name: string) => AgentConfig;
-  createAgent?: (config: AgentConfig) => Agent;
-  render?: InkRenderFn;
-}
-```
-
-Update the constructor:
-
-```ts
-export class AgentHandler implements NodeHandler {
-  private resolve: (name: string) => AgentConfig;
-  private create: (config: AgentConfig) => Agent;
-  private render: InkRenderFn | null;
-
-  constructor(deps?: AgentHandlerDeps) {
-    this.resolve = deps?.resolveAgent ?? defaultResolveAgent;
-    this.create = deps?.createAgent ?? ((c) => new Agent(c));
-    this.render = deps?.render ?? null; // lazy-load ink at runtime to avoid ESM init issues in tests
-  }
-  // ... rest of class
-}
-```
-
-- [ ] **Step 2: Add the interactive branch in `execute()`**
-
-First, re-arrange so the `const agent = this.create({...})` instance is created **above** the interactive branch (both paths need it). Before:
-
-```ts
-// (existing order, simplified)
-const expandedRawPrompt = expandVariables(node.prompt ?? "", ctx.values);
-const preamble = buildPreamble(checkpoint, fidelity);
-const prompt = preamble + expandedRawPrompt;
-writeFileSync(join(nodeDir, "prompt.md"), prompt);
-
-// ... loop over retries calling agent.run({ ... interactive ? undefined : onStdout }) ...
-const agent = this.create(config);  // currently somewhere inside or near the loop
-```
-
-After:
-
-```ts
-const expandedRawPrompt = expandVariables(node.prompt ?? "", ctx.values);
-const preamble = buildPreamble(checkpoint, fidelity);
-const prompt = preamble + expandedRawPrompt;
-writeFileSync(join(nodeDir, "prompt.md"), prompt);
-
-// Declare the node.interactive flag explicitly (add if the binding doesn't exist yet)
-const interactive = node.interactive === true;
-
-// Hoist agent construction — both interactive and legacy paths use it
-const agent = this.create(config);
-
-// --- Path 1.5: interactive branch (inserted here) ---
-if (interactive) {
-  // ... see below ...
-}
-
-// ... legacy retry loop calling agent.run({...}) continues unchanged below ...
-```
-
-If the legacy `agent.run(...)` call previously included `interactive ? undefined : onStdout`, simplify it to just `onStdout` — control now never reaches the loop when `interactive === true`. If that conditional expression doesn't already exist in the file (from an earlier chunk), skip this simplification.
-
-Insert the interactive branch body:
-
-```ts
-    // --- Path 1.5: interactive branch ---
-    if (interactive) {
-      // Guard: interactive + json_schema_file is not allowed
-      if (jsonSchema) {
-        return {
-          status: "fail",
-          failureReason: "interactive=true cannot be combined with json_schema_file: structured output (json_schema) is incompatible with live chat streaming",
-        };
-      }
-
-      const sessionId = randomUUID();
-      const session = new Session(sessionId);
-      const systemPrompt = prompt; // already preamble + expanded node prompt
-
-      const child: ChildHandle = agent.runInteractive({
-        session,
-        systemPrompt,
-        cwd,
-        allowedTools: config.tools,
-        dangerouslySkipPermissions: config.permissionMode === "dangerouslySkipPermissions",
-        abortSignal: signal,
-      });
-
-      // Lazy-load Ink render and ChatUI to avoid import cost for non-interactive pipelines
-      let renderFn = this.render;
-      let ChatUIComponent: any;
-      if (!renderFn) {
-        const ink = await import("ink");
-        renderFn = ink.render as unknown as InkRenderFn;
-      }
-      const chatUiModule = await import("../../cli/components/ChatUI.js");
-      ChatUIComponent = chatUiModule.ChatUI;
-
-      const exitReason: ExitReason = await new Promise<ExitReason>((resolvePromise) => {
-        let handled = false;
-        const handleExit = (reason: ExitReason) => {
-          if (handled) return;
-          handled = true;
-          resolvePromise(reason);
-        };
-        const instance = renderFn!(
-          React.createElement(ChatUIComponent, { session, child, onExit: handleExit }),
-        );
-        // If the child exits unexpectedly before ChatUI has a chance to set exitReason,
-        // the ChatUI's internal useEffect on child.exited handles it.
-        child.exited.finally(() => {
-          try { instance.unmount(); } catch {}
-        });
-      });
-
-      // Ensure the process is actually gone
-      try {
-        await Promise.race([
-          child.exited,
-          new Promise<void>((_, reject) => setTimeout(() => reject(new Error("timeout")), 5000)),
-        ]);
-      } catch {
-        try { await child.kill("SIGKILL"); } catch {}
-      }
-
-      // Build digest and flatten into contextUpdates
-      const digest = buildSessionDigest(session);
-      const prefix = node.id;
-      const contextUpdates: Record<string, unknown> = {
-        [`${prefix}.output`]: digest.output,
-        [`${prefix}.success`]: digest.success,
-        [`${prefix}.turnsUsed`]: digest.turnsUsed,
-        [`${prefix}.sessionId`]: digest.sessionId,
-        [`${prefix}.exitReason`]: digest.exitReason,
-        [`${prefix}.transcriptPath`]: digest.transcriptPath,
-        [`${prefix}.digest`]: digest.digest,
-      };
-
-      // Persist the flattened digest to the node's logs dir for operator visibility
-      writeFileSync(join(nodeDir, "digest.json"), JSON.stringify(digest, null, 2));
-
-      return {
-        status: digest.success ? "success" : "fail",
-        failureReason: digest.success ? undefined : `Interactive session ended with ${digest.exitReason}`,
-        contextUpdates,
-      };
-    }
-    // --- end interactive branch; legacy path below is unchanged ---
-```
-
-**Scoping notes already covered above:**
-- `const agent` must be hoisted above the `if (interactive)` branch (see "Before"/"After" diff).
-- `jsonSchema` is derived from `jsonSchemaFile` higher up in the file (confirmed in the Step 0 preflight).
-- The legacy `onStdout` branch inside the retry loop is unchanged if it wasn't previously conditional on `interactive`.
-
-- [ ] **Step 3: Unskip and finish the deferred test case from Task 6.1**
-
-Edit the `it.skip(...)` placeholder in `src/attractor/tests/agent-handler-interactive.test.ts` — remove `.skip` and fill in the body:
-
-Edit `src/attractor/tests/agent-handler-interactive.test.ts` and replace the `expect(true).toBe(true)` placeholder with:
-
-```ts
-    // Inject a stub render that reads from the fake ChildHandle controller
-    const stubRender: any = (element: any) => {
-      const props = element.props;
-      const { session, child, onExit } = props;
-      // Simulate ChatUI behavior: drain events until result, then call /end path
-      (async () => {
-        for await (const ev of child.events) {
-          if (ev.type === "result") {
-            session.history.push({
-              role: "assistant",
-              text: ev.text,
-              toolCalls: [],
-              usage: ev.usage,
-              at: Date.now(),
-            });
-            session.exitReason = "user_end";
-            try { await child.end(); } catch {}
-            onExit("user_end");
-            return;
-          }
-        }
-      })();
-      return { unmount: () => {}, waitUntilExit: async () => {} };
-    };
-
-    const handler = new AgentHandler({
-      resolveAgent: () => agent.config,
-      createAgent: () => agent,
-      render: stubRender,
-    });
-
-    const tmp = mkdtempSync(join(tmpdir(), "ralph-handler-"));
-    try {
-      const node: Node = {
-        id: "chat_node",
-        prompt: "talk to the user",
-        interactive: true,
-      };
-      const out = await handler.execute(node, baseCtx(), baseMeta(tmp, tmp));
-      expect(out.status).toBe("success");
-      expect(out.contextUpdates!["chat_node.output"]).toBe("summary text");
-      expect(out.contextUpdates!["chat_node.success"]).toBe(true);
-      expect(out.contextUpdates!["chat_node.exitReason"]).toBe("user_end");
-      // Session.turnsUsed() counts user-role turns; the stub only pushed an
-      // assistant turn, so turnsUsed is 0. (See src/cli/lib/session.ts — Chunk 3.)
-      expect(out.contextUpdates!["chat_node.turnsUsed"]).toBe(0);
-      expect(typeof out.contextUpdates!["chat_node.digest"]).toBe("object");
-    } finally {
-      rmSync(tmp, { recursive: true, force: true });
-    }
-```
-
-Also add an abort-path test:
-
-```ts
-  it("interactive abort path: status='fail', contextUpdates contain partial digest", async () => {
-    const agent = makeFakeAgent((ctrl, session) => {
-      setTimeout(() => {
-        session.exitReason = "abort";
-      }, 10);
-    });
-
-    const stubRender: any = (element: any) => {
-      const { session, child, onExit } = element.props;
-      setTimeout(() => {
-        session.exitReason = "abort";
-        child.kill("SIGTERM").finally(() => onExit("abort"));
-      }, 5);
-      return { unmount: () => {}, waitUntilExit: async () => {} };
-    };
-
-    const handler = new AgentHandler({
-      resolveAgent: () => agent.config,
-      createAgent: () => agent,
-      render: stubRender,
-    });
-
-    const tmp = mkdtempSync(join(tmpdir(), "ralph-handler-"));
-    try {
-      const node: Node = { id: "chat_node", prompt: "p", interactive: true };
-      const out = await handler.execute(node, baseCtx(), baseMeta(tmp, tmp));
-      expect(out.status).toBe("fail");
-      expect(out.contextUpdates!["chat_node.success"]).toBe(false);
-      expect(out.contextUpdates!["chat_node.exitReason"]).toBe("abort");
-    } finally {
-      rmSync(tmp, { recursive: true, force: true });
-    }
-  });
-```
-
-- [ ] **Step 4: Run tests, verify pass**
-
-Run: `npx vitest run src/attractor/tests/agent-handler-interactive.test.ts`
-Expected: all tests pass, including legacy passthrough, jsonSchema guard, success path, abort path.
-
-- [ ] **Step 5: Run the full suite + build**
-
-Run: `npm test && npm run build`
-Expected: all green.
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add src/attractor/handlers/agent-handler.ts src/attractor/tests/agent-handler-interactive.test.ts
-git commit -m "feat(agent-handler): add interactive=true branch with ChatUI + digest flattening"
-```
-
-### Task 6.3: Chunk 6 verification gate
-
-- [ ] **Step 1: Full suite**
-
-Run: `npm test && npm run build`
-Expected: all green.
-
-- [ ] **Step 2: Regression check — existing non-interactive pipelines**
-
-Run: `ralph pipeline validate pipelines/illumination-to-plan.dot`
-Expected: no errors.
-
-- [ ] **Step 3: Confirm `interactive=true` nodes now go through the new branch (dry check)**
-
-Grep: `grep -n 'runInteractive\|interactive branch' src/attractor/handlers/agent-handler.ts`
-Expected: matches on both the branch guard and the `agent.runInteractive()` call.
+All tasks complete.
+
+**Additional fixes during Chunk 7:**
+- Fixed type error in `src/attractor/handlers/parallel.ts:17` — `ctx.values` returns `unknown` after Chunk 1 widening; added `String()` coercion for `JSON.parse`.
+- Added explicit `interactive` and `jsonSchemaFile` properties to `Node` interface in `src/attractor/types.ts` for type safety.
+- Corrected smoke pipeline DOT syntax: ralph-cli uses `shape=Mdiamond`/`shape=Msquare` for entry/exit nodes and `agent="implement"` for agent nodes (not `kind=` attributes).
 
 ---
 
@@ -1435,7 +987,7 @@ Expected: matches on both the branch guard and the `agent.runInteractive()` call
 **Files:**
 - Create: `pipelines/smoke/chat-only.dot`
 
-- [ ] **Step 1: Write the file**
+- [x] **Step 1: Write the file**
 
 ```
 digraph chat_only {
@@ -1447,12 +999,12 @@ digraph chat_only {
 }
 ```
 
-- [ ] **Step 2: Validate it parses**
+- [x] **Step 2: Validate it parses**
 
 Run: `ralph pipeline validate pipelines/smoke/chat-only.dot` (or whatever validate subcommand exists; `ralph pipeline list pipelines/smoke/` otherwise)
 Expected: no errors.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add pipelines/smoke/chat-only.dot
@@ -1465,7 +1017,7 @@ git commit -m "feat(pipelines): add chat-only smoke pipeline for ChatUI isolatio
 - Create: `pipelines/smoke/chat-end-to-end.dot`
 - Create: `pipelines/smoke/schemas/summary.json`
 
-- [ ] **Step 1: Write the schema file**
+- [x] **Step 1: Write the schema file**
 
 Create `pipelines/smoke/schemas/summary.json`:
 
@@ -1479,7 +1031,7 @@ Create `pipelines/smoke/schemas/summary.json`:
 }
 ```
 
-- [ ] **Step 2: Write the DOT file**
+- [x] **Step 2: Write the DOT file**
 
 Create `pipelines/smoke/chat-end-to-end.dot`:
 
@@ -1518,12 +1070,12 @@ digraph chat_end_to_end {
 
 **Note on variable syntax:** ralph-cli's `expandVariables` uses `$key` (single-dollar) per `src/attractor/transforms/variable-expansion.ts:8`. The spec text uses `${chat.output}` in prose but this plan uses the actual working syntax `$chat.output`.
 
-- [ ] **Step 3: Validate it parses**
+- [x] **Step 3: Validate it parses**
 
 Run: `ralph pipeline validate pipelines/smoke/chat-end-to-end.dot`
 Expected: no errors.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add pipelines/smoke/chat-end-to-end.dot pipelines/smoke/schemas/summary.json

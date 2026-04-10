@@ -1,0 +1,28 @@
+digraph chat_end_to_end {
+  start [shape=Mdiamond];
+
+  chat [
+    agent="implement",
+    interactive=true,
+    prompt="You are helping the user capture one thing they learned today. Ask them one question, acknowledge their answer, then tell them you will summarize it for them."
+  ];
+
+  summarize [
+    agent="implement",
+    prompt="Summarize this chat into a single sentence. Input:\n\n$chat.output",
+    json_schema_file="pipelines/smoke/schemas/summary.json"
+  ];
+
+  recovery [
+    agent="implement",
+    prompt="The interactive chat was aborted. Write a one-line note saying the user aborted early. Partial output (may be empty): $chat.output"
+  ];
+
+  done [shape=Msquare];
+
+  start     -> chat;
+  chat      -> summarize [condition="outcome=success"];
+  chat      -> recovery  [condition="outcome=fail"];
+  summarize -> done;
+  recovery  -> done;
+}

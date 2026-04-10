@@ -14,7 +14,7 @@ export class ParallelHandler implements NodeHandler {
 export class FanInHandler implements NodeHandler {
   async execute(_node: Node, ctx: PipelineContext, _meta: Record<string, unknown>): Promise<Outcome> {
     const raw = ctx.values["parallel.results"];
-    const results: Outcome[] = raw ? JSON.parse(raw) : [];
+    const results: Outcome[] = raw ? JSON.parse(String(raw)) : [];
     const allSucceeded = results.every(r => r.status === "success");
     const anySucceeded = results.some(r => r.status === "success");
     const status = allSucceeded ? "success" : anySucceeded ? "partial_success" : "fail";

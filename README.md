@@ -60,3 +60,8 @@ npm link           # test ralph binary locally
 - [Prompt Bootstrap](specs/bootstrap.md)
 - [Loop Script](specs/loop.md)
 attractor-test-comment
+
+<!-- This is a comment added to README.md -->
+attractor-test-comment
+attractor-test-comment
+<!-- Added by pipeline: human-gated workflow test -->

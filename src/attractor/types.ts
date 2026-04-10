@@ -28,6 +28,8 @@ export interface Node {
   retryTarget?: string;
   fallbackRetryTarget?: string;
   agent?: string;
+  interactive?: boolean | string;
+  jsonSchemaFile?: string;
   class?: string;
   [key: string]: unknown;
 }
