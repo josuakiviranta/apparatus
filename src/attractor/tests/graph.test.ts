@@ -235,6 +235,66 @@ describe("parseDot", () => {
   });
 });
 
+describe("parseDot — Bug B.2 unescape inside quoted attributes", () => {
+  it("unescapes \\n inside quoted node attr", () => {
+    const src = `digraph t {
+      start [shape=Mdiamond]
+      done [shape=Msquare]
+      n1 [kind=agent, prompt="line1\\nline2"]
+      start -> n1 -> done
+    }`;
+    const g = parseDot(src);
+    const n = g.nodes.get("n1")!;
+    expect(n.prompt).toBe("line1\nline2");
+  });
+
+  it("unescapes \\t and \\\" inside quoted attr", () => {
+    const src = `digraph t {
+      start [shape=Mdiamond]
+      done [shape=Msquare]
+      n1 [kind=agent, prompt="tab\\there and \\"quote\\""]
+      start -> n1 -> done
+    }`;
+    const g = parseDot(src);
+    expect(g.nodes.get("n1")!.prompt).toBe('tab\there and "quote"');
+  });
+
+  it("unescapes \\\\ inside quoted attr", () => {
+    const src = `digraph t {
+      start [shape=Mdiamond]
+      done [shape=Msquare]
+      n1 [kind=agent, prompt="a\\\\b"]
+      start -> n1 -> done
+    }`;
+    const g = parseDot(src);
+    expect(g.nodes.get("n1")!.prompt).toBe("a\\b");
+  });
+
+  it("does NOT touch unquoted values (kind=agent)", () => {
+    const src = `digraph t {
+      start [shape=Mdiamond]
+      done [shape=Msquare]
+      n1 [kind=agent, weight=5]
+      start -> n1 -> done
+    }`;
+    const g = parseDot(src);
+    const n = g.nodes.get("n1")!;
+    expect(n.kind).toBe("agent");
+    expect(n.weight).toBe(5);
+  });
+
+  it("does NOT interpret backslashes in unquoted identifier values", () => {
+    const src = `digraph t {
+      start [shape=Mdiamond]
+      done [shape=Msquare]
+      n1 [kind=agent]
+      start -> n1 -> done
+    }`;
+    const g = parseDot(src);
+    expect(g.nodes.get("n1")!.kind).toBe("agent");
+  });
+});
+
 describe("resolveHandlerType with agent attribute", () => {
   it("resolves agent attribute to 'agent' handler type", () => {
     const dot = `digraph g {

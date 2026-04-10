@@ -21,6 +21,20 @@ function stripComments(src: string): string {
   return src;
 }
 
+// Unescape DOT escape sequences inside double-quoted attribute values
+function unescapeDotString(s: string): string {
+  return s.replace(/\\(.)/g, (_, ch) => {
+    switch (ch) {
+      case "n": return "\n";
+      case "t": return "\t";
+      case "r": return "\r";
+      case '"': return '"';
+      case "\\": return "\\";
+      default: return ch;
+    }
+  });
+}
+
 // Parse key=value attribute list from a string like: shape=box, label="foo bar", max_retries=3
 function parseAttrs(attrStr: string): Record<string, unknown> {
   const attrs: Record<string, unknown> = {};
@@ -28,8 +42,10 @@ function parseAttrs(attrStr: string): Record<string, unknown> {
   let m: RegExpExecArray | null;
   while ((m = re.exec(attrStr)) !== null) {
     const key = toCamel(m[1]);
-    const val = m[2] !== undefined ? m[2] : m[3];
-    attrs[key] = coerceValue(val);
+    // m[2] is the quoted value (escape sequences apply);
+    // m[3] is the unquoted value (raw identifier/number/bool — no escape processing)
+    const rawVal = m[2] !== undefined ? unescapeDotString(m[2]) : m[3];
+    attrs[key] = coerceValue(rawVal);
   }
   return attrs;
 }
