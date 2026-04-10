@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import { render, Box, Text, useApp, Static } from "ink";
 import { StreamLine } from "./ui.js";
 import type { StreamEvent } from "../lib/stream-formatter.js";
+import type { Session, ExitReason } from "../lib/session.js";
+import type { ChildHandle } from "../lib/agent.js";
 
 export type DisplayLine =
   | { kind: "stream"; event: StreamEvent }
@@ -10,9 +12,17 @@ export type DisplayLine =
   | { kind: "warn"; text: string }
   | { kind: "success"; text: string };
 
+export interface ChatProps {
+  session: Session;
+  child: ChildHandle;
+  tracePath: string;
+  onExit: (reason: ExitReason) => void;
+}
+
 export interface PipelineDisplayCallbacks {
   push: (line: DisplayLine) => void;
   setStatus: (nodeLabel: string) => void;
+  setChat: (props: ChatProps | null) => void;
   done: () => void;
 }
 
@@ -42,11 +52,13 @@ export function PipelineDisplay({ pipelineName, pid, onReady }: Props) {
   const { exit } = useApp();
   const [lines, setLines] = useState<DisplayLine[]>([]);
   const [currentNode, setCurrentNode] = useState<string>("");
+  const [_chat, setChat] = useState<ChatProps | null>(null);
 
   useEffect(() => {
     onReady({
       push: (line) => setLines((prev) => [...prev, line]),
       setStatus: (label) => setCurrentNode(label),
+      setChat,
       done: () => exit(),
     });
   }, []);

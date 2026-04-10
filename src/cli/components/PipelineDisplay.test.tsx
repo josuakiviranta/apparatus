@@ -19,6 +19,7 @@ describe("PipelineDisplay", () => {
     expect(typeof cbs!.push).toBe("function");
     expect(typeof cbs!.setStatus).toBe("function");
     expect(typeof cbs!.done).toBe("function");
+    expect(typeof cbs!.setChat).toBe("function");
   });
 
   it("renders pushed info lines", async () => {
