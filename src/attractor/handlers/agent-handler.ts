@@ -10,6 +10,14 @@ import { expandVariables } from "../transforms/variable-expansion.js";
 import { Session, buildSessionDigest, type ExitReason } from "../../cli/lib/session.js";
 import React from "react";
 
+export interface InteractiveRequest {
+  session: Session;
+  child: ChildHandle;
+  tracePath: string;
+}
+
+export type OnInteractiveRequest = (req: InteractiveRequest) => Promise<void>;
+
 export type InkRenderFn = (
   element: React.ReactElement,
 ) => { unmount: () => void; waitUntilExit: () => Promise<void> };
