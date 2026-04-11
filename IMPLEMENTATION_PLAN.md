@@ -1,792 +1,1372 @@
-# Interactive Ink Overlay Implementation Plan
+# Tmux Drive Harness Implementation Plan
 
-> **Status (2026-04-10):** All 3 chunks implemented and verified. 540 tests pass, build clean. Remaining: manual smoke test (Task 3.4).
+> **Status:** Implemented — 2026-04-14 (tag 0.0.58)
+> Smoke tests 1+3 passed. Smoke tests 2+4 skipped (no wait.human pipeline; osascript not authorized).
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [x]`) syntax for tracking.
 
-**Goal:** Make pipeline runs with `interactive=true` nodes render from a single Ink tree so downstream pipeline output (e.g. `summarize`, `done`) is not visually lost after the user exits an interactive chat.
+**Goal:** Ship a single authoritative document (`docs/harness/tmux-drive.md`) plus two discoverability pointers that let Claude autonomously drive ralph-cli inside tmux, observe its Ink TUI, and analyze results — all via Bash, with no new code or dependencies.
 
-**Architecture:** The root cause is that `agent-handler.ts` calls `ink.render(<ChatUI/>)` while `pipeline.ts` has already called `render(<PipelineDisplay/>)` — two renders on the same stdout, which the Ink docs explicitly say is unsupported. Fix: `PipelineDisplay` gains a `chat` state slot and renders `<ChatUI>` as a conditional child. The handler signals "time to chat" through a new `onInteractiveRequest` callback threaded via `EngineOptions` → handler `meta`. `pipeline.ts` wires that callback to `setChat`, and the handler no longer imports Ink at all.
+**Architecture:** Pure documentation + filesystem conventions. One markdown file containing six Bash patterns (start/capture/wait-stable/wait-for-source/send-input/cleanup) plus visual capture, recovery, gotchas. Scratchpad at `~/.ralph/harness/<run-id>/` slots next to existing `~/.ralph/runs/`. Two pointers (in `MEMORY.md` and `CLAUDE.md`) ensure discoverability in fresh sessions.
 
-**Tech Stack:** TypeScript, Ink 6 (React for terminals), Vitest, `ink-testing-library`, commander, tsup.
+**Tech Stack:** macOS bash, tmux, ripgrep, `screencapture`, stock coreutils. No Node, no Python, no jq, no npm packages. Node is used only for a one-shot JSON validation check in smoke tests (ralph already depends on Node).
 
-**Spec:** `docs/superpowers/specs/2026-04-10-interactive-ink-overlay-design.md`
+**Source spec:** `docs/superpowers/specs/2026-04-14-tmux-drive-harness-design.md`
 
-**Ground-truth file state (captured 2026-04-10):**
-- `Session` constructor: `new Session(id: string)` — `exitReason` starts `undefined`.
-- `buildSessionDigest` already falls back to `"user_end"` when `session.exitReason` is undefined, so no initialization change is needed.
-- `agent-handler-interactive.test.ts` has **6** `it(...)` cases total, of which **4** use `render: stubRender` (the ones that actually reach the Ink render path). The other 2 return early before the render path and do not use the stub — leave them alone. Migrate only the 4.
-- `ChatUI.test.tsx` has **5** `<ChatUI ...>` usages. `tracePath` is optional → **zero migrations**.
-- `PipelineDisplay.test.tsx` has **5** `it(...)` cases. One test asserts on `onReady` callback shape — extend it to include `setChat`.
-- `git diff src/cli/lib/agent.ts` is empty even though git status shows `M`. Treat `agent.ts` as already clean; do not touch it.
-- Handler `meta` is typed as `Record<string, unknown>` (structural, not a named interface). Adding `onInteractiveRequest` to it is additive and requires no type interface update.
-- `git status` also shows `M src/cli/components/ChatUI.tsx` and `M src/cli/tests/helpers/fake-child-handle.ts` and `?? src/cli/agents/chat.md`. **Pre-flight:** inspect these before starting. If they contain in-progress work related to this spec, keep them; if they're stale, `git stash` first. The plan does not assume their contents.
-
-**Chunk ordering is strict.** Chunk 2 depends on types and the state slot from Chunk 1. Chunk 3 depends on both Chunk 1 (`ChatProps`, `setChat` in `PipelineDisplayCallbacks`) and Chunk 2 (handler rewrite, ChatUI `tracePath` prop). Do not execute chunks out of order.
+**TDD adaptation for documentation:** Each pattern follows a red/green cycle adapted for Bash-in-Markdown: (1) write a smoke-test scenario that exercises the pattern, (2) run it against a deliberately-incomplete snippet and watch it fail, (3) write the snippet per spec, (4) run the smoke test and watch it pass, (5) commit. Documentation that cannot be executed is not trustworthy.
 
 ---
 
-## Chunk 1: Type surface + engine plumbing (no behavior change)
+## File Structure
 
-**Outcome:** New types and state slots are in place. Overlay is always `null` because nobody sets it yet. Existing tests still pass. No user-visible change.
+Files created:
 
-**Files:**
-- Modify: `src/attractor/handlers/agent-handler.ts` (add exports)
-- Modify: `src/attractor/core/engine.ts` (extend `EngineOptions` + meta)
-- Modify: `src/cli/components/PipelineDisplay.tsx` (add `setChat` state slot)
-- Modify: `src/cli/components/PipelineDisplay.test.tsx` (assert `setChat` in callbacks shape)
+| Path | Responsibility |
+|---|---|
+| `docs/harness/tmux-drive.md` | The patterns document. Single file, sectioned. Authoritative source of truth. |
+| `docs/harness/README.md` | One-paragraph index pointing at `tmux-drive.md`. Keeps the new top-level directory obvious to casual browsers. |
 
-### Task 1.1: Export `InteractiveRequest` and `OnInteractiveRequest` types
+Files modified:
 
-**Files:**
-- Modify: `src/attractor/handlers/agent-handler.ts`
+| Path | Change |
+|---|---|
+| `MEMORY.md` | Add a "Harness" pointer as a new `## Harness` section appended after the existing `## Known Issues` section. |
+| `CLAUDE.md` | Add a `## Debugging the Ink TUI` section as a new top-level section at the end. |
+| `docs/superpowers/specs/2026-04-14-tmux-drive-harness-design.md` | Update `Status:` to `Implemented — 2026-04-14` after smoke tests pass (final task only). |
 
-- [x] **Step 1: Add type exports near the top of the file, after existing imports**
+Files NOT touched:
 
-Add to `src/attractor/handlers/agent-handler.ts` (after the existing imports, before `AgentHandlerDeps`):
+- No `src/**` changes. The spec forbids ralph-cli source modifications.
+- No `package.json`, no `tsup.config.ts`, no build changes.
+- No new test files in `src/cli/tests/` — smoke tests are ad-hoc shell runs documented in this plan, not committed test code.
 
-```ts
-import type { Session } from "../../cli/lib/session.js";
-import type { ChildHandle } from "../../cli/lib/agent.js";
+---
 
-export interface InteractiveRequest {
-  session: Session;
-  child: ChildHandle;
-  tracePath: string;
-}
+## Chunk 1: Environment Probing, Doc Skeleton, `wait_stable`
 
-export type OnInteractiveRequest = (req: InteractiveRequest) => Promise<void>;
-```
+**Why this chunk first:** Patterns 1, 3, 4 depend on `date +%s%N` being available (or a fallback). If the probe fails on the developer's macOS, we hard-code the working alternative before writing the patterns — otherwise the doc ships broken. Pattern 6 uses a pure-bash `meta.json` rewrite (no `sed -i.bak`) so there is no sed portability probe. `wait_stable` (Pattern 3) is the foundation every other pattern calls, so it goes first.
 
-If `Session` or `ChildHandle` are already imported at the top of the file, do not duplicate the import — extend the existing import statement.
+### Task 1.1: Probe the environment
 
-- [x] **Step 2: Verify TypeScript compiles**
+**Why this task exists:** Task 1.3 writes the canonical `now_ns()` helper into the patterns doc. That helper must work on THIS machine. This task runs concrete bash checks and prints the right incantation so Task 1.3 can paste it verbatim. The patterns doc is the durable record — no probe log, no scratch file, no hidden state.
 
-Run: `npm run build`
-Expected: build succeeds with no errors.
-
-- [x] **Step 3: Commit**
+- [x] **Step 1: Confirm tmux is installed and a recent version**
 
 ```bash
-git add src/attractor/handlers/agent-handler.ts
-git commit -m "feat(agent-handler): export InteractiveRequest + OnInteractiveRequest types"
+tmux -V || { echo "STOP: tmux is required"; exit 1; }
 ```
 
-### Task 1.2: Add `onInteractiveRequest` to `EngineOptions` and thread into handler meta
+Expected: `tmux 3.x` or newer. If the command aborts, STOP and surface to the human — the entire plan is infeasible without tmux.
+
+- [x] **Step 2: Decide which command `now_ns()` will use**
+
+Run this concrete check and read the final line. A valid nanosecond timestamp is all-digits and at least 18 characters long. BSD `date +%s%N` prints a trailing literal `N`, which fails the all-digits case; the length check catches other malformed outputs.
+
+```bash
+is_ns_ok() {
+  local out=$1
+  [ -n "$out" ] || return 1
+  case "$out" in
+    *[!0-9]*) return 1 ;;   # contains a non-digit — reject
+  esac
+  [ "${#out}" -ge 18 ]
+}
+
+if out=$(date +%s%N 2>/dev/null) && is_ns_ok "$out"; then
+  echo "TIME_SRC_CMD='date +%s%N'"
+elif out=$(gdate +%s%N 2>/dev/null) && is_ns_ok "$out"; then
+  echo "TIME_SRC_CMD='gdate +%s%N'"
+elif out=$(perl -MTime::HiRes=time -e 'printf "%d\n", time()*1000000000' 2>/dev/null) && is_ns_ok "$out"; then
+  echo "TIME_SRC_CMD='perl -MTime::HiRes=time -e \"printf \\\"%d\\\\n\\\", time()*1000000000\"'"
+else
+  echo "STOP: no nanosecond time source"
+fi
+```
+
+Expected: exactly one line starting with `TIME_SRC_CMD=`, or `STOP:` (surface to human and abort). Sanity-check on macOS: `date +%s%N` prints `<unix-seconds>N` (with a trailing literal `N`), so the `*[!0-9]*` pattern rejects it and the probe falls through to `gdate` / `perl`. On Linux, `date +%s%N` prints 19 digits and is selected.
+
+**Record the result:** Copy the printed `TIME_SRC_CMD=...` value into the task's commit message in Task 1.3 Step 7 (e.g., `docs(harness): wait_stable (pattern 3) + sourceable block skeleton — TIME_SRC_CMD='gdate +%s%N'`). That way the decision is permanent in git history and the patterns doc itself already encodes the chosen command in `now_ns()`.
+
+- [x] **Step 3: Probe `osascript` terminal detection (screenshot prerequisite)**
+
+```bash
+osascript -e 'tell application "System Events" to get name of first application process whose frontmost is true' \
+  && echo "OSA_WORKS=yes" \
+  || echo "OSA_WORKS=no  # screenshot helper will fail until accessibility access is granted"
+```
+
+Expected: a non-empty app name followed by `OSA_WORKS=yes`. If `OSA_WORKS=no`, the text patterns still work — only the opt-in `screenshot` helper in Task 3.2 will be non-functional. Continue the plan; surface this to the human at Task 3.2 time.
+
+- [x] **Step 4: Confirm ripgrep and Node are available**
+
+```bash
+rg --version >/dev/null && echo "RG=ok" || { echo "STOP: ripgrep required"; exit 1; }
+node --version >/dev/null && echo "NODE=ok" || { echo "STOP: node required"; exit 1; }
+```
+
+Expected: `RG=ok` and `NODE=ok`. ripgrep is used by Pattern 4; Node is used by smoke tests for one-shot JSON validation.
+
+- [x] **Step 5: No state to save**
+
+This task writes nothing to disk. The `TIME_SRC_CMD` decision lives in Task 1.3's commit message and in the `now_ns()` body inside the patterns doc. There is no `/tmp` scratchpad to avoid committing.
+
+---
+
+### Task 1.2: Scaffold `docs/harness/` and the skeleton of `tmux-drive.md`
 
 **Files:**
-- Modify: `src/attractor/core/engine.ts`
+- Create: `docs/harness/README.md`
+- Create: `docs/harness/tmux-drive.md` (skeleton only; patterns added in later tasks)
 
-- [x] **Step 1: Extend `EngineOptions` interface**
+- [x] **Step 1: Write the failing test — verify the doc file does not exist yet**
 
-In `src/attractor/core/engine.ts`, locate `EngineOptions` and add a new optional field at the end:
+Run: `test -f docs/harness/tmux-drive.md && echo "FAIL: already exists" || echo "OK: not yet created"`
+Expected: `OK: not yet created`
 
-```ts
-import type { OnInteractiveRequest } from "../handlers/agent-handler.js";
+- [x] **Step 2: Create `docs/harness/README.md`**
 
-export interface EngineOptions {
-  logsRoot: string;
-  cwd: string;
-  interviewer: Interviewer;
-  signal?: AbortSignal;
-  project?: string;
-  resume?: boolean;
-  onNodeStart?: (node: Node) => void;
-  onStdout?: (stdout: NodeJS.ReadableStream) => Promise<void>;
-  onInteractiveRequest?: OnInteractiveRequest;   // NEW
-}
+```markdown
+# docs/harness/
+
+Authoritative harness documentation for Claude driving ralph-cli under tmux.
+
+- [`tmux-drive.md`](./tmux-drive.md) — the patterns document. Start here.
+
+This directory is a sibling of `docs/superpowers/` and does not conflict with it.
 ```
 
-- [x] **Step 2: Thread `onInteractiveRequest` into the handler meta bag**
+- [x] **Step 3: Create `docs/harness/tmux-drive.md` skeleton**
 
-Find the place in `runPipeline` where `handler.execute(node, ctx, { ...meta })` is called. Add `onInteractiveRequest: opts.onInteractiveRequest,` to the meta object literal alongside the existing `onStdout: opts.onStdout` wiring.
+Write the file with these section headers and nothing else under them yet:
 
-**No type interface to update.** `handler.execute(node, ctx, meta)` takes `meta: Record<string, unknown>` — structurally typed, not a named interface. Adding an optional field is purely additive at runtime and accepted by the type system without any declaration change. Do not hunt for a named `HandlerMeta` interface; it does not exist. Do not touch `src/attractor/core/handler.ts` for this step.
+```markdown
+# Tmux Drive Harness — Patterns
 
-- [x] **Step 3: Verify build**
+Read this document at the start of any debugging session that needs to observe ralph's Ink TUI. All six patterns below are presented as sections of a single sourceable bash block. Copy the whole block into your shell before calling any pattern individually.
 
-Run: `npm run build`
-Expected: build succeeds.
+## When to use this
 
-- [x] **Step 4: Run existing engine tests**
+## Prerequisites
 
-Run: `npx vitest run src/attractor/tests/`
-Expected: all existing tests still pass — we added only an optional field.
+## Setup: source the patterns block
+
+## Pattern 1 — Start a run
+
+## Pattern 2 — Capture
+
+## Pattern 3 — Wait for stable UI
+
+## Pattern 4 — Wait for a precise state (source grep)
+
+## Pattern 5 — Send input
+
+## Pattern 6 — Cleanup
+
+## Visual capture (opt-in)
+
+## Recovery from orphaned runs
+
+## Pruning the scratchpad
+
+## Gotchas
+```
+
+- [x] **Step 4: Run the existence test again to verify it passes**
+
+Run: `test -f docs/harness/tmux-drive.md && echo "OK: exists" || echo "FAIL"`
+Expected: `OK: exists`
+
+Also run: `grep -c "^## " docs/harness/tmux-drive.md`
+Expected: `13` (thirteen top-level section headers).
 
 - [x] **Step 5: Commit**
 
 ```bash
-git add src/attractor/core/engine.ts
-git commit -m "feat(engine): plumb optional onInteractiveRequest through EngineOptions + meta"
+git add docs/harness/README.md docs/harness/tmux-drive.md
+git commit -m "docs(harness): scaffold tmux-drive patterns document"
 ```
 
-### Task 1.3: Add `chat` state slot + `setChat` callback to PipelineDisplay
+---
+
+### Task 1.3: Write and validate `wait_stable` (Pattern 3)
 
 **Files:**
-- Modify: `src/cli/components/PipelineDisplay.tsx`
+- Modify: `docs/harness/tmux-drive.md` (fill in "Pattern 3" and "Setup" sections)
 
-This task is **state slot only** — no JSX rendering of ChatUI yet. That lands in Chunk 3. The slot exists so callers can already wire it without runtime effect.
+- [x] **Step 1: Write the failing smoke test**
 
-- [x] **Step 1: Write the failing test**
+Paste this into a shell (do NOT save in git) — it exercises `wait_stable` against a live tmux window before we have written it:
 
-Edit the PipelineDisplay test file. Find the existing onReady test (which already has an await for useEffect). Keep that wait and extend its assertions inside the same test body:
-
-```tsx
-expect(cbs).not.toBeNull();
-expect(typeof cbs!.push).toBe("function");
-expect(typeof cbs!.setStatus).toBe("function");
-expect(typeof cbs!.done).toBe("function");
-expect(typeof cbs!.setChat).toBe("function");   // NEW
+```bash
+# Smoke test for wait_stable: create a window that sits idle, wait for it to stabilize.
+SESSION=$(tmux display-message -p '#S')
+WIN="wait-stable-probe-$$"
+tmux new-window -t "$SESSION" -n "$WIN" -d
+sleep 0.5  # let the shell initialize
+# At this point the pane is stable (a bash prompt waiting).
+# wait_stable should return 0 within its default budget.
+if declare -F wait_stable >/dev/null; then
+  wait_stable 5000 && echo "PASS: stabilized" || echo "FAIL: timed out"
+else
+  echo "FAIL: wait_stable not defined"
+fi
+tmux kill-window -t "$SESSION:$WIN"
 ```
 
-- [x] **Step 2: Run test — expect failure**
+Expected BEFORE implementation: `FAIL: wait_stable not defined`.
 
-Run: `npx vitest run src/cli/components/PipelineDisplay.test.tsx`
-Expected: FAIL with `expected undefined to be "function"` on the `setChat` line (or a TypeScript error if `setChat` isn't in the interface yet).
+- [x] **Step 2: Run the smoke test to confirm it fails**
 
-- [x] **Step 3: Define `ChatProps` type and add `setChat` to `PipelineDisplayCallbacks`**
+Paste the snippet above into a shell and confirm it prints `FAIL: wait_stable not defined`. This is the "red" state.
 
-In `src/cli/components/PipelineDisplay.tsx`, add imports and a new exported type near the top (after existing imports):
+- [x] **Step 3: Fill in the "Setup: source the patterns block" section of `tmux-drive.md`**
 
-```ts
-import type { Session, ExitReason } from "../lib/session.js";
-import type { ChildHandle } from "../lib/agent.js";
+Add this content under the `## Setup: source the patterns block` header:
 
-export interface ChatProps {
-  session: Session;
-  child: ChildHandle;
-  tracePath: string;
-  onExit: (reason: ExitReason) => void;
+````markdown
+Copy the entire fenced block below into your current shell. It defines every helper function used by the patterns that follow. Nothing is executed by sourcing — you still need to call the individual helpers.
+
+```bash
+# ---------- tmux drive harness helpers ----------
+# Source this block before using any pattern.
+
+# Globals filled in by Pattern 1 (start_run). Every other helper reads them.
+: "${SESSION:=}"
+: "${WIN:=}"
+: "${RUN_DIR:=}"
+: "${RUN_ID:=}"
+: "${CAPTURE_INDEX:=0}"
+
+# Time source — resolved at source time based on what the probe found.
+# Pattern 3 and Pattern 4 call now_ns() for deadline math.
+now_ns() {
+  date +%s%N    # <-- replace with gdate or perl fallback if the probe required it
+}
+
+# ---------- Pattern 3: wait_stable ----------
+wait_stable() {
+  local budget_ms=${1:-10000}
+  local start_ns deadline_ns t
+  start_ns=$(now_ns)
+  deadline_ns=$((start_ns + budget_ms * 1000000))
+  local prev=$'\x01'   # control-byte sentinel; tmux capture-pane never emits it
+  while : ; do
+    t=$(now_ns)
+    if [ "$t" -ge "$deadline_ns" ]; then
+      local spent=$(( (t - start_ns) / 1000000 ))
+      echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) wait-stable TIMEOUT elapsed=${spent}ms" >> "$RUN_DIR/events.log" 2>/dev/null || true
+      return 1
+    fi
+    local now
+    now=$(tmux capture-pane -p -t "$SESSION:$WIN")
+    if [ "$prev" != $'\x01' ] && [ "$prev" = "$now" ]; then
+      local spent=$(( ($(now_ns) - start_ns) / 1000000 ))
+      echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) wait-stable elapsed=${spent}ms" >> "$RUN_DIR/events.log" 2>/dev/null || true
+      return 0
+    fi
+    prev="$now"
+    sleep 0.2
+  done
 }
 ```
+````
 
-Extend `PipelineDisplayCallbacks`:
+Important substitution: if Task 1.1 Step 2 recorded `TIME_SRC=gdate`, replace `date +%s%N` inside `now_ns()` with `gdate +%s%N`. If `TIME_SRC=perl`, replace with `perl -MTime::HiRes=time -e 'printf "%d\n", time()*1000000000'`. The doc must contain the working incantation verbatim; no "if/else" in the patterns document itself.
 
-```ts
-export interface PipelineDisplayCallbacks {
-  push: (line: DisplayLine) => void;
-  setStatus: (nodeLabel: string) => void;
-  setChat: (props: ChatProps | null) => void;   // NEW
-  done: () => void;
+- [x] **Step 4: Fill in the "Pattern 3 — Wait for stable UI" section with the explanatory prose**
+
+Add under `## Pattern 3 — Wait for stable UI`:
+
+```markdown
+`wait_stable` is the default synchronization primitive. It polls `tmux capture-pane` every 200ms and returns 0 as soon as two consecutive captures match. Works for every Ink surface without knowing what is being rendered.
+
+Call it:
+- Before the first capture after `start_run`, to let the new window's shell print its prompt.
+- Before and after every `send_input` call, to let Ink absorb the input.
+- Whenever you need to treat `current.txt` as authoritative.
+
+Failure mode: if the UI keeps changing past `budget_ms` (default 10000), it returns 1 and logs `wait-stable TIMEOUT` to `events.log`. The timeout is measured by wall clock via `now_ns()`, so heavy `capture-pane` calls do not inflate the budget.
+
+Gotcha: the control-byte sentinel `$'\x01'` lets an empty pane be "stable" (a genuinely empty capture is distinct from the pre-loop sentinel). Without it, `wait_stable` would hang on any pane that captures to an empty string.
+```
+
+- [x] **Step 5: Source the patterns block and re-run the smoke test**
+
+In a fresh shell:
+
+```bash
+# Extract the fenced bash block from the doc and source it.
+# A copy-paste equivalent that the document itself instructs users to do.
+eval "$(sed -n '/^# ---------- tmux drive harness helpers ----------/,/^# ---------- end helpers ----------/p' docs/harness/tmux-drive.md 2>/dev/null | sed '1d;$d')" 2>/dev/null || {
+  # If the sed extraction fails (the block has no end marker yet), paste the
+  # block manually or use the Read tool to grab it.
+  echo "NOTE: paste the bash block manually for this smoke test"
 }
+
+# Now run the smoke test from Step 1.
+SESSION=$(tmux display-message -p '#S')
+WIN="wait-stable-probe-$$"
+RUN_DIR=/tmp/wait-stable-probe   # wait_stable logs to this dir
+mkdir -p "$RUN_DIR"
+tmux new-window -t "$SESSION" -n "$WIN" -d
+sleep 0.5
+wait_stable 5000 && echo "PASS: stabilized" || echo "FAIL: timed out"
+tmux kill-window -t "$SESSION:$WIN"
+rm -rf "$RUN_DIR"
 ```
 
-- [x] **Step 4: Add `chat` state + expose setter via `onReady`**
+Expected: `PASS: stabilized`, and `$RUN_DIR/events.log` contains a `wait-stable elapsed=...ms` line.
 
-Inside the `PipelineDisplay` function component, add a new `useState` call next to the existing ones:
+- [x] **Step 6: Add the end-marker comment to the bash block**
 
-```tsx
-const [chat, setChat] = useState<ChatProps | null>(null);
+The extraction script in Step 5 expects `# ---------- end helpers ----------` at the end of the sourceable block. Add this line inside the fenced block at the very end (after `wait_stable`'s closing brace):
+
+```bash
+# ---------- end helpers ----------
 ```
 
-Extend the `onReady` effect to pass `setChat`:
-
-```tsx
-useEffect(() => {
-  onReady({
-    push: (line) => setLines((prev) => [...prev, line]),
-    setStatus: (nodeLabel) => setCurrentNode(nodeLabel),
-    setChat,   // NEW — stable reference from useState, pass directly
-    done: () => exit(),
-  });
-}, [onReady, exit]);
-```
-
-Do **not** wrap `setChat` in a closure. React's `useState` setter is guaranteed stable across renders, and wrapping it would create a new function identity each render — potentially triggering the `onReady` effect if the dependency array were to include it.
-
-Prefix the unused `chat` variable with `_` if your ESLint config flags it (`const [_chat, setChat] = useState...`) — it becomes used in Chunk 3.
-
-- [x] **Step 5: Run test — expect pass**
-
-Run: `npx vitest run src/cli/components/PipelineDisplay.test.tsx`
-Expected: PASS.
-
-- [x] **Step 6: Run full test suite — expect no regressions**
-
-Run: `npx vitest run`
-Expected: same pass count as before this chunk.
+Re-run Step 5 and confirm `PASS`.
 
 - [x] **Step 7: Commit**
 
 ```bash
-git add src/cli/components/PipelineDisplay.tsx src/cli/components/PipelineDisplay.test.tsx
-git commit -m "feat(PipelineDisplay): add chat state slot + setChat callback (no runtime effect yet)"
+git add docs/harness/tmux-drive.md
+git commit -m "docs(harness): wait_stable (pattern 3) + sourceable block skeleton"
 ```
 
 ---
 
-## Chunk 2: ChatUI `tracePath` + handler rewrite + test migration
+## Chunk 2: Core Lifecycle — Patterns 1, 2, 5, 6
 
-**Outcome:** `agent-handler.ts` no longer imports Ink. Interactive branch calls `meta.onInteractiveRequest` and trusts the caller to drive the UI. Tests pass with migrated stubs. `chat-end-to-end.dot` still breaks at runtime because Chunk 3 hasn't wired `pipeline.ts` yet — that's expected.
+**Why this chunk next:** Patterns 1, 2, 5, 6 are the happy path: start a run, capture output, send input, clean up. Together they cover Smoke Test 1 in the spec ("round-trip a trivial command"). Pattern 4 (source grep) and the opt-in features (visual capture, recovery) go into Chunk 3 because they are not needed for the core happy path.
 
-**Files:**
-- Modify: `src/cli/components/ChatUI.tsx` (add optional `tracePath` prop + header)
-- Modify: `src/attractor/handlers/agent-handler.ts` (rewrite interactive branch)
-- Modify: `src/attractor/tests/agent-handler-interactive.test.ts` (migrate 4 tests)
-
-### Task 2.1: Add optional `tracePath` prop + header to ChatUI
+### Task 2.1: Pattern 1 — Start a run
 
 **Files:**
-- Modify: `src/cli/components/ChatUI.tsx`
+- Modify: `docs/harness/tmux-drive.md` (fill in "Pattern 1" section and add `start_run` to the sourceable block)
 
-- [x] **Step 1: Write the failing test**
-
-Append to `src/cli/tests/ChatUI.test.tsx`:
-
-```tsx
-it("renders the trace path header when tracePath is provided", () => {
-  const session = new Session("test-id");
-  const ctrl = createFakeChildHandle();
-  const { lastFrame, unmount } = render(
-    <ChatUI
-      session={session}
-      child={ctrl.handle}
-      onExit={() => {}}
-      tracePath="/tmp/trace/chat-node"
-    />,
-  );
-  expect(lastFrame()).toContain("/tmp/trace/chat-node");
-  unmount();
-});
-```
-
-- [x] **Step 2: Run test — expect failure**
-
-Run: `npx vitest run src/cli/tests/ChatUI.test.tsx`
-Expected: FAIL — either TypeScript complains about an unknown `tracePath` prop, or the frame does not contain the path.
-
-- [x] **Step 3: Add optional prop + header**
-
-In `src/cli/components/ChatUI.tsx`, extend the `Props` interface:
-
-```ts
-interface Props {
-  session: Session;
-  child: ChildHandle;
-  onExit: (reason: ExitReason) => void;
-  tracePath?: string;   // NEW
-}
-```
-
-Destructure `tracePath` from props. At the **top** of the returned `<Box flexDirection="column">`, add:
-
-```tsx
-{tracePath && (
-  <Box borderStyle="single" borderColor="gray" paddingX={1} marginBottom={1}>
-    <Text dimColor>trace: </Text>
-    <Text>{tracePath}</Text>
-  </Box>
-)}
-```
-
-The header must render **before** the `<Static>` element so it appears above the conversation history.
-
-- [x] **Step 4: Run test — expect pass**
-
-Run: `npx vitest run src/cli/tests/ChatUI.test.tsx`
-Expected: PASS. All 5 existing `<ChatUI ...>` tests must still pass — the new prop is optional.
-
-- [x] **Step 5: Commit**
+- [x] **Step 1: Write the failing smoke test**
 
 ```bash
-git add src/cli/components/ChatUI.tsx src/cli/tests/ChatUI.test.tsx
-git commit -m "feat(ChatUI): add optional tracePath prop + trace header"
+# Self-contained smoke test for start_run.
+unset SESSION WIN RUN_DIR RUN_ID CAPTURE_INDEX
+if declare -F start_run >/dev/null; then
+  start_run "echo hello && sleep 10"
+  test -f "$RUN_DIR/meta.json" && echo "PASS: meta.json written" || echo "FAIL: meta.json missing"
+  tmux list-windows -t "$SESSION" -F '#W' | grep -q "^$WIN$" && echo "PASS: window exists" || echo "FAIL: window missing"
+  tmux kill-window -t "$SESSION:$WIN" 2>/dev/null
+  rm -rf "$RUN_DIR"
+else
+  echo "FAIL: start_run not defined"
+fi
 ```
 
-### Task 2.2: Migrate `agent-handler-interactive.test.ts` to use `onInteractiveRequest` stub
+Expected BEFORE implementation: `FAIL: start_run not defined`.
 
-This task migrates tests **before** rewriting the handler so we can watch them fail, then go green when the handler rewrite lands. This is inverted TDD: the test migration itself is the "new test," the handler rewrite is the "implementation."
+- [x] **Step 2: Run the smoke test and confirm failure**
 
-**Files:**
-- Modify: `src/attractor/tests/agent-handler-interactive.test.ts`
+Expected: `FAIL: start_run not defined`.
 
-- [x] **Step 1: Add a shared stub factory near the top of the test file**
+- [x] **Step 3: Add `start_run` to the sourceable block in `tmux-drive.md`**
 
-After the existing imports and helpers (`baseMeta`, etc.), add:
+Inside the bash block in "Setup", BEFORE `# ---------- end helpers ----------`:
 
-```ts
-import type { OnInteractiveRequest } from "../handlers/agent-handler.js";
-import type { ExitReason } from "../../cli/lib/session.js";
+```bash
+# ---------- Pattern 1: start_run ----------
+# Usage: start_run "<command to run in the new window>"
+# Side effects: sets SESSION, WIN, RUN_DIR, RUN_ID, CAPTURE_INDEX; creates the
+# scratchpad directory; creates a new tmux window in the current session; writes
+# meta.json; launches the command.
+start_run() {
+  local cmd=$1
+  if [ -z "$cmd" ]; then
+    echo "start_run: command is required" >&2
+    return 2
+  fi
 
-const makeInteractiveStub = (reason: ExitReason): OnInteractiveRequest =>
-  async ({ session, child }) => {
-    // Drain events in the background, as ChatUI would
-    void (async () => {
-      try {
-        for await (const _ev of child.events) {
-          /* consume */
-        }
-      } catch {
-        /* stream may close abruptly in fakes */
-      }
-    })();
-    session.exitReason = reason;
-    await child.end();
-  };
-```
+  RUN_ID="drive-$(date +%s)-$$"
+  SESSION=$(tmux display-message -p '#S')
+  WIN="ralph-$RUN_ID"
+  RUN_DIR="$HOME/.ralph/harness/$RUN_ID"
+  CAPTURE_INDEX=0
+  mkdir -p "$RUN_DIR"
 
-- [x] **Step 2: Update `baseMeta` to accept an optional interactive stub**
+  # -d = don't steal focus
+  tmux new-window -t "$SESSION" -n "$WIN" -d
 
-Extend the helper:
+  # Wait for the fresh shell to finish printing its prompt.
+  wait_stable 5000 || true
 
-```ts
-const baseMeta = (
-  cwd: string,
-  logsRoot: string,
-  onInteractiveRequest?: OnInteractiveRequest,
-) => ({
-  cwd,
-  logsRoot,
-  completedNodes: [] as string[],
-  nodeRetries: {},
-  outgoingLabels: [] as string[],
-  onInteractiveRequest,
-});
-```
+  local pane_size win_index
+  pane_size=$(tmux display-message -t "$SESSION:$WIN" -p '#{pane_width}x#{pane_height}')
+  win_index=$(tmux display-message -t "$SESSION:$WIN" -p '#I')
 
-- [x] **Step 3: Migrate each of the 4 tests that use `render: stubRender`**
+  # Escape embedded double quotes in $cmd so meta.json stays valid JSON.
+  local cmd_json
+  cmd_json=$(printf '%s' "$cmd" | sed 's/"/\\"/g')
 
-Only the tests that currently have a local `const stubRender: InkRenderFn = ...;` declaration and pass `render: stubRender` to `new AgentHandler({ ... })` need migration. The other 2 tests in the file return early from the handler (before the Ink render path) and do not need changes — leave them alone.
+  cat > "$RUN_DIR/meta.json" <<EOF
+{
+  "session": "$SESSION",
+  "window": "$WIN",
+  "window_index": "$win_index",
+  "run_id": "$RUN_ID",
+  "pid": "$$",
+  "pane_size": "$pane_size",
+  "started": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "command": "$cmd_json"
+}
+EOF
 
-For each of the 4 migrating tests:
+  # Launch: text via -l, then Enter as a separate call.
+  tmux send-keys -t "$SESSION:$WIN" -l "$cmd"
+  tmux send-keys -t "$SESSION:$WIN" Enter
 
-1. Delete the local `const stubRender: InkRenderFn = ...;` declaration.
-2. In `new AgentHandler({ ... })`, remove the `render: stubRender` field. The constructor now takes only `resolveAgent` and `createAgent`.
-3. In the call to `handler.execute(node, ctx, baseMeta(tmp, tmp))`, pass a third arg: `baseMeta(tmp, tmp, makeInteractiveStub(REASON))`.
-
-Pick `REASON` per test by reading the test's assertions:
-- If the test asserts `status: "success"` or `success: true` → use `"user_end"`.
-- If the test asserts `status: "fail"` or `success: false` via the abort path → use `"abort"`.
-- If the test doesn't assert on status at all (e.g., only checks that `prompt.md` was written to `nodeDir`) → use `"user_end"` as the default.
-
-If a test's assertions depend on specific `session.history` entries that the shared stub doesn't populate, define an inline stub for that test instead of using the shared factory. Do not over-generalize `makeInteractiveStub`.
-
-- [x] **Step 4: Remove `InkRenderFn` import**
-
-Delete `import type { InkRenderFn } from "../handlers/agent-handler.js";` (or equivalent) if no longer used. The linter will flag it after the migration.
-
-- [x] **Step 5: Run the migrated tests — expect failure**
-
-Run: `npx vitest run src/attractor/tests/agent-handler-interactive.test.ts`
-Expected: FAIL. The handler hasn't been rewritten yet, so it still tries to call `renderFn!(...)` which is now `undefined`. Errors will mention `renderFn` or `render` being undefined.
-
-This failure is the gate. Do not proceed to Task 2.3 until the tests fail at runtime for the right reason.
-
-- [x] **Step 6: Do not commit yet — repo is intentionally broken**
-
-The repo is in a broken state from the end of Step 5 through the end of Task 2.3. Do not run the full test suite in between — you will see cascading failures that are expected. The next commit lands only at the end of Task 2.3. If you must pause work here, stash the changes; do not commit.
-
-### Task 2.3: Rewrite `agent-handler.ts` interactive branch
-
-**Files:**
-- Modify: `src/attractor/handlers/agent-handler.ts`
-
-- [x] **Step 1: Remove Ink-related imports and type**
-
-Delete from `src/attractor/handlers/agent-handler.ts`:
-
-- `import React from "react";`
-- The `InkRenderFn` type alias declaration
-- The `render?: InkRenderFn` field on `AgentHandlerDeps`
-- The `this.render` (or equivalent) member declaration and constructor wiring
-- Any import of `ChatUI` if one exists at the top (the lazy import inside `execute()` will also be deleted in Step 2)
-
-`AgentHandlerDeps` should end up as:
-
-```ts
-export interface AgentHandlerDeps {
-  resolveAgent?: (name: string) => AgentConfig;
-  createAgent?: (config: AgentConfig) => Agent;
+  echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) start window=$WIN" >> "$RUN_DIR/events.log"
 }
 ```
 
-- [x] **Step 2: Rewrite the interactive branch**
+- [x] **Step 4: Fill in the "Pattern 1 — Start a run" prose section**
 
-In `execute()`, locate the `if (interactive) { ... }` block. Replace the `await new Promise<ExitReason>((resolvePromise) => { ... })` block — the one that constructs `React.createElement(ChatUIComponent, ...)` and schedules `instance.unmount()` — with:
+```markdown
+`start_run "<cmd>"` creates a new tmux window in your current session (without stealing focus), waits for the shell to print its prompt, records run metadata, and launches the command.
 
-```ts
-const onInteractiveRequest = meta.onInteractiveRequest;
+After it returns, these globals are set and are used implicitly by every other pattern:
 
-if (!onInteractiveRequest) {
-  try { await child.kill("SIGKILL"); } catch {}
-  return {
-    status: "fail",
-    failureReason:
-      "interactive=true node requires onInteractiveRequest in engine options",
-  };
-}
+- `RUN_ID` — `drive-<unix-seconds>-<pid>`, unique even when two runs start in the same second.
+- `SESSION` — the tmux session you were attached to.
+- `WIN` — the new window's name, `ralph-<run-id>`.
+- `RUN_DIR` — `~/.ralph/harness/<run-id>/`, the scratchpad for this run.
+- `CAPTURE_INDEX` — starts at `0`; Pattern 2 increments it.
 
-await onInteractiveRequest({ session, child, tracePath: nodeDir });
+`meta.json` is written once here. Pattern 6 appends `ended` and `exit_reason` before kill. Embedded `"` characters in the command are escaped with `sed` so the JSON stays valid.
 ```
 
-Also delete, within the interactive branch:
-- `await import("ink")` (or any lazy `import` of ink)
-- `await import("../../cli/components/ChatUI.js")` (or similar)
-- Any reference to `renderFn`, `ChatUIComponent`, `instance.unmount()`
+- [x] **Step 5: Re-source the block and run the smoke test**
 
-**Leave untouched:**
-- The child spawn via `agent.runInteractive(...)`
-- The `Promise.race([child.exited, 5s timeout])` cleanup that follows
-- `buildSessionDigest(session)` and `contextUpdates` flattening
-- Writing `digest.json` to `nodeDir`
-- The final `return { status, contextUpdates }`
+Expected: `PASS: meta.json written` and `PASS: window exists`.
 
-- [x] **Step 3: Run migrated interactive tests — expect pass**
+- [x] **Step 6: Validate the generated `meta.json` is valid JSON**
 
-Run: `npx vitest run src/attractor/tests/agent-handler-interactive.test.ts`
-Expected: all 6 tests PASS.
+Re-run Step 1 (start_run produces a fresh `$RUN_DIR`), then:
 
-- [x] **Step 4: Run full test suite — expect no regressions**
+```bash
+node -e 'const j=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")); console.log("OK", Object.keys(j).length, "keys")' "$RUN_DIR/meta.json" || echo "FAIL: JSON invalid"
+```
 
-Run: `npx vitest run`
-Expected: same pass count as before Chunk 2 started. Note in particular that `agent-handler.test.ts` (non-interactive path) should be unaffected.
+Expected: `OK 8 keys` (session, window, window_index, run_id, pid, pane_size, started, command). If you see `FAIL: JSON invalid`, the command-escaping in `start_run` is broken — fix before proceeding.
 
-- [x] **Step 5: Verify build**
+- [x] **Step 7: Commit**
 
-Run: `npm run build`
-Expected: clean build.
+```bash
+git add docs/harness/tmux-drive.md
+git commit -m "docs(harness): start_run (pattern 1)"
+```
+
+---
+
+### Task 2.2: Pattern 2 — Capture
+
+**Files:**
+- Modify: `docs/harness/tmux-drive.md` (add `capture` to the sourceable block + Pattern 2 prose)
+
+- [x] **Step 1: Write the failing smoke test**
+
+```bash
+# Self-contained: reset all globals and drive the full happy path.
+unset SESSION WIN RUN_DIR RUN_ID CAPTURE_INDEX
+if declare -F capture >/dev/null; then
+  start_run "echo hello && sleep 10"
+  wait_stable 3000 || true
+  capture
+  test -f "$RUN_DIR/current.txt" && echo "PASS: current.txt exists" || echo "FAIL: current.txt missing"
+  test -f "$RUN_DIR/current.ansi" && echo "PASS: current.ansi exists" || echo "FAIL: current.ansi missing"
+  test -f "$RUN_DIR/capture-001.txt" && echo "PASS: capture-001.txt exists" || echo "FAIL: capture-001.txt missing"
+  grep -q "hello" "$RUN_DIR/current.txt" && echo "PASS: captured hello output" || echo "FAIL: hello not captured"
+  # Best-effort cleanup so subsequent smoke tests start clean.
+  tmux kill-window -t "$SESSION:$WIN" 2>/dev/null
+  rm -rf "$RUN_DIR"
+else
+  echo "FAIL: capture not defined"
+fi
+```
+
+Expected BEFORE implementation: `FAIL: capture not defined`.
+
+- [x] **Step 2: Run the smoke test and confirm failure**
+
+- [x] **Step 3: Add `capture` to the sourceable block**
+
+Before `# ---------- end helpers ----------`:
+
+```bash
+# ---------- Pattern 2: capture ----------
+# Writes both ANSI-stripped and ANSI-preserved versions. Atomically swaps the
+# current.txt / current.ansi pointers via rename.
+capture() {
+  CAPTURE_INDEX=$((CAPTURE_INDEX + 1))
+  local n
+  n=$(printf "%03d" "$CAPTURE_INDEX")
+
+  # ANSI-stripped
+  tmux capture-pane -p -t "$SESSION:$WIN" > "$RUN_DIR/capture-$n.txt"
+  cp "$RUN_DIR/capture-$n.txt" "$RUN_DIR/current.txt.tmp"
+  mv "$RUN_DIR/current.txt.tmp" "$RUN_DIR/current.txt"
+
+  # ANSI-preserved
+  tmux capture-pane -e -p -t "$SESSION:$WIN" > "$RUN_DIR/capture-$n.ansi"
+  cp "$RUN_DIR/capture-$n.ansi" "$RUN_DIR/current.ansi.tmp"
+  mv "$RUN_DIR/current.ansi.tmp" "$RUN_DIR/current.ansi"
+
+  echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) capture $n" >> "$RUN_DIR/events.log"
+}
+```
+
+- [x] **Step 4: Fill in the "Pattern 2 — Capture" prose section**
+
+```markdown
+`capture` writes the current pane contents to two archive files and atomically updates the `current.*` pointers. Default analysis uses `current.txt` (ANSI-stripped, clean through the Read tool). `current.ansi` is the escalation path when colors or cursor state matter.
+
+After calling `capture`, read `current.txt` — that is the authoritative snapshot. The numbered archive files (`capture-001.txt`, `capture-002.txt`, ...) support retrospective diffs: `diff capture-005.txt capture-006.txt` shows exactly what changed between two stable states.
+
+Both `current.txt` and `current.ansi` are overwritten atomically via `mv` (POSIX rename is atomic within a filesystem), so a concurrent reader cannot see a half-written file. The two files are swapped independently; a consumer that reads *both* in one operation could briefly see a new `.txt` paired with a stale `.ansi`. This is intentional — analyze them independently, not as a matched pair.
+
+Always call `wait_stable` before `capture` unless you are intentionally catching a mid-render frame.
+```
+
+- [x] **Step 5: Re-source and run the smoke test**
+
+Expected: all four `PASS` lines.
 
 - [x] **Step 6: Commit**
 
-ChatUI changes from Task 2.1 are already committed separately. This commit only covers the handler rewrite and the test migration:
-
 ```bash
-git add src/attractor/handlers/agent-handler.ts src/attractor/tests/agent-handler-interactive.test.ts
-git commit -m "refactor(agent-handler): replace direct Ink render with onInteractiveRequest callback
-
-- Remove React/Ink imports from agent-handler; interactive branch now
-  calls meta.onInteractiveRequest and lets the caller drive the UI.
-- Remove render: InkRenderFn field from AgentHandlerDeps.
-- Migrate the 4 agent-handler-interactive tests that used stubRender
-  to use a stub onInteractiveRequest that mutates session.exitReason
-  directly. The 2 tests that did not use stubRender are unchanged."
+git add docs/harness/tmux-drive.md
+git commit -m "docs(harness): capture (pattern 2)"
 ```
-
-- [x] **Step 7: Positive verification — no Ink imports remain in `src/attractor/`**
-
-Run: `grep -rn "from 'ink'\|from \"ink\"" src/attractor/`
-Expected: zero matches. If any match, fix before proceeding.
 
 ---
 
-## Chunk 3: Wire pipeline.ts, render ChatUI, add integration test, smoke-test
-
-**Prerequisites from earlier chunks:**
-- `PipelineDisplayCallbacks` includes `setChat` (from Chunk 1 Task 1.3).
-- `ChatProps` type is exported from `src/cli/components/PipelineDisplay.tsx` (from Chunk 1 Task 1.3).
-- `EngineOptions` includes optional `onInteractiveRequest` (from Chunk 1 Task 1.2).
-- `agent-handler.ts` interactive branch calls `meta.onInteractiveRequest` and has no Ink imports (from Chunk 2 Task 2.3).
-- `ChatUI` accepts an optional `tracePath` prop and renders a header (from Chunk 2 Task 2.1).
-
-Do not start this chunk until all of the above are landed and committed.
-
-**Outcome:** Interactive nodes in pipelines actually render chat, chat exits cleanly, downstream nodes' output appears on screen. `chat-end-to-end.dot` smoke test passes manually.
+### Task 2.3: Pattern 5 — Send input
 
 **Files:**
-- Modify: `src/cli/components/PipelineDisplay.tsx` (render `<ChatUI>` conditionally)
-- Modify: `src/cli/commands/pipeline.ts` (wire `onInteractiveRequest`)
-- Create: `src/cli/tests/pipeline-interactive.test.tsx`
+- Modify: `docs/harness/tmux-drive.md` (add `send_input` + Pattern 5 prose)
 
-### Task 3.1: Render `<ChatUI>` as a conditional child of `PipelineDisplay`
-
-**Files:**
-- Modify: `src/cli/components/PipelineDisplay.tsx`
-
-- [x] **Step 1: Import ChatUI**
-
-Add near the other component imports in `src/cli/components/PipelineDisplay.tsx`:
-
-```ts
-import { ChatUI } from "./ChatUI.js";
-```
-
-- [x] **Step 2: Render the conditional child**
-
-In the JSX returned from `PipelineDisplay`, insert `<ChatUI>` between the `<Static>` and the existing status box. The tree should read, top to bottom:
-
-```tsx
-return (
-  <>
-    <Static items={lines}>
-      {(line, i) => <Box key={i}>{/* existing line renderer */}</Box>}
-    </Static>
-    {chat && (
-      <ChatUI
-        session={chat.session}
-        child={chat.child}
-        tracePath={chat.tracePath}
-        onExit={chat.onExit}
-      />
-    )}
-    {/* existing status box unchanged */}
-  </>
-);
-```
-
-Rename the `_chat` variable destructured from `useState` back to `chat` now that it's used.
-
-- [x] **Step 3: Run existing PipelineDisplay tests**
-
-Run: `npx vitest run src/cli/components/PipelineDisplay.test.tsx`
-Expected: PASS. The existing tests don't invoke `setChat`, so the `chat` slot stays null and `<ChatUI>` is not rendered.
-
-- [x] **Step 4: Commit**
+- [x] **Step 1: Write the failing smoke test**
 
 ```bash
-git add src/cli/components/PipelineDisplay.tsx
-git commit -m "feat(PipelineDisplay): render ChatUI as conditional child when chat slot is set"
+# Self-contained.
+unset SESSION WIN RUN_DIR RUN_ID CAPTURE_INDEX
+if declare -F send_input >/dev/null; then
+  start_run "cat"
+  wait_stable 3000 || true
+  send_input "hello from test"
+  wait_stable 3000 || true
+  capture
+  grep -q "hello from test" "$RUN_DIR/current.txt" && echo "PASS: input echoed" || echo "FAIL: input not echoed"
+  tmux kill-window -t "$SESSION:$WIN" 2>/dev/null
+  rm -rf "$RUN_DIR"
+else
+  echo "FAIL: send_input not defined"
+fi
 ```
 
-### Task 3.2: Wire `onInteractiveRequest` in `pipeline.ts`
+Expected BEFORE implementation: `FAIL: send_input not defined`.
 
-**Files:**
-- Modify: `src/cli/commands/pipeline.ts`
+- [x] **Step 2: Run and confirm failure**
 
-- [x] **Step 1: Destructure `setChat` from callbacks**
+- [x] **Step 3: Add `send_input` to the sourceable block**
 
-Update the destructuring to include `setChat`:
-
-```ts
-const { push, setStatus, setChat, done } = callbacks;
-```
-
-- [x] **Step 2: Pass `onInteractiveRequest` to `runPipeline`**
-
-In the `runPipeline(graph, { ... })` options object, add:
-
-```ts
-onInteractiveRequest: ({ session, child, tracePath }) =>
-  new Promise<void>((resolve) => {
-    let handled = false;
-    const props: ChatProps = {
-      session,
-      child,
-      tracePath,
-      onExit: () => {
-        if (handled) return;
-        handled = true;
-        setChat(null);
-        resolve();
-      },
-    };
-    setChat(props);
-  }),
-```
-
-Add the `ChatProps` import at the top of `pipeline.ts`:
-
-```ts
-import type { ChatProps } from "../components/PipelineDisplay.js";
-```
-
-The `handled` flag closes over each invocation; sequential interactive nodes each get their own fresh closure. This is intentional.
-
-- [x] **Step 3: Build and verify**
-
-Run: `npm run build`
-Expected: clean build.
-
-- [x] **Step 4: Commit**
+Before `# ---------- end helpers ----------`:
 
 ```bash
-git add src/cli/commands/pipeline.ts
-git commit -m "feat(pipeline): wire onInteractiveRequest to PipelineDisplay chat slot"
+# ---------- Pattern 5: send_input ----------
+# Sends text followed by Enter. Always pair with wait_stable on both sides.
+# Control keys (Escape, C-c, etc.) should be sent directly via tmux send-keys,
+# not through this helper.
+send_input() {
+  local text=$1
+  wait_stable 3000 || true
+  tmux send-keys -t "$SESSION:$WIN" -l "$text"
+  tmux send-keys -t "$SESSION:$WIN" Enter
+  wait_stable 3000 || true
+  echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) send-input \"$text\" Enter" >> "$RUN_DIR/events.log"
+}
+
+# For control keys and non-text sequences, use tmux send-keys directly:
+#   tmux send-keys -t "$SESSION:$WIN" Escape
+#   tmux send-keys -t "$SESSION:$WIN" C-c
 ```
 
-### Task 3.3: Integration test for the overlay regression
+- [x] **Step 4: Fill in the "Pattern 5 — Send input" prose**
 
-**Files:**
-- Create: `src/cli/tests/pipeline-interactive.test.tsx`
+```markdown
+`send_input "<text>"` sends a literal string followed by Enter. It calls `wait_stable` before and after, so the UI has a chance to absorb the input and render the response.
 
-This test is the regression gate for the bug the spec fixes. It must assert that pipeline output pushed **after** chat ends still reaches the rendered frame.
-
-**API note:** The test uses `ink-testing-library`'s `render()`, which is a test double that renders to an in-memory stdout and does **not** conflict with `ink`'s real `render()`. `renderPipelineDisplay()` (the production helper) uses real Ink; this test bypasses it and mounts `<PipelineDisplay>` directly via the test library. That's the intended pattern — same as the existing `PipelineDisplay.test.tsx`.
-
-- [x] **Step 1: Write the failing test**
-
-Create `src/cli/tests/pipeline-interactive.test.tsx`:
-
-```tsx
-import React from "react";
-import { render } from "ink-testing-library";
-import { describe, it, expect } from "vitest";
-import {
-  PipelineDisplay,
-  type PipelineDisplayCallbacks,
-  type ChatProps,
-} from "../components/PipelineDisplay.js";
-import { Session } from "../lib/session.js";
-import { createFakeChildHandle } from "./helpers/fake-child-handle.js";
-
-describe("PipelineDisplay interactive chat overlay", () => {
-  it("shows chat, hides it on exit, and keeps rendering new lines afterwards", async () => {
-    let cbs: PipelineDisplayCallbacks | null = null;
-
-    const { lastFrame, unmount } = render(
-      <PipelineDisplay
-        pipelineName="test-pipeline"
-        pid={1234}
-        onReady={(callbacks) => {
-          cbs = callbacks;
-        }}
-      />,
-    );
-
-    // Wait one microtask for useEffect to fire onReady
-    await Promise.resolve();
-    expect(cbs).not.toBeNull();
-
-    // Push a line before chat starts
-    cbs!.push({ kind: "info", text: "before-chat-line" });
-    expect(lastFrame()).toContain("before-chat-line");
-
-    // Mount chat overlay
-    const session = new Session("test-session");
-    const ctrl = createFakeChildHandle();
-    let exitCalled = false;
-    const chatProps: ChatProps = {
-      session,
-      child: ctrl.handle,
-      tracePath: "/tmp/trace/test-node",
-      onExit: () => {
-        exitCalled = true;
-      },
-    };
-    cbs!.setChat(chatProps);
-
-    // Chat header should appear
-    expect(lastFrame()).toContain("/tmp/trace/test-node");
-    // Prior Static content is still there
-    expect(lastFrame()).toContain("before-chat-line");
-
-    // Close chat
-    cbs!.setChat(null);
-
-    // Regression assertion: new pipeline output after chat ends MUST appear
-    cbs!.push({ kind: "info", text: "after-chat-line" });
-    expect(lastFrame()).toContain("after-chat-line");
-    // Old content persists
-    expect(lastFrame()).toContain("before-chat-line");
-    // Header is gone
-    expect(lastFrame()).not.toContain("/tmp/trace/test-node");
-
-    unmount();
-  });
-});
-```
-
-- [x] **Step 2: Run the test**
-
-Run: `npx vitest run src/cli/tests/pipeline-interactive.test.tsx`
-Expected: PASS. If it fails, the most likely causes are (a) `setChat` isn't stable and triggers a Static remount, or (b) the `chat` slot wasn't added to the render tree in Task 3.1. Debug accordingly before moving on.
-
-- [x] **Step 3: Run full test suite**
-
-Run: `npx vitest run`
-Expected: all tests pass, including the new file.
-
-- [x] **Step 4: Commit**
+For control keys, use `tmux send-keys` directly:
 
 ```bash
-git add src/cli/tests/pipeline-interactive.test.tsx
-git commit -m "test(pipeline): add regression test for overlay exit + subsequent output"
+tmux send-keys -t "$SESSION:$WIN" Escape
+tmux send-keys -t "$SESSION:$WIN" C-c
 ```
 
-### Task 3.4: Manual smoke test via `chat-end-to-end.dot`
+Gotcha: `send_input` is two `tmux send-keys` calls (text, then Enter). If you are interrupted between them, the pane holds text with no newline. Mitigation: keep `send_input` calls in a single shell command group so the interrupt window is tiny, and let the trailing `wait_stable` surface any stuck state.
+```
 
-This task is manual and does not have an automated assertion step. Follow it carefully.
+- [x] **Step 5: Re-source and run the smoke test**
 
-- [x] **Step 1: Rebuild and re-link (if necessary)**
+Expected: `PASS: input echoed`.
 
-Run: `npm run build`
-Expected: clean build. If `ralph` is globally linked, no re-link needed.
+- [x] **Step 6: Commit**
 
-- [x] **Step 2: Clean any prior checkpoint for the pipeline**
-
-Run: `rm -rf ~/.ralph/runs/chat_end_to_end/`
-Expected: directory removed (or did not exist).
-
-- [x] **Step 3: Run the smoke pipeline interactively**
-
-Run: `ralph pipeline run pipelines/smoke/chat-end-to-end.dot`
-
-Expected flow:
-1. Pipeline prints the `[start]` node.
-2. Chat UI mounts. The header shows a trace path under `~/.ralph/runs/chat_end_to_end/chat/`.
-3. Claude asks one question. You type an answer and hit enter.
-4. Claude acknowledges. You type `/end`.
-5. Chat UI unmounts.
-6. **Crucially:** the `summarize` node's output appears on screen, followed by `[done]`.
-7. Shell prompt returns.
-
-- [x] **Step 4: If any downstream node's output is missing**
-
-Debug before proceeding. Check:
-- `~/.ralph/runs/chat_end_to_end/` checkpoints — did the engine actually run those nodes? If yes, the render is broken.
-- Are there two `render()` calls somewhere? Grep: `grep -rn "from 'ink'" src/attractor/ src/cli/commands/` should show zero Ink imports in `src/attractor/`.
-- Did `setChat(null)` get called? Add a temporary `console.error` in pipeline.ts's `onExit` to confirm.
-
-Do NOT move on until the smoke flow is visually clean.
-
-- [x] **Step 5: Verify the `abort` path**
-
-Run: `rm -rf ~/.ralph/runs/chat_end_to_end/ && ralph pipeline run pipelines/smoke/chat-end-to-end.dot`
-
-When Claude asks the question, press **Ctrl+C** instead of typing. Expected: ChatUI unmounts, the `recovery` node runs and its one-line abort note appears, then `[done]`, then shell prompt.
-
-- [x] **Step 6: No commit — nothing changed on disk**
-
-This task is purely verification. If you had to fix code to make the smoke test pass, those fixes get their own commits earlier in the plan, not stapled here.
-
-### Task 3.5: Final full-suite verification
-
-- [x] **Step 1: Run the entire test suite**
-
-Run: `npx vitest run`
-Expected: all tests pass, including `pipeline-interactive.test.tsx` and the migrated `agent-handler-interactive.test.ts`.
-
-- [x] **Step 2: Run the build**
-
-Run: `npm run build`
-Expected: clean build.
-
-- [x] **Step 3: Check git status**
-
-Run: `git status`
-
-Expected: working tree clean modulo the files that were already dirty at plan start. Specifically:
-- `pipelines/smoke/chat-end-to-end.dot` — pre-existing.
-- `pipelines/smoke/chat-only.dot` — pre-existing.
-- `src/cli/tests/helpers/fake-child-handle.ts` — pre-existing (the plan's new test imports from it but does not modify it; if it does show as modified by you during execution, investigate before proceeding).
-- `src/cli/lib/agent.ts` — pre-existing (`git diff` is empty). Do not touch.
-- `src/cli/agents/chat.md` — pre-existing untracked file.
-- `src/cli/components/ChatUI.tsx` — this was dirty at plan start. If you stashed it during the pre-flight, that stash is separate work; decide separately whether to restore it. The plan's changes to `ChatUI.tsx` (adding optional `tracePath`) are already committed at this point via Task 2.1, so the file should not show as modified unless the stashed work reintroduced differences.
-
-None of the files this plan committed (`src/attractor/handlers/agent-handler.ts`, `src/attractor/core/engine.ts`, `src/cli/components/PipelineDisplay.tsx`, `src/cli/components/PipelineDisplay.test.tsx`, `src/cli/components/ChatUI.tsx`, `src/cli/tests/ChatUI.test.tsx`, `src/attractor/tests/agent-handler-interactive.test.ts`, `src/cli/commands/pipeline.ts`, `src/cli/tests/pipeline-interactive.test.tsx`) should show as modified.
-
-- [x] **Step 4: No further commits**
-
-All work is landed. Plan complete.
+```bash
+git add docs/harness/tmux-drive.md
+git commit -m "docs(harness): send_input (pattern 5)"
+```
 
 ---
 
-## Risks already mitigated in the plan
+### Task 2.4: Pattern 6 — Cleanup
 
-| Risk | Mitigation in plan |
-|---|---|
-| TDD inversion for test migration (Task 2.2) leaves repo broken mid-chunk | Tasks 2.2 and 2.3 share a single commit at the end of 2.3. The only person exposed to the broken state is the executor. |
-| `setChat` stability causes spurious re-renders | Task 1.3 passes the `useState` setter directly without a closure wrapper; React guarantees stability. |
-| Handler meta type mismatch (hidden type hole via `as` cast) | Task 1.2 adds `onInteractiveRequest` to the typed meta interface, not as an untyped `Record` lookup. |
-| `tracePath` migration flood in `ChatUI.test.tsx` | Task 2.1 makes the prop optional. Zero migrations. Verified: 5 existing `<ChatUI ...>` usages, all safe. |
-| Lazy-importing Ink again in a future refactor | Spec Risks table forbids handlers from calling `render()` directly. Chunk 2 Step 1 (Task 2.3) removes the last Ink import from `src/attractor/`. A lint rule to enforce "no `from \"ink\"`" in `src/attractor/` is left as a follow-up, not in scope. |
+**Files:**
+- Modify: `docs/harness/tmux-drive.md` (add `cleanup_run` + Pattern 6 prose)
 
-## Known Concern: Nested Static Elements
+- [x] **Step 1: Write the failing smoke test**
 
-The integration test (Task 3.3) mocks ChatUI because the real ChatUI uses `<Static items={history}>` internally. When a child `<Static>` mounts/unmounts inside PipelineDisplay's parent `<Static>`, Ink's item tracking can break — new items pushed to the parent Static after the child unmounts may be silently dropped. The mock avoids this in tests. In production, this may manifest if many lines are pushed during/after chat. A follow-up to replace `<Static>` in ChatUI with a non-Static scrollback when rendered inside PipelineDisplay should be considered.
+```bash
+# Self-contained.
+unset SESSION WIN RUN_DIR RUN_ID CAPTURE_INDEX
+if declare -F cleanup_run >/dev/null; then
+  start_run "sleep 30"
+  SAVED_SESSION=$SESSION
+  SAVED_DIR=$RUN_DIR
+  SAVED_WIN=$WIN
+  cleanup_run clean
+  # Window should be dead
+  tmux list-windows -t "$SAVED_SESSION" -F '#W' | grep -q "^$SAVED_WIN$" && echo "FAIL: window still exists" || echo "PASS: window killed"
+  # meta.json should have ended + exit_reason
+  grep -q '"ended"' "$SAVED_DIR/meta.json" && echo "PASS: ended present" || echo "FAIL: ended missing"
+  grep -q '"exit_reason"' "$SAVED_DIR/meta.json" && echo "PASS: exit_reason present" || echo "FAIL: exit_reason missing"
+  # meta.json must still parse — echo FAIL on parse error (node exits non-zero, shell moves on)
+  node -e 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")); console.log("PASS: JSON valid")' "$SAVED_DIR/meta.json" || echo "FAIL: JSON invalid"
+  rm -rf "$SAVED_DIR"
+else
+  echo "FAIL: cleanup_run not defined"
+fi
+```
 
-## Out-of-scope follow-ups (do not attempt in this plan)
+Expected BEFORE implementation: `FAIL: cleanup_run not defined`.
 
-- Bug A: `Agent.run()` drops the assembled prompt in interactive mode. Tracked at `memory/2026-04-13-interactive-pipeline-context-bug.md`. The smoke test's chat node will run with whatever context it currently has — unchanged by this plan.
-- TTY auto-detection / non-TTY fallback for interactive nodes in CI.
-- Lint rule forbidding `import ... from "ink"` in `src/attractor/`.
-- Dropping the status box during chat (currently retained — consistent with the spec).
+- [x] **Step 2: Run and confirm failure**
+
+- [x] **Step 3: Add `cleanup_run` to the sourceable block**
+
+Before `# ---------- end helpers ----------`:
+
+```bash
+# ---------- Pattern 6: cleanup_run ----------
+# Updates meta.json FIRST (so the audit trail survives even if kill-window fails),
+# then kills the window. Pure-bash rewrite — no sed, no jq, no portability traps.
+cleanup_run() {
+  local exit_reason=${1:-clean}
+  local ended
+  ended=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+  # Rewrite meta.json line-by-line, inserting "ended" + "exit_reason" before the
+  # closing brace. Pattern 1's heredoc always writes "}" on its own line, so a
+  # literal string compare is enough.
+  local tmp="$RUN_DIR/meta.json.tmp"
+  : > "$tmp"
+  while IFS= read -r line; do
+    if [ "$line" = "}" ]; then
+      printf '  ,"ended": "%s",\n  "exit_reason": "%s"\n}\n' "$ended" "$exit_reason" >> "$tmp"
+    else
+      printf '%s\n' "$line" >> "$tmp"
+    fi
+  done < "$RUN_DIR/meta.json"
+  mv "$tmp" "$RUN_DIR/meta.json"
+
+  echo "$ended cleanup exit_reason=$exit_reason" >> "$RUN_DIR/events.log"
+  tmux kill-window -t "$SESSION:$WIN" 2>/dev/null || true
+}
+```
+
+Rationale: BSD `sed -i.bak` does not reliably honor `\n` in the replacement side of a substitution (it varies by macOS version), and GNU-vs-BSD divergence here would silently produce malformed JSON. The pure-bash rewrite works identically on every POSIX system and uses no tools beyond `printf`, `while read`, and `mv`.
+
+- [x] **Step 4: Fill in the "Pattern 6 — Cleanup" prose**
+
+```markdown
+`cleanup_run [exit_reason]` finalizes a run. It updates `meta.json` with `ended` + `exit_reason`, logs the cleanup event, then kills the tmux window.
+
+The `meta.json` update happens *before* `kill-window` so the audit trail survives even if the kill fails. `exit_reason` defaults to `clean`; pass `aborted` or `orphaned` when appropriate.
+
+After cleanup, the scratchpad at `$RUN_DIR` stays on disk for post-mortem analysis. Prune manually — see "Pruning the scratchpad" below.
+```
+
+- [x] **Step 5: Re-source and run the smoke test**
+
+Expected: `PASS: window killed`, `PASS: ended present`, `PASS: exit_reason present`, `PASS: JSON valid`.
+
+- [x] **Step 6: Commit**
+
+```bash
+git add docs/harness/tmux-drive.md
+git commit -m "docs(harness): cleanup_run (pattern 6)"
+```
+
+---
+
+## Chunk 3: Advanced Patterns — Pattern 4, Visual Capture, Recovery
+
+**Why this chunk:** Pattern 4 (source grep) is opt-in for precision waits. Visual Capture and `recover_orphans` are also opt-in features that are not needed for the core happy path. They have enough complexity to warrant a distinct review cycle.
+
+### Task 3.1: Pattern 4 — Wait for a precise state via source grep
+
+**Files:**
+- Modify: `docs/harness/tmux-drive.md` (add `wait_for_string` + Pattern 4 prose + usage notes)
+
+- [x] **Step 1: Pick a verifiable literal that ralph --help actually renders**
+
+Before writing the smoke test, run `ralph --help` directly in your shell and eyeball a short, stable, unambiguous literal from the output (e.g., a command name like `implement`, or a flag description like `Run the implement loop`). Capture it in a variable:
+
+```bash
+# Choose a stable literal you just confirmed by eye.
+KNOWN="implement"   # <-- replace with whatever you verified is in `ralph --help` output
+ralph --help 2>&1 | grep -qF -- "$KNOWN" && echo "OK: '$KNOWN' is rendered" || { echo "STOP: picked a literal that ralph --help does not render"; }
+```
+
+If `STOP` is printed, pick a different literal and re-run until `OK` — do NOT proceed to Step 2 with an unverified needle.
+
+- [x] **Step 2: Write the failing smoke test**
+
+```bash
+# Self-contained. KNOWN was verified in Step 1.
+unset SESSION WIN RUN_DIR RUN_ID CAPTURE_INDEX
+if declare -F wait_for_string >/dev/null; then
+  start_run "ralph --help"
+  wait_for_string "$KNOWN" 5000 && echo "PASS: found '$KNOWN'" || echo "FAIL: timed out"
+  cleanup_run
+  rm -rf "$RUN_DIR"
+else
+  echo "FAIL: wait_for_string not defined"
+fi
+```
+
+Expected BEFORE implementation: `FAIL: wait_for_string not defined`.
+
+- [x] **Step 3: Run the Step 2 snippet and confirm failure**
+
+- [x] **Step 4: Add `wait_for_string` to the sourceable block**
+
+Before `# ---------- end helpers ----------`:
+
+```bash
+# ---------- Pattern 4: wait_for_string ----------
+# Polls the pane until a literal substring appears, or the budget expires.
+# Use when wait_stable is not precise enough (e.g., distinguishing
+# "overlay is waiting for input" from "overlay is still opening").
+wait_for_string() {
+  local needle=$1
+  local budget_ms=${2:-10000}
+  if [ -z "$needle" ]; then
+    echo "wait_for_string: needle is required" >&2
+    return 2
+  fi
+  local start_ns deadline_ns t
+  start_ns=$(now_ns)
+  deadline_ns=$((start_ns + budget_ms * 1000000))
+  while : ; do
+    t=$(now_ns)
+    if [ "$t" -ge "$deadline_ns" ]; then
+      local spent=$(( (t - start_ns) / 1000000 ))
+      echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) wait-for-string TIMEOUT needle=\"$needle\" elapsed=${spent}ms" >> "$RUN_DIR/events.log" 2>/dev/null || true
+      return 1
+    fi
+    if tmux capture-pane -p -t "$SESSION:$WIN" | grep -qF -- "$needle"; then
+      local spent=$(( ($(now_ns) - start_ns) / 1000000 ))
+      echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) wait-for-string MATCH needle=\"$needle\" elapsed=${spent}ms" >> "$RUN_DIR/events.log" 2>/dev/null || true
+      return 0
+    fi
+    sleep 0.2
+  done
+}
+```
+
+- [x] **Step 5: Fill in the "Pattern 4" prose**
+
+```markdown
+When `wait_stable` is too coarse — e.g., you need to distinguish "the overlay is waiting for your input" from "the overlay is still opening its box" — extract the literal string the component renders by grepping the source, then wait for it.
+
+Example: find the current ChatUI submit hint by its anchor words and wait for it.
+
+```bash
+HINT=$(rg -o '"[^"]*(Press|submit|↵)[^"]*"' src/cli/lib/ src/cli/commands/ | head -1 | sed 's/^"//;s/"$//')
+wait_for_string "$HINT" 10000
+```
+
+Source directories worth grepping:
+
+- `src/cli/lib/output.ts` — shared Ink components
+- `src/cli/commands/` — command-specific overlays
+- `src/attractor/handlers/` — interactive handler prompts
+
+Known limitations:
+
+- **Only matches double-quoted string literals.** Template literals (backticks) and JSX text nodes split across lines are not found. Fall back to `wait_stable` + visual inspection of `current.txt` in those cases.
+- **False positives possible** when two unrelated strings share an anchor word. Verify the extracted needle by eye (`echo "$HINT"`) before waiting on it.
+- **`src/cli/mcp/` is not in the grep list** — MCP server code does not render user-visible TUI strings.
+```
+
+- [x] **Step 6: Re-source and run the smoke test**
+
+Expected: `PASS: found '<needle>'`.
+
+- [x] **Step 7: Commit**
+
+```bash
+git add docs/harness/tmux-drive.md
+git commit -m "docs(harness): wait_for_string (pattern 4)"
+```
+
+---
+
+### Task 3.2: Visual Capture
+
+**Files:**
+- Modify: `docs/harness/tmux-drive.md` (add `screenshot` + Visual Capture section)
+
+- [x] **Step 1: Write the failing smoke test**
+
+```bash
+# Self-contained. Must be run with the terminal emulator frontmost.
+unset SESSION WIN RUN_DIR RUN_ID CAPTURE_INDEX
+if declare -F screenshot >/dev/null; then
+  start_run "sleep 30"
+  wait_stable 3000 || true
+  capture   # bump CAPTURE_INDEX so screenshot's PNG has a matching index
+  screenshot && {
+    PNG="$RUN_DIR/capture-$(printf %03d "$CAPTURE_INDEX").png"
+    test -s "$PNG" && echo "PASS: PNG exists and non-empty at $PNG" || echo "FAIL: PNG missing or empty"
+  }
+  cleanup_run
+  rm -rf "$RUN_DIR"
+else
+  echo "FAIL: screenshot not defined"
+fi
+```
+
+Expected BEFORE implementation: `FAIL: screenshot not defined`.
+
+- [x] **Step 2: Run and confirm failure**
+
+- [x] **Step 3: Add `screenshot` to the sourceable block**
+
+```bash
+# ---------- Visual capture: screenshot ----------
+# Briefly switches tmux to the harness window, screenshots the entire screen,
+# then switches back. Requires the terminal emulator to be the frontmost app.
+screenshot() {
+  local front
+  front=$(osascript -e 'tell application "System Events" to get name of first application process whose frontmost is true' 2>/dev/null)
+  case "$front" in
+    Terminal|iTerm2|Ghostty|kitty|WezTerm|Alacritty|"Terminal.app") ;;
+    *)
+      echo "screenshot aborted: frontmost app is '$front', not a known terminal" >&2
+      return 1
+      ;;
+  esac
+
+  local n current
+  n=$(printf "%03d" "$CAPTURE_INDEX")
+  current=$(tmux display-message -p '#I')
+
+  tmux select-window -t "$SESSION:$WIN"
+  sleep 0.3   # let the terminal emulator redraw
+  screencapture -x "$RUN_DIR/capture-$n.png"
+  tmux select-window -t "$SESSION:$current"
+
+  echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) screenshot $n" >> "$RUN_DIR/events.log"
+}
+```
+
+- [x] **Step 4: Fill in the "Visual capture (opt-in)" prose**
+
+```markdown
+`screenshot` briefly switches your tmux view to the harness window, captures the whole screen via macOS `screencapture`, then switches back. The PNG lands in `$RUN_DIR/capture-<NNN>.png` with the same index as the most recent `capture` call.
+
+**Opt-in, not default.** Screenshots are disruptive (they flash your view). Call `screenshot` only when text capture is insufficient — e.g., to verify Ink box alignment, color bleed, or cursor placement that strips out of `current.txt`.
+
+**Requires terminal focus.** The helper aborts with a clear message if the frontmost macOS app is not a known terminal emulator. If you are in another app when you call `screenshot`, `screencapture` would grab the wrong window.
+
+**Captures the whole screen.** Cropping to the tmux pane is out of scope — Claude can identify the tmux content visually. Computing pane pixel bounds requires additional AppleScript and is explicitly deferred.
+```
+
+- [x] **Step 5: Re-source and run the smoke test (foreground this terminal first)**
+
+Expected: `PASS: PNG exists and non-empty at ...`. You will see a brief flash as tmux switches windows.
+
+- [x] **Step 6: Commit**
+
+```bash
+git add docs/harness/tmux-drive.md
+git commit -m "docs(harness): screenshot (visual capture)"
+```
+
+---
+
+### Task 3.3: Recovery from orphaned runs
+
+**Files:**
+- Modify: `docs/harness/tmux-drive.md` (add `recover_orphans` + Recovery section)
+
+- [x] **Step 1: Write the failing smoke test**
+
+```bash
+# Create a fake orphan: a run dir with meta.json lacking "ended".
+ORPHAN_ID="drive-$(date +%s)-$$-fake"
+ORPHAN_DIR="$HOME/.ralph/harness/$ORPHAN_ID"
+mkdir -p "$ORPHAN_DIR"
+cat > "$ORPHAN_DIR/meta.json" <<EOF
+{
+  "session": "nosuch",
+  "window": "ralph-$ORPHAN_ID",
+  "run_id": "$ORPHAN_ID",
+  "started": "2026-04-14T00:00:00Z"
+}
+EOF
+
+if declare -F recover_orphans >/dev/null; then
+  OUTPUT=$(recover_orphans)
+  echo "$OUTPUT" | grep -q "$ORPHAN_ID" && echo "PASS: orphan listed" || echo "FAIL: orphan not listed"
+  echo "$OUTPUT" | grep -q "tmux list-windows" && echo "PASS: kill recipe shown"
+  echo "$OUTPUT" | grep -q "find ~/.ralph/harness" && echo "PASS: prune recipe shown"
+else
+  echo "FAIL: recover_orphans not defined"
+fi
+
+# Cleanup the fake orphan
+rm -rf "$ORPHAN_DIR"
+```
+
+Expected BEFORE implementation: `FAIL: recover_orphans not defined`.
+
+- [x] **Step 2: Run and confirm failure**
+
+- [x] **Step 3: Add `recover_orphans` to the sourceable block**
+
+```bash
+# ---------- Recovery: recover_orphans ----------
+# A run is orphaned when meta.json has no "ended" field. Lists orphans and
+# prints the recipes for killing stale windows / pruning stale scratch dirs.
+# Never kills or deletes automatically.
+recover_orphans() {
+  local found=0
+  local dir
+  for dir in "$HOME/.ralph/harness"/drive-*/; do
+    [ -d "$dir" ] || continue
+    if ! grep -q '"ended"' "$dir/meta.json" 2>/dev/null; then
+      found=$((found + 1))
+      local win
+      win=$(grep -o '"window"[[:space:]]*:[[:space:]]*"[^"]*"' "$dir/meta.json" \
+             | head -1 \
+             | sed 's/.*"\([^"]*\)"$/\1/')
+      echo "orphan: $dir window=$win"
+    fi
+  done
+
+  if [ "$found" -eq 0 ]; then
+    echo "no orphans"
+    return 0
+  fi
+
+  echo ""
+  echo "To kill all orphan windows:"
+  echo "  tmux list-windows -a -F '#S:#W' | grep ':ralph-drive-' | xargs -n1 tmux kill-window -t"
+  echo ""
+  echo "To prune orphan scratch dirs:"
+  echo "  find ~/.ralph/harness -maxdepth 1 -type d -name 'drive-*' \\"
+  echo "    -exec sh -c 'grep -q \"\\\"ended\\\"\" \"\$1/meta.json\" 2>/dev/null || rm -rf \"\$1\"' _ {} \\;"
+}
+```
+
+- [x] **Step 4: Fill in the "Recovery from orphaned runs" prose**
+
+```markdown
+A run is **orphaned** when its `meta.json` has no `ended` field (i.e., `cleanup_run` was never reached — a crash, Ctrl-C, or terminal close). At the start of any new session, call `recover_orphans` to list stale runs:
+
+```bash
+recover_orphans
+```
+
+Output looks like:
+
+```
+orphan: /Users/you/.ralph/harness/drive-1712950000-38291/ window=ralph-drive-1712950000-38291
+orphan: /Users/you/.ralph/harness/drive-1712950123-40104/ window=ralph-drive-1712950123-40104
+
+To kill all orphan windows:
+  tmux list-windows -a -F '#S:#W' | grep ':ralph-drive-' | xargs -n1 tmux kill-window -t
+
+To prune orphan scratch dirs:
+  find ~/.ralph/harness -maxdepth 1 -type d -name 'drive-*' \
+    -exec sh -c 'grep -q "\"ended\"" "$1/meta.json" 2>/dev/null || rm -rf "$1"' _ {} \;
+```
+
+`recover_orphans` prints recipes but never runs them. Review the orphan list, then run the kill/prune commands manually.
+
+Note on the prune one-liner: the inline `sh -c` wrapper is *required*. A naive `find -exec grep -L \; -exec rm +` chain would delete every run (including finished ones), because `-exec` returns the command's exit status and `grep -L` always succeeds when the target file exists.
+```
+
+- [x] **Step 5: Re-source and run the smoke test**
+
+Expected: `PASS: orphan listed`, `PASS: kill recipe shown`, `PASS: prune recipe shown`.
+
+- [x] **Step 6: Commit**
+
+```bash
+git add docs/harness/tmux-drive.md
+git commit -m "docs(harness): recover_orphans"
+```
+
+---
+
+## Chunk 4: Gotchas, Pruning, Discoverability, Full Smoke Tests
+
+**Why this chunk last:** The patterns document is functionally complete after Chunk 3. This chunk adds the human-facing documentation (Gotchas, Pruning, When to use this), wires up discoverability pointers (`MEMORY.md`, `CLAUDE.md`), then runs each of the four smoke tests from the spec as its own task (4.3–4.6) so defects surface one at a time. Task 4.7 finalizes the spec status.
+
+### Task 4.1: Fill in "When to use this", "Prerequisites", "Pruning the scratchpad", and "Gotchas"
+
+**Files:**
+- Modify: `docs/harness/tmux-drive.md`
+
+- [x] **Step 1: Fill in "When to use this"**
+
+```markdown
+Use this harness when debugging ralph's Ink TUI — pipeline display, ChatUI overlay, meditate session, implement loop output, run-scenarios progress — and you need to *observe* what the UI actually does (not what the code says it should do).
+
+Not for:
+
+- **Automated regression tests.** See `src/cli/tests/scenarios/` and the existing `run-scenarios` command.
+- **User-facing demos.** This is a dev-time debugging tool.
+- **Driving commands that do not spawn a TUI.** For non-TUI commands, just run them in your current shell.
+```
+
+- [x] **Step 2: Fill in "Prerequisites"**
+
+```markdown
+- **tmux** (any 3.x version).
+- **macOS** (the `screenshot` helper is mac-specific; text patterns are portable but not validated elsewhere).
+- **ripgrep** (`rg`) for Pattern 4 source grep.
+- **Node** (already a ralph dependency) for validating `meta.json` in smoke tests.
+
+No jq, no Python, no npm packages.
+```
+
+- [x] **Step 3: Fill in "Pruning the scratchpad"**
+
+```markdown
+Runs accumulate under `~/.ralph/harness/`. The harness never auto-deletes them. Prune manually:
+
+```bash
+# Delete runs older than 7 days
+find ~/.ralph/harness -maxdepth 1 -type d -mtime +7 -exec rm -rf {} +
+
+# Or delete everything that is definitely orphaned (no "ended" field)
+find ~/.ralph/harness -maxdepth 1 -type d -name 'drive-*' \
+  -exec sh -c 'grep -q "\"ended\"" "$1/meta.json" 2>/dev/null || rm -rf "$1"' _ {} \;
+```
+
+7 days is a suggestion, not a policy. Claude runs these when the developer asks.
+```
+
+- [x] **Step 4: Fill in "Gotchas"**
+
+```markdown
+1. **Screenshots require terminal focus.** `screencapture` captures whatever is currently on screen. `screenshot` aborts if the frontmost app is not a known terminal, but even then the capture reflects the current view, not "the harness window in isolation."
+2. **Pane size drifts after start.** `meta.json.pane_size` is the size at window creation. Re-read live via `tmux display-message -t "$SESSION:$WIN" -p '#{pane_width}x#{pane_height}'` when geometry matters.
+3. **`current.txt` is racy with in-flight renders.** Atomic rename on write protects against torn reads of a single file but does nothing for rendering races inside ralph. Always `wait_stable` before treating `current.txt` as authoritative. `current.txt` and `current.ansi` are swapped independently — do not read them as a matched pair.
+4. **`send-keys` is instantaneous.** Ink may not have a reader ready at that moment. Always `wait_stable` before and after `send_input`, and also after `new-window -d` in Pattern 1 before sending the launch command.
+5. **Long payloads need `-l`.** Spaces, quotes, and `$` are parsed by tmux unless `send-keys -l` is used. Control keys must be sent as separate `send-keys` arguments.
+6. **No auto-cleanup of scratchpad.** See "Pruning the scratchpad".
+7. **Abort leaves orphaned windows.** Run `recover_orphans` at session start to list them.
+8. **macOS-only for screenshots.** Text patterns are portable; the screenshot helper is not.
+9. **Two-call input race.** `send_input` is two tmux calls (text, then Enter). An interrupt between them leaves the pane with text but no newline. Mitigation: keep `send_input` within a single shell command group and let the trailing `wait_stable` surface stuck state.
+10. **BSD `date` does not support `%N`.** `now_ns` in the sourceable block uses whichever of `date`/`gdate`/`perl` the Task 1.1 probe selected. If you move to a machine without that binary, re-run the probe.
+11. **`cleanup_run`'s rewrite depends on the closing-brace format.** The heredoc in Pattern 1 always writes `}` on its own line, and `cleanup_run` does a literal `[ "$line" = "}" ]` compare. If that format ever changes, `cleanup_run` silently does nothing. The smoke tests exercise this end-to-end.
+```
+
+- [x] **Step 5: Verify the doc renders cleanly**
+
+Run: `grep -c "^## " docs/harness/tmux-drive.md`
+Expected: `13` (same count as the skeleton — no new top-level sections added).
+
+Run: `wc -l docs/harness/tmux-drive.md`
+Expected: Reasonable (~500-800 lines).
+
+- [x] **Step 6: Commit**
+
+```bash
+git add docs/harness/tmux-drive.md
+git commit -m "docs(harness): prose sections (when to use, prereqs, pruning, gotchas)"
+```
+
+---
+
+### Task 4.2: Wire discoverability into `MEMORY.md` and `CLAUDE.md`
+
+**Files:**
+- Modify: `MEMORY.md` (add "Harness" subsection)
+- Modify: `CLAUDE.md` (add "Debugging the Ink TUI" subsection)
+
+- [x] **Step 1: Add the `MEMORY.md` pointer**
+
+Insert this block as a new `## Harness` section immediately after the existing `## Known Issues` section (per the Files modified table at the top of this plan):
+
+```markdown
+## Harness
+
+**Tmux debugging harness:** When you need to observe ralph's Ink TUI, read `docs/harness/tmux-drive.md` at session start. Source the bash block it contains, then use `start_run`, `capture`, `wait_stable`, `send_input`, `cleanup_run`. Scratchpad lives at `~/.ralph/harness/<run-id>/`.
+```
+
+- [x] **Step 2: Add the `CLAUDE.md` pointer**
+
+Append as a new top-level section:
+
+```markdown
+## Debugging the Ink TUI
+
+When you need to observe or interact with ralph's Ink TUI (pipeline display, ChatUI overlay, meditate session, etc.), read `docs/harness/tmux-drive.md` first. It contains the complete, authoritative set of bash patterns for driving ralph inside tmux. Do not invent your own tmux incantations — the document already accounts for edge cases (nanosecond timing, atomic JSON updates, orphan recovery, terminal focus).
+```
+
+- [x] **Step 3: Verify the discoverability path (Success Criterion 1)**
+
+Simulate a fresh Claude session: the CLAUDE.md pointer must literally contain the path `docs/harness/tmux-drive.md`, not merely the word "harness".
+
+```bash
+grep -qF "docs/harness/tmux-drive.md" CLAUDE.md && echo "PASS: CLAUDE.md points at the doc" || echo "FAIL: CLAUDE.md missing path"
+grep -qF "docs/harness/tmux-drive.md" MEMORY.md && echo "PASS: MEMORY.md points at the doc" || echo "FAIL: MEMORY.md missing path"
+```
+
+Expected: both PASS lines. A fresh session reads `CLAUDE.md` (already loaded by default) or `MEMORY.md` (already loaded by default), sees the exact path, and the single follow-up `Read docs/harness/tmux-drive.md` finishes the bootstrap. That is the "exactly two effective operations" success criterion.
+
+- [x] **Step 4: Commit**
+
+```bash
+git add MEMORY.md CLAUDE.md
+git commit -m "docs: discoverability pointers for tmux drive harness"
+```
+
+---
+
+### Task 4.3: Smoke test 1 — round-trip a trivial command
+
+**Files:** None modified (diagnostic only; if the test fails, you fix `docs/harness/tmux-drive.md`).
+
+- [x] **Step 1: Pick a verified literal from `ralph --help`**
+
+Same verify-or-STOP pattern as Task 3.1 Step 1. Do not ship an unverified needle:
+
+```bash
+KNOWN="Usage:"   # <-- replace with whatever you verified is in `ralph --help` output
+ralph --help 2>&1 | grep -qF -- "$KNOWN" && echo "OK: '$KNOWN' is rendered" || { echo "STOP: picked a literal that ralph --help does not render"; }
+```
+
+If `STOP` is printed, pick another literal and re-run until `OK`. Commander.js emits `Usage:` with a colon on the first line by default, so that is usually a safe starting point — but verify it on THIS binary before running the smoke test.
+
+- [x] **Step 2: Run the smoke test in a fresh shell with the patterns block sourced**
+
+```bash
+unset SESSION WIN RUN_DIR RUN_ID CAPTURE_INDEX
+# Paste the bash block from docs/harness/tmux-drive.md into this shell first.
+# $KNOWN was verified in Step 1.
+start_run "ralph --help"
+wait_stable 5000
+capture
+grep -qF -- "$KNOWN" "$RUN_DIR/current.txt" && echo "PASS: literal captured" || echo "FAIL: literal missing"
+SAVED_DIR=$RUN_DIR
+cleanup_run
+node -e 'const j=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")); console.log(j.ended ? "PASS: ended set" : "FAIL: ended not set")' "$SAVED_DIR/meta.json" || echo "FAIL: JSON invalid"
+rm -rf "$SAVED_DIR"
+```
+
+Expected: `PASS: literal captured` and `PASS: ended set`. If either fails, fix the doc (not the shell) and re-run — the spec says workarounds in the test are forbidden.
+
+---
+
+### Task 4.4: Smoke test 2 — interactive pipeline (wait.human overlay)
+
+**Files:** None modified (diagnostic only).
+
+**Prerequisite verification:** This smoke test requires two things the plan did not yet confirm:
+
+1. A real pipeline file in the repo that contains a `wait.human` node (not a synthetic one we invented).
+2. The literal anchor string the wait.human overlay actually renders, extracted from source (Pattern 4 territory).
+
+- [x] **Step 1: Locate a real wait.human pipeline or STOP**
+
+```bash
+# Find pipeline files that reference wait.human.
+PIPELINE=$(grep -rl "wait.human\|wait_human" pipelines/ 2>/dev/null | head -1)
+echo "PIPELINE=$PIPELINE"
+```
+
+If the output is empty, STOP: the smoke test as written assumes a wait.human pipeline exists. Surface this to the human and either (a) have them point you at an existing pipeline with a human-interactive node, or (b) skip Smoke Test 2 and mark it N/A in the final verification. Do NOT invent a synthetic `.dot` file — the DOT schema used by ralph's pipeline engine is not validated by this plan and a synthetic file may be rejected by the parser.
+
+- [x] **Step 2: Extract the real overlay anchor string via source grep**
+
+Before sending input, figure out what the wait.human overlay actually renders. Grep the source for the component's text:
+
+```bash
+# Candidate locations — the spec calls out these directories for Pattern 4.
+rg -n '"[^"]*(Press|approve|reject|decision|Enter)[^"]*"' \
+   src/attractor/handlers/ src/cli/lib/ src/cli/commands/ 2>/dev/null | head -20
+```
+
+Read the output by eye. Pick a literal that is clearly rendered by the wait.human overlay (not by some unrelated component). Put it in a variable you will use below:
+
+```bash
+OVERLAY_ANCHOR="<paste the literal you confirmed>"
+```
+
+If you cannot find a clearly-rendered literal, STOP and surface to the human. The smoke test cannot run against unverified anchors.
+
+- [x] **Step 3: Run the smoke test**
+
+```bash
+unset SESSION WIN RUN_DIR RUN_ID CAPTURE_INDEX
+# PIPELINE and OVERLAY_ANCHOR set in previous steps.
+start_run "ralph pipeline run $PIPELINE"
+wait_for_string "$OVERLAY_ANCHOR" 15000 && echo "PASS: overlay visible" || echo "FAIL: overlay not visible"
+capture
+# Send whatever response the overlay expects. If you do not know, STOP.
+# Example: send_input "approve" for an approve/reject overlay.
+send_input "approve"
+wait_stable 10000
+capture
+SAVED_DIR=$RUN_DIR
+cleanup_run
+rm -rf "$SAVED_DIR"
+```
+
+Expected: `PASS: overlay visible`. This smoke test verifies the full input loop: Pattern 1 (start) → Pattern 4 (wait for precise state) → Pattern 2 (capture) → Pattern 5 (send input) → Pattern 3 (wait stable) → Pattern 6 (cleanup). If the overlay is not visible, either `wait_for_string` is wrong (fix in doc) or `OVERLAY_ANCHOR` is wrong (re-run Step 2 and pick a different literal).
+
+---
+
+### Task 4.5: Smoke test 3 — orphan recovery
+
+**Files:** None modified (diagnostic only).
+
+- [x] **Step 1: Run the smoke test**
+
+```bash
+unset SESSION WIN RUN_DIR RUN_ID CAPTURE_INDEX
+start_run "sleep 300"
+SAVED_SESSION=$SESSION
+SAVED_DIR=$RUN_DIR
+SAVED_WIN=$WIN
+# Simulate a crash: do NOT call cleanup_run. Force-kill the window manually.
+tmux kill-window -t "$SAVED_SESSION:$SAVED_WIN"
+
+# The dir now lacks "ended". recover_orphans should find it.
+recover_orphans | grep -q "$SAVED_DIR" && echo "PASS: orphan detected" || echo "FAIL: orphan not detected"
+
+# Manual cleanup of the test-created orphan.
+rm -rf "$SAVED_DIR"
+```
+
+Expected: `PASS: orphan detected`. If not, fix `recover_orphans` in the doc and re-run.
+
+---
+
+### Task 4.6: Smoke test 4 — visual capture
+
+**Files:** None modified (diagnostic only).
+
+**Prerequisite:** Your terminal emulator must be the frontmost macOS app. Run this test interactively.
+
+- [x] **Step 1: Run the smoke test**
+
+```bash
+unset SESSION WIN RUN_DIR RUN_ID CAPTURE_INDEX
+start_run "ralph --help"
+wait_stable 5000
+capture
+screenshot
+PNG="$RUN_DIR/capture-$(printf %03d "$CAPTURE_INDEX").png"
+test -s "$PNG" && echo "PASS: PNG exists and non-empty" || echo "FAIL: PNG missing or empty"
+grep -q "screenshot" "$RUN_DIR/events.log" && echo "PASS: event logged" || echo "FAIL: event not logged"
+SAVED_DIR=$RUN_DIR
+cleanup_run
+rm -rf "$SAVED_DIR"
+
+# Sanity: your current tmux window should be whatever you were on before screenshot ran.
+tmux display-message -p '#W'
+```
+
+Expected: `PASS: PNG exists and non-empty`, `PASS: event logged`, and your original tmux window active. If the `screencapture` call failed because Task 1.1 Step 3 recorded `OSA_WORKS=no`, skip this smoke test and note it in the final verification.
+
+---
+
+### Task 4.7: Finalize — mark spec implemented and sanity-check commits
+
+- [x] **Step 1: Sanity-check the commit trail**
+
+```bash
+git log --oneline -20
+```
+
+Expected: A clean series of `docs(harness): ...` commits, one per implementation task, plus the discoverability-wiring commit.
+
+- [x] **Step 2: Re-run the discoverability verification from Task 4.2 Step 3**
+
+```bash
+grep -qF "docs/harness/tmux-drive.md" CLAUDE.md && echo "PASS" || echo "FAIL"
+grep -qF "docs/harness/tmux-drive.md" MEMORY.md && echo "PASS" || echo "FAIL"
+```
+
+- [x] **Step 3: Update the spec status**
+
+Edit `docs/superpowers/specs/2026-04-14-tmux-drive-harness-design.md`:
+
+```markdown
+**Status:** Implemented — 2026-04-14
+```
+
+- [x] **Step 4: Commit**
+
+```bash
+git add docs/superpowers/specs/2026-04-14-tmux-drive-harness-design.md
+git commit -m "docs(spec): mark tmux drive harness as implemented"
+```
+
+**Handling of required-but-skipped smoke tests:** If Smoke Test 2 or 4 was skipped because a prerequisite failed (no wait.human pipeline, or `OSA_WORKS=no`), note the skip in the commit message body so future readers know coverage is incomplete, and open a follow-up issue with the human.
+
+---
+
+## Final Verification
+
+- [x] Smoke tests 1, 3 pass without doc workarounds. Smoke tests 2 and 4 pass, or are explicitly marked skipped with the reason documented.
+- [x] `CLAUDE.md` literally contains the string `docs/harness/tmux-drive.md` (Task 4.2 Step 3 verification).
+- [x] `MEMORY.md` literally contains the string `docs/harness/tmux-drive.md`.
+- [x] `docs/harness/tmux-drive.md` and `docs/harness/README.md` exist.
+- [x] The sourceable bash block in `tmux-drive.md` has both start and end markers (`# ---------- tmux drive harness helpers ----------` and `# ---------- end helpers ----------`) and contains: `now_ns`, `wait_stable`, `start_run`, `capture`, `send_input`, `cleanup_run`, `wait_for_string`, `screenshot`, `recover_orphans`.
+- [x] No `src/**` files were modified.
+- [x] No new npm packages were added to `package.json`.
+- [x] Spec is marked Implemented.
+
+---
+
+## Out of Scope (Reference)
+
+The following were considered and explicitly excluded during brainstorming. Do NOT add them in this plan:
+
+- A `ralph drive` CLI subcommand.
+- An MCP server exposing launch/capture/send tools.
+- A static markers catalog mapping UI states to strings.
+- Automatic cleanup / cron-based pruning.
+- Linux or Windows support for `screenshot`.
+- ANSI-to-PNG rendering (niche deps rejected by the developer).
+- Pixel-level visual regression diffing.
+- A separate isolated tmux session per run (dropped in favor of "new window in existing session").
+
+If a future requirement needs any of these, it gets its own spec + plan.
