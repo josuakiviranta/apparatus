@@ -1,7 +1,7 @@
 # Tmux Drive Harness — Design
 
 **Date:** 2026-04-14
-**Status:** Draft — pending implementation plan
+**Status:** Implemented — 2026-04-14
 **Owner:** Claude (primary consumer), authored collaboratively
 **Scope:** A documentation artifact + filesystem conventions that let Claude autonomously drive ralph-cli inside tmux, observe its Ink-based TUI, interact with it, and analyze the results — without adding code, dependencies, or MCP servers.
 
