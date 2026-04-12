@@ -37,6 +37,9 @@ export function markImplemented(
   filename: string,
 ): { success: true; filename: string; previous_status: string; new_status: string }
   | { success: false; error: string } {
+  const fnErr = validateFilename(filename);
+  if (fnErr) return { success: false, error: fnErr };
+
   const illumDir = join(projectRoot, "meditations", "illuminations");
   const filePath = join(illumDir, filename);
 

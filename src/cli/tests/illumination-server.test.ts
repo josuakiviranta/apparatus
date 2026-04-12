@@ -458,6 +458,11 @@ describe("markImplemented", () => {
     }
   });
 
+  it("rejects path traversal filename", () => {
+    const result = markImplemented(tmpDir, "../../../etc/passwd");
+    expect(result.success).toBe(false);
+  });
+
   it("returns error when file not found", () => {
     const result = markImplemented(tmpDir, "nonexistent.md");
     expect(result.success).toBe(false);
