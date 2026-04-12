@@ -233,6 +233,39 @@ describe("parseDot", () => {
     // start has no matching shape/class/id rule, universal applies
     expect(graph.nodes.get("start")?.llmModel).toBe("universal-model");
   });
+
+  it("parses headless_safe=false as headlessSafe boolean", () => {
+    const dot = `digraph g {
+      goal="test"
+      headless_safe=false
+      start [shape=Mdiamond]
+      done [shape=Msquare]
+      start -> done
+    }`;
+    const graph = parseDot(dot);
+    expect(graph.headlessSafe).toBe(false);
+  });
+
+  it("parses headless_safe=true as headlessSafe boolean", () => {
+    const dot = `digraph g {
+      headless_safe=true
+      start [shape=Mdiamond]
+      done [shape=Msquare]
+      start -> done
+    }`;
+    const graph = parseDot(dot);
+    expect(graph.headlessSafe).toBe(true);
+  });
+
+  it("defaults headlessSafe to undefined when attribute is absent", () => {
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      done [shape=Msquare]
+      start -> done
+    }`;
+    const graph = parseDot(dot);
+    expect(graph.headlessSafe).toBeUndefined();
+  });
 });
 
 describe("parseDot — Bug B.2 unescape inside quoted attributes", () => {

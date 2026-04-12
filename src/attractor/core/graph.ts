@@ -197,6 +197,7 @@ export function parseDot(src: string): Graph {
     maxParallel: graphAttrs["maxParallel"] as number | undefined,
     retryTarget: graphAttrs["retryTarget"] as string | undefined,
     fallbackRetryTarget: graphAttrs["fallbackRetryTarget"] as string | undefined,
+    headlessSafe: graphAttrs["headlessSafe"] as boolean | undefined,
     nodes,
     edges,
   };

@@ -56,6 +56,7 @@ export interface Graph {
   maxParallel?: number;
   retryTarget?: string;
   fallbackRetryTarget?: string;
+  headlessSafe?: boolean;
   nodes: Map<string, Node>;
   edges: Edge[];
 }
