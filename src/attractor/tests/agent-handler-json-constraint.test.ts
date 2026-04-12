@@ -7,6 +7,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { AgentHandler } from "../handlers/agent-handler.js";
+import type { HandlerExecutionContext } from "../handlers/registry.js";
 import type { Node, PipelineContext } from "../types.js";
 import { writeFileSync, mkdirSync, existsSync } from "fs";
 import { join } from "path";
@@ -14,6 +15,10 @@ import { mkdtempSync, rmSync } from "fs";
 import { tmpdir } from "os";
 
 const baseCtx = (): PipelineContext => ({ values: {} });
+
+function makeContext(overrides: Partial<HandlerExecutionContext> = {}): HandlerExecutionContext {
+  return { logsRoot: "/tmp/logs", cwd: "/tmp/project", dotDir: "/tmp/project", outgoingLabels: [], completedNodes: [], nodeRetries: {}, ...overrides };
+}
 
 describe("AgentHandler – JSON constraint injection", () => {
   const mockResolve = vi.fn();
@@ -64,7 +69,7 @@ describe("AgentHandler – JSON constraint injection", () => {
       await handler.execute(
         makeNode({ prompt: "Verify the implementation", jsonSchemaFile: "schemas/test.json" } as any),
         baseCtx(),
-        { logsRoot: logsDir, cwd: logsDir, signal: undefined, outgoingLabels: [], completedNodes: [], nodeRetries: {} },
+        makeContext({ logsRoot: logsDir, cwd: logsDir, dotDir: logsDir }),
       );
 
       // The JSON constraint must appear BEFORE the node prompt (prepended)
@@ -98,7 +103,7 @@ describe("AgentHandler – JSON constraint injection", () => {
       await handler.execute(
         makeNode({ prompt: "Verify the implementation", jsonSchemaFile: "schemas/test.json" } as any),
         baseCtx(),
-        { logsRoot: logsDir, cwd: logsDir, signal: undefined, outgoingLabels: [], completedNodes: [], nodeRetries: {} },
+        makeContext({ logsRoot: logsDir, cwd: logsDir, dotDir: logsDir }),
       );
 
       // The JSON constraint must also appear AFTER the node prompt (appended)
@@ -125,7 +130,7 @@ describe("AgentHandler – JSON constraint injection", () => {
       await handler.execute(
         makeNode({ prompt: "Verify the implementation" }),
         baseCtx(),
-        { logsRoot: logsDir, cwd: "/tmp/project", signal: undefined, outgoingLabels: [], completedNodes: [], nodeRetries: {} },
+        makeContext({ logsRoot: logsDir }),
       );
 
       expect(capturedConfig.prompt).not.toContain("MUST be valid JSON");
@@ -163,7 +168,7 @@ describe("AgentHandler – JSON constraint injection", () => {
       const outcome = await handler.execute(
         makeNode({ jsonSchemaFile: "schemas/test.json" } as any),
         baseCtx(),
-        { logsRoot: logsDir, cwd: logsDir, signal: undefined, outgoingLabels: [], completedNodes: [], nodeRetries: {} },
+        makeContext({ logsRoot: logsDir, cwd: logsDir, dotDir: logsDir }),
       );
 
       // Must surface as failure, not silently repair
@@ -199,7 +204,7 @@ describe("AgentHandler – JSON constraint injection", () => {
       const outcome = await handler.execute(
         makeNode({ jsonSchemaFile: "schemas/test.json" } as any),
         baseCtx(),
-        { logsRoot: logsDir, cwd: logsDir, signal: undefined, outgoingLabels: [], completedNodes: [], nodeRetries: {} },
+        makeContext({ logsRoot: logsDir, cwd: logsDir, dotDir: logsDir }),
       );
 
       expect(outcome.status).toBe("success");
@@ -234,7 +239,7 @@ describe("AgentHandler – JSON constraint injection", () => {
       const outcome = await handler.execute(
         makeNode({ jsonSchemaFile: "schemas/test.json" } as any),
         baseCtx(),
-        { logsRoot: logsDir, cwd: logsDir, signal: undefined, outgoingLabels: [], completedNodes: [], nodeRetries: {} },
+        makeContext({ logsRoot: logsDir, cwd: logsDir, dotDir: logsDir }),
       );
 
       expect(outcome.status).toBe("fail");
@@ -268,7 +273,7 @@ describe("AgentHandler – JSON constraint injection", () => {
       const outcome = await handler.execute(
         makeNode({ jsonSchemaFile: "schemas/test.json" } as any),
         baseCtx(),
-        { logsRoot: logsDir, cwd: logsDir, signal: undefined, outgoingLabels: [], completedNodes: [], nodeRetries: {} },
+        makeContext({ logsRoot: logsDir, cwd: logsDir, dotDir: logsDir }),
       );
 
       expect(outcome.status).toBe("success");
@@ -300,7 +305,7 @@ describe("AgentHandler – JSON constraint injection", () => {
       await handler.execute(
         makeNode({ jsonSchemaFile: "schemas/test.json" } as any),
         baseCtx(),
-        { logsRoot: logsDir, cwd: logsDir, signal: undefined, outgoingLabels: [], completedNodes: [], nodeRetries: {} },
+        makeContext({ logsRoot: logsDir, cwd: logsDir, dotDir: logsDir }),
       );
 
       expect(existsSync(join(logsDir, "work", "raw-output.txt"))).toBe(true);
@@ -333,15 +338,7 @@ describe("AgentHandler – JSON constraint injection", () => {
       const outcome = await handler.execute(
         makeNode({ prompt: "Verify", jsonSchemaFile: "pipelines/schemas/test.json" } as any),
         baseCtx(),
-        {
-          logsRoot: projectDir,
-          cwd: projectDir,   // project dir — does NOT contain the schema
-          dotDir: dotDir,    // dot file dir — DOES contain the schema
-          signal: undefined,
-          outgoingLabels: [],
-          completedNodes: [],
-          nodeRetries: {},
-        },
+        makeContext({ logsRoot: projectDir, cwd: projectDir, dotDir: dotDir }),
       );
 
       expect(outcome.status).toBe("success");
@@ -371,7 +368,7 @@ describe("AgentHandler – JSON constraint injection", () => {
       const outcome = await handler.execute(
         makeNode({ jsonSchemaFile: "schemas/test.json" } as any),
         baseCtx(),
-        { logsRoot: logsDir, cwd: logsDir, signal: undefined, outgoingLabels: [], completedNodes: [], nodeRetries: {} },
+        makeContext({ logsRoot: logsDir, cwd: logsDir, dotDir: logsDir }),
       );
 
       expect(outcome.status).toBe("fail");

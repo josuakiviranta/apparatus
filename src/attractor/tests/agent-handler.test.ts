@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { AgentHandler } from "../handlers/agent-handler.js";
+import type { HandlerExecutionContext } from "../handlers/registry.js";
 import type { Node, PipelineContext } from "../types.js";
 import { readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
@@ -7,6 +8,10 @@ import { mkdtempSync, rmSync } from "fs";
 import { tmpdir } from "os";
 
 const baseCtx = (): PipelineContext => ({ values: {} });
+
+function makeContext(overrides: Partial<HandlerExecutionContext> = {}): HandlerExecutionContext {
+  return { logsRoot: "/tmp/logs", cwd: "/tmp/project", dotDir: "/tmp/project", outgoingLabels: [], completedNodes: [], nodeRetries: {}, ...overrides };
+}
 
 describe("AgentHandler", () => {
   const mockResolve = vi.fn();
@@ -52,7 +57,7 @@ describe("AgentHandler", () => {
     const outcome = await handler.execute(
       makeNode(),
       baseCtx(),
-      { logsRoot: "/tmp/logs", cwd: "/tmp/project", signal: undefined, outgoingLabels: [] },
+      makeContext(),
     );
 
     expect(outcome.status).toBe("success");
@@ -69,7 +74,7 @@ describe("AgentHandler", () => {
     const outcome = await handler.execute(
       makeNode(),
       baseCtx(),
-      { logsRoot: "/tmp/logs", cwd: "/tmp/project", signal: undefined, outgoingLabels: [] },
+      makeContext(),
     );
 
     expect(outcome.status).toBe("fail");
@@ -85,7 +90,7 @@ describe("AgentHandler", () => {
     const outcome = await handler.execute(
       makeNode({ maxIterations: 3 }),
       baseCtx(),
-      { logsRoot: "/tmp/logs", cwd: "/tmp/project", signal: undefined, outgoingLabels: [] },
+      makeContext(),
     );
 
     expect(mockAgentRun).toHaveBeenCalledTimes(3);
@@ -104,7 +109,7 @@ describe("AgentHandler", () => {
     const outcome = await handler.execute(
       makeNode({ maxIterations: 3 }),
       baseCtx(),
-      { logsRoot: "/tmp/logs", cwd: "/tmp/project", signal: undefined, outgoingLabels: [] },
+      makeContext(),
     );
 
     expect(outcome.status).toBe("success");
@@ -119,7 +124,7 @@ describe("AgentHandler", () => {
     const outcome = await handler.execute(
       { id: "work", shape: "box" } as Node,
       baseCtx(),
-      { logsRoot: "/tmp/logs", cwd: "/tmp/project", signal: undefined, outgoingLabels: [] },
+      makeContext(),
     );
 
     expect(outcome.status).toBe("success");
@@ -133,7 +138,7 @@ describe("AgentHandler", () => {
     const outcome = await handler.execute(
       makeNode({ agent: "nonexistent" }),
       baseCtx(),
-      { logsRoot: "/tmp/logs", cwd: "/tmp/project", signal: undefined, outgoingLabels: [] },
+      makeContext(),
     );
 
     expect(outcome.status).toBe("fail");
@@ -149,7 +154,7 @@ describe("AgentHandler", () => {
     await handler.execute(
       makeNode(),
       ctx,
-      { logsRoot: "/tmp/logs", cwd: "/tmp/project", signal: undefined, outgoingLabels: [] },
+      makeContext(),
     );
 
     expect(mockAgentRun).toHaveBeenCalledWith(
@@ -176,7 +181,7 @@ describe("AgentHandler", () => {
       await handler.execute(
         makeNode({ prompt: "Build the feature" }),
         ctx,
-        { logsRoot: logsDir, cwd: "/tmp/project", signal: undefined, outgoingLabels: [], completedNodes: ["start", "meditate"], nodeRetries: {} },
+        makeContext({ logsRoot: logsDir, completedNodes: ["start", "meditate"] }),
       );
 
       // Verify prompt.md on disk
@@ -209,7 +214,7 @@ describe("AgentHandler", () => {
       await handler.execute(
         makeNode({ prompt: "Next step" }),
         baseCtx(),
-        { logsRoot: logsDir, cwd: "/tmp/project", signal: undefined, outgoingLabels: [], completedNodes: ["start", "analyze", "review"], nodeRetries: {} },
+        makeContext({ logsRoot: logsDir, completedNodes: ["start", "analyze", "review"] }),
       );
 
       expect(capturedConfig.prompt).toContain("start, analyze, review");
@@ -227,7 +232,7 @@ describe("AgentHandler", () => {
     await handler.execute(
       makeNode(),
       baseCtx(),
-      { logsRoot: "/tmp/logs", cwd: "/tmp/project", signal: undefined, outgoingLabels: [], completedNodes: [], nodeRetries: {}, onStdout },
+      makeContext({ onStdout }),
     );
 
     expect(mockAgentRun).toHaveBeenCalledWith(
@@ -269,7 +274,7 @@ describe("AgentHandler", () => {
     await handler.execute(
       makeNode({ interactive: "true" } as any),
       baseCtx(),
-      { logsRoot: "/tmp/logs", cwd: "/tmp/project", signal: undefined, outgoingLabels: [], completedNodes: [], nodeRetries: {} },
+      makeContext(),
     );
 
     expect(mockAgentRun).not.toHaveBeenCalled();
@@ -292,7 +297,7 @@ describe("AgentHandler", () => {
       await handler.execute(
         makeNode({ prompt: "Check $illumination_path which has $summary" }),
         ctx,
-        { logsRoot: logsDir, cwd: "/tmp/project", signal: undefined, outgoingLabels: [], completedNodes: [], nodeRetries: {} },
+        makeContext({ logsRoot: logsDir }),
       );
 
       expect(capturedConfig.prompt).toContain("/meditations/foo.md");
@@ -324,7 +329,7 @@ describe("AgentHandler", () => {
       await handler.execute(
         makeNode({ jsonSchemaFile: "schemas/test.json" } as any),
         baseCtx(),
-        { logsRoot: logsDir, cwd: logsDir, signal: undefined, outgoingLabels: [], completedNodes: [], nodeRetries: {} },
+        makeContext({ logsRoot: logsDir, cwd: logsDir, dotDir: logsDir }),
       );
 
       expect(capturedConfig.jsonSchema).toBe(schema);
@@ -355,7 +360,7 @@ describe("AgentHandler", () => {
       const outcome = await handler.execute(
         makeNode({ jsonSchemaFile: "schemas/test.json" } as any),
         baseCtx(),
-        { logsRoot: logsDir, cwd: logsDir, signal: undefined, outgoingLabels: [], completedNodes: [], nodeRetries: {} },
+        makeContext({ logsRoot: logsDir, cwd: logsDir, dotDir: logsDir }),
       );
 
       expect(outcome.status).toBe("success");
@@ -392,7 +397,7 @@ describe("AgentHandler", () => {
       const outcome = await handler.execute(
         makeNode({ jsonSchemaFile: "schemas/test.json" } as any),
         baseCtx(),
-        { logsRoot: logsDir, cwd: logsDir, signal: undefined, outgoingLabels: [], completedNodes: [], nodeRetries: {} },
+        makeContext({ logsRoot: logsDir, cwd: logsDir, dotDir: logsDir }),
       );
 
       expect(outcome.status).toBe("success");
@@ -429,7 +434,7 @@ describe("AgentHandler", () => {
       const outcome = await handler.execute(
         makeNode({ jsonSchemaFile: "schemas/test.json" } as any),
         baseCtx(),
-        { logsRoot: logsDir, cwd: logsDir, signal: undefined, outgoingLabels: [], completedNodes: [], nodeRetries: {} },
+        makeContext({ logsRoot: logsDir, cwd: logsDir, dotDir: logsDir }),
       );
 
       expect(outcome.status).toBe("success");
@@ -462,7 +467,7 @@ describe("AgentHandler", () => {
       const outcome = await handler.execute(
         makeNode({ jsonSchemaFile: "schemas/test.json" } as any),
         baseCtx(),
-        { logsRoot: logsDir, cwd: logsDir, signal: undefined, outgoingLabels: [], completedNodes: [], nodeRetries: {} },
+        makeContext({ logsRoot: logsDir, cwd: logsDir, dotDir: logsDir }),
       );
 
       expect(outcome.preferredLabel).toBe("false");
@@ -490,7 +495,7 @@ describe("AgentHandler", () => {
       const outcome = await handler.execute(
         makeNode({ jsonSchemaFile: "schemas/test.json" } as any),
         baseCtx(),
-        { logsRoot: logsDir, cwd: logsDir, signal: undefined, outgoingLabels: [], completedNodes: [], nodeRetries: {} },
+        makeContext({ logsRoot: logsDir, cwd: logsDir, dotDir: logsDir }),
       );
 
       expect(outcome.status).toBe("fail");
@@ -512,7 +517,7 @@ describe("AgentHandler", () => {
     const outcome = await handler.execute(
       makeNode({ maxIterations: 5 }),
       baseCtx(),
-      { logsRoot: "/tmp/logs", cwd: "/tmp/project", signal: ac.signal, outgoingLabels: [] },
+      makeContext({ signal: ac.signal }),
     );
 
     // Should stop after first iteration since signal was aborted

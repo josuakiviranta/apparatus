@@ -1,11 +1,11 @@
 import { mkdir, writeFile } from "fs/promises";
 import { dirname } from "path";
-import type { NodeHandler } from "./registry.js";
+import type { NodeHandler, HandlerExecutionContext } from "./registry.js";
 import type { Node, Outcome, PipelineContext } from "../types.js";
 import { expandVariables } from "../transforms/variable-expansion.js";
 
 export class StoreHandler implements NodeHandler {
-  async execute(node: Node, ctx: PipelineContext, _meta: Record<string, unknown>): Promise<Outcome> {
+  async execute(node: Node, ctx: PipelineContext, _meta: HandlerExecutionContext): Promise<Outcome> {
     const storeKey = node.storeKey as string | undefined;
     const storeFile = node.storeFile as string | undefined;
 

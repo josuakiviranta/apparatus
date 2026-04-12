@@ -6,6 +6,7 @@ import * as readline from "node:readline";
 import type { Session } from "./session.js";
 import { formatUserTurn } from "./stream-json-input.js";
 import { parseStreamJsonEvents, type StreamJsonEvent } from "./stream-formatter.js";
+import { parseStructuredOutput } from "./parse-structured-output.js";
 
 export interface McpServerConfig {
   name: string;
@@ -82,30 +83,30 @@ export class Agent {
     return result;
   }
 
-  buildArgs(options: RunOptions): string[] {
+  private buildCommonArgs(): string[] {
     const args: string[] = [];
 
-    // Model
     args.push("--model", this.config.model);
 
-    // Permission mode
     if (this.config.permissionMode === "dangerouslySkipPermissions") {
       args.push("--dangerously-skip-permissions");
     } else {
       args.push("--permission-mode", this.config.permissionMode);
     }
 
-    // Tools
-    if (this.config.tools.length > 0) {
-      for (const tool of this.config.tools) {
-        args.push("--allowedTools", tool);
-      }
+    for (const tool of this.config.tools) {
+      args.push("--allowedTools", tool);
     }
 
-    // MCP config
     if (this._mcpConfigPath) {
       args.push("--mcp-config", this._mcpConfigPath);
     }
+
+    return args;
+  }
+
+  buildArgs(options: RunOptions): string[] {
+    const args = this.buildCommonArgs();
 
     // Output format (non-interactive only)
     if (!options.interactive) {
@@ -263,25 +264,7 @@ export class Agent {
         // array of events; fall back to NDJSON for other callers.
         if (options.onStdout) {
           try {
-            const trimmed = capturedOutput.trim();
-            let events: Array<Record<string, unknown>>;
-            try {
-              const top = JSON.parse(trimmed) as unknown;
-              events = Array.isArray(top)
-                ? (top as Array<Record<string, unknown>>)
-                : [top as Record<string, unknown>];
-            } catch {
-              events = trimmed
-                .split("\n")
-                .filter((l) => l.trim())
-                .flatMap((l) => {
-                  try {
-                    return [JSON.parse(l) as Record<string, unknown>];
-                  } catch {
-                    return [];
-                  }
-                });
-            }
+            const events = parseStructuredOutput(capturedOutput) as Array<Record<string, unknown>>;
 
             const syntheticLines: string[] = [];
 
@@ -370,30 +353,7 @@ export class Agent {
   }
 
   buildInteractiveArgs(opts: { systemPrompt: string; sessionId: string }): string[] {
-    const args: string[] = [];
-
-    // -p flag for prompt mode (initial prompt sent via stdin)
-    args.push("-p");
-
-    // Model
-    args.push("--model", this.config.model);
-
-    // Permission mode
-    if (this.config.permissionMode === "dangerouslySkipPermissions") {
-      args.push("--dangerously-skip-permissions");
-    } else {
-      args.push("--permission-mode", this.config.permissionMode);
-    }
-
-    // Tools
-    for (const tool of this.config.tools) {
-      args.push("--allowedTools", tool);
-    }
-
-    // MCP config
-    if (this._mcpConfigPath) {
-      args.push("--mcp-config", this._mcpConfigPath);
-    }
+    const args = ["-p", ...this.buildCommonArgs()];
 
     // Stream-json bidirectional protocol
     args.push("--input-format", "stream-json");

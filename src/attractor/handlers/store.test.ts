@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { StoreHandler } from "./store.js";
+import type { HandlerExecutionContext } from "./registry.js";
 import type { Node, PipelineContext } from "../types.js";
 
 vi.mock("fs/promises", () => ({
@@ -11,6 +12,10 @@ import * as fsPromises from "fs/promises";
 
 function makeCtx(values: Record<string, unknown> = {}): PipelineContext {
   return { values };
+}
+
+function makeContext(): HandlerExecutionContext {
+  return { logsRoot: "/tmp", cwd: "/tmp", dotDir: "/tmp", outgoingLabels: [], completedNodes: [], nodeRetries: {} };
 }
 
 function makeNode(attrs: Partial<Node>): Node {
@@ -28,7 +33,7 @@ describe("StoreHandler", () => {
     const outcome = await handler.execute(
       makeNode({ storeFile: "/out/file.md" }),
       makeCtx(),
-      {}
+      makeContext()
     );
     expect(outcome.status).toBe("fail");
     expect(outcome.failureReason).toMatch(/store_key/);
@@ -38,7 +43,7 @@ describe("StoreHandler", () => {
     const outcome = await handler.execute(
       makeNode({ storeKey: "agent.output" }),
       makeCtx(),
-      {}
+      makeContext()
     );
     expect(outcome.status).toBe("fail");
     expect(outcome.failureReason).toMatch(/store_file/);
@@ -48,7 +53,7 @@ describe("StoreHandler", () => {
     const outcome = await handler.execute(
       makeNode({ storeKey: "missing.output", storeFile: "/out/file.md" }),
       makeCtx({}),
-      {}
+      makeContext()
     );
     expect(outcome.status).toBe("fail");
     expect(outcome.failureReason).toMatch(/missing\.output/);
@@ -58,7 +63,7 @@ describe("StoreHandler", () => {
     const outcome = await handler.execute(
       makeNode({ storeKey: "agent.output", storeFile: "/out/result.md" }),
       makeCtx({ "agent.output": "Hello world" }),
-      {}
+      makeContext()
     );
     expect(outcome.status).toBe("success");
     expect(outcome.contextUpdates?.["store.path"]).toBe("/out/result.md");
@@ -72,7 +77,7 @@ describe("StoreHandler", () => {
     const outcome = await handler.execute(
       makeNode({ storeKey: "agent.output", storeFile: "$dir/$filename" }),
       makeCtx({ "agent.output": "content", dir: "/output/jobs", filename: "acme-corp.md" }),
-      {}
+      makeContext()
     );
     expect(outcome.status).toBe("success");
     expect(outcome.contextUpdates?.["store.path"]).toBe("/output/jobs/acme-corp.md");
@@ -87,7 +92,7 @@ describe("StoreHandler", () => {
     const outcome = await handler.execute(
       makeNode({ storeKey: "score", storeFile: "/out/score.txt" }),
       makeCtx({ score: 42 }),
-      {}
+      makeContext()
     );
     expect(outcome.status).toBe("success");
     expect(fsPromises.writeFile).toHaveBeenCalledWith("/out/score.txt", "42", "utf8");

@@ -1,4 +1,4 @@
-import type { NodeHandler } from "./registry.js";
+import type { NodeHandler, HandlerExecutionContext } from "./registry.js";
 import type { Node, Outcome, PipelineContext } from "../types.js";
 
 export interface ChildStatus {
@@ -19,7 +19,7 @@ export class ManagerLoopHandler implements NodeHandler {
     private config: ManagerLoopConfig = {}
   ) {}
 
-  async execute(_node: Node, _ctx: PipelineContext, _meta: Record<string, unknown>): Promise<Outcome> {
+  async execute(_node: Node, _ctx: PipelineContext, _meta: HandlerExecutionContext): Promise<Outcome> {
     const maxCycles = this.config.maxCycles ?? 1000;
     const pollMs = this.config.pollIntervalMs ?? 45_000;
 

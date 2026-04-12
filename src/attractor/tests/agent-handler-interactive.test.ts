@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { AgentHandler } from "../handlers/agent-handler.js";
-import type { OnInteractiveRequest } from "../handlers/agent-handler.js";
+import type { OnInteractiveRequest, HandlerExecutionContext } from "../handlers/registry.js";
 import { Session } from "../../cli/lib/session.js";
 import type { ExitReason } from "../../cli/lib/session.js";
 import type { AgentConfig } from "../../cli/lib/agent.js";
@@ -73,9 +73,10 @@ const baseMeta = (
   cwd: string,
   logsRoot: string,
   onInteractiveRequest?: OnInteractiveRequest,
-) => ({
+): HandlerExecutionContext => ({
   cwd,
   logsRoot,
+  dotDir: cwd,
   completedNodes: [] as string[],
   nodeRetries: {},
   outgoingLabels: [] as string[],

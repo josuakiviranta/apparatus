@@ -1,4 +1,4 @@
-import type { NodeHandler } from "./registry.js";
+import type { NodeHandler, HandlerExecutionContext } from "./registry.js";
 import type { Node, Outcome, PipelineContext } from "../types.js";
 import type { Interviewer } from "../interviewer/index.js";
 import { expandVariables } from "../transforms/variable-expansion.js";
@@ -6,9 +6,9 @@ import { expandVariables } from "../transforms/variable-expansion.js";
 export class WaitHumanHandler implements NodeHandler {
   constructor(private interviewer: Interviewer) {}
 
-  async execute(node: Node, ctx: PipelineContext, meta: Record<string, unknown>): Promise<Outcome> {
-    const labels = (meta["outgoingLabels"] as string[]) ?? [];
-    const signal = meta["signal"] as AbortSignal | undefined;
+  async execute(node: Node, ctx: PipelineContext, meta: HandlerExecutionContext): Promise<Outcome> {
+    const labels = meta.outgoingLabels;
+    const signal = meta.signal;
 
     if (signal?.aborted) {
       return { status: "fail", failureReason: "Aborted before human prompt" };

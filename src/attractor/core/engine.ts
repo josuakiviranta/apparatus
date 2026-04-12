@@ -13,9 +13,8 @@ import { RalphMeditateHandler } from "../handlers/ralph-meditate.js";
 import { RalphScenariosHandler } from "../handlers/ralph-scenarios.js";
 import { ParallelHandler, FanInHandler } from "../handlers/parallel.js";
 import { AgentHandler } from "../handlers/agent-handler.js";
-import type { OnInteractiveRequest } from "../handlers/agent-handler.js";
 import { StoreHandler } from "../handlers/store.js";
-import type { NodeHandler } from "../handlers/registry.js";
+import type { NodeHandler, HandlerExecutionContext, OnInteractiveRequest } from "../handlers/registry.js";
 
 export interface EngineOptions {
   logsRoot: string;
@@ -200,7 +199,7 @@ export async function runPipeline(graph: Graph, opts: EngineOptions): Promise<Pi
     const outgoingLabels = edges.filter(e => e.from === node.id).map(e => e.label ?? e.to).filter(Boolean);
 
     const ctx: PipelineContext = { values: context };
-    const outcome = await handler.execute(node, ctx, {
+    const meta: HandlerExecutionContext = {
       logsRoot: opts.logsRoot,
       cwd: opts.cwd,
       dotDir: opts.dotDir ?? opts.cwd,
@@ -210,7 +209,8 @@ export async function runPipeline(graph: Graph, opts: EngineOptions): Promise<Pi
       nodeRetries,
       onStdout: opts.onStdout,
       onInteractiveRequest: opts.onInteractiveRequest,
-    });
+    };
+    const outcome = await handler.execute(node, ctx, meta);
 
     // Merge context updates
     if (outcome.contextUpdates) {

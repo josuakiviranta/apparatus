@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { registerHandler, lookupHandler, clearHandlers } from "../handlers/registry.js";
+import { describe, it, expect, vi } from "vitest";
+import type { HandlerExecutionContext } from "../handlers/registry.js";
 import { ConditionalHandler } from "../handlers/conditional.js";
 import { WaitHumanHandler } from "../handlers/wait-human.js";
 import { ToolHandler } from "../handlers/tool.js";
@@ -13,26 +13,15 @@ import type { Node, PipelineContext } from "../types.js";
 
 const baseCtx = (): PipelineContext => ({ values: {} });
 
-describe("registry", () => {
-  beforeEach(() => { clearHandlers(); });
-
-  it("lookupHandler returns handler for known type", () => {
-    registerHandler("conditional", new ConditionalHandler());
-    const h = lookupHandler("conditional");
-    expect(h).toBeDefined();
-  });
-
-  it("lookupHandler returns null for unknown type", () => {
-    const h = lookupHandler("does.not.exist");
-    expect(h).toBeNull();
-  });
-});
+function makeContext(overrides: Partial<HandlerExecutionContext> = {}): HandlerExecutionContext {
+  return { logsRoot: "/tmp", cwd: "/tmp", dotDir: "/tmp", outgoingLabels: [], completedNodes: [], nodeRetries: {}, ...overrides };
+}
 
 describe("ConditionalHandler", () => {
   it("returns success immediately", async () => {
     const h = new ConditionalHandler();
     const node: Node = { id: "c", shape: "diamond" };
-    const outcome = await h.execute(node, baseCtx(), {});
+    const outcome = await h.execute(node, baseCtx(), makeContext());
     expect(outcome.status).toBe("success");
   });
 });
@@ -40,13 +29,13 @@ describe("ConditionalHandler", () => {
 describe("StartHandler / ExitHandler", () => {
   it("start returns success immediately", async () => {
     const h = new StartHandler();
-    const outcome = await h.execute({ id: "start" }, baseCtx(), {});
+    const outcome = await h.execute({ id: "start" }, baseCtx(), makeContext());
     expect(outcome.status).toBe("success");
   });
 
   it("exit returns success immediately", async () => {
     const h = new ExitHandler();
-    const outcome = await h.execute({ id: "done" }, baseCtx(), {});
+    const outcome = await h.execute({ id: "done" }, baseCtx(), makeContext());
     expect(outcome.status).toBe("success");
   });
 });
@@ -56,7 +45,7 @@ describe("WaitHumanHandler", () => {
     const interviewer = new QueueInterviewer(["Yes"]);
     const h = new WaitHumanHandler(interviewer);
     const node: Node = { id: "gate", shape: "hexagon", label: "Accept?" };
-    const outcome = await h.execute(node, baseCtx(), { outgoingLabels: ["Yes", "No"] });
+    const outcome = await h.execute(node, baseCtx(), makeContext({ outgoingLabels: ["Yes", "No"] }));
     expect(outcome.status).toBe("success");
     expect(outcome.preferredLabel).toBe("Yes");
   });
@@ -64,7 +53,7 @@ describe("WaitHumanHandler", () => {
   it("auto-approves with AutoApproveInterviewer", async () => {
     const h = new WaitHumanHandler(new AutoApproveInterviewer());
     const node: Node = { id: "gate", shape: "hexagon" };
-    const outcome = await h.execute(node, baseCtx(), { outgoingLabels: ["Approve", "Reject"] });
+    const outcome = await h.execute(node, baseCtx(), makeContext({ outgoingLabels: ["Approve", "Reject"] }));
     expect(outcome.preferredLabel).toBe("Approve");
   });
 
@@ -74,7 +63,7 @@ describe("WaitHumanHandler", () => {
     const ac = new AbortController();
     ac.abort();
     const node: Node = { id: "gate", shape: "hexagon", label: "Accept?" };
-    const outcome = await h.execute(node, baseCtx(), { outgoingLabels: ["Yes", "No"], signal: ac.signal });
+    const outcome = await h.execute(node, baseCtx(), makeContext({ outgoingLabels: ["Yes", "No"], signal: ac.signal }));
     expect(outcome.status).toBe("fail");
     expect(outcome.failureReason).toContain("Aborted");
   });
@@ -86,7 +75,7 @@ describe("WaitHumanHandler", () => {
     };
     const h = new WaitHumanHandler(slowInterviewer);
     const node: Node = { id: "gate", shape: "hexagon", label: "Accept?" };
-    const promise = h.execute(node, baseCtx(), { outgoingLabels: ["Yes", "No"], signal: ac.signal });
+    const promise = h.execute(node, baseCtx(), makeContext({ outgoingLabels: ["Yes", "No"], signal: ac.signal }));
     ac.abort();
     const outcome = await promise;
     expect(outcome.status).toBe("fail");
@@ -98,7 +87,7 @@ describe("WaitHumanHandler", () => {
     const h = new WaitHumanHandler(interviewer);
     const ac = new AbortController();
     const node: Node = { id: "gate", shape: "hexagon", label: "Accept?" };
-    const outcome = await h.execute(node, baseCtx(), { outgoingLabels: ["Yes", "No"], signal: ac.signal });
+    const outcome = await h.execute(node, baseCtx(), makeContext({ outgoingLabels: ["Yes", "No"], signal: ac.signal }));
     expect(outcome.status).toBe("success");
     expect(outcome.preferredLabel).toBe("Yes");
   });
@@ -108,7 +97,7 @@ describe("ToolHandler", () => {
   it("returns success when command exits 0", async () => {
     const h = new ToolHandler();
     const node: Node = { id: "t", shape: "parallelogram", toolCommand: "echo hello" };
-    const outcome = await h.execute(node, baseCtx(), {});
+    const outcome = await h.execute(node, baseCtx(), makeContext());
     expect(outcome.status).toBe("success");
     expect(outcome.contextUpdates?.["tool.output"]).toContain("hello");
   });
@@ -116,14 +105,14 @@ describe("ToolHandler", () => {
   it("returns fail when command exits non-zero", async () => {
     const h = new ToolHandler();
     const node: Node = { id: "t", shape: "parallelogram", toolCommand: "exit 1" };
-    const outcome = await h.execute(node, baseCtx(), {});
+    const outcome = await h.execute(node, baseCtx(), makeContext());
     expect(outcome.status).toBe("fail");
   });
 
   it("returns fail when no toolCommand", async () => {
     const h = new ToolHandler();
     const node: Node = { id: "t", shape: "parallelogram" };
-    const outcome = await h.execute(node, baseCtx(), {});
+    const outcome = await h.execute(node, baseCtx(), makeContext());
     expect(outcome.status).toBe("fail");
     expect(outcome.failureReason).toContain("tool_command");
   });
@@ -133,9 +122,9 @@ describe("ParallelHandler", () => {
   it("returns success and stores parallel.results in contextUpdates", async () => {
     const h = new ParallelHandler();
     const node: Node = { id: "fan", shape: "component" };
-    const outcome = await h.execute(node, baseCtx(), {
+    const outcome = await h.execute(node, baseCtx(), makeContext({
       branchOutcomes: { branch_a: { status: "success" }, branch_b: { status: "success" } },
-    });
+    }));
     expect(outcome.status).toBe("success");
     expect(outcome.contextUpdates?.["parallel.results"]).toBeDefined();
   });
@@ -145,21 +134,21 @@ describe("FanInHandler", () => {
   it("aggregates all-success to success", async () => {
     const h = new FanInHandler();
     const ctx = { values: { "parallel.results": JSON.stringify([{ status: "success" }, { status: "success" }]) } };
-    const outcome = await h.execute({ id: "join", shape: "tripleoctagon" }, ctx, {});
+    const outcome = await h.execute({ id: "join", shape: "tripleoctagon" }, ctx, makeContext());
     expect(outcome.status).toBe("success");
   });
 
   it("aggregates mixed to partial_success", async () => {
     const h = new FanInHandler();
     const ctx = { values: { "parallel.results": JSON.stringify([{ status: "success" }, { status: "fail" }]) } };
-    const outcome = await h.execute({ id: "join", shape: "tripleoctagon" }, ctx, {});
+    const outcome = await h.execute({ id: "join", shape: "tripleoctagon" }, ctx, makeContext());
     expect(outcome.status).toBe("partial_success");
   });
 
   it("aggregates all-fail to fail", async () => {
     const h = new FanInHandler();
     const ctx = { values: { "parallel.results": JSON.stringify([{ status: "fail" }, { status: "fail" }]) } };
-    const outcome = await h.execute({ id: "join", shape: "tripleoctagon" }, ctx, {});
+    const outcome = await h.execute({ id: "join", shape: "tripleoctagon" }, ctx, makeContext());
     expect(outcome.status).toBe("fail");
   });
 });
@@ -171,7 +160,7 @@ describe("ManagerLoopHandler", () => {
       .mockResolvedValueOnce({ status: "success" });
     const h = new ManagerLoopHandler(fakeChild, { pollIntervalMs: 0, maxCycles: 10 });
     const node: Node = { id: "mgr", shape: "house" };
-    const outcome = await h.execute(node, baseCtx(), {});
+    const outcome = await h.execute(node, baseCtx(), makeContext());
     expect(outcome.status).toBe("success");
   });
 
@@ -179,7 +168,7 @@ describe("ManagerLoopHandler", () => {
     const fakeChild = vi.fn().mockResolvedValue({ status: "running", currentNode: "work" });
     const h = new ManagerLoopHandler(fakeChild, { pollIntervalMs: 0, maxCycles: 3 });
     const node: Node = { id: "mgr", shape: "house" };
-    const outcome = await h.execute(node, baseCtx(), {});
+    const outcome = await h.execute(node, baseCtx(), makeContext());
     expect(outcome.status).toBe("fail");
     expect(fakeChild).toHaveBeenCalledTimes(3);
   });

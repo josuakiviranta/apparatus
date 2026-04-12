@@ -1,9 +1,9 @@
 import { spawnSync } from "child_process";
-import type { NodeHandler } from "./registry.js";
+import type { NodeHandler, HandlerExecutionContext } from "./registry.js";
 import type { Node, Outcome, PipelineContext } from "../types.js";
 
 export class ToolHandler implements NodeHandler {
-  async execute(node: Node, _ctx: PipelineContext, _meta: Record<string, unknown>): Promise<Outcome> {
+  async execute(node: Node, _ctx: PipelineContext, _meta: HandlerExecutionContext): Promise<Outcome> {
     if (!node.toolCommand) {
       return { status: "fail", failureReason: "No tool_command specified on node" };
     }
