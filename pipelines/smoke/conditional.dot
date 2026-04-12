@@ -1,0 +1,34 @@
+digraph conditional_smoke {
+  goal="Smoke test: diamond conditional node routing on context variable"
+
+  start [shape=Mdiamond]
+
+  // Agent node produces structured output with a "result" field
+  classify [
+    agent="implement",
+    json_schema_file="pipelines/smoke/schemas/conditional-result.json",
+    prompt="You are a classifier. Return JSON with exactly: { \"result\": \"pass\" }. Do NOT use any tools."
+  ]
+
+  // Diamond node routes based on context variable set by classify
+  router [shape=diamond]
+
+  pass_path [
+    agent="implement",
+    prompt="Routing was: pass. Output exactly one line: 'conditional: pass'. Do NOT use any tools."
+  ]
+
+  fail_path [
+    agent="implement",
+    prompt="Routing was: fail. Output exactly one line: 'conditional: fail'. Do NOT use any tools."
+  ]
+
+  done [shape=Msquare]
+
+  start     -> classify
+  classify  -> router
+  router    -> pass_path [condition="result=pass"]
+  router    -> fail_path [condition="result=fail"]
+  pass_path -> done
+  fail_path -> done
+}

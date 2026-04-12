@@ -54,6 +54,19 @@ function buildHandlerMap(opts: EngineOptions): Map<string, NodeHandler> {
   return m;
 }
 
+// Selects a recovery edge on failure: only considers explicitly conditioned edges
+// so that unconditional success-path edges are never mistaken for fail-path edges.
+function selectFailEdge(
+  node: Node,
+  outcome: Outcome,
+  ctx: Record<string, unknown>,
+  edges: Edge[]
+): Edge | null {
+  const outgoing = edges.filter(e => e.from === node.id);
+  const condMatch = outgoing.filter(e => e.condition && evaluateCondition(e.condition, outcome, ctx));
+  return condMatch.length > 0 ? condMatch[0] : null;
+}
+
 function selectNextEdge(
   node: Node,
   outcome: Outcome,
@@ -240,7 +253,15 @@ export async function runPipeline(graph: Graph, opts: EngineOptions): Promise<Pi
     }
 
     if (outcome.status === "fail") {
-      return { status: "fail", completedNodes, context, failureReason: outcome.failureReason ?? `Node "${node.id}" failed` };
+      // Before terminating, try to route through a conditioned fail-path edge.
+      const failEdge = selectFailEdge(node, outcome, context, edges);
+      if (!failEdge) {
+        return { status: "fail", completedNodes, context, failureReason: outcome.failureReason ?? `Node "${node.id}" failed` };
+      }
+      if (!completedNodes.includes(node.id)) completedNodes = [...completedNodes, node.id];
+      await saveCheckpoint(opts.logsRoot, { timestamp: new Date().toISOString(), currentNode: failEdge.to, completedNodes, nodeRetries, context });
+      currentNodeId = failEdge.to;
+      continue;
     }
 
     // Advance — deduplicate completedNodes (set semantics, not bag)

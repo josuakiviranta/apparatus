@@ -1,5 +1,5 @@
 import React, { useEffect, useReducer, useRef, useState } from "react";
-import { render as inkRender, Box, Static, Text, useApp } from "ink";
+import { render as inkRender, Box, Static, Text, useApp, useInput } from "ink";
 import { pipelineReducer } from "../lib/pipelineReducer.js";
 import { initialPipelineState, type NodeEvent, type Block } from "../lib/pipelineEvents.js";
 import { BlockView } from "./BlockView.js";
@@ -41,6 +41,14 @@ export function PipelineApp({ pipelineName, pid, goal, nodes, onReady }: Props) 
       }
     }
   }, [state.frozen]);
+
+  // Re-raise SIGINT when C-c is pressed in raw mode (Ink suppresses the signal;
+  // this restores the expected abort behavior via the pipeline's onSignal handler).
+  useInput((input, key) => {
+    if (key.ctrl && input === "c") {
+      process.kill(process.pid, "SIGINT");
+    }
+  });
 
   // Fire onReady exactly once.
   const readyOnce = useRef(false);
@@ -143,7 +151,7 @@ export async function renderPipelineApp(props: Omit<Props, "onReady">): Promise<
 
   const instance = inkRender(
     React.createElement(PipelineApp, { ...props, onReady: (cbs) => resolve(cbs) }),
-    { patchConsole: false },
+    { patchConsole: false, exitOnCtrlC: false },
   );
 
   const callbacks = await ready;

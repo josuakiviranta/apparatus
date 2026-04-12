@@ -12,7 +12,11 @@ function resolveKey(key: string, outcome: Outcome, ctx: ContextMap): string {
     if (typeof v === "number" || typeof v === "boolean") return String(v);
     return JSON.stringify(v);
   }
-  return "";
+  const v = ctx[key];
+  if (v === undefined || v === null) return "";
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  return JSON.stringify(v);
 }
 
 function evaluateClause(clause: string, outcome: Outcome, ctx: ContextMap): boolean {

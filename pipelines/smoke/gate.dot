@@ -1,0 +1,25 @@
+digraph gate_smoke {
+  goal="Smoke test: gate node with two labeled choices"
+
+  start [shape=Mdiamond]
+
+  gate [shape=hexagon, label="Pick a path:\n\nA: Proceed  B: Abort"]
+
+  proceed [
+    agent="implement",
+    prompt="The user chose to proceed. Output exactly one line: 'gate: proceed chosen'. Do NOT use any tools."
+  ]
+
+  abort [
+    agent="implement",
+    prompt="The user chose to abort. Output exactly one line: 'gate: abort chosen'. Do NOT use any tools."
+  ]
+
+  done [shape=Msquare]
+
+  start   -> gate
+  gate    -> proceed [label="Proceed"]
+  gate    -> abort   [label="Abort"]
+  proceed -> done
+  abort   -> done
+}

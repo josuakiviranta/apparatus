@@ -1,0 +1,14 @@
+digraph agent_implement {
+  goal="Smoke test: single implement agent node"
+
+  start [shape=Mdiamond]
+
+  work [
+    agent="implement",
+    prompt="Output exactly one line: 'agent-implement: ok'. Do NOT use any tools."
+  ]
+
+  done [shape=Msquare]
+
+  start -> work -> done
+}

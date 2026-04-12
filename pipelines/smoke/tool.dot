@@ -1,0 +1,15 @@
+digraph tool_smoke {
+  goal="Smoke test: tool node executing a shell command"
+
+  start [shape=Mdiamond]
+
+  // Parallelogram shape = tool node; runs tool_command as a subprocess
+  run_echo [
+    shape=parallelogram,
+    tool_command="echo 'tool-node: ok'"
+  ]
+
+  done [shape=Msquare]
+
+  start -> run_echo -> done
+}

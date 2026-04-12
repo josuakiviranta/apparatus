@@ -105,18 +105,33 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
   // Track whether the current node had a block emitted (so we can gate `end`
   // emission symmetrically). Marker nodes (start, exit) do NOT emit a block.
   let currentBlockNodeId: string | null = null;
-  // One-shot flag: once we synthesize an abort end from the signal handler,
-  // ignore any late `onNodeEnd` for the same node.
-  let abortHandled = false;
+  // ID of the node whose end was already synthesised by the signal handler.
+  // Only that specific node is skipped in onNodeEnd; subsequent nodes are unaffected.
+  let abortHandledFor: string | null = null;
+  // Resolved by onSignal to unblock a hanging onInteractiveRequest promise.
+  let interactiveResolve: (() => void) | null = null;
+  // Stamps session.exitReason="abort" so the agent returns outcome=fail for routing.
+  let markInteractiveAbort: (() => void) | null = null;
+  // Immediately kills the interactive child so agent-handler doesn't wait 5s.
+  let killInteractiveChild: (() => void) | null = null;
 
   const ac = new AbortController();
   const onSignal = () => {
     if (currentBlockNodeId !== null) {
       emit({ kind: "end", outcome: { status: "abort", reason: "user-interrupt" } });
+      abortHandledFor = currentBlockNodeId;
       currentBlockNodeId = null;
-      abortHandled = true;
     }
-    ac.abort();
+    if (markInteractiveAbort !== null) markInteractiveAbort();
+    if (killInteractiveChild !== null) killInteractiveChild();
+    if (interactiveResolve !== null) {
+      interactiveResolve();
+      // Don't abort the engine — the fail-path edge (condition="outcome=fail") will
+      // route to the recovery node. A second signal will abort since interactiveResolve
+      // will be null by then.
+    } else {
+      ac.abort();
+    }
   };
   process.on("SIGINT", onSignal);
   process.on("SIGTERM", onSignal);
@@ -134,6 +149,9 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
 
       onInteractiveRequest: ({ child, session }) =>
         new Promise<void>((resolve) => {
+          interactiveResolve = resolve;
+          markInteractiveAbort = () => { session.exitReason = "abort"; };
+          killInteractiveChild = () => { child.kill("SIGTERM").catch(() => {}); };
           emit({ kind: "interactive-ready", child, onDone: resolve });
           if (child.sessionId) {
             emit({ kind: "trace-path", sessionId: child.sessionId });
@@ -157,16 +175,22 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
                 }
                 for (const nev of parseClaudeEvent(raw)) emit(nev);
               }
-              // turn_limit is success; everything else is a voluntary /end
-              session.exitReason = lastStopReason === "turn_limit" ? "turn_limit" : "user_end";
+              // Only set exitReason if it wasn't already set by markInteractiveAbort
+              // (which sets "abort" when C-c is pressed — we must not overwrite it).
+              if (session.exitReason === undefined) {
+                session.exitReason = lastStopReason === "turn_limit" ? "turn_limit" : "user_end";
+              }
               resolve();
             } catch (err) {
-              if (abortHandled) return;
+              if (abortHandledFor !== null) return;
               emit({
                 kind: "end",
                 outcome: { status: "fail", reason: `crash: ${(err as Error).message}` },
               });
               currentBlockNodeId = null;
+            } finally {
+              interactiveResolve = null;
+              markInteractiveAbort = null;
             }
           })();
         }),
@@ -184,7 +208,7 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
       },
 
       onNodeEnd: (node, outcome) => {
-        if (abortHandled) return;
+        if (node.id === abortHandledFor) return;
         if (classifyNode(node) === "marker") return;
         // Engine OutcomeStatus is "success"|"retry"|"fail"|"partial_success".
         // Map to the renderer's 3-value union. Abort is only emitted by
@@ -207,7 +231,7 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
       },
     });
 
-    if (result.status !== "success" && !abortHandled && currentBlockNodeId !== null) {
+    if (result.status !== "success" && abortHandledFor === null && currentBlockNodeId !== null) {
       emit({
         kind: "end",
         outcome: { status: "fail", reason: result.failureReason ?? "pipeline failed" },
