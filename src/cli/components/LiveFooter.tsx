@@ -50,20 +50,28 @@ export function LiveFooter({ block, index }: { block: LiveBlockWithInput; index:
   return (
     <Box flexDirection="column">
       <Text>{headerLine(index, block.nodeId, block.label)}</Text>
-      {block.tracePath && <Text dimColor>  trace: {block.tracePath}</Text>}
+      {(block.kind === "agent" || block.kind === "interactive-agent") && (
+        <Text dimColor>
+          {"  trace: "}{block.tracePath ?? "…"}
+        </Text>
+      )}
       {block.body.map((line, i) => <BodyLineView key={i} line={line} />)}
       {block.gate && (
         <GateSelector options={block.gate.options} onChoose={block.gate.onChoose} />
       )}
       <Text dimColor>{statusLine(block)}</Text>
-      {block.input && (
+      {block.kind === "interactive-agent" && (
         <Box>
           <Text color="gray">{"> "}</Text>
-          <TextInput
-            value={block.input.value}
-            onChange={block.input.onChange}
-            onSubmit={block.input.onSubmit}
-          />
+          {block.input ? (
+            <TextInput
+              value={block.input.value}
+              onChange={block.input.onChange}
+              onSubmit={block.input.onSubmit}
+            />
+          ) : (
+            <Text dimColor>{" "}</Text>
+          )}
         </Box>
       )}
     </Box>

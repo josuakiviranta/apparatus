@@ -17,6 +17,10 @@ function makeLive(overrides: Partial<LiveBlockWithInput> = {}): LiveBlockWithInp
   };
 }
 
+function makeAgentLive(overrides: Partial<LiveBlockWithInput> = {}): LiveBlockWithInput {
+  return makeLive({ kind: "agent", ...overrides });
+}
+
 describe("LiveFooter", () => {
   it("renders header with index, nodeId, label", () => {
     const block = makeLive();
@@ -38,11 +42,15 @@ describe("LiveFooter", () => {
     expect(frame).toContain("sid-a.jsonl");
   });
 
-  it("omits trace path when absent", () => {
+  it("shows a placeholder trace line when kind is agent/interactive-agent and tracePath is absent", () => {
     const block = makeLive({ tracePath: undefined });
     const { lastFrame } = render(<LiveFooter block={block} index={1} />);
     const frame = lastFrame() ?? "";
-    expect(frame).not.toContain("trace:");
+    // A placeholder trace row must exist to keep line count stable
+    expect(frame).toMatch(/trace:/);
+    expect(frame).toContain("…");
+    // But it must NOT show a real path
+    expect(frame).not.toMatch(/\.jsonl/);
   });
 
   it("renders body lines using BodyLineView", () => {
@@ -93,12 +101,14 @@ describe("LiveFooter", () => {
     expect(frame).toContain("what's in src?");
   });
 
-  it("omits TextInput when input prop is absent", () => {
+  it("shows a disabled input placeholder when kind is interactive-agent and input is absent", () => {
     const block = makeLive({ input: undefined });
     const { lastFrame } = render(<LiveFooter block={block} index={1} />);
     const frame = lastFrame() ?? "";
-    // Should not contain the prompt character at the start of a line
-    expect(frame).not.toMatch(/^> /m);
+    // Placeholder prompt row must exist to keep line count stable
+    expect(frame).toMatch(/^>/m);
+    // But there must be no interactive value content
+    expect(frame).not.toContain("what's in src?");
   });
 
   it("handles empty body gracefully", () => {
@@ -108,6 +118,52 @@ describe("LiveFooter", () => {
     // Should still render header and status, no crash
     expect(frame).toContain("[1]");
     expect(frame).toContain("turns");
+  });
+
+  it("shows trace placeholder for agent kind before tracePath arrives", () => {
+    const block = makeAgentLive({ tracePath: undefined });
+    const { lastFrame } = render(<LiveFooter block={block} index={2} />);
+    const frame = lastFrame() ?? "";
+    expect(frame).toMatch(/trace:/);
+    expect(frame).toContain("…");
+    expect(frame).not.toMatch(/\.jsonl/);
+  });
+
+  it("shows real trace path for agent kind once tracePath is set", () => {
+    const block = makeAgentLive({
+      tracePath: "/Users/x/.claude/projects/-cwd/abc.jsonl",
+    });
+    const { lastFrame } = render(<LiveFooter block={block} index={2} />);
+    const frame = lastFrame() ?? "";
+    expect(frame).toContain("trace:");
+    expect(frame).toContain("abc.jsonl");
+  });
+
+  it("does not show trace row for non-agent kinds (wait-human)", () => {
+    const { lastFrame } = render(
+      <LiveFooter
+        block={{
+          id: "gate-0",
+          nodeId: "g",
+          label: "gate",
+          kind: "wait-human",
+          startedAt: Date.now(),
+          body: [],
+          stats: { turns: 0, tokensIn: 0, tokensOut: 0 },
+          gate: { options: ["Yes"], onChoose: vi.fn() },
+        }}
+        index={1}
+      />
+    );
+    const frame = lastFrame() ?? "";
+    expect(frame).not.toMatch(/trace:/);
+  });
+
+  it("does not show input row for agent (non-interactive) kind", () => {
+    const block = makeAgentLive({ tracePath: undefined });
+    const { lastFrame } = render(<LiveFooter block={block} index={1} />);
+    const frame = lastFrame() ?? "";
+    expect(frame).not.toMatch(/^> /m);
   });
 });
 
