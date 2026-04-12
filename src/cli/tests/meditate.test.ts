@@ -56,6 +56,7 @@ import {
   appendMeditateGitignore,
   runMeditationSession,
   meditateCommand,
+  meditateKillCommand,
 } from "../commands/meditate";
 
 let tmpDir: string;
