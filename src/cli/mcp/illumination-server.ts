@@ -361,6 +361,20 @@ if (!isTestEnv) {
       },
     );
 
+    server.tool(
+      "mark_implemented",
+      "Mark an illumination as implemented. Valid from status open or dispatched.",
+      {
+        filename: z.string(),
+      },
+      async ({ filename }: { filename: string }) => {
+        const result = markImplemented(projectRoot, filename);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      },
+    );
+
     process.on("SIGINT", async () => {
       await server.close();
       process.exit(0);
