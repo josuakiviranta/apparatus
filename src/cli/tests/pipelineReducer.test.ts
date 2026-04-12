@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { pipelineReducer } from "../lib/pipelineReducer.js";
 import { initialPipelineState, type PipelineState } from "../lib/pipelineEvents.js";
 import type { ChildHandle } from "../lib/agent.js";
@@ -241,5 +241,44 @@ describe("pipelineReducer — trace-path derivation", () => {
   it("is a no-op when live is null (trace-path before start)", () => {
     const s = pipelineReducer(initialPipelineState, { kind: "trace-path", sessionId: "x" });
     expect(s).toEqual(initialPipelineState);
+  });
+});
+
+describe("pipelineReducer — gate-ready", () => {
+  it("stores options and onChoose on live.gate", () => {
+    let s = pipelineReducer(initialPipelineState, {
+      kind: "start", nodeId: "g", label: "Gate?", blockKind: "wait-human",
+    });
+    const onChoose = vi.fn();
+    s = pipelineReducer(s, { kind: "gate-ready", options: ["Yes", "No"], onChoose });
+    expect(s.live?.gate?.options).toEqual(["Yes", "No"]);
+    expect(s.live?.gate?.onChoose).toBe(onChoose);
+  });
+
+  it("is a no-op when live is null", () => {
+    const onChoose = vi.fn();
+    const s = pipelineReducer(initialPipelineState, {
+      kind: "gate-ready", options: ["Yes"], onChoose,
+    });
+    expect(s).toEqual(initialPipelineState);
+  });
+
+  it("does not call onChoose (reducer never invokes callbacks)", () => {
+    let s = pipelineReducer(initialPipelineState, {
+      kind: "start", nodeId: "g", label: "Gate?", blockKind: "wait-human",
+    });
+    const onChoose = vi.fn();
+    s = pipelineReducer(s, { kind: "gate-ready", options: ["Yes"], onChoose });
+    expect(onChoose).not.toHaveBeenCalled();
+  });
+
+  it("gate-ready does not affect frozen array", () => {
+    let s = pipelineReducer(initialPipelineState, {
+      kind: "start", nodeId: "g", label: "Gate?", blockKind: "wait-human",
+    });
+    s = pipelineReducer(s, {
+      kind: "gate-ready", options: ["Yes"], onChoose: vi.fn(),
+    });
+    expect(s.frozen).toHaveLength(0);
   });
 });

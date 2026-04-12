@@ -24,6 +24,7 @@ export type NodeEvent =
   | { kind: "tool_use"; name: string; summary: string }
   | { kind: "stats"; tokensIn: number; tokensOut: number }
   | { kind: "interactive-ready"; child: ChildHandle; onDone: () => void }
+  | { kind: "gate-ready"; options: string[]; onChoose: (choice: string) => void }
   | { kind: "end"; outcome: Outcome; stats?: Partial<Stats> };
 
 export type Block = {
@@ -51,6 +52,10 @@ export type LiveBlock = {
   stats: { turns: number; tokensIn: number; tokensOut: number };
   child?: ChildHandle;
   onDone?: () => void;
+  gate?: {
+    options: string[];
+    onChoose: (choice: string) => void;
+  };
 };
 
 export type PipelineState = {

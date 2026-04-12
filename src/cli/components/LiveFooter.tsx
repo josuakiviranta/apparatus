@@ -3,6 +3,7 @@ import { Box, Text } from "ink";
 import type { LiveBlock } from "../lib/pipelineEvents.js";
 import { BodyLineView } from "./BlockView.js";
 import { TextInput } from "./TextInput.js";
+import { GateSelector } from "./GateSelector.js";
 
 const HEADER_WIDTH = 80;
 
@@ -26,6 +27,9 @@ function formatElapsed(startedAt: number): string {
 }
 
 function statusLine(block: LiveBlockWithInput): string {
+  if (block.kind === "wait-human") {
+    return `  ◆ awaiting choice · ${formatElapsed(block.startedAt)}`;
+  }
   const icon = block.input ? "●" : "⠋";
   const verb = block.input ? "awaiting" : "streaming";
   const parts = [
@@ -48,6 +52,9 @@ export function LiveFooter({ block, index }: { block: LiveBlockWithInput; index:
       <Text>{headerLine(index, block.nodeId, block.label)}</Text>
       {block.tracePath && <Text dimColor>  trace: {block.tracePath}</Text>}
       {block.body.map((line, i) => <BodyLineView key={i} line={line} />)}
+      {block.gate && (
+        <GateSelector options={block.gate.options} onChoose={block.gate.onChoose} />
+      )}
       <Text dimColor>{statusLine(block)}</Text>
       {block.input && (
         <Box>

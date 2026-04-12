@@ -110,3 +110,45 @@ describe("LiveFooter", () => {
     expect(frame).toContain("turns");
   });
 });
+
+describe("LiveFooter — wait-human gate", () => {
+  function makeGateLiveBlock(overrides: Partial<LiveBlockWithInput> = {}): LiveBlockWithInput {
+    return {
+      id: "gate-0",
+      nodeId: "approval_gate",
+      label: "Do you approve?",
+      kind: "wait-human",
+      startedAt: Date.now() - 1000,
+      body: [],
+      stats: { turns: 0, tokensIn: 0, tokensOut: 0 },
+      gate: {
+        options: ["Approve", "Decline"],
+        onChoose: vi.fn(),
+      },
+      ...overrides,
+    };
+  }
+
+  it("renders GateSelector options when block.gate is set", () => {
+    const { lastFrame } = render(<LiveFooter block={makeGateLiveBlock()} index={1} />);
+    const frame = lastFrame() ?? "";
+    expect(frame).toContain("▶ 1. Approve");
+    expect(frame).toContain("  2. Decline");
+  });
+
+  it("shows 'awaiting choice' status instead of streaming spinner", () => {
+    const { lastFrame } = render(<LiveFooter block={makeGateLiveBlock()} index={1} />);
+    const frame = lastFrame() ?? "";
+    expect(frame).toContain("awaiting choice");
+    expect(frame).not.toContain("streaming");
+  });
+
+  it("does not render GateSelector when block.gate is absent", () => {
+    const block = makeGateLiveBlock();
+    delete (block as Partial<typeof block>).gate;
+    const { lastFrame } = render(<LiveFooter block={block} index={1} />);
+    const frame = lastFrame() ?? "";
+    expect(frame).not.toContain("▶");
+    expect(frame).not.toContain("↑↓ navigate");
+  });
+});

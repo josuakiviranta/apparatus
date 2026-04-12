@@ -71,6 +71,14 @@ export function pipelineReducer(state: PipelineState, event: NodeEvent): Pipelin
       };
     }
 
+    case "gate-ready": {
+      if (!state.live) return state;
+      return {
+        ...state,
+        live: { ...state.live, gate: { options: event.options, onChoose: event.onChoose } },
+      };
+    }
+
     case "end": {
       if (!state.live) return state;
       const filled = fillStats(state.live, event.stats);

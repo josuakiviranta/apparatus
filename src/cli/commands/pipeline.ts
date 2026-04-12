@@ -4,7 +4,7 @@ import { homedir } from "os";
 import { parseDot, validateGraph, validateOrRaise } from "../../attractor/core/graph.js";
 import { runPipeline } from "../../attractor/core/engine.js";
 import { variableExpansionTransform } from "../../attractor/transforms/variable-expansion.js";
-import { ConsoleInterviewer } from "../../attractor/interviewer/console.js";
+import { InkInterviewer } from "../../attractor/interviewer/ink.js";
 import { AutoApproveInterviewer } from "../../attractor/interviewer/auto-approve.js";
 import { getPipelinesDir, resolvePipelineArg, isNameShorthand } from "../lib/pipeline-resolver.js";
 import { spawn, spawnSync } from "child_process";
@@ -125,7 +125,9 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
     const result = await runPipeline(graph, {
       logsRoot,
       cwd: project,
-      interviewer: process.stdin.isTTY ? new ConsoleInterviewer() : new AutoApproveInterviewer(),
+      interviewer: process.stdin.isTTY
+        ? new InkInterviewer(callbacks.emit)
+        : new AutoApproveInterviewer(),
       signal: ac.signal,
       project: opts.project,
       resume: opts.resume,
