@@ -5,6 +5,7 @@ export type BlockKind =
   | "agent"
   | "interactive-agent"
   | "tool"
+  | "store"
   | "wait-human"
   | "conditional"
   | "marker";
@@ -35,6 +36,7 @@ export function classifyNode(node: Node): BlockKind {
     return interactive ? "interactive-agent" : "agent";
   }
   if (t === "tool") return "tool";
+  if (t === "store") return "store";
   // Accept both the hyphenated form (node.type="wait-human") and the dotted form
   // (SHAPE_TO_TYPE["hexagon"] = "wait.human") that resolveHandlerType can produce.
   if (t === "wait-human" || t === "wait.human") return "wait-human";
