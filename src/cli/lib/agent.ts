@@ -190,6 +190,21 @@ export class Agent {
       const child = spawn("claude", args, spawnOptions);
       this._child = child;
 
+      // Kill child immediately when the caller aborts (e.g. Ctrl+C).
+      // The child is spawned with detached:true so it won't receive the
+      // terminal's SIGINT — we must kill it explicitly.
+      if (options.signal) {
+        const onAbort = () => {
+          child.kill("SIGTERM");
+          setTimeout(() => { if (!child.killed) child.kill("SIGKILL"); }, 3000);
+        };
+        if (options.signal.aborted) {
+          onAbort();
+        } else {
+          options.signal.addEventListener("abort", onAbort, { once: true });
+        }
+      }
+
       // Pipe prompt to stdin for non-interactive, non-resume
       if (!isInteractive && !isResume && child.stdin) {
         child.stdin.write(expandedPrompt);

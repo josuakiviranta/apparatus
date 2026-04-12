@@ -342,3 +342,53 @@ describe("Agent.run readline completion", () => {
     expect(result.sessionId).toBe("s1");
   });
 });
+
+describe("Agent.run abort signal", () => {
+  it("kills child process when abort signal fires during run", async () => {
+    const ac = new AbortController();
+
+    const killFn = vi.fn((_sig: string) => {});
+    const mockChild = {
+      killed: false,
+      kill: vi.fn((sig: string) => {
+        mockChild.killed = true;
+        killFn(sig);
+      }),
+      on: vi.fn((event: string, cb: (code: number) => void) => {
+        if (event === "close") {
+          setTimeout(() => cb(0), 50);
+        }
+      }),
+      stdin: {
+        write: vi.fn((_data: unknown, cb?: (err?: Error) => void) => {
+          cb?.();
+        }),
+        end: vi.fn(),
+      },
+      stdout: null,
+      stderr: null,
+    };
+
+    mockSpawn.mockReturnValueOnce(mockChild as any);
+
+    const agent = new Agent({
+      name: "test",
+      description: "",
+      model: "opus",
+      permissionMode: "dangerouslySkipPermissions",
+      tools: [],
+      mcp: [],
+      prompt: "hello",
+    });
+
+    const runPromise = agent.run({ cwd: "/tmp", signal: ac.signal });
+
+    // Let spawn execute and the abort listener be registered
+    await new Promise((r) => setImmediate(r));
+    ac.abort();
+
+    await runPromise;
+
+    expect(killFn).toHaveBeenCalledWith("SIGTERM");
+  });
+});
