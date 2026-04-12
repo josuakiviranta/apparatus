@@ -72,6 +72,15 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
 
   graph = variableExpansionTransform(graph, { project: opts.project });
 
+  // Headless safety: refuse to run headless_safe=false pipelines without a TTY
+  if (graph.headlessSafe === false && !process.stdin.isTTY) {
+    await output.error(
+      `This pipeline has headless_safe=false and cannot run without a TTY.\n` +
+      `Run it interactively: ralph pipeline run ${dotFile}`
+    );
+    process.exit(1);
+  }
+
   const slug = graph.name.replace(/\s+/g, "-").toLowerCase();
   const logsRoot = opts.logsRoot ?? join(homedir(), ".ralph", "runs", slug);
 
