@@ -1,13 +1,19 @@
-# Meditate `--steer` Flag Implementation Plan
+# Implementation Plan
 
-> **Status: COMPLETE** — shipped in v0.1.7 (commit 67e776a)
+No pending work items.
 
-Both chunks implemented and tested:
-- Chunk 1: `message?` field in `RunOptions`, `steer?` parameter in `runMeditationSession`
-- Chunk 2: `--steer` flag in Commander (`program.ts`), `meditateCommand` opts passthrough, `heartbeat meditate` args inclusion
+## Recently Completed
 
-All 653 tests pass, typecheck clean, build succeeds.
+### Illumination Auto-Commit (v0.1.8)
 
----
+**Commit:** `1f15c0c` — `feat(meditate): auto-commit illuminations after write_illumination`
 
-No pending items.
+**What:** After `writeIllumination` writes the file to disk, `git add` + `git commit` run automatically. Wrapped in try/catch (fail-open) so git failures never break the tool call.
+
+**Why:** Illumination files were vulnerable to `git clean`, branch switches, and worktree cleanup. Auto-committing makes them durable in git-managed projects.
+
+**Files changed:**
+- `src/cli/mcp/illumination-server.ts` — added `execSync` import + git auto-commit after `writeFileSync`
+- `src/cli/tests/illumination-server.test.ts` — added 3 tests (git commands called, fail-open, idempotent re-write)
+
+**Design doc:** `docs/superpowers/specs/2026-04-12-illumination-auto-commit-design.md`

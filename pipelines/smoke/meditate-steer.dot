@@ -1,0 +1,14 @@
+digraph meditate_steer {
+  goal="Smoke test: meditate with --steer flag"
+
+  start [shape=Mdiamond]
+
+  reflect [
+    type="ralph.meditate",
+    steer="Write one illumination that lists the top-level source directories in this project. Do not explore deeply — just list src/, docs/, pipelines/ etc. and write the illumination."
+  ]
+
+  done [shape=Msquare]
+
+  start -> reflect -> done
+}
