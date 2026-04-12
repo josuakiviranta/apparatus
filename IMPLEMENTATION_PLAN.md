@@ -668,11 +668,11 @@ This chunk is a manual verification session using the tmux harness. It confirms 
 
 ### Task 7.1: Source the harness and start the run
 
-- [ ] **Step 1: Read `docs/harness/tmux-drive.md`**
+- [x] **Step 1: Read `docs/harness/tmux-drive.md`**
 
   Read the full file. Source the entire fenced bash block into your shell before running any harness commands.
 
-- [ ] **Step 2: Start the run**
+- [x] **Step 2: Start the run**
 
   ```bash
   start_run "ralph pipeline run pipelines/gate-test.dot"
@@ -681,7 +681,7 @@ This chunk is a manual verification session using the tmux harness. It confirms 
 
 ### Task 7.2: Verify the gate renders inside Ink
 
-- [ ] **Step 1: Wait for `▶ 1. Approve` to appear**
+- [x] **Step 1: Wait for `▶ 1. Approve` to appear**
 
   ```bash
   wait_for_string "▶ 1. Approve" 30000
@@ -689,7 +689,7 @@ This chunk is a manual verification session using the tmux harness. It confirms 
 
   If this times out: the GateSelector is not rendering. Stop and debug — do not proceed.
 
-- [ ] **Step 2: Capture and inspect the TUI state**
+- [x] **Step 2: Capture and inspect the TUI state**
 
   ```bash
   wait_stable 2000 && capture
@@ -706,7 +706,7 @@ This chunk is a manual verification session using the tmux harness. It confirms 
 
 ### Task 7.3: Test arrow-key navigation
 
-- [ ] **Step 1: Press down arrow and capture**
+- [x] **Step 1: Press down arrow and capture**
 
   ```bash
   tmux send-keys -t "$SESSION:$WIN" Down
@@ -717,7 +717,7 @@ This chunk is a manual verification session using the tmux harness. It confirms 
 
   Expected: `▶ 2. Decline` is now highlighted; `1. Approve` has no `▶`.
 
-- [ ] **Step 2: Press up arrow and capture**
+- [x] **Step 2: Press up arrow and capture**
 
   ```bash
   tmux send-keys -t "$SESSION:$WIN" Up
@@ -730,13 +730,13 @@ This chunk is a manual verification session using the tmux harness. It confirms 
 
 ### Task 7.4: Confirm choice and verify frozen block
 
-- [ ] **Step 1: Press Enter to select Approve**
+- [x] **Step 1: Press Enter to select Approve**
 
   ```bash
   tmux send-keys -t "$SESSION:$WIN" Enter
   ```
 
-- [ ] **Step 2: Wait for the body line and frozen outcome**
+- [x] **Step 2: Wait for the body line and frozen outcome**
 
   ```bash
   wait_for_string "you: Approve" 15000
@@ -755,18 +755,18 @@ This chunk is a manual verification session using the tmux harness. It confirms 
 
   The block header appears exactly once. No raw readline artifact above it.
 
-- [ ] **Step 3: Verify the `approved` agent ran to completion**
+- [x] **Step 3: Verify the `approved` agent ran to completion**
 
   The capture should also show `━━ [2] approved · agent` block with `✓ success`.
 
 ### Task 7.5: Cleanup
 
-- [ ] **Step 1: Clean up the tmux window**
+- [x] **Step 1: Clean up the tmux window**
 
   ```bash
   cleanup_run
   ```
 
-- [ ] **Step 2: Commit a session note if any unexpected issues were found**
+- [x] **Step 2: Commit a session note if any unexpected issues were found**
 
   If everything passed cleanly, no commit is needed. If you had to fix anything during the tmux session, commit those fixes now before declaring done.
