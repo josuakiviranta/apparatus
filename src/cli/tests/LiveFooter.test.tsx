@@ -60,6 +60,15 @@ describe("LiveFooter", () => {
     expect(frame).toContain("ralph-cli has 4 layers");
   });
 
+  it("indents body text lines with 2 spaces", () => {
+    const block = makeLive({
+      body: [{ kind: "text", role: "you", text: "hello" }],
+    });
+    const { lastFrame } = render(<LiveFooter block={block} index={1} />);
+    const frame = lastFrame() ?? "";
+    expect(frame).toMatch(/^  you:/m);
+  });
+
   it("renders status line with turn count and token stats", () => {
     const block = makeLive({
       stats: { turns: 3, tokensIn: 891, tokensOut: 634 },

@@ -113,6 +113,22 @@ describe("BlockView", () => {
     expect(frame).toContain("21.3s");
   });
 
+  it("indents outcome line with 2 spaces", () => {
+    const block = makeBlock();
+    const { lastFrame } = render(<BlockView block={block} index={1} />);
+    const frame = lastFrame() ?? "";
+    expect(frame).toMatch(/^  ✓/m);
+  });
+
+  it("indents body text lines with 2 spaces", () => {
+    const block = makeBlock({
+      body: [{ kind: "text", role: "you", text: "hello" }],
+    });
+    const { lastFrame } = render(<BlockView block={block} index={1} />);
+    const frame = lastFrame() ?? "";
+    expect(frame).toMatch(/^  you:/m);
+  });
+
   it("handles empty body gracefully", () => {
     const block = makeBlock({ body: [] });
     const { lastFrame } = render(<BlockView block={block} index={1} />);

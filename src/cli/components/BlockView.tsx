@@ -15,12 +15,14 @@ function roleColor(role: "you" | "claude" | "system"): string {
 export function BodyLineView({ line }: { line: BodyLine }) {
   if (line.kind === "text") {
     return (
-      <Text>
-        <Text bold color={roleColor(line.role)}>{line.role}:</Text> {line.text}
-      </Text>
+      <Box marginLeft={2}>
+        <Text>
+          <Text bold color={roleColor(line.role)}>{line.role}:</Text> {line.text}
+        </Text>
+      </Box>
     );
   }
-  return <Text dimColor>[tool_use: {line.name}] {line.summary}</Text>;
+  return <Box marginLeft={2}><Text dimColor>[tool_use: {line.name}] {line.summary}</Text></Box>;
 }
 
 function headerLine(index: number, nodeId: string, label: string): string {
@@ -36,7 +38,7 @@ function formatDuration(ms: number): string {
 function outcomeLine(block: Block): string {
   const glyph = block.outcome.status === "success" ? "✓" : "✗";
   const parts = [
-    `${glyph} ${block.outcome.status}`,
+    `  ${glyph} ${block.outcome.status}`,
   ];
   if (block.outcome.reason) {
     parts.push(block.outcome.reason);
