@@ -1,5 +1,6 @@
 ---
 date: 2026-04-11
+status: open
 description: The 12 accumulated illuminations form a dependency graph where some fixes must land before others are actionable — the pipeline's non-deterministic verifier will process them as a flat set and generate plans in the wrong order, including plans for state-machine enhancements that are useless until the 3-line ChatUI fix is in place.
 ---
 

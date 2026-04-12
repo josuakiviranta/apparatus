@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync, statSync, readFileSync, readdirSync, existsSync } from "fs";
+import { mkdirSync, writeFileSync, statSync, readFileSync, readdirSync, existsSync, rmSync } from "fs";
 import { execSync } from "node:child_process";
 import { join, resolve, isAbsolute, relative } from "path";
 import ignore from "ignore";
@@ -25,7 +25,7 @@ export function writeIllumination(
   if (err) throw new Error(err);
   if (!description || !description.trim()) throw new Error("description is required");
   const date = new Date().toISOString().slice(0, 10);
-  const frontmatter = `---\ndate: ${date}\ndescription: ${description.trim()}\n---\n\n`;
+  const frontmatter = `---\ndate: ${date}\nstatus: open\ndescription: ${description.trim()}\n---\n\n`;
   const dir = join(projectRoot, "meditations", "illuminations");
   mkdirSync(dir, { recursive: true });
   const filePath = join(dir, filename);
@@ -100,6 +100,119 @@ export function markImplemented(
   };
 }
 
+export function markDispatched(
+  projectRoot: string,
+  filename: string,
+  planPath: string,
+): { success: true; filename: string; previous_status: string; new_status: string }
+  | { success: false; error: string } {
+  const fnErr = validateFilename(filename);
+  if (fnErr) return { success: false, error: fnErr };
+
+  const illumDir = join(projectRoot, "meditations", "illuminations");
+  const filePath = join(illumDir, filename);
+
+  if (!existsSync(filePath)) {
+    return { success: false, error: `Illumination file not found: ${filename}` };
+  }
+
+  const raw = readFileSync(filePath, "utf-8");
+  const fmMatch = raw.match(/^---\n([\s\S]*?)\n---\n/);
+  if (!fmMatch) {
+    return { success: false, error: "No frontmatter found in illumination file" };
+  }
+
+  const fmBlock = fmMatch[1];
+  const body = raw.slice(fmMatch[0].length);
+
+  const statusMatch = fmBlock.match(/^status:\s*(.+)$/m);
+  const currentStatus = statusMatch ? statusMatch[1].trim() : "open";
+
+  if (currentStatus !== "open") {
+    return {
+      success: false,
+      error: `Cannot mark as dispatched: current status is ${currentStatus}`,
+    };
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  let updatedFm = statusMatch
+    ? fmBlock.replace(/^status:\s*.+$/m, "status: dispatched")
+    : fmBlock + "\nstatus: dispatched";
+  updatedFm += `\ndispatched_at: ${today}`;
+  updatedFm += `\nplan_path: ${planPath}`;
+
+  const updatedContent = `---\n${updatedFm}\n---\n${body}`;
+  writeFileSync(filePath, updatedContent);
+
+  return {
+    success: true,
+    filename,
+    previous_status: currentStatus,
+    new_status: "dispatched",
+  };
+}
+
+export function markArchived(
+  projectRoot: string,
+  filename: string,
+  reason: string,
+): { success: true; filename: string; previous_status: string; new_status: string; archive_path: string }
+  | { success: false; error: string } {
+  const fnErr = validateFilename(filename);
+  if (fnErr) return { success: false, error: fnErr };
+
+  const illumDir = join(projectRoot, "meditations", "illuminations");
+  const filePath = join(illumDir, filename);
+
+  if (!existsSync(filePath)) {
+    return { success: false, error: `Illumination file not found: ${filename}` };
+  }
+
+  const raw = readFileSync(filePath, "utf-8");
+  const fmMatch = raw.match(/^---\n([\s\S]*?)\n---\n/);
+  if (!fmMatch) {
+    return { success: false, error: "No frontmatter found in illumination file" };
+  }
+
+  const fmBlock = fmMatch[1];
+  const body = raw.slice(fmMatch[0].length);
+
+  const statusMatch = fmBlock.match(/^status:\s*(.+)$/m);
+  const currentStatus = statusMatch ? statusMatch[1].trim() : "open";
+
+  if (currentStatus === "archived") {
+    return {
+      success: false,
+      error: "Cannot archive: current status is already archived",
+    };
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  let updatedFm = statusMatch
+    ? fmBlock.replace(/^status:\s*.+$/m, "status: archived")
+    : fmBlock + "\nstatus: archived";
+  updatedFm += `\narchived_at: ${today}`;
+  updatedFm += `\narchive_reason: ${reason}`;
+
+  const archiveDir = join(illumDir, "archive");
+  mkdirSync(archiveDir, { recursive: true });
+
+  const archivePath = join(archiveDir, filename);
+  const updatedContent = `---\n${updatedFm}\n---\n${body}`;
+  writeFileSync(archivePath, updatedContent);
+
+  rmSync(filePath);
+
+  return {
+    success: true,
+    filename,
+    previous_status: currentStatus,
+    new_status: "archived",
+    archive_path: join("meditations", "illuminations", "archive", filename),
+  };
+}
+
 export function assertWithinRoot(inputPath: string, projectRoot: string): void {
   const resolvedPath = resolve(inputPath);
   const resolvedRoot = resolve(projectRoot);
@@ -165,12 +278,22 @@ function parseIlluminationDescription(filePath: string): string {
   }
 }
 
-export function listIlluminations(projectRoot: string): string {
+export function listIlluminations(projectRoot: string, status?: string): string {
   const dir = join(projectRoot, "meditations", "illuminations");
   try {
-    const files = readdirSync(dir)
+    let files = readdirSync(dir)
       .filter((f) => f.endsWith(".md"))
       .sort();
+    if (status) {
+      files = files.filter((f) => {
+        const content = readFileSync(join(dir, f), "utf-8");
+        const fmMatch = content.match(/^---\n([\s\S]*?)\n---\n/);
+        if (!fmMatch) return status === "open"; // no frontmatter = open
+        const statusMatch = fmMatch[1].match(/^status:\s*(.+)$/m);
+        const fileStatus = statusMatch ? statusMatch[1].trim() : "open";
+        return fileStatus === status;
+      });
+    }
     if (files.length === 0) return NO_ILLUMINATIONS_MESSAGE;
     return files
       .map((f) => `${f} — ${parseIlluminationDescription(join(dir, f))}`)
@@ -363,11 +486,14 @@ if (!isTestEnv) {
 
     server.tool(
       "list_illuminations",
-      "List all illuminations written to this project, with descriptions. " +
-        "Call this at the start of a session to orient yourself before writing new insights.",
-      {},
-      async () => {
-        const result = listIlluminations(projectRoot);
+      "List illuminations written to this project, with descriptions. " +
+        "Call this at the start of a session to orient yourself before writing new insights. " +
+        "Optionally filter by lifecycle status.",
+      {
+        status: z.enum(["open", "dispatched", "implemented", "archived"]).optional(),
+      },
+      async ({ status }: { status?: string }) => {
+        const result = listIlluminations(projectRoot, status);
         return { content: [{ type: "text" as const, text: result }] };
       },
     );
@@ -380,6 +506,36 @@ if (!isTestEnv) {
       },
       async ({ filename }: { filename: string }) => {
         const result = markImplemented(projectRoot, filename);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      },
+    );
+
+    server.tool(
+      "mark_dispatched",
+      "Mark an illumination as dispatched after a plan has been generated. Valid only from status open.",
+      {
+        filename: z.string(),
+        plan_path: z.string(),
+      },
+      async ({ filename, plan_path }: { filename: string; plan_path: string }) => {
+        const result = markDispatched(projectRoot, filename, plan_path);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      },
+    );
+
+    server.tool(
+      "mark_archived",
+      "Archive an illumination. Moves file to archive/ subdirectory. Valid from any status except archived.",
+      {
+        filename: z.string(),
+        reason: z.string(),
+      },
+      async ({ filename, reason }: { filename: string; reason: string }) => {
+        const result = markArchived(projectRoot, filename, reason);
         return {
           content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
         };

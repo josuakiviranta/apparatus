@@ -1,5 +1,6 @@
 ---
 date: 2026-04-12
+status: open
 description: A map of the top-level source directories in ralph-cli, showing where code, docs, tests, pipelines, and specs live.
 ---
 

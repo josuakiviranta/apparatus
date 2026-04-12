@@ -1,5 +1,6 @@
 ---
 date: 2026-04-11
+status: open
 description: The illumination-to-plan pipeline's interactive chat_session node will silently discard design_writer and plan_writer output due to the T1620 nested-Static bug — making the pipeline useless in practice until that 3-line fix lands first.
 ---
 

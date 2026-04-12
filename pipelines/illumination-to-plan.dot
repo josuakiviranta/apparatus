@@ -10,7 +10,9 @@ digraph illumination_to_plan {
 
   remove_gate [shape=hexagon, label="Remove this illumination?\n$illumination_path\n\n$explanation"]
 
-  delete_agent [agent="implement", prompt="Delete the file at $illumination_path. Confirm the file has been deleted. Do NOT modify any other files."]
+  mark_archived [agent="implement", prompt="Call mcp__illumination__mark_archived with filename from $illumination_path (basename only) and reason summarizing why the illumination is being archived (use context from $summary). Return the JSON result."]
+
+  mark_dispatched [agent="implement", prompt="Call mcp__illumination__mark_dispatched with filename from $illumination_path (basename only) and plan_path set to $design_doc_path. Return the JSON result."]
 
   explainer [agent="implement", prompt="Read the illumination at $illumination_path.\n\nVerifier summary: $summary\nVerifier explanation: $explanation\n\nExplain to the user in simple, clear terms:\n1. What would change in the codebase\n2. Why this change matters\n3. What files or modules would be affected\n\nKeep it concise — aim for 3-5 sentences. Do NOT modify any project files."]
 
@@ -34,13 +36,13 @@ digraph illumination_to_plan {
 
   // False path
   explain_removal -> remove_gate
-  remove_gate -> done          [label="No"]
-  remove_gate -> delete_agent  [label="Yes"]
-  delete_agent -> done
+  remove_gate -> done           [label="No"]
+  remove_gate -> mark_archived  [label="Yes"]
+  mark_archived -> done
 
   // True path
   explainer -> approval_gate
-  approval_gate -> delete_agent  [label="Decline"]
+  approval_gate -> mark_archived  [label="Decline"]
   approval_gate -> design_writer [label="Approve"]
   approval_gate -> chat_session  [label="Chat"]
 
@@ -48,5 +50,5 @@ digraph illumination_to_plan {
   chat_session -> chat_summarizer -> approval_gate
 
   // Plan writing
-  design_writer -> plan_writer -> done
+  design_writer -> mark_dispatched -> plan_writer -> done
 }

@@ -1,5 +1,6 @@
 ---
 date: 2026-04-11
+status: open
 description: Illumination files have no lifecycle state — there is no difference between a fresh observation and one already dispatched or implemented — so the illumination-to-plan pipeline will process the same illumination repeatedly, and meditate sessions will keep re-diagnosing already-resolved problems.
 ---
 

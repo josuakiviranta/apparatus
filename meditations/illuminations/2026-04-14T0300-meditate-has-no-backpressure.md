@@ -1,5 +1,6 @@
 ---
 date: 2026-04-11
+status: open
 description: ralph meditate runs unconditionally regardless of illumination backlog depth — it has a PID lock to prevent concurrency but no pre-session check on the unprocessed illumination count, so the corpus grows without bound while the action pipeline remains blocked.
 ---
 

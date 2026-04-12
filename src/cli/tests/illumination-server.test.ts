@@ -11,7 +11,7 @@ vi.mock("node:child_process", () => ({
   execSync: mockExecSync,
 }));
 
-import { validateFilename, writeIllumination, assertWithinRoot, readFile, validateGlobPattern, globFiles, projectTree, listMetaMeditations, readMetaMeditation, listIlluminations, markImplemented } from "../mcp/illumination-server";
+import { validateFilename, writeIllumination, assertWithinRoot, readFile, validateGlobPattern, globFiles, projectTree, listMetaMeditations, readMetaMeditation, listIlluminations, markImplemented, markDispatched, markArchived } from "../mcp/illumination-server";
 
 let tmpDir: string;
 
@@ -76,11 +76,21 @@ describe("writeIllumination", () => {
     expect(() => writeIllumination(tmpDir, "bad/name.md", "A description", "content")).toThrow();
   });
 
-  it("prepends YAML frontmatter with date and description", () => {
+  it("prepends YAML frontmatter with date, status, and description", () => {
     writeIllumination(tmpDir, "test.md", "My core insight", "# Body");
     const written = readFileSync(join(tmpDir, "meditations", "illuminations", "test.md"), "utf8");
     const today = new Date().toISOString().slice(0, 10);
-    expect(written).toMatch(new RegExp(`^---\\ndate: ${today}\\ndescription: My core insight\\n---\\n`));
+    expect(written).toMatch(new RegExp(`^---\\ndate: ${today}\\nstatus: open\\ndescription: My core insight\\n---\\n`));
+  });
+
+  it("includes status: open in frontmatter", () => {
+    writeIllumination(tmpDir, "T1200-status-test.md", "Status test", "Body");
+    const content = readFileSync(
+      join(tmpDir, "meditations", "illuminations", "T1200-status-test.md"),
+      "utf-8"
+    );
+    expect(content).toMatch(/^---\n/);
+    expect(content).toMatch(/status: open/);
   });
 
   it("places the content body after the frontmatter separator", () => {
@@ -442,6 +452,49 @@ describe("listIlluminations", () => {
       "2026-04-08T0900-first.md — First insight.\n2026-04-08T1100-second.md — Second insight."
     );
   });
+
+  it("filters by status when status parameter provided", () => {
+    const illumDir = join(tmpDir, "meditations", "illuminations");
+    mkdirSync(illumDir, { recursive: true });
+    writeFileSync(
+      join(illumDir, "T1000-open.md"),
+      "---\ndate: 2026-04-12\nstatus: open\ndescription: Open one\n---\n\nBody"
+    );
+    writeFileSync(
+      join(illumDir, "T1100-dispatched.md"),
+      "---\ndate: 2026-04-12\nstatus: dispatched\ndescription: Dispatched one\n---\n\nBody"
+    );
+    const result = listIlluminations(tmpDir, "open");
+    expect(result).toContain("T1000-open.md");
+    expect(result).not.toContain("T1100-dispatched.md");
+  });
+
+  it("treats files without status field as open", () => {
+    const illumDir = join(tmpDir, "meditations", "illuminations");
+    mkdirSync(illumDir, { recursive: true });
+    writeFileSync(
+      join(illumDir, "T0900-legacy.md"),
+      "---\ndate: 2026-04-12\ndescription: Legacy file\n---\n\nBody"
+    );
+    const result = listIlluminations(tmpDir, "open");
+    expect(result).toContain("T0900-legacy.md");
+  });
+
+  it("returns all illuminations when status omitted", () => {
+    const illumDir = join(tmpDir, "meditations", "illuminations");
+    mkdirSync(illumDir, { recursive: true });
+    writeFileSync(
+      join(illumDir, "T1000-open.md"),
+      "---\ndate: 2026-04-12\nstatus: open\ndescription: Open\n---\n\nBody"
+    );
+    writeFileSync(
+      join(illumDir, "T1100-dispatched.md"),
+      "---\ndate: 2026-04-12\nstatus: dispatched\ndescription: Dispatched\n---\n\nBody"
+    );
+    const result = listIlluminations(tmpDir);
+    expect(result).toContain("T1000-open.md");
+    expect(result).toContain("T1100-dispatched.md");
+  });
 });
 
 describe("markImplemented", () => {
@@ -533,5 +586,269 @@ describe("markImplemented", () => {
     const today = new Date().toISOString().slice(0, 10);
     expect(content).toContain(`implemented_at: ${today}`);
     expect(content).toMatch(/implemented_at: \d{4}-\d{2}-\d{2}/);
+  });
+});
+
+describe("markDispatched", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = realpathSync(mkdtempSync(join(tmpdir(), "ralph-test-")));
+    mkdirSync(join(tmpDir, "meditations", "illuminations"), { recursive: true });
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  function writeIlluminationFile(filename: string, frontmatter: string, body: string) {
+    const content = `---\n${frontmatter}\n---\n\n${body}`;
+    writeFileSync(join(tmpDir, "meditations", "illuminations", filename), content);
+  }
+
+  it("transitions open to dispatched", () => {
+    writeIlluminationFile(
+      "T1300-open.md",
+      "date: 2026-04-12\nstatus: open\ndescription: An open issue",
+      "Body content."
+    );
+
+    const result = markDispatched(tmpDir, "T1300-open.md", "docs/superpowers/specs/2026-04-12-test.md");
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.previous_status).toBe("open");
+      expect(result.new_status).toBe("dispatched");
+    }
+
+    const written = readFileSync(
+      join(tmpDir, "meditations", "illuminations", "T1300-open.md"),
+      "utf-8"
+    );
+    expect(written).toMatch(/status: dispatched/);
+    expect(written).toMatch(/dispatched_at: \d{4}-\d{2}-\d{2}/);
+    expect(written).toMatch(/plan_path: docs\/superpowers\/specs\/2026-04-12-test\.md/);
+    expect(written).toContain("Body content.");
+  });
+
+  it("rejects already-dispatched illumination", () => {
+    writeIlluminationFile(
+      "T1400-dispatched.md",
+      "date: 2026-04-12\nstatus: dispatched\ndescription: Already dispatched",
+      "Body."
+    );
+
+    const result = markDispatched(tmpDir, "T1400-dispatched.md", "some/path.md");
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toContain("dispatched");
+    }
+  });
+
+  it("rejects implemented illumination", () => {
+    writeIlluminationFile(
+      "T1500-impl.md",
+      "date: 2026-04-12\nstatus: implemented\ndescription: Done",
+      "Body."
+    );
+
+    const result = markDispatched(tmpDir, "T1500-impl.md", "some/path.md");
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toContain("implemented");
+    }
+  });
+
+  it("rejects archived illumination", () => {
+    writeIlluminationFile(
+      "T1600-archived.md",
+      "date: 2026-04-12\nstatus: archived\ndescription: Old",
+      "Body."
+    );
+
+    const result = markDispatched(tmpDir, "T1600-archived.md", "some/path.md");
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toContain("archived");
+    }
+  });
+
+  it("returns error when file not found", () => {
+    const result = markDispatched(tmpDir, "T9999-nonexistent.md", "some/path.md");
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toContain("not found");
+    }
+  });
+
+  it("treats files without status field as open", () => {
+    writeIlluminationFile(
+      "T1700-legacy.md",
+      "date: 2026-04-12\ndescription: Legacy file",
+      "Body."
+    );
+
+    const result = markDispatched(tmpDir, "T1700-legacy.md", "some/plan.md");
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.previous_status).toBe("open");
+      expect(result.new_status).toBe("dispatched");
+    }
+  });
+
+  it("preserves body content unchanged", () => {
+    const body = "# Analysis\n\nMultiple paragraphs.\n\n- Item 1\n- Item 2";
+    writeIlluminationFile(
+      "T1800-preserve.md",
+      "date: 2026-04-12\nstatus: open\ndescription: Preserve test",
+      body
+    );
+
+    markDispatched(tmpDir, "T1800-preserve.md", "some/path.md");
+
+    const written = readFileSync(
+      join(tmpDir, "meditations", "illuminations", "T1800-preserve.md"),
+      "utf-8"
+    );
+    expect(written).toContain(body);
+  });
+});
+
+describe("markArchived", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = realpathSync(mkdtempSync(join(tmpdir(), "ralph-test-")));
+    mkdirSync(join(tmpDir, "meditations", "illuminations"), { recursive: true });
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  function writeIlluminationFile(filename: string, frontmatter: string, body: string) {
+    const content = `---\n${frontmatter}\n---\n\n${body}`;
+    writeFileSync(join(tmpDir, "meditations", "illuminations", filename), content);
+  }
+
+  it("archives an open illumination", () => {
+    writeIlluminationFile(
+      "T2000-open.md",
+      "date: 2026-04-12\nstatus: open\ndescription: Stale issue",
+      "Body."
+    );
+
+    const result = markArchived(tmpDir, "T2000-open.md", "No longer relevant");
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.previous_status).toBe("open");
+      expect(result.new_status).toBe("archived");
+      expect(result.archive_path).toContain("archive/T2000-open.md");
+    }
+
+    // File moved to archive
+    expect(existsSync(join(tmpDir, "meditations", "illuminations", "T2000-open.md"))).toBe(false);
+    expect(existsSync(join(tmpDir, "meditations", "illuminations", "archive", "T2000-open.md"))).toBe(true);
+
+    // Frontmatter updated
+    const written = readFileSync(
+      join(tmpDir, "meditations", "illuminations", "archive", "T2000-open.md"),
+      "utf-8"
+    );
+    expect(written).toMatch(/status: archived/);
+    expect(written).toMatch(/archived_at: \d{4}-\d{2}-\d{2}/);
+    expect(written).toMatch(/archive_reason: No longer relevant/);
+  });
+
+  it("archives an implemented illumination", () => {
+    writeIlluminationFile(
+      "T2100-impl.md",
+      "date: 2026-04-12\nstatus: implemented\ndescription: Done",
+      "Body."
+    );
+
+    const result = markArchived(tmpDir, "T2100-impl.md", "Completed and verified");
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.previous_status).toBe("implemented");
+      expect(result.new_status).toBe("archived");
+    }
+  });
+
+  it("archives a dispatched illumination", () => {
+    writeIlluminationFile(
+      "T2200-dispatched.md",
+      "date: 2026-04-12\nstatus: dispatched\ndescription: In progress",
+      "Body."
+    );
+
+    const result = markArchived(tmpDir, "T2200-dispatched.md", "Plan abandoned");
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.previous_status).toBe("dispatched");
+    }
+  });
+
+  it("rejects already-archived illumination", () => {
+    writeIlluminationFile(
+      "T2300-archived.md",
+      "date: 2026-04-12\nstatus: archived\ndescription: Old",
+      "Body."
+    );
+
+    const result = markArchived(tmpDir, "T2300-archived.md", "Already done");
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toContain("archived");
+    }
+  });
+
+  it("returns error when file not found", () => {
+    const result = markArchived(tmpDir, "T9999-nonexistent.md", "Gone");
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toContain("not found");
+    }
+  });
+
+  it("creates archive directory if it does not exist", () => {
+    writeIlluminationFile(
+      "T2400-new-archive.md",
+      "date: 2026-04-12\nstatus: open\ndescription: Test",
+      "Body."
+    );
+
+    expect(existsSync(join(tmpDir, "meditations", "illuminations", "archive"))).toBe(false);
+
+    markArchived(tmpDir, "T2400-new-archive.md", "Testing archive creation");
+
+    expect(existsSync(join(tmpDir, "meditations", "illuminations", "archive"))).toBe(true);
+  });
+
+  it("preserves body content unchanged", () => {
+    const body = "# Deep Analysis\n\nParagraphs.\n\n- List";
+    writeIlluminationFile(
+      "T2500-preserve.md",
+      "date: 2026-04-12\nstatus: open\ndescription: Preserve test",
+      body
+    );
+
+    markArchived(tmpDir, "T2500-preserve.md", "Done");
+
+    const written = readFileSync(
+      join(tmpDir, "meditations", "illuminations", "archive", "T2500-preserve.md"),
+      "utf-8"
+    );
+    expect(written).toContain(body);
   });
 });
