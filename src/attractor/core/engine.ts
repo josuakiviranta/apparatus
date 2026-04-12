@@ -26,6 +26,7 @@ export interface EngineOptions {
   onNodeStart?: (node: Node) => void;
   onStdout?: (stdout: NodeJS.ReadableStream) => Promise<void>;
   onInteractiveRequest?: OnInteractiveRequest;
+  onNodeEnd?: (node: Node, outcome: Outcome) => void;
 }
 
 export interface PipelineResult {
@@ -197,6 +198,22 @@ export async function runPipeline(graph: Graph, opts: EngineOptions): Promise<Pi
     // Merge context updates
     if (outcome.contextUpdates) {
       context = { ...context, ...outcome.contextUpdates };
+    }
+
+    // Notify observers of the resolved outcome — but ONLY for terminal outcomes.
+    // Intermediate retries `continue` the main loop below without re-firing
+    // onNodeStart, so firing onNodeEnd here on a retry would leave the reducer
+    // with an unbalanced end event.
+    {
+      const _maxRetries = node.maxRetries ?? graph.defaultMaxRetries ?? 0;
+      const _retryCount = nodeRetries[node.id] ?? 0;
+      const _willRetry =
+        (outcome.status === "retry" ||
+          (outcome.status === "fail" && _maxRetries > 0)) &&
+        _retryCount < _maxRetries;
+      if (!_willRetry) {
+        opts.onNodeEnd?.(node, outcome);
+      }
     }
 
     // Write status artifact

@@ -342,4 +342,47 @@ describe("runPipeline", () => {
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("no checkpoint found"));
     warnSpy.mockRestore();
   });
+
+  it("fires onNodeEnd for agent nodes with terminal outcomes", async () => {
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      work  [shape=box, prompt="Do the work"]
+      done  [shape=Msquare]
+      start -> work -> done
+    }`;
+    const calls: Array<{ id: string; status: string }> = [];
+    await runPipeline(parseDot(dot), makeOpts(dir, {
+      onNodeEnd: (node, outcome) => {
+        calls.push({ id: node.id, status: outcome.status });
+      },
+    }));
+    // "work" should fire onNodeEnd; start/done are exit/entry markers
+    expect(calls.some((c) => c.id === "work")).toBe(true);
+    expect(calls.find((c) => c.id === "work")?.status).toBe("success");
+  });
+
+  it("does NOT fire onNodeEnd for in-flight retries", async () => {
+    // First call fails, second succeeds — with maxRetries=1 the first failure
+    // is retried and should NOT emit onNodeEnd.
+    mockAgentRun
+      .mockResolvedValueOnce({ exitCode: 1, sessionId: "s1", stdout: null })
+      .mockResolvedValueOnce({ exitCode: 0, sessionId: "s2", stdout: null });
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      work  [shape=box, prompt="Do the work", maxRetries="1"]
+      done  [shape=Msquare]
+      start -> work -> done
+    }`;
+    const calls: Array<{ id: string; status: string }> = [];
+    await runPipeline(parseDot(dot), makeOpts(dir, {
+      onNodeEnd: (node, outcome) => {
+        calls.push({ id: node.id, status: outcome.status });
+      },
+    }));
+    // onNodeEnd should fire exactly once for "work" (the terminal success),
+    // NOT twice (once for the retry failure + once for success).
+    const workCalls = calls.filter((c) => c.id === "work");
+    expect(workCalls).toHaveLength(1);
+    expect(workCalls[0].status).toBe("success");
+  });
 });
