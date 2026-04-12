@@ -193,10 +193,14 @@ export class Agent {
       // Kill child immediately when the caller aborts (e.g. Ctrl+C).
       // The child is spawned with detached:true so it won't receive the
       // terminal's SIGINT — we must kill it explicitly.
+      let onAbort: (() => void) | undefined;
       if (options.signal) {
-        const onAbort = () => {
+        onAbort = () => {
           child.kill("SIGTERM");
-          setTimeout(() => { if (!child.killed) child.kill("SIGKILL"); }, 3000);
+          const escalation = setTimeout(() => {
+            if (!child.killed) child.kill("SIGKILL");
+          }, 3000);
+          child.once("close", () => clearTimeout(escalation));
         };
         if (options.signal.aborted) {
           onAbort();
@@ -218,6 +222,7 @@ export class Agent {
       // if onStdout awaits stream consumption and close fires before we listen, we'd hang.
       const closePromise = new Promise<number>((resolve) => {
         child.on("close", (code) => {
+          options.signal?.removeEventListener("abort", onAbort!);
           resolve(code ?? 1);
         });
       });
