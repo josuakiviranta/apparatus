@@ -35,7 +35,7 @@ describe("parseClaudeEvent", () => {
     expect(parseClaudeEvent(ev)).toEqual([]);
   });
 
-  it("returns [] for result events (turn closure handled by caller)", () => {
+  it("maps result event to a stats event with token counts", () => {
     const ev: StreamJsonEvent = {
       type: "result",
       stopReason: "end_turn",
@@ -43,7 +43,9 @@ describe("parseClaudeEvent", () => {
       usage: { inputTokens: 10, outputTokens: 5 },
       raw: {},
     };
-    expect(parseClaudeEvent(ev)).toEqual([]);
+    expect(parseClaudeEvent(ev)).toEqual([
+      { kind: "stats", tokensIn: 10, tokensOut: 5 },
+    ]);
   });
 
   it("returns [] for tool_result (caller renders from tool_use only)", () => {
