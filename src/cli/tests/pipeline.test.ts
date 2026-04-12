@@ -178,6 +178,51 @@ describe("pipelineRunCommand", () => {
   });
 });
 
+describe("pipelineRunCommand — onInteractiveRequest", () => {
+  let dir: string;
+  beforeEach(() => {
+    vi.clearAllMocks();
+    dir = mkdtempSync(join(tmpdir(), "ralph-pipeline-test-"));
+  });
+  afterEach(() => { rmSync(dir, { recursive: true }); });
+
+  it("populates session.history with assistant turns so $node.output is available downstream", async () => {
+    const dotFile = join(dir, "test.dot");
+    writeFileSync(dotFile, VALID_DOT);
+    await pipelineRunCommand(dotFile, { logsRoot: dir });
+
+    const call = (engine.runPipeline as ReturnType<typeof vi.fn>).mock.calls[0];
+    const capturedOnInteractive = call[1].onInteractiveRequest as
+      ((req: { session: any; child: any; tracePath: string }) => Promise<void>) | undefined;
+
+    expect(capturedOnInteractive).toBeDefined();
+
+    const { Session } = await import("../../cli/lib/session.js");
+    const { createFakeChildHandle } = await import("./helpers/fake-child-handle.js");
+
+    const session = new Session("test-session-id");
+    const ctrl = createFakeChildHandle("test-session-id");
+
+    // Emit a result event then end the stream so the for-await loop in the callback completes
+    setTimeout(() => {
+      ctrl.emit({
+        type: "result",
+        stopReason: "end_turn",
+        text: "the assistant final response",
+        usage: { inputTokens: 10, outputTokens: 5 },
+        raw: {},
+      });
+      ctrl.endStream();
+    }, 5);
+
+    await capturedOnInteractive!({ session, child: ctrl.handle, tracePath: dir });
+
+    expect(session.history).toHaveLength(1);
+    expect(session.history[0].role).toBe("assistant");
+    expect((session.history[0] as any).text).toBe("the assistant final response");
+  });
+});
+
 describe("pipelineListCommand", () => {
   let dir: string;
   beforeEach(() => {

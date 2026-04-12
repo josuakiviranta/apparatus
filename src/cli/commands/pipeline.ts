@@ -132,7 +132,18 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
             try {
               let lastStopReason: string | undefined;
               for await (const raw of child.events) {
-                if (raw.type === "result") lastStopReason = raw.stopReason;
+                if (raw.type === "result") {
+                  lastStopReason = raw.stopReason;
+                  if (raw.text) {
+                    session.history.push({
+                      role: "assistant",
+                      text: raw.text,
+                      toolCalls: [],
+                      usage: raw.usage,
+                      at: Date.now(),
+                    });
+                  }
+                }
                 for (const nev of parseClaudeEvent(raw)) emit(nev);
               }
               // turn_limit is success; everything else is a voluntary /end
