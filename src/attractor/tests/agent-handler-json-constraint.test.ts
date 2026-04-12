@@ -309,6 +309,48 @@ describe("AgentHandler – JSON constraint injection", () => {
     }
   });
 
+  it("resolves json_schema_file relative to dotDir, not cwd", async () => {
+    const schema = JSON.stringify({ type: "object", properties: { verdict: { type: "string" } }, required: ["verdict"] });
+    const dotDir = mkdtempSync(join(tmpdir(), "ralph-dotdir-"));
+    const projectDir = mkdtempSync(join(tmpdir(), "ralph-project-"));
+    const schemaDir = join(dotDir, "pipelines", "schemas");
+    mkdirSync(schemaDir, { recursive: true });
+    writeFileSync(join(schemaDir, "test.json"), schema);
+    // NOTE: schema is in dotDir, NOT in projectDir — resolution must use dotDir
+
+    mockResolve.mockReturnValue({ ...baseConfig });
+    mockAgentRun.mockResolvedValue({
+      exitCode: 0, sessionId: null, stdout: null,
+      output: JSON.stringify([{ type: "result", result: "", structured_output: { verdict: "pass" } }]),
+    });
+
+    const handler = new AgentHandler({
+      resolveAgent: mockResolve,
+      createAgent: () => ({ run: mockAgentRun, kill: mockAgentKill, config: {} } as any),
+    });
+
+    try {
+      const outcome = await handler.execute(
+        makeNode({ prompt: "Verify", jsonSchemaFile: "pipelines/schemas/test.json" } as any),
+        baseCtx(),
+        {
+          logsRoot: projectDir,
+          cwd: projectDir,   // project dir — does NOT contain the schema
+          dotDir: dotDir,    // dot file dir — DOES contain the schema
+          signal: undefined,
+          outgoingLabels: [],
+          completedNodes: [],
+          nodeRetries: {},
+        },
+      );
+
+      expect(outcome.status).toBe("success");
+    } finally {
+      rmSync(dotDir, { recursive: true, force: true });
+      rmSync(projectDir, { recursive: true, force: true });
+    }
+  });
+
   it("returns descriptive failure when agent produces no output", async () => {
     const schema = JSON.stringify({ type: "object", properties: { verdict: { type: "string" } } });
     const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-json-constraint-"));

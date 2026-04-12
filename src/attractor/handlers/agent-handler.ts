@@ -54,8 +54,9 @@ export class AgentHandler implements NodeHandler {
     const jsonSchemaFile = node.jsonSchemaFile as string | undefined;
     let jsonSchema: string | undefined;
     if (jsonSchemaFile) {
+      const dotDir = (meta["dotDir"] ?? meta["cwd"]) as string;
       try {
-        jsonSchema = readFileSync(resolve(cwd, jsonSchemaFile), "utf8");
+        jsonSchema = readFileSync(resolve(dotDir, jsonSchemaFile), "utf8");
       } catch (err) {
         return { status: "fail", failureReason: `Failed to read json_schema_file "${jsonSchemaFile}": ${(err as Error).message}` };
       }

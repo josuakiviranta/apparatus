@@ -23,6 +23,7 @@ export interface EngineOptions {
   signal?: AbortSignal;
   project?: string;
   resume?: boolean;
+  dotDir?: string;
   onNodeStart?: (node: Node) => void;
   onStdout?: (stdout: NodeJS.ReadableStream) => Promise<void>;
   onInteractiveRequest?: OnInteractiveRequest;
@@ -200,6 +201,7 @@ export async function runPipeline(graph: Graph, opts: EngineOptions): Promise<Pi
     const outcome = await handler.execute(node, ctx, {
       logsRoot: opts.logsRoot,
       cwd: opts.cwd,
+      dotDir: opts.dotDir ?? opts.cwd,
       signal: opts.signal,
       outgoingLabels,
       completedNodes,

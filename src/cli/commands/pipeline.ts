@@ -1,5 +1,5 @@
 import { readFileSync, existsSync, readdirSync, mkdirSync, rmSync } from "fs";
-import { resolve, join, basename } from "path";
+import { resolve, join, basename, dirname } from "path";
 import { homedir } from "os";
 import { parseDot, validateGraph, validateOrRaise } from "../../attractor/core/graph.js";
 import { runPipeline } from "../../attractor/core/engine.js";
@@ -65,6 +65,7 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
   }
 
   const src = readFileSync(absPath, "utf8");
+  const dotDir = dirname(absPath);
   let graph = parseDot(src);
 
   try { validateOrRaise(graph); }
@@ -140,6 +141,7 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
     const result = await runPipeline(graph, {
       logsRoot,
       cwd: project,
+      dotDir,
       interviewer: process.stdin.isTTY
         ? new InkInterviewer(callbacks.emit)
         : new AutoApproveInterviewer(),
