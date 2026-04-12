@@ -359,6 +359,7 @@ describe("Agent.run abort signal", () => {
           setTimeout(() => cb(0), 50);
         }
       }),
+      once: vi.fn((_event: string, _cb: () => void) => {}),
       stdin: {
         write: vi.fn((_data: unknown, cb?: (err?: Error) => void) => {
           cb?.();
