@@ -216,9 +216,14 @@ export class Agent {
         rl.on("line", (line) => {
           capturedOutput += line + "\n";
           try {
-            const parsed = JSON.parse(line);
-            if (parsed.session_id && !sessionId) {
-              sessionId = parsed.session_id;
+            const parsed = JSON.parse(line) as unknown;
+            // Output may be a single-line JSON array (--output-format json) or a plain object (NDJSON)
+            const eventsArr: Array<Record<string, unknown>> = Array.isArray(parsed)
+              ? (parsed as Array<Record<string, unknown>>)
+              : [parsed as Record<string, unknown>];
+            const found = eventsArr.find((e) => typeof e.session_id === "string");
+            if (found?.session_id && !sessionId) {
+              sessionId = found.session_id as string;
               options.onSessionId?.(sessionId!);
             }
           } catch {
@@ -228,38 +233,83 @@ export class Agent {
         // Ensure all buffered lines are processed before returning
         await rlDone;
 
-        // If caller wants events for pipeline TUI, synthesize a stream-json-compatible
-        // stream: system event (→ trace-path), assistant event (→ body text), and the
-        // original result line (→ stats). onStdout handles these identically to a real
-        // stream-json stream.
+        // If caller wants events for the pipeline TUI, synthesize a stream-json-compatible
+        // stream from the buffered output. --output-format json emits a single-line JSON
+        // array of events; fall back to NDJSON for other callers.
         if (options.onStdout) {
-          const syntheticLines: string[] = [];
-          if (sessionId) {
-            syntheticLines.push(JSON.stringify({ type: "system", session_id: sessionId }));
-          }
-          for (const line of capturedOutput.split("\n")) {
-            if (!line.trim()) continue;
+          try {
+            const trimmed = capturedOutput.trim();
+            let events: Array<Record<string, unknown>>;
             try {
-              const parsed = JSON.parse(line) as Record<string, unknown>;
-              if (parsed.type === "result") {
-                const resultText = typeof parsed.result === "string" ? parsed.result : undefined;
-                if (resultText) {
-                  syntheticLines.push(
-                    JSON.stringify({
-                      type: "assistant",
-                      message: { content: [{ type: "text", text: resultText }] },
-                    })
-                  );
-                }
-                syntheticLines.push(line); // pass-through result line for usage stats
-                break;
-              }
+              const top = JSON.parse(trimmed) as unknown;
+              events = Array.isArray(top)
+                ? (top as Array<Record<string, unknown>>)
+                : [top as Record<string, unknown>];
             } catch {
-              // not a parseable JSON line — skip
+              events = trimmed
+                .split("\n")
+                .filter((l) => l.trim())
+                .flatMap((l) => {
+                  try {
+                    return [JSON.parse(l) as Record<string, unknown>];
+                  } catch {
+                    return [];
+                  }
+                });
             }
-          }
-          if (syntheticLines.length > 0) {
-            await options.onStdout(Readable.from(syntheticLines.map((l) => l + "\n")));
+
+            const syntheticLines: string[] = [];
+
+            // session_id can live on any event (system or result)
+            const evtSessionId =
+              events.find((e) => typeof e.session_id === "string")?.session_id ??
+              sessionId;
+            if (evtSessionId) {
+              syntheticLines.push(
+                JSON.stringify({ type: "system", session_id: evtSessionId }),
+              );
+            }
+
+            const resultEvt = events.find((e) => e.type === "result");
+            if (resultEvt) {
+              // structured_output takes priority (json-schema mode); fall back to result
+              const structuredOut = resultEvt.structured_output;
+              const bodyText: string | undefined =
+                structuredOut != null
+                  ? typeof structuredOut === "string"
+                    ? structuredOut
+                    : JSON.stringify(structuredOut)
+                  : typeof resultEvt.result === "string" && resultEvt.result
+                    ? resultEvt.result
+                    : undefined;
+
+              if (bodyText) {
+                syntheticLines.push(
+                  JSON.stringify({
+                    type: "assistant",
+                    message: { content: [{ type: "text", text: bodyText }] },
+                  }),
+                );
+              }
+
+              // Synthesize a stream-json result event for stats
+              syntheticLines.push(
+                JSON.stringify({
+                  type: "result",
+                  stop_reason: resultEvt.stop_reason ?? "end_turn",
+                  result: bodyText ?? "",
+                  usage: resultEvt.usage ?? {},
+                }),
+              );
+            }
+
+            if (syntheticLines.length > 0) {
+              await options.onStdout(
+                Readable.from(syntheticLines.map((l) => l + "\n")),
+              );
+            }
+          } catch {
+            // Outer guard: if synthesis fails entirely, skip silently
           }
         }
       } else if (!isInteractive && child.stdout && options.onStdout) {

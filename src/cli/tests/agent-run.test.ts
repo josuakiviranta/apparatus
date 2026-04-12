@@ -181,15 +181,24 @@ describe("Agent.run with jsonSchema", () => {
   });
 
   it("calls onStdout with synthetic stream-json events when jsonSchema is set", async () => {
-    const jsonOutputLine = JSON.stringify({
-      type: "result",
-      subtype: "success",
-      is_error: false,
-      num_turns: 1,
-      result: '{"summary":"test output"}',
-      session_id: "sess-json-001",
-      usage: { input_tokens: 42, output_tokens: 17 },
-    });
+    const jsonOutputLine = JSON.stringify([
+      {
+        type: "system",
+        subtype: "init",
+        session_id: "sess-json-001",
+        cwd: "/tmp/project",
+      },
+      {
+        type: "result",
+        subtype: "success",
+        is_error: false,
+        num_turns: 1,
+        result: "",
+        structured_output: { summary: "test output" },
+        session_id: "sess-json-001",
+        usage: { input_tokens: 42, output_tokens: 17 },
+      },
+    ]);
     const child = createMockChild(0, jsonOutputLine + "\n");
     mockSpawn.mockReturnValue(child);
 
@@ -210,13 +219,13 @@ describe("Agent.run with jsonSchema", () => {
       .find((e) => e?.type === "system");
     expect(systemEvent?.session_id).toBe("sess-json-001");
 
-    // Should have received an assistant event with result text
+    // Should have received an assistant event with structured_output as JSON string
     const assistantEvent = receivedLines
       .map((l) => { try { return JSON.parse(l); } catch { return null; } })
       .find((e) => e?.type === "assistant");
-    expect(assistantEvent?.message?.content?.[0]?.text).toBe('{"summary":"test output"}');
+    expect(assistantEvent?.message?.content?.[0]?.text).toBe(JSON.stringify({ summary: "test output" }));
 
-    // Should have received the result event (pass-through)
+    // Should have received the result event (synthesized for stats)
     const resultEvent = receivedLines
       .map((l) => { try { return JSON.parse(l); } catch { return null; } })
       .find((e) => e?.type === "result");
@@ -239,19 +248,22 @@ describe("Agent.run with jsonSchema", () => {
   });
 
   it("still buffers output and returns it as RunResult.output", async () => {
-    const jsonOutputLine = JSON.stringify({
-      type: "result",
-      result: '{"key":"val"}',
-      session_id: "s1",
-      usage: {},
-    });
+    const jsonOutputLine = JSON.stringify([
+      {
+        type: "result",
+        result: "",
+        structured_output: { key: "val" },
+        session_id: "s1",
+        usage: {},
+      },
+    ]);
     const child = createMockChild(0, jsonOutputLine + "\n");
     mockSpawn.mockReturnValue(child);
 
     const agent = new Agent(jsonSchemaConfig);
     const result = await agent.run({ cwd: "/tmp/project" });
 
-    expect(result.output).toContain('"session_id":"s1"');
+    expect(result.output).toContain('"key":"val"');
     expect(result.sessionId).toBe("s1");
   });
 });
