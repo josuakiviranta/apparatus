@@ -1,441 +1,284 @@
-# Mark-Implemented Lifecycle Completion — Implementation Plan
+## Status: Chunk 1 COMPLETE (v0.1.5) — all tests pass (645/645)
 
-> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [x]`) syntax for tracking.
+# Portable Pipeline Schema Resolution Implementation Plan
 
-**Goal:** Add a `mark_implemented` MCP tool to `illumination-server.ts` so developers can transition illuminations from `dispatched`/`open` to `implemented` during `ralph meditate` sessions.
+> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Architecture:** A new exported function `markImplemented(projectRoot, filename)` reads an illumination file, parses its YAML frontmatter, validates the current status allows transition, updates `status` to `implemented`, adds `implemented_at` date, and writes the file back. The tool is registered in the MCP server, whitelisted in the meditate agent, and referenced in the meditation prompt.
+**Goal:** Resolve `json_schema_file` paths relative to the `.dot` file's directory so pipelines are self-contained and portable across projects.
 
-**Tech Stack:** TypeScript, Node.js `fs`, YAML frontmatter parsing (regex-based, matching existing patterns in the file), Vitest.
+**Architecture:** Thread `dotDir` (dirname of the `.dot` file) from `pipelineRunCommand` through `runPipeline` options and into handler `meta`. In `AgentHandler`, replace `resolve(cwd, jsonSchemaFile)` with `resolve(dotDir, jsonSchemaFile)`. When `dotDir` is absent (e.g. direct `runPipeline` calls in tests), fall back to `cwd` — preserving all existing behaviour.
 
-## Status: COMPLETE ✅
-
-All 6 tasks implemented and verified in v0.1.4:
-- `markImplemented` function with TDD (8 test cases including path traversal protection)
-- MCP tool registration (`mark_implemented`)
-- Meditate agent whitelist updated
-- Prompt instruction added
-- 644/644 tests passing, clean build
+**Tech Stack:** TypeScript, Node.js `path.dirname`, vitest, tmux harness (`docs/harness/tmux-drive.md`)
 
 ---
 
-## Files
-
-| Action | Path | What changes |
-|---|---|---|
-| Modify | `src/cli/mcp/illumination-server.ts` | Add `markImplemented` function + MCP tool registration |
-| Modify | `src/cli/tests/illumination-server.test.ts` | Add `describe("markImplemented", ...)` test block |
-| Modify | `src/cli/agents/meditate.md` | Add tool to whitelist |
-| Modify | `src/cli/prompts/PROMPT_meditation.md` | Add prompt instruction |
-
----
-
-## Chunk 1: `markImplemented` function with TDD
-
-### Task 1: Write failing tests for `markImplemented`
+## Chunk 1: Engine + handler + CLI wiring (TDD)
 
 **Files:**
-- Modify: `src/cli/tests/illumination-server.test.ts`
+- Modify: `src/attractor/core/engine.ts` — add `dotDir?: string` to `EngineOptions`, inject into handler `meta`
+- Modify: `src/attractor/handlers/agent-handler.ts` — use `meta["dotDir"]` for schema resolution
+- Modify: `src/cli/commands/pipeline.ts` — compute `dotDir`, pass to `runPipeline`
+- Modify: `src/attractor/tests/agent-handler-json-constraint.test.ts` — add dotDir separation test
 
-- [x] **Step 1: Read the test file to understand existing patterns**
+### Task 1.1: Write the failing test
 
-```bash
-cat src/cli/tests/illumination-server.test.ts
-```
+Add this test to `src/attractor/tests/agent-handler-json-constraint.test.ts` inside the existing `describe` block (after line 341, before the closing `}`):
 
-Confirm: `tmpDir` setup/teardown via `beforeEach`/`afterEach`, `mkdtempSync`/`rmSync` pattern, direct `writeFileSync` for fixture files.
+- [x] **Step 1: Add the test**
 
-- [x] **Step 2: Write failing tests for `markImplemented`**
+```ts
+it("resolves json_schema_file relative to dotDir, not cwd", async () => {
+  const schema = JSON.stringify({ type: "object", properties: { verdict: { type: "string" } }, required: ["verdict"] });
+  const dotDir = mkdtempSync(join(tmpdir(), "ralph-dotdir-"));
+  const projectDir = mkdtempSync(join(tmpdir(), "ralph-project-"));
+  const schemaDir = join(dotDir, "pipelines", "schemas");
+  mkdirSync(schemaDir, { recursive: true });
+  writeFileSync(join(schemaDir, "test.json"), schema);
+  // NOTE: schema is in dotDir, NOT in projectDir — resolution must use dotDir
 
-Add a new `describe("markImplemented", ...)` block at the end of the file. Import `markImplemented` from `../mcp/illumination-server.js` alongside existing imports.
-
-```typescript
-describe("markImplemented", () => {
-  let tmpDir: string;
-
-  beforeEach(() => {
-    tmpDir = realpathSync(mkdtempSync(join(tmpdir(), "ralph-test-")));
-    mkdirSync(join(tmpDir, "meditations", "illuminations"), { recursive: true });
+  mockResolve.mockReturnValue({ ...baseConfig });
+  mockAgentRun.mockResolvedValue({
+    exitCode: 0, sessionId: null, stdout: null,
+    output: JSON.stringify([{ type: "result", result: "", structured_output: { verdict: "pass" } }]),
   });
 
-  afterEach(() => {
-    rmSync(tmpDir, { recursive: true, force: true });
+  const handler = new AgentHandler({
+    resolveAgent: mockResolve,
+    createAgent: () => ({ run: mockAgentRun, kill: mockAgentKill, config: {} } as any),
   });
 
-  function writeIlluminationFile(filename: string, frontmatter: string, body: string) {
-    const content = `---\n${frontmatter}\n---\n\n${body}`;
-    writeFileSync(join(tmpDir, "meditations", "illuminations", filename), content);
+  try {
+    const outcome = await handler.execute(
+      makeNode({ prompt: "Verify", jsonSchemaFile: "pipelines/schemas/test.json" } as any),
+      baseCtx(),
+      {
+        logsRoot: projectDir,
+        cwd: projectDir,   // project dir — does NOT contain the schema
+        dotDir: dotDir,    // dot file dir — DOES contain the schema
+        signal: undefined,
+        outgoingLabels: [],
+        completedNodes: [],
+        nodeRetries: {},
+      },
+    );
+
+    expect(outcome.status).toBe("success");
+  } finally {
+    rmSync(dotDir, { recursive: true, force: true });
+    rmSync(projectDir, { recursive: true, force: true });
   }
-
-  it("transitions dispatched to implemented", () => {
-    writeIlluminationFile(
-      "T1620-some-bug.md",
-      "date: 2026-04-10\ndescription: A bug\nstatus: dispatched",
-      "Body content here."
-    );
-
-    const result = markImplemented(tmpDir, "T1620-some-bug.md");
-
-    expect(result.success).toBe(true);
-    expect(result.previous_status).toBe("dispatched");
-    expect(result.new_status).toBe("implemented");
-
-    const written = readFileSync(
-      join(tmpDir, "meditations", "illuminations", "T1620-some-bug.md"),
-      "utf-8"
-    );
-    expect(written).toMatch(/status: implemented/);
-    expect(written).toMatch(/implemented_at: \d{4}-\d{2}-\d{2}/);
-    expect(written).toContain("Body content here.");
-  });
-
-  it("transitions open to implemented", () => {
-    writeIlluminationFile(
-      "T1700-open-issue.md",
-      "date: 2026-04-10\ndescription: An issue\nstatus: open",
-      "Some body."
-    );
-
-    const result = markImplemented(tmpDir, "T1700-open-issue.md");
-
-    expect(result.success).toBe(true);
-    expect(result.previous_status).toBe("open");
-    expect(result.new_status).toBe("implemented");
-  });
-
-  it("rejects already-implemented illumination", () => {
-    writeIlluminationFile(
-      "T1800-done.md",
-      "date: 2026-04-10\ndescription: Done\nstatus: implemented",
-      "Body."
-    );
-
-    const result = markImplemented(tmpDir, "T1800-done.md");
-
-    expect(result.success).toBe(false);
-    expect(result.error).toContain("Cannot mark as implemented");
-    expect(result.error).toContain("implemented");
-  });
-
-  it("rejects archived illumination", () => {
-    writeIlluminationFile(
-      "T1900-archived.md",
-      "date: 2026-04-10\ndescription: Old\nstatus: archived",
-      "Body."
-    );
-
-    const result = markImplemented(tmpDir, "T1900-archived.md");
-
-    expect(result.success).toBe(false);
-    expect(result.error).toContain("Cannot mark as implemented");
-    expect(result.error).toContain("archived");
-  });
-
-  it("returns error when file not found", () => {
-    const result = markImplemented(tmpDir, "T9999-nonexistent.md");
-
-    expect(result.success).toBe(false);
-    expect(result.error).toContain("not found");
-  });
-
-  it("preserves body content unchanged", () => {
-    const body = "# Deep Analysis\n\nMultiple paragraphs.\n\n- List item\n- Another";
-    writeIlluminationFile(
-      "T2000-preserve.md",
-      "date: 2026-04-10\ndescription: Preserve test\nstatus: dispatched",
-      body
-    );
-
-    markImplemented(tmpDir, "T2000-preserve.md");
-
-    const written = readFileSync(
-      join(tmpDir, "meditations", "illuminations", "T2000-preserve.md"),
-      "utf-8"
-    );
-    expect(written).toContain(body);
-  });
-
-  it("adds implemented_at as UTC date in YYYY-MM-DD format", () => {
-    writeIlluminationFile(
-      "T2100-date.md",
-      "date: 2026-04-10\ndescription: Date test\nstatus: open",
-      "Body."
-    );
-
-    markImplemented(tmpDir, "T2100-date.md");
-
-    const written = readFileSync(
-      join(tmpDir, "meditations", "illuminations", "T2100-date.md"),
-      "utf-8"
-    );
-    const match = written.match(/implemented_at: (\d{4}-\d{2}-\d{2})/);
-    expect(match).not.toBeNull();
-    // Verify it's a valid date string
-    const parsed = new Date(match![1]);
-    expect(parsed.toString()).not.toBe("Invalid Date");
-  });
 });
 ```
 
-- [x] **Step 3: Run tests to confirm they fail**
+- [x] **Step 2: Run the test to confirm it fails**
 
 ```bash
-npx vitest run src/cli/tests/illumination-server.test.ts --reporter=verbose 2>&1 | tail -30
+cd /Users/josu/Documents/projects/ralph-cli
+npx vitest run src/attractor/tests/agent-handler-json-constraint.test.ts --reporter=verbose 2>&1 | tail -20
 ```
 
-Expected: all `markImplemented` tests fail (function doesn't exist yet). Existing tests still pass.
+Expected: FAIL — `dotDir` is not a recognized meta key yet, schema lookup falls back to `cwd` (projectDir) and throws ENOENT.
 
-- [x] **Step 4: Commit the failing tests**
+### Task 1.2: Add `dotDir` to `EngineOptions` and inject into meta
 
-```bash
-git add src/cli/tests/illumination-server.test.ts
-git commit -m "test(illumination): add failing tests for markImplemented lifecycle transition"
+- [x] **Step 1: Open `src/attractor/core/engine.ts`**
+
+In the `EngineOptions` interface (line 19), add one field after `resume?`:
+
+```ts
+dotDir?: string;
 ```
 
----
+- [x] **Step 2: Inject `dotDir` into handler `meta`**
 
-### Task 2: Implement `markImplemented` in illumination-server.ts
+In the `handler.execute(...)` call block (around line 200–209), add `dotDir` to the meta object:
 
-**Files:**
-- Modify: `src/cli/mcp/illumination-server.ts`
-
-- [x] **Step 1: Read the current implementation**
-
-```bash
-cat src/cli/mcp/illumination-server.ts
+```ts
+const outcome = await handler.execute(node, ctx, {
+  logsRoot: opts.logsRoot,
+  cwd: opts.cwd,
+  dotDir: opts.dotDir ?? opts.cwd,   // ← add this line
+  signal: opts.signal,
+  outgoingLabels,
+  completedNodes,
+  nodeRetries,
+  onStdout: opts.onStdout,
+  onInteractiveRequest: opts.onInteractiveRequest,
+});
 ```
 
-Understand: how `writeIllumination` constructs frontmatter, the export pattern, and where to place the new function.
+### Task 1.3: Use `dotDir` in `AgentHandler`
 
-- [x] **Step 2: Add the `markImplemented` function**
+- [x] **Step 1: Open `src/attractor/handlers/agent-handler.ts`**
 
-Add the exported function after `writeIllumination`. It should:
+Around line 50–62, replace the schema resolution block:
 
-```typescript
-export function markImplemented(
-  projectRoot: string,
-  filename: string,
-): { success: true; filename: string; previous_status: string; new_status: string }
-  | { success: false; error: string } {
-  const illumDir = join(projectRoot, "meditations", "illuminations");
-  const filePath = join(illumDir, filename);
-
-  if (!existsSync(filePath)) {
-    return { success: false, error: "Illumination file not found" };
+```ts
+// Before
+if (jsonSchemaFile) {
+  try {
+    jsonSchema = readFileSync(resolve(cwd, jsonSchemaFile), "utf8");
+  } catch (err) {
+    return { status: "fail", failureReason: `Failed to read json_schema_file "${jsonSchemaFile}": ${(err as Error).message}` };
   }
-
-  const raw = readFileSync(filePath, "utf-8");
-
-  // Parse frontmatter block: content between first --- and second ---
-  const fmMatch = raw.match(/^---\n([\s\S]*?)\n---\n/);
-  if (!fmMatch) {
-    return { success: false, error: "No frontmatter found in illumination file" };
-  }
-
-  const fmBlock = fmMatch[1];
-  const body = raw.slice(fmMatch[0].length);
-
-  // Extract current status
-  const statusMatch = fmBlock.match(/^status:\s*(.+)$/m);
-  const currentStatus = statusMatch ? statusMatch[1].trim() : "open";
-
-  // Validate transition
-  const allowed = ["open", "dispatched"];
-  if (!allowed.includes(currentStatus)) {
-    return {
-      success: false,
-      error: `Cannot mark as implemented: current status is ${currentStatus}`,
-    };
-  }
-
-  // Update frontmatter
-  const today = new Date().toISOString().slice(0, 10);
-  let updatedFm = statusMatch
-    ? fmBlock.replace(/^status:\s*.+$/m, "status: implemented")
-    : fmBlock + "\nstatus: implemented";
-  updatedFm += `\nimplemented_at: ${today}`;
-
-  const updatedContent = `---\n${updatedFm}\n---\n${body}`;
-  writeFileSync(filePath, updatedContent);
-
-  return {
-    success: true,
-    filename,
-    previous_status: currentStatus,
-    new_status: "implemented",
-  };
 }
 ```
 
-**Note:** Uses `existsSync` and `readFileSync` from `fs` (already imported in the file). Pattern matches existing frontmatter handling: regex-based, no external YAML library.
+```ts
+// After
+if (jsonSchemaFile) {
+  const dotDir = (meta["dotDir"] ?? meta["cwd"]) as string;
+  try {
+    jsonSchema = readFileSync(resolve(dotDir, jsonSchemaFile), "utf8");
+  } catch (err) {
+    return { status: "fail", failureReason: `Failed to read json_schema_file "${jsonSchemaFile}": ${(err as Error).message}` };
+  }
+}
+```
 
-- [x] **Step 3: Run tests to confirm they pass**
+> **Why `?? meta["cwd"]`:** The engine always injects `dotDir` when running a pipeline, but tests that call `handler.execute()` directly without a `dotDir` key in meta must not break. The fallback mirrors the engine's own `opts.dotDir ?? opts.cwd` logic.
+
+### Task 1.4: Pass `dotDir` from `pipeline.ts`
+
+- [x] **Step 1: Open `src/cli/commands/pipeline.ts`**
+
+Add `dirname` to the existing path import (line 2):
+
+```ts
+import { resolve, join, basename, dirname } from "path";
+```
+
+- [x] **Step 2: Compute `dotDir` after `absPath` is resolved (around line 67)**
+
+After `const src = readFileSync(absPath, "utf8");`, add:
+
+```ts
+const dotDir = dirname(absPath);
+```
+
+- [x] **Step 3: Pass `dotDir` to `runPipeline` (around line 140)**
+
+```ts
+const result = await runPipeline(graph, {
+  logsRoot,
+  cwd: project,
+  dotDir,           // ← add this line
+  interviewer: process.stdin.isTTY
+    ? new InkInterviewer(callbacks.emit)
+    : new AutoApproveInterviewer(),
+  signal: ac.signal,
+  project: opts.project,
+  resume: opts.resume,
+  // ... rest unchanged
+```
+
+### Task 1.5: Run all tests
+
+- [x] **Step 1: Run the new test to verify it passes**
 
 ```bash
-npx vitest run src/cli/tests/illumination-server.test.ts --reporter=verbose 2>&1 | tail -30
+npx vitest run src/attractor/tests/agent-handler-json-constraint.test.ts --reporter=verbose 2>&1 | tail -20
 ```
 
-Expected: all `markImplemented` tests pass. All existing tests still pass.
+Expected: ALL PASS — including the new `dotDir` test.
 
-- [x] **Step 4: Run the full test suite**
+- [x] **Step 2: Run the full test suite to confirm no regressions**
 
 ```bash
-npx vitest run 2>&1 | tail -20
+npm test 2>&1 | tail -30
 ```
 
-Expected: no regressions.
-
-- [x] **Step 5: Commit**
-
-```bash
-git add src/cli/mcp/illumination-server.ts
-git commit -m "feat(illumination): add markImplemented function for lifecycle transition
-
-Reads illumination file, validates status is open or dispatched,
-updates frontmatter to status: implemented with implemented_at date.
-Preserves body content unchanged."
-```
-
----
-
-## Chunk 2: MCP tool registration
-
-### Task 3: Register `mark_implemented` as an MCP tool
-
-**Files:**
-- Modify: `src/cli/mcp/illumination-server.ts`
-
-- [x] **Step 1: Read the MCP server registration section**
-
-```bash
-grep -n "server.tool\|addTool\|registerTool" src/cli/mcp/illumination-server.ts
-```
-
-Understand: how existing tools are registered (name, description, input schema, handler).
-
-- [x] **Step 2: Add the MCP tool registration**
-
-Add after the last existing tool registration, following the same pattern:
-
-```typescript
-server.tool(
-  "mark_implemented",
-  "Mark an illumination as implemented. Valid from status open or dispatched.",
-  {
-    filename: {
-      type: "string",
-      description: "Illumination filename (e.g. T1620-some-bug.md)",
-    },
-  },
-  async ({ filename }: { filename: string }) => {
-    const result = markImplemented(projectRoot, filename);
-    return {
-      content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-    };
-  },
-);
-```
-
-- [x] **Step 3: Build to verify no compilation errors**
-
-```bash
-npm run build 2>&1 | tail -10
-```
-
-Expected: clean build, no errors.
-
-- [x] **Step 4: Commit**
-
-```bash
-git add src/cli/mcp/illumination-server.ts
-git commit -m "feat(illumination): register mark_implemented MCP tool"
-```
-
----
-
-## Chunk 3: Meditate agent whitelist + prompt instruction
-
-### Task 4: Add tool to meditate agent whitelist
-
-**Files:**
-- Modify: `src/cli/agents/meditate.md`
-
-- [x] **Step 1: Read the file**
-
-```bash
-cat src/cli/agents/meditate.md
-```
-
-- [x] **Step 2: Add `mcp__illumination__mark_implemented` to the tools whitelist**
-
-Insert after `mcp__illumination__write_illumination`:
-
-```yaml
-  - mcp__illumination__mark_implemented
-```
+Expected: all existing tests continue to pass. The `dotDir ?? cwd` fallback in the engine means existing tests that don't pass `dotDir` resolve schemas from `cwd` as before.
 
 - [x] **Step 3: Commit**
 
 ```bash
-git add src/cli/agents/meditate.md
-git commit -m "feat(meditate): whitelist mark_implemented tool in agent config"
+git add src/attractor/core/engine.ts \
+        src/attractor/handlers/agent-handler.ts \
+        src/cli/commands/pipeline.ts \
+        src/attractor/tests/agent-handler-json-constraint.test.ts
+git commit -m "feat(engine): resolve json_schema_file relative to dot file directory
+
+Fixes portability: ralph pipeline run ./pipelines/foo.dot --project ../other
+now resolves schemas from the dot file's directory, not the target project.
+Fallback to cwd when dotDir is absent preserves all existing behaviour.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 ```
 
 ---
 
-### Task 5: Add prompt instruction for marking resolved illuminations
+## Chunk 2: Tmux smoke verification
+
+This chunk is a manual verification step using the tmux harness. It is NOT a vitest test — it drives a real ralph process and visually confirms the schema resolves correctly.
+
+**Prerequisite:** `../jobs-post-worker` must exist and have a `meditations/illuminations/` directory (can be empty — the `verifier` node handles the empty case and routes to `done` without error).
 
 **Files:**
-- Modify: `src/cli/prompts/PROMPT_meditation.md`
+- Read: `docs/harness/tmux-drive.md` — source the bash block before proceeding
 
-- [x] **Step 1: Read the file**
+### Task 2.1: Set up the target project
 
-```bash
-cat src/cli/prompts/PROMPT_meditation.md
-```
-
-- [x] **Step 2: Add instruction after the existing task list**
-
-After the last numbered step in the workflow (step 7 — `write_illumination`), add:
-
-```markdown
-8. If the user reports that a fix has been shipped or an illumination has been resolved,
-   call `mark_implemented` with the illumination filename before ending the session.
-```
-
-- [x] **Step 3: Commit**
+- [ ] **Step 1: Ensure `../jobs-post-worker` has an illuminations folder**
 
 ```bash
-git add src/cli/prompts/PROMPT_meditation.md
-git commit -m "feat(meditate): add prompt instruction for marking resolved illuminations"
+mkdir -p ../jobs-post-worker/meditations/illuminations
 ```
 
----
+If the folder is empty, `illumination-to-plan.dot`'s verifier node returns `preferred_label: empty` and routes to `done` — a clean exit that still proves schema resolution succeeded.
 
-### Task 6: Final verification
+### Task 2.2: Source the harness and start a run
 
-- [x] **Step 1: Run full test suite**
+- [ ] **Step 1: Source the tmux harness**
+
+Open `docs/harness/tmux-drive.md`, copy the fenced bash block into your shell, and source it.
+
+- [ ] **Step 2: Build ralph**
 
 ```bash
-npx vitest run 2>&1 | tail -20
+npm run build
 ```
 
-Expected: all tests pass.
-
-- [x] **Step 2: Build**
+- [ ] **Step 3: Start the run inside tmux**
 
 ```bash
-npm run build 2>&1 | tail -10
+start_run "ralph pipeline run $(pwd)/pipelines/illumination-to-plan.dot --project ../jobs-post-worker"
 ```
 
-Expected: clean build.
+### Task 2.3: Assert schema resolution succeeds
 
-- [x] **Step 3: Verify the tool appears in MCP server output**
+- [ ] **Step 1: Wait for the TUI to stabilise**
 
 ```bash
-node dist/cli/mcp/illumination-server.js --help 2>&1 || true
-# Or check via listing tools if the server supports it
-grep -n "mark_implemented" dist/cli/mcp/illumination-server.js
+wait_stable 15000
 ```
 
-Expected: `mark_implemented` appears in the built output.
+- [ ] **Step 2: Capture the TUI output**
+
+```bash
+capture
+```
+
+- [ ] **Step 3: Assert no schema error**
+
+Inspect the capture. It must NOT contain the string:
+
+```
+Failed to read json_schema_file
+```
+
+- [ ] **Step 4: Assert the pipeline progressed past `verifier`**
+
+The TUI should show either:
+- `verifier` marked done + `done` node reached (empty illuminations path), OR
+- `verifier` marked done + `explainer` or `explain_removal` started (non-empty path)
+
+Neither outcome is possible if the schema failed to load — a schema failure routes to an immediate pipeline `fail`.
+
+### Task 2.4: Teardown
+
+- [ ] **Step 1: Clean up**
+
+```bash
+cleanup_run
+```
