@@ -1,0 +1,28 @@
+digraph store_smoke {
+  goal="Smoke test: store node writes ctx value to a file"
+
+  start [shape=Mdiamond]
+
+  // tool node generates output → sets tool.output in ctx
+  generate [
+    shape=parallelogram,
+    tool_command="echo 'store-node: ok'"
+  ]
+
+  // store node reads tool.output and writes it to a file
+  save [
+    shape=cylinder,
+    store_key="tool.output",
+    store_file="/tmp/ralph-store-smoke.md"
+  ]
+
+  // verify the file was written
+  verify [
+    shape=parallelogram,
+    tool_command="cat /tmp/ralph-store-smoke.md"
+  ]
+
+  done [shape=Msquare]
+
+  start -> generate -> save -> verify -> done
+}
