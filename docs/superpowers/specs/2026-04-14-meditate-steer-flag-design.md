@@ -9,7 +9,7 @@
 
 ## Solution
 
-Add an optional `--steer <text>` flag to `ralph meditate` and `ralph heartbeat meditate`. When provided, the text is injected as the first user message Claude sees at session start (via `--message` on the claude CLI spawn). When omitted, behavior is identical to today.
+Add an optional `--steer <text>` flag to `ralph meditate` and `ralph heartbeat meditate`. When provided, the text is appended to the initial input sent to Claude (effectively injected as additional first-user-turn content). When omitted, behavior is identical to today.
 
 ## CLI Interface
 
@@ -30,8 +30,9 @@ ralph heartbeat meditate my-app --every 30 --steer "look for regressions in pipe
 ### meditate.ts
 
 - Add `.option('--steer <text>', 'initial steering message for the session')` to the Commander registration
-- Thread `steer?: string` through to `runMeditationSession(absPath, steer?)`
-- In the claude spawn, when `steer` is present, append `--message <steer>` to the claude CLI args
+- Thread `steer?: string` through `meditateCommand` → `runMeditationSession(absPath, steer?)`
+- Add `message?: string` to `RunOptions` in `agent.ts`; when present, append it to the stdin content written to the claude process
+- Pass `steer` as `message` in the `agent.run()` call inside `runMeditationSession`
 
 ### heartbeat.ts (meditate subcommand)
 
@@ -55,8 +56,10 @@ No changes required to the daemon or runner.
 
 | File | Change |
 |------|--------|
-| `src/cli/commands/meditate.ts` | Add `--steer` option; pass `--message` to claude spawn |
-| `src/cli/commands/heartbeat.ts` | Add `--steer` option to meditate subcommand; include in `args` |
+| `src/cli/lib/agent.ts` | Add `message?: string` to `RunOptions`; append to stdin content when present |
+| `src/cli/commands/meditate.ts` | Export `runMeditationSession`; add `steer?` param; thread through to `agent.run()` |
+| `src/cli/program.ts` | Add `--steer` option to `meditate` Commander registration |
+| `src/cli/commands/heartbeat.ts` | Add `--steer` option to heartbeat meditate subcommand; include in daemon `args` |
 
 ## Non-Goals
 
@@ -67,6 +70,6 @@ No changes required to the daemon or runner.
 
 ## Testing
 
-- Unit: `meditateCommand` with and without `--steer` — verify claude spawn args
+- Unit: `runMeditationSession` with and without `steer` — verify `agent.run()` receives `message`
 - Unit: heartbeat meditate with `--steer` — verify `args` array in `register_task` payload
 - Manual smoke: `ralph meditate . --steer "focus on X"` produces a session steered toward X
