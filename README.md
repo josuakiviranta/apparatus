@@ -44,6 +44,20 @@ Press `Ctrl+C`. Ralph cleanly terminates its own claude subprocess without affec
 On first run in a project, ralph injects default `PROMPT_plan.md` and `PROMPT_build.md` files and exits.
 Review and customize them, then re-run.
 
+## Directory Map
+
+| Directory | Purpose |
+|---|---|
+| `src/` | All TypeScript source: `cli/`, `attractor/`, `daemon/`, `lib/`, `types/` |
+| `specs/` | Behavioral specs per subsystem (current, authoritative) |
+| `docs/` | Harness docs + `superpowers/specs/` (design history, not authoritative specs) |
+| `pipelines/` | `.dot` pipeline definitions + JSON schemas; `smoke/` for smoke tests |
+| `scenario-tests/` | Shell-based end-to-end scenario tests per command |
+| `meditations/` | Curated lenses (meta-meditations) + `illuminations/` subfolder |
+| `memory/` | Session memory written by Claude agents across conversations |
+
+> **specs/ vs docs/superpowers/specs/:** `specs/` holds current behavioral specifications that are authoritative. `docs/superpowers/specs/` holds historical design documents that motivated those specs.
+
 ## Development
 
 ```bash

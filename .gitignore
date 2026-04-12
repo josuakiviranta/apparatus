@@ -11,4 +11,6 @@ context-mode-guidance-*/
 context-mode-healed-*
 ralph-engine-test-*/
 scenario-runs/
+# tsx runner cache
+tsx-*/
 meditations/.triage/
