@@ -8,11 +8,12 @@ import { ConsoleInterviewer } from "../../attractor/interviewer/console.js";
 import { AutoApproveInterviewer } from "../../attractor/interviewer/auto-approve.js";
 import { getPipelinesDir, resolvePipelineArg, isNameShorthand } from "../lib/pipeline-resolver.js";
 import { spawn, spawnSync } from "child_process";
-import { streamEvents } from "../lib/stream-formatter.js";
+import { streamEvents, parseStreamJsonEvents } from "../lib/stream-formatter.js";
 import { getPipelineCreatePromptPath } from "../lib/assets.js";
 import * as output from "../lib/output.js";
-import { renderPipelineDisplay } from "../components/PipelineDisplay.js";
-import type { ChatProps } from "../components/PipelineDisplay.js";
+import { renderPipelineApp } from "../components/PipelineApp.js";
+import { classifyNode } from "../lib/classifyNode.js";
+import { parseClaudeEvent } from "../lib/parseClaudeEvent.js";
 
 export interface PipelineRunOptions {
   project?: string;
@@ -87,28 +88,35 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
     rmSync(logsRoot, { recursive: true, force: true });
   }
 
-  const branchResult = spawnSync("git", ["branch", "--show-current"], { cwd: project, encoding: "utf8" });
-  const branch = branchResult.stdout.trim() || "main";
+  // Mount the new single-<Static> PipelineApp.
+  const overviewNodeIds = [...graph.nodes.values()]
+    .filter((n) => n.shape !== "Mdiamond" && n.shape !== "Msquare")
+    .map((n) => n.id);
 
-  // Mount long-lived Ink display
-  const { callbacks, waitUntilExit } = await renderPipelineDisplay({
+  const { callbacks, waitUntilExit } = await renderPipelineApp({
     pipelineName: graph.name,
     pid: process.pid,
     goal: graph.goal,
+    nodes: overviewNodeIds,
   });
-  const { push, setStatus, setChat, done } = callbacks;
+  const { emit, done } = callbacks;
 
-  // Show pipeline overview
-  push({ kind: "info", text: `${graph.name}  ·  ${branch}  ·  ${project}` });
-  if (graph.goal) push({ kind: "info", text: `goal: ${graph.goal}` });
-  const overviewNodes = [...graph.nodes.values()]
-    .filter(n => n.shape !== "Mdiamond" && n.shape !== "Msquare")
-    .map(n => `${n.id} [${shapeToType(n.shape)}]`)
-    .join(" → ");
-  if (overviewNodes) push({ kind: "info", text: `nodes: ${overviewNodes}` });
+  // Track whether the current node had a block emitted (so we can gate `end`
+  // emission symmetrically). Marker nodes (start, exit) do NOT emit a block.
+  let currentBlockNodeId: string | null = null;
+  // One-shot flag: once we synthesize an abort end from the signal handler,
+  // ignore any late `onNodeEnd` for the same node.
+  let abortHandled = false;
 
   const ac = new AbortController();
-  const onSignal = () => ac.abort();
+  const onSignal = () => {
+    if (currentBlockNodeId !== null) {
+      emit({ kind: "end", outcome: { status: "abort", reason: "user-interrupt" } });
+      currentBlockNodeId = null;
+      abortHandled = true;
+    }
+    ac.abort();
+  };
   process.on("SIGINT", onSignal);
   process.on("SIGTERM", onSignal);
 
@@ -120,49 +128,77 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
       signal: ac.signal,
       project: opts.project,
       resume: opts.resume,
-      onInteractiveRequest: ({ session, child, tracePath }) =>
+
+      onInteractiveRequest: ({ child }) =>
         new Promise<void>((resolve) => {
-          let handled = false;
-          const props: ChatProps = {
-            session,
-            child,
-            tracePath,
-            onExit: () => {
-              if (handled) return;
-              handled = true;
-              setChat(null);
-              resolve();
-            },
-          };
-          setChat(props);
+          emit({ kind: "interactive-ready", child, onDone: resolve });
+          if (child.sessionId) {
+            emit({ kind: "trace-path", sessionId: child.sessionId });
+          }
+          // Pipe the child's event stream into the reducer.
+          (async () => {
+            try {
+              for await (const raw of child.events) {
+                for (const nev of parseClaudeEvent(raw)) emit(nev);
+              }
+            } catch (err) {
+              if (abortHandled) return;
+              emit({
+                kind: "end",
+                outcome: { status: "fail", reason: `crash: ${(err as Error).message}` },
+              });
+              currentBlockNodeId = null;
+            }
+          })();
         }),
+
       onNodeStart: (node) => {
-        const type = shapeToType(node.shape);
-        const interactiveTag = node.interactive === true || node.interactive === "true"
-          ? "  (interactive)" : "";
-        const label = `[${node.id}] [${type}]  ${node.label ?? ""}${interactiveTag}`.trim();
-        push({ kind: "step", text: label });
-        setStatus(label);
+        const blockKind = classifyNode(node);
+        if (blockKind === "marker") return;
+        currentBlockNodeId = node.id;
+        emit({
+          kind: "start",
+          nodeId: node.id,
+          label: node.label ?? shapeToType(node.shape),
+          blockKind,
+        });
       },
+
+      onNodeEnd: (node, outcome) => {
+        if (abortHandled) return;
+        if (classifyNode(node) === "marker") return;
+        // Engine OutcomeStatus is "success"|"retry"|"fail"|"partial_success".
+        // Map to the renderer's 3-value union. Abort is only emitted by
+        // the signal handler above, never by the engine itself.
+        const status = outcome.status === "success" ? "success" as const : "fail" as const;
+        emit({
+          kind: "end",
+          outcome: {
+            status,
+            reason: outcome.failureReason ?? (outcome.status === "partial_success" ? "partial success" : undefined),
+          },
+        });
+        currentBlockNodeId = null;
+      },
+
       onStdout: async (stdout) => {
-        for await (const event of streamEvents(stdout, {})) {
-          push({ kind: "stream", event });
+        for await (const raw of parseStreamJsonEvents(stdout)) {
+          for (const nev of parseClaudeEvent(raw)) emit(nev);
         }
       },
     });
 
-    if (result.status === "success") {
-      push({ kind: "success", text: `Pipeline complete: ${graph.name}  (${result.completedNodes.length} nodes)` });
-      setStatus("done");
-    } else {
-      push({ kind: "warn", text: `Pipeline failed: ${result.failureReason}` });
-      setStatus("failed");
+    if (result.status !== "success" && !abortHandled && currentBlockNodeId !== null) {
+      emit({
+        kind: "end",
+        outcome: { status: "fail", reason: result.failureReason ?? "pipeline failed" },
+      });
+      currentBlockNodeId = null;
     }
   } finally {
     process.off("SIGINT", onSignal);
     process.off("SIGTERM", onSignal);
-    // Yield one macrotask to let Ink flush the final render (matches output.ts renderOnce pattern)
-    await new Promise(resolve => setTimeout(resolve, 0));
+    await new Promise((resolve) => setImmediate(resolve));
     done();
     await waitUntilExit();
   }

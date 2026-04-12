@@ -29,11 +29,10 @@ vi.mock("child_process", () => ({
   })),
   spawnSync: vi.fn(() => ({ status: 0, stdout: "main\n" })),
 }));
-vi.mock("../components/PipelineDisplay.js", () => ({
-  renderPipelineDisplay: vi.fn(async () => ({
+vi.mock("../components/PipelineApp.js", () => ({
+  renderPipelineApp: vi.fn(async () => ({
     callbacks: {
-      push: vi.fn(),
-      setStatus: vi.fn(),
+      emit: vi.fn(),
       done: vi.fn(),
     },
     waitUntilExit: vi.fn(async () => {}),
@@ -44,6 +43,7 @@ vi.mock("../lib/assets.js", () => ({
 }));
 vi.mock("../lib/stream-formatter.js", () => ({
   streamEvents: vi.fn(async function* () {}),
+  parseStreamJsonEvents: vi.fn(async function* () {}),
 }));
 
 import { pipelineRunCommand, pipelineValidateCommand, pipelineListCommand, pipelineCreateCommand } from "../commands/pipeline.js";
@@ -100,18 +100,16 @@ describe("pipelineRunCommand", () => {
   });
   afterEach(() => { rmSync(dir, { recursive: true }); });
 
-  it("calls runPipeline with parsed graph", async () => {
+  it("calls runPipeline with parsed graph and done on success", async () => {
     const dotFile = join(dir, "test.dot");
     writeFileSync(dotFile, VALID_DOT);
     await pipelineRunCommand(dotFile, { logsRoot: dir });
     expect(engine.runPipeline).toHaveBeenCalledTimes(1);
-    // Success is now communicated via PipelineDisplay callbacks, not output.success
-    const { renderPipelineDisplay } = await import("../components/PipelineDisplay.js");
-    const mockDisplay = renderPipelineDisplay as ReturnType<typeof vi.fn>;
-    const result = await mockDisplay.mock.results[0].value;
-    expect(result.callbacks.push).toHaveBeenCalledWith(
-      expect.objectContaining({ kind: "success" }),
-    );
+    // The new adapter calls done() on PipelineApp after runPipeline resolves.
+    const { renderPipelineApp } = await import("../components/PipelineApp.js");
+    const mockApp = renderPipelineApp as ReturnType<typeof vi.fn>;
+    const result = await mockApp.mock.results[0].value;
+    expect(result.callbacks.done).toHaveBeenCalled();
   });
 
   it("exits 1 if dotFile does not exist", async () => {
@@ -165,19 +163,18 @@ describe("pipelineRunCommand", () => {
     writeFileSync(dotFile, dot);
     await pipelineRunCommand(dotFile, { logsRoot: dir });
 
-    const { renderPipelineDisplay } = await import("../components/PipelineDisplay.js");
-    const mockDisplay = renderPipelineDisplay as ReturnType<typeof vi.fn>;
-    const result = await mockDisplay.mock.results[0].value;
-    const pushCalls: Array<{ kind: string; text?: string }> = (result.callbacks.push as ReturnType<typeof vi.fn>).mock.calls.map((c: any[]) => c[0]);
-    const overviewCall = pushCalls.find(c => c.kind === "info" && c.text?.startsWith("nodes:"));
+    // The new adapter passes node IDs directly as the `nodes` prop to renderPipelineApp.
+    const { renderPipelineApp } = await import("../components/PipelineApp.js");
+    const mockApp = renderPipelineApp as ReturnType<typeof vi.fn>;
+    const call = mockApp.mock.calls[0][0];
+    const nodes: string[] = call.nodes;
 
-    expect(overviewCall).toBeDefined();
-    expect(overviewCall!.text).toContain("worker");
-    expect(overviewCall!.text).toContain("approval");
-    // Must NOT contain raw label content
-    expect(overviewCall!.text).not.toContain("Approve?");
-    expect(overviewCall!.text).not.toContain("\\n");
-    expect(overviewCall!.text).not.toContain("$some_var");
+    expect(nodes).toContain("worker");
+    expect(nodes).toContain("approval");
+    // Must NOT contain raw label content or marker nodes
+    expect(nodes.join(" ")).not.toContain("Approve?");
+    expect(nodes.join(" ")).not.toContain("start");
+    expect(nodes.join(" ")).not.toContain("done");
   });
 });
 
