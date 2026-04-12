@@ -64,7 +64,8 @@ const SAFE_DOT = `digraph g {
 }`;
 
 describe("pipelineRunCommand headless safety", () => {
-  let exitSpy: ReturnType<typeof vi.spyOn<typeof process, "exit">>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let exitSpy: any;
   const origIsTTY = process.stdin.isTTY;
   let dir: string;
 

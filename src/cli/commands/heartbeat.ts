@@ -1,8 +1,9 @@
 // src/cli/commands/heartbeat.ts
 import { Command } from "commander";
 import { resolve, basename } from "path";
-import { statSync, Stats } from "fs";
+import { statSync, Stats, readFileSync } from "fs";
 import { request, stream } from "../../lib/daemon-client";
+import { parseDot } from "../../attractor/core/graph.js";
 import type { Task } from "../../daemon/state";
 import * as output from "../lib/output.js";
 
@@ -171,6 +172,17 @@ Examples:
     .action(async (dotfile: string, opts: { project?: string; every: number }) => {
       const absDotFile = resolve(dotfile);
       validatePathArg(dotfile, absDotFile, "file", "Pipeline dotfile");
+
+      // Warn if pipeline is marked as headless-unsafe
+      const dotSrc = readFileSync(absDotFile, "utf8");
+      const dotGraph = parseDot(dotSrc);
+      if (dotGraph.headlessSafe === false) {
+        await output.warn(
+          `Warning: ${basename(absDotFile)} has headless_safe=false and will be ` +
+          `rejected when the daemon runs it without a TTY.`
+        );
+      }
+
       const stem = basename(absDotFile).replace(/\.dot$/i, "");
       const id = `pipeline:${stem}`;
       const args: string[] = ["run", absDotFile];
