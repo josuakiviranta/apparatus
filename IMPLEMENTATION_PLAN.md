@@ -1,35 +1,21 @@
-# LiveFooter Stable Height Implementation Plan
+# Mark-Implemented Lifecycle Completion — Implementation Plan
 
-> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [x]`) syntax for tracking.
 
-**Goal:** Eliminate stacked header reprints in the terminal by making `LiveFooter` render at a fixed, stable height from the moment a block starts — so Ink's cursor-tracking never encounters a height mismatch.
+**Goal:** Add a `mark_implemented` MCP tool to `illumination-server.ts` so developers can transition illuminations from `dispatched`/`open` to `implemented` during `ralph meditate` sessions.
 
-**Architecture:** `LiveFooter` currently hides the trace line and input row until the corresponding events arrive (`trace-path` and `interactive-ready`). This causes height growth mid-render: Ink moves the cursor up by the *previous* line count, fails to erase all stale output, and leaves ghost header lines. The fix pre-allocates placeholder lines for `agent` and `interactive-agent` kinds from the first `start` event so the line count never changes.
+**Architecture:** A new exported function `markImplemented(projectRoot, filename)` reads an illumination file, parses its YAML frontmatter, validates the current status allows transition, updates `status` to `implemented`, adds `implemented_at` date, and writes the file back. The tool is registered in the MCP server, whitelisted in the meditate agent, and referenced in the meditation prompt.
 
-**Tech Stack:** TypeScript, React 18, Ink (terminal UI), `ink-testing-library` for tests, Vitest.
+**Tech Stack:** TypeScript, Node.js `fs`, YAML frontmatter parsing (regex-based, matching existing patterns in the file), Vitest.
 
-> **Status (v0.1.3):** Tasks 1 and 2 complete — tests updated and implementation landed in commit `5ff43f8`. All 636 tests pass. Task 3 (manual tmux smoke verification) remains.
+## Status: COMPLETE ✅
 
----
-
-## Background: how Ink re-renders
-
-Ink maintains a "live" dynamic section at the bottom of the terminal. On every re-render it:
-1. Moves cursor up N lines (N = lines printed last time)
-2. Clears to end of screen
-3. Prints the new content
-
-If new content is taller than N, the extra lines at the top of the *previous* render are never erased — they become permanent stale output. With `LiveFooter`'s 100 ms `setInterval` tick, each subsequent render compounds this, printing another copy of the header below the stale one.
-
-Root events and their height impact (interactive-agent node):
-
-| Event | Lines rendered before fix | Lines after fix |
-|---|---|---|
-| `start` | 2 (header + status) | 4 (header + trace-placeholder + status + input-placeholder) |
-| `interactive-ready` | 3 (+input) | 4 (same) |
-| `trace-path` | 4 (+trace) | 4 (same, placeholder replaced with real path) |
-
-After the fix the line count is constant at 4 for interactive-agent and 3 for agent.
+All 6 tasks implemented and verified in v0.1.4:
+- `markImplemented` function with TDD (8 test cases including path traversal protection)
+- MCP tool registration (`mark_implemented`)
+- Meditate agent whitelist updated
+- Prompt instruction added
+- 644/644 tests passing, clean build
 
 ---
 
@@ -37,499 +23,419 @@ After the fix the line count is constant at 4 for interactive-agent and 3 for ag
 
 | Action | Path | What changes |
 |---|---|---|
-| Modify | `src/cli/components/LiveFooter.tsx` | Add placeholder trace + input rows for agent kinds |
-| Modify | `src/cli/tests/LiveFooter.test.tsx` | Update two existing tests that asserted absence of these rows; add new placeholder tests |
-
-No other files change. The reducer, pipeline command, and BlockView are untouched.
+| Modify | `src/cli/mcp/illumination-server.ts` | Add `markImplemented` function + MCP tool registration |
+| Modify | `src/cli/tests/illumination-server.test.ts` | Add `describe("markImplemented", ...)` test block |
+| Modify | `src/cli/agents/meditate.md` | Add tool to whitelist |
+| Modify | `src/cli/prompts/PROMPT_meditation.md` | Add prompt instruction |
 
 ---
 
-## Chunk 1: Tests then implementation
+## Chunk 1: `markImplemented` function with TDD
 
-### Task 1: Update existing conflicting tests + add new ones
-
-The following two existing tests assert the *old* (buggy) behaviour — they must be updated first so we have a clear red baseline before touching the component.
+### Task 1: Write failing tests for `markImplemented`
 
 **Files:**
-- Modify: `src/cli/tests/LiveFooter.test.tsx`
+- Modify: `src/cli/tests/illumination-server.test.ts`
 
-- [x] **Step 1: Read the current test file**
+- [x] **Step 1: Read the test file to understand existing patterns**
 
 ```bash
-cat src/cli/tests/LiveFooter.test.tsx
+cat src/cli/tests/illumination-server.test.ts
 ```
 
-Understand the two failing tests before editing:
-- `"omits trace path when absent"` — will conflict because we'll now always render a trace row for `interactive-agent`.
-- `"omits TextInput when input prop is absent"` — will conflict because we'll now always render an input placeholder row for `interactive-agent`.
+Confirm: `tmpDir` setup/teardown via `beforeEach`/`afterEach`, `mkdtempSync`/`rmSync` pattern, direct `writeFileSync` for fixture files.
 
-- [x] **Step 2: Update `"omits trace path when absent"` test**
+- [x] **Step 2: Write failing tests for `markImplemented`**
 
-The block in this test uses `kind: "interactive-agent"` (from `makeLive()`). After the fix, a placeholder `  trace: …` line must appear. Update the test:
+Add a new `describe("markImplemented", ...)` block at the end of the file. Import `markImplemented` from `../mcp/illumination-server.js` alongside existing imports.
 
 ```typescript
-it("shows a placeholder trace line when kind is agent/interactive-agent and tracePath is absent", () => {
-  const block = makeLive({ tracePath: undefined });
-  const { lastFrame } = render(<LiveFooter block={block} index={1} />);
-  const frame = lastFrame() ?? "";
-  // A placeholder trace row must exist to keep line count stable
-  expect(frame).toMatch(/trace:/);
-  expect(frame).toContain("…");
-  // But it must NOT show a real path
-  expect(frame).not.toMatch(/\.jsonl/);
+describe("markImplemented", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = realpathSync(mkdtempSync(join(tmpdir(), "ralph-test-")));
+    mkdirSync(join(tmpDir, "meditations", "illuminations"), { recursive: true });
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  function writeIlluminationFile(filename: string, frontmatter: string, body: string) {
+    const content = `---\n${frontmatter}\n---\n\n${body}`;
+    writeFileSync(join(tmpDir, "meditations", "illuminations", filename), content);
+  }
+
+  it("transitions dispatched to implemented", () => {
+    writeIlluminationFile(
+      "T1620-some-bug.md",
+      "date: 2026-04-10\ndescription: A bug\nstatus: dispatched",
+      "Body content here."
+    );
+
+    const result = markImplemented(tmpDir, "T1620-some-bug.md");
+
+    expect(result.success).toBe(true);
+    expect(result.previous_status).toBe("dispatched");
+    expect(result.new_status).toBe("implemented");
+
+    const written = readFileSync(
+      join(tmpDir, "meditations", "illuminations", "T1620-some-bug.md"),
+      "utf-8"
+    );
+    expect(written).toMatch(/status: implemented/);
+    expect(written).toMatch(/implemented_at: \d{4}-\d{2}-\d{2}/);
+    expect(written).toContain("Body content here.");
+  });
+
+  it("transitions open to implemented", () => {
+    writeIlluminationFile(
+      "T1700-open-issue.md",
+      "date: 2026-04-10\ndescription: An issue\nstatus: open",
+      "Some body."
+    );
+
+    const result = markImplemented(tmpDir, "T1700-open-issue.md");
+
+    expect(result.success).toBe(true);
+    expect(result.previous_status).toBe("open");
+    expect(result.new_status).toBe("implemented");
+  });
+
+  it("rejects already-implemented illumination", () => {
+    writeIlluminationFile(
+      "T1800-done.md",
+      "date: 2026-04-10\ndescription: Done\nstatus: implemented",
+      "Body."
+    );
+
+    const result = markImplemented(tmpDir, "T1800-done.md");
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("Cannot mark as implemented");
+    expect(result.error).toContain("implemented");
+  });
+
+  it("rejects archived illumination", () => {
+    writeIlluminationFile(
+      "T1900-archived.md",
+      "date: 2026-04-10\ndescription: Old\nstatus: archived",
+      "Body."
+    );
+
+    const result = markImplemented(tmpDir, "T1900-archived.md");
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("Cannot mark as implemented");
+    expect(result.error).toContain("archived");
+  });
+
+  it("returns error when file not found", () => {
+    const result = markImplemented(tmpDir, "T9999-nonexistent.md");
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("not found");
+  });
+
+  it("preserves body content unchanged", () => {
+    const body = "# Deep Analysis\n\nMultiple paragraphs.\n\n- List item\n- Another";
+    writeIlluminationFile(
+      "T2000-preserve.md",
+      "date: 2026-04-10\ndescription: Preserve test\nstatus: dispatched",
+      body
+    );
+
+    markImplemented(tmpDir, "T2000-preserve.md");
+
+    const written = readFileSync(
+      join(tmpDir, "meditations", "illuminations", "T2000-preserve.md"),
+      "utf-8"
+    );
+    expect(written).toContain(body);
+  });
+
+  it("adds implemented_at as UTC date in YYYY-MM-DD format", () => {
+    writeIlluminationFile(
+      "T2100-date.md",
+      "date: 2026-04-10\ndescription: Date test\nstatus: open",
+      "Body."
+    );
+
+    markImplemented(tmpDir, "T2100-date.md");
+
+    const written = readFileSync(
+      join(tmpDir, "meditations", "illuminations", "T2100-date.md"),
+      "utf-8"
+    );
+    const match = written.match(/implemented_at: (\d{4}-\d{2}-\d{2})/);
+    expect(match).not.toBeNull();
+    // Verify it's a valid date string
+    const parsed = new Date(match![1]);
+    expect(parsed.toString()).not.toBe("Invalid Date");
+  });
 });
 ```
 
-- [ ] **Step 3: Update `"omits TextInput when input prop is absent"` test**
+- [x] **Step 3: Run tests to confirm they fail**
 
-The block uses `kind: "interactive-agent"`. After the fix, a disabled `>` placeholder row must appear even without `block.input`. Update:
-
-```typescript
-it("shows a disabled input placeholder when kind is interactive-agent and input is absent", () => {
-  const block = makeLive({ input: undefined });
-  const { lastFrame } = render(<LiveFooter block={block} index={1} />);
-  const frame = lastFrame() ?? "";
-  // Placeholder prompt row must exist to keep line count stable
-  expect(frame).toMatch(/^> /m);
-  // But there must be no interactive value content
-  expect(frame).not.toContain("what's in src?");
-});
+```bash
+npx vitest run src/cli/tests/illumination-server.test.ts --reporter=verbose 2>&1 | tail -30
 ```
 
-- [ ] **Step 4: Add test — agent (non-interactive) shows trace placeholder, no input row**
+Expected: all `markImplemented` tests fail (function doesn't exist yet). Existing tests still pass.
 
-Add a helper and new test after the `makeLive` helper at the top of the `describe("LiveFooter")` block:
+- [x] **Step 4: Commit the failing tests**
+
+```bash
+git add src/cli/tests/illumination-server.test.ts
+git commit -m "test(illumination): add failing tests for markImplemented lifecycle transition"
+```
+
+---
+
+### Task 2: Implement `markImplemented` in illumination-server.ts
+
+**Files:**
+- Modify: `src/cli/mcp/illumination-server.ts`
+
+- [x] **Step 1: Read the current implementation**
+
+```bash
+cat src/cli/mcp/illumination-server.ts
+```
+
+Understand: how `writeIllumination` constructs frontmatter, the export pattern, and where to place the new function.
+
+- [x] **Step 2: Add the `markImplemented` function**
+
+Add the exported function after `writeIllumination`. It should:
 
 ```typescript
-function makeAgentLive(overrides: Partial<LiveBlockWithInput> = {}): LiveBlockWithInput {
-  return makeLive({ kind: "agent", ...overrides });
+export function markImplemented(
+  projectRoot: string,
+  filename: string,
+): { success: true; filename: string; previous_status: string; new_status: string }
+  | { success: false; error: string } {
+  const illumDir = join(projectRoot, "meditations", "illuminations");
+  const filePath = join(illumDir, filename);
+
+  if (!existsSync(filePath)) {
+    return { success: false, error: "Illumination file not found" };
+  }
+
+  const raw = readFileSync(filePath, "utf-8");
+
+  // Parse frontmatter block: content between first --- and second ---
+  const fmMatch = raw.match(/^---\n([\s\S]*?)\n---\n/);
+  if (!fmMatch) {
+    return { success: false, error: "No frontmatter found in illumination file" };
+  }
+
+  const fmBlock = fmMatch[1];
+  const body = raw.slice(fmMatch[0].length);
+
+  // Extract current status
+  const statusMatch = fmBlock.match(/^status:\s*(.+)$/m);
+  const currentStatus = statusMatch ? statusMatch[1].trim() : "open";
+
+  // Validate transition
+  const allowed = ["open", "dispatched"];
+  if (!allowed.includes(currentStatus)) {
+    return {
+      success: false,
+      error: `Cannot mark as implemented: current status is ${currentStatus}`,
+    };
+  }
+
+  // Update frontmatter
+  const today = new Date().toISOString().slice(0, 10);
+  let updatedFm = statusMatch
+    ? fmBlock.replace(/^status:\s*.+$/m, "status: implemented")
+    : fmBlock + "\nstatus: implemented";
+  updatedFm += `\nimplemented_at: ${today}`;
+
+  const updatedContent = `---\n${updatedFm}\n---\n${body}`;
+  writeFileSync(filePath, updatedContent);
+
+  return {
+    success: true,
+    filename,
+    previous_status: currentStatus,
+    new_status: "implemented",
+  };
 }
 ```
 
-Then add the test:
+**Note:** Uses `existsSync` and `readFileSync` from `fs` (already imported in the file). Pattern matches existing frontmatter handling: regex-based, no external YAML library.
 
-```typescript
-it("shows trace placeholder for agent kind before tracePath arrives", () => {
-  const block = makeAgentLive({ tracePath: undefined });
-  const { lastFrame } = render(<LiveFooter block={block} index={2} />);
-  const frame = lastFrame() ?? "";
-  expect(frame).toMatch(/trace:/);
-  expect(frame).toContain("…");
-  expect(frame).not.toMatch(/\.jsonl/);
-});
-
-it("shows real trace path for agent kind once tracePath is set", () => {
-  const block = makeAgentLive({
-    tracePath: "/Users/x/.claude/projects/-cwd/abc.jsonl",
-  });
-  const { lastFrame } = render(<LiveFooter block={block} index={2} />);
-  const frame = lastFrame() ?? "";
-  expect(frame).toContain("trace:");
-  expect(frame).toContain("abc.jsonl");
-});
-
-it("does not show trace row for non-agent kinds (wait-human)", () => {
-  // wait-human gate blocks never have a trace path — no placeholder row
-  const { lastFrame } = render(
-    <LiveFooter
-      block={{
-        id: "gate-0",
-        nodeId: "g",
-        label: "gate",
-        kind: "wait-human",
-        startedAt: Date.now(),
-        body: [],
-        stats: { turns: 0, tokensIn: 0, tokensOut: 0 },
-        gate: { options: ["Yes"], onChoose: vi.fn() },
-      }}
-      index={1}
-    />
-  );
-  const frame = lastFrame() ?? "";
-  expect(frame).not.toMatch(/trace:/);
-});
-
-it("does not show input row for agent (non-interactive) kind", () => {
-  const block = makeAgentLive({ tracePath: undefined });
-  const { lastFrame } = render(<LiveFooter block={block} index={1} />);
-  const frame = lastFrame() ?? "";
-  expect(frame).not.toMatch(/^> /m);
-});
-```
-
-- [ ] **Step 5: Run tests — confirm they fail for the right reasons**
+- [x] **Step 3: Run tests to confirm they pass**
 
 ```bash
-npx vitest run src/cli/tests/LiveFooter.test.tsx 2>&1 | tail -40
+npx vitest run src/cli/tests/illumination-server.test.ts --reporter=verbose 2>&1 | tail -30
 ```
 
-Expected: the updated/new tests fail. The existing tests that we did NOT modify still pass. If anything unexpected fails, investigate before continuing.
+Expected: all `markImplemented` tests pass. All existing tests still pass.
 
-- [ ] **Step 6: Commit the test changes**
-
-```bash
-git add src/cli/tests/LiveFooter.test.tsx
-git commit -m "test(LiveFooter): update tests to expect stable-height placeholder rows"
-```
-
----
-
-### Task 2: Implement stable-height placeholder rows in LiveFooter
-
-**Files:**
-- Modify: `src/cli/components/LiveFooter.tsx`
-
-- [ ] **Step 1: Read the current implementation**
-
-```bash
-cat src/cli/components/LiveFooter.tsx
-```
-
-The key sections to change are:
-1. The conditional trace line: `{block.tracePath && <Text dimColor>  trace: {block.tracePath}</Text>}`
-2. The conditional input section: `{block.input && (...)}`
-
-- [ ] **Step 2: Replace the trace line with a kind-aware renderer**
-
-Change this:
-
-```tsx
-{block.tracePath && <Text dimColor>  trace: {block.tracePath}</Text>}
-```
-
-To this:
-
-```tsx
-{(block.kind === "agent" || block.kind === "interactive-agent") && (
-  <Text dimColor>
-    {"  trace: "}{block.tracePath ?? "…"}
-  </Text>
-)}
-```
-
-**Why:** `agent` and `interactive-agent` nodes always produce a `.jsonl` trace file. By reserving the row from the first render (using `…` as placeholder), the line count is stable. `wait-human`, `conditional`, `tool`, and `marker` nodes never have trace paths — they keep zero trace rows.
-
-- [ ] **Step 3: Replace the input section with a kind-aware renderer**
-
-Change this:
-
-```tsx
-{block.input && (
-  <Box>
-    <Text color="gray">{"> "}</Text>
-    <TextInput
-      value={block.input.value}
-      onChange={block.input.onChange}
-      onSubmit={block.input.onSubmit}
-    />
-  </Box>
-)}
-```
-
-To this:
-
-```tsx
-{block.kind === "interactive-agent" && (
-  <Box>
-    <Text color="gray">{"> "}</Text>
-    {block.input ? (
-      <TextInput
-        value={block.input.value}
-        onChange={block.input.onChange}
-        onSubmit={block.input.onSubmit}
-      />
-    ) : (
-      <Text dimColor>{" "}</Text>
-    )}
-  </Box>
-)}
-```
-
-**Why:** `interactive-agent` nodes always end up with an input row once `interactive-ready` fires. By rendering a static `> ` row from the first render (before `interactive-ready`), the line count is stable. The placeholder `<Text dimColor>{" "}</Text>` occupies the same visual space without any interactivity.
-
-- [ ] **Step 4: Run the tests — all must pass**
-
-```bash
-npx vitest run src/cli/tests/LiveFooter.test.tsx 2>&1 | tail -40
-```
-
-Expected: all tests pass, zero failures. If any test still fails, do not proceed — investigate why before adding more changes.
-
-- [ ] **Step 5: Run the full test suite to check for regressions**
+- [x] **Step 4: Run the full test suite**
 
 ```bash
 npx vitest run 2>&1 | tail -20
 ```
 
-Expected: all tests pass. If something breaks in `PipelineApp.test.tsx` or `pipeline-app-integration.test.tsx`, read the failure carefully — the change is isolated to rendering logic and should not break reducer or event handling tests.
+Expected: no regressions.
 
-- [ ] **Step 6: Commit the implementation**
+- [x] **Step 5: Commit**
 
 ```bash
-git add src/cli/components/LiveFooter.tsx
-git commit -m "fix(LiveFooter): pre-allocate trace and input rows to stabilize render height
+git add src/cli/mcp/illumination-server.ts
+git commit -m "feat(illumination): add markImplemented function for lifecycle transition
 
-Before this fix, LiveFooter grew in height as events arrived:
-- start:             2 lines (header + status)
-- interactive-ready: 3 lines (+input)
-- trace-path:        4 lines (+trace)
-
-Each height increase caused Ink to underestimate how many lines to erase,
-leaving stale header lines visible. With the 100ms setInterval tick, these
-accumulated into 60+ repeated headers in the terminal.
-
-After this fix, agent and interactive-agent blocks always render 3 or 4 lines
-respectively from the first start event, using '…' and ' ' as placeholders
-until the real values arrive."
+Reads illumination file, validates status is open or dispatched,
+updates frontmatter to status: implemented with implemented_at date.
+Preserves body content unchanged."
 ```
 
 ---
 
----
+## Chunk 2: MCP tool registration
 
-### Task 3: Tmux smoke run — all pipelines/smoke/*.dot
+### Task 3: Register `mark_implemented` as an MCP tool
 
-This task verifies the fix visually using the tmux harness from `docs/harness/tmux-drive.md`. The core assertion for every pipeline is: **the header line `━━ [` appears exactly once per node in the live section**. Stacked headers would show as multiple `━━ [` lines before the status line.
+**Files:**
+- Modify: `src/cli/mcp/illumination-server.ts`
 
-**Prerequisites:**
-- `npm run build` completed successfully (Task 2 Step 5)
-- A tmux session is active
-- Terminal is a known emulator (Terminal, iTerm2, Ghostty, kitty, WezTerm, Alacritty)
-
-- [ ] **Step 1: Source the harness helpers**
-
-Open a shell inside your active tmux session and paste the entire helpers block from `docs/harness/tmux-drive.md`. Nothing executes on paste — the helpers are just function definitions.
-
-Verify sourcing worked:
+- [x] **Step 1: Read the MCP server registration section**
 
 ```bash
-type start_run
-# Expected: "start_run is a function"
+grep -n "server.tool\|addTool\|registerTool" src/cli/mcp/illumination-server.ts
 ```
 
-- [ ] **Step 2: Build**
+Understand: how existing tools are registered (name, description, input schema, handler).
 
-```bash
-npm run build
+- [x] **Step 2: Add the MCP tool registration**
+
+Add after the last existing tool registration, following the same pattern:
+
+```typescript
+server.tool(
+  "mark_implemented",
+  "Mark an illumination as implemented. Valid from status open or dispatched.",
+  {
+    filename: {
+      type: "string",
+      description: "Illumination filename (e.g. T1620-some-bug.md)",
+    },
+  },
+  async ({ filename }: { filename: string }) => {
+    const result = markImplemented(projectRoot, filename);
+    return {
+      content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+    };
+  },
+);
 ```
 
-Expected: exits 0 with no errors.
-
----
-
-#### Pipeline 1: agent-implement.dot (agent — trace placeholder)
-
-This pipeline is the canonical test for the trace placeholder on a regular `agent` node.
-
-- [ ] **Step 3a: Start the run**
+- [x] **Step 3: Build to verify no compilation errors**
 
 ```bash
-start_run "ralph pipeline run pipelines/smoke/agent-implement.dot"
+npm run build 2>&1 | tail -10
 ```
 
-- [ ] **Step 3b: Wait for the streaming state**
+Expected: clean build, no errors.
+
+- [x] **Step 4: Commit**
 
 ```bash
-wait_for_string "streaming" 15000 && capture
-```
-
-- [ ] **Step 3c: Read the capture and verify**
-
-```bash
-cat "$RUN_DIR/current.txt"
-```
-
-Expected in the live section:
-- `━━ [1]` appears **exactly once** (no stacking)
-- `trace: …` appears (placeholder before sessionId arrives) OR `trace: /Users/` (real path if sessionId arrived fast)
-- `⠋ streaming` appears
-- No second `━━ [1]` line anywhere above the trace line
-
-```bash
-grep -c '━━ \[' "$RUN_DIR/current.txt"
-# Expected: 1 (exactly one header line visible)
-```
-
-- [ ] **Step 3d: Wait for completion and capture final state**
-
-```bash
-wait_for_string "✓ success" 180000 && capture
-cat "$RUN_DIR/current.txt"
-```
-
-Expected: pipeline completed, `✓ success` visible.
-
-- [ ] **Step 3e: Cleanup**
-
-```bash
-cleanup_run clean
+git add src/cli/mcp/illumination-server.ts
+git commit -m "feat(illumination): register mark_implemented MCP tool"
 ```
 
 ---
 
-#### Pipeline 2: gate.dot (wait-human — no trace/input row)
+## Chunk 3: Meditate agent whitelist + prompt instruction
 
-This verifies the fix didn't accidentally add trace/input placeholders to `wait-human` gate nodes.
+### Task 4: Add tool to meditate agent whitelist
 
-- [ ] **Step 4a: Start the run**
+**Files:**
+- Modify: `src/cli/agents/meditate.md`
+
+- [x] **Step 1: Read the file**
 
 ```bash
-start_run "ralph pipeline run pipelines/smoke/gate.dot"
+cat src/cli/agents/meditate.md
 ```
 
-- [ ] **Step 4b: Wait for the gate prompt**
+- [x] **Step 2: Add `mcp__illumination__mark_implemented` to the tools whitelist**
 
-```bash
-wait_for_string "awaiting choice" 15000 && capture
-cat "$RUN_DIR/current.txt"
+Insert after `mcp__illumination__write_illumination`:
+
+```yaml
+  - mcp__illumination__mark_implemented
 ```
 
-Expected in the live section:
-- `━━ [1]` appears once
-- `trace:` does **NOT** appear (gate nodes have no trace path)
-- `> ` does **NOT** appear (gate nodes have no input row)
-- `◆ awaiting choice` appears
-- Gate options visible (e.g., `1. Proceed`, `2. Abort`)
+- [x] **Step 3: Commit**
 
 ```bash
-grep -c 'trace:' "$RUN_DIR/current.txt"
-# Expected: 0
-```
-
-- [ ] **Step 4c: Select "Proceed" (option 1)**
-
-```bash
-# Gate selector responds to number keys — press 1 then Enter
-tmux send-keys -t "$SESSION:$WIN" "1"
-wait_stable 3000 || true
-tmux send-keys -t "$SESSION:$WIN" Enter
-wait_for_string "success" 15000 && capture
-```
-
-- [ ] **Step 4d: Cleanup**
-
-```bash
-cleanup_run clean
+git add src/cli/agents/meditate.md
+git commit -m "feat(meditate): whitelist mark_implemented tool in agent config"
 ```
 
 ---
 
-#### Pipeline 3: chat-only.dot (interactive-agent — trace + input placeholders)
+### Task 5: Add prompt instruction for marking resolved illuminations
 
-This is the **primary regression test** for the bug. It exercises the `interactive-agent` node that was producing 60+ stacked headers.
+**Files:**
+- Modify: `src/cli/prompts/PROMPT_meditation.md`
 
-- [ ] **Step 5a: Start the run**
+- [x] **Step 1: Read the file**
 
 ```bash
-start_run "ralph pipeline run pipelines/smoke/chat-only.dot"
+cat src/cli/prompts/PROMPT_meditation.md
 ```
 
-- [ ] **Step 5b: Wait for the awaiting state**
+- [x] **Step 2: Add instruction after the existing task list**
 
-```bash
-wait_for_string "awaiting" 15000 && capture
-cat "$RUN_DIR/current.txt"
+After the last numbered step in the workflow (step 7 — `write_illumination`), add:
+
+```markdown
+8. If the user reports that a fix has been shipped or an illumination has been resolved,
+   call `mark_implemented` with the illumination filename before ending the session.
 ```
 
-Expected in the live section:
-- `━━ [1]` appears **exactly once** (the bug would produce 10+ copies here)
-- `trace:` appears (either `trace: …` placeholder or real path)
-- `> ` appears on its own line (input prompt — either active TextInput or placeholder)
-- `● awaiting` appears
+- [x] **Step 3: Commit**
 
 ```bash
-grep -c '━━ \[' "$RUN_DIR/current.txt"
-# Expected: 1 (the fix is working if this is 1, not 10+)
-```
-
-- [ ] **Step 5c: Send /end to close the interactive session**
-
-```bash
-send_input "/end"
-wait_for_string "success" 30000 && capture
-cat "$RUN_DIR/current.txt"
-```
-
-Expected: chat node shows `✓ success`, pipeline completes.
-
-- [ ] **Step 5d: Cleanup**
-
-```bash
-cleanup_run clean
+git add src/cli/prompts/PROMPT_meditation.md
+git commit -m "feat(meditate): add prompt instruction for marking resolved illuminations"
 ```
 
 ---
 
-#### Pipeline 4: chat-end-to-end.dot (interactive-agent + fallback agent)
+### Task 6: Final verification
 
-Same interactive-agent check, plus verifies multi-node pipeline still renders correctly after the interactive node completes.
-
-- [ ] **Step 6a: Start the run**
+- [x] **Step 1: Run full test suite**
 
 ```bash
-start_run "ralph pipeline run pipelines/smoke/chat-end-to-end.dot"
+npx vitest run 2>&1 | tail -20
 ```
 
-- [ ] **Step 6b: Wait for awaiting, verify, send /end**
+Expected: all tests pass.
+
+- [x] **Step 2: Build**
 
 ```bash
-wait_for_string "awaiting" 15000 && capture
-grep -c '━━ \[' "$RUN_DIR/current.txt"
-# Expected: 1
-send_input "/end"
+npm run build 2>&1 | tail -10
 ```
 
-- [ ] **Step 6c: Wait for the second agent node (chat_summarizer/fallback) to complete**
+Expected: clean build.
+
+- [x] **Step 3: Verify the tool appears in MCP server output**
 
 ```bash
-wait_for_string "success" 120000 && capture
-cat "$RUN_DIR/current.txt"
+node dist/cli/mcp/illumination-server.js --help 2>&1 || true
+# Or check via listing tools if the server supports it
+grep -n "mark_implemented" dist/cli/mcp/illumination-server.js
 ```
 
-Expected: both nodes show in `<Static>` section with `✓ success`. Headers appear once each.
-
-- [ ] **Step 6d: Cleanup**
-
-```bash
-cleanup_run clean
-```
-
----
-
-#### Pipeline 5: conditional.dot (conditional node — no trace row)
-
-- [ ] **Step 7a: Start, wait for completion, verify**
-
-```bash
-start_run "ralph pipeline run pipelines/smoke/conditional.dot"
-wait_for_string "success" 30000 && capture
-cat "$RUN_DIR/current.txt"
-grep -c 'trace:' "$RUN_DIR/current.txt"
-# Expected: 0 (conditional nodes have no trace row)
-cleanup_run clean
-```
-
----
-
-#### Pipeline 6: tool.dot (tool node — no trace row)
-
-- [ ] **Step 8a: Start, wait for completion, verify**
-
-```bash
-start_run "ralph pipeline run pipelines/smoke/tool.dot"
-wait_for_string "success" 30000 && capture
-cat "$RUN_DIR/current.txt"
-grep -c 'trace:' "$RUN_DIR/current.txt"
-# Expected: 0 (tool nodes have no trace row)
-cleanup_run clean
-```
-
----
-
-- [ ] **Step 9: Final commit**
-
-All pipelines passed. Record the smoke test result:
-
-```bash
-git commit --allow-empty -m "chore: smoke test all pipelines/smoke/*.dot — stable header verified"
-```
+Expected: `mark_implemented` appears in the built output.
