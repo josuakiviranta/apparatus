@@ -1,5 +1,6 @@
 digraph illumination_to_plan {
   goal="Triage an illumination into an approved design doc and implementation plan"
+  headless_safe=false
 
   start [shape=Mdiamond]
 
@@ -33,14 +34,14 @@ digraph illumination_to_plan {
 
   // False path
   explain_removal -> remove_gate
-  remove_gate -> delete_agent  [label="Yes"]
   remove_gate -> done          [label="No"]
+  remove_gate -> delete_agent  [label="Yes"]
   delete_agent -> done
 
   // True path
   explainer -> approval_gate
-  approval_gate -> design_writer [label="Approve"]
   approval_gate -> delete_agent  [label="Decline"]
+  approval_gate -> design_writer [label="Approve"]
   approval_gate -> chat_session  [label="Chat"]
 
   // Chat loop
