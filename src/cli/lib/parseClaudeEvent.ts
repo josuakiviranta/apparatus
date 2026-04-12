@@ -31,6 +31,7 @@ export function parseClaudeEvent(raw: StreamJsonEvent): NodeEvent[] {
         ? [{ kind: "trace-path", sessionId: raw.sessionId }]
         : [];
     case "result":
+      return [{ kind: "stats", tokensIn: raw.usage.inputTokens, tokensOut: raw.usage.outputTokens }];
     case "tool_result":
     case "parse_error":
       return [];

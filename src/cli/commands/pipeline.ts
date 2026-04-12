@@ -133,6 +133,7 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
               for await (const raw of child.events) {
                 for (const nev of parseClaudeEvent(raw)) emit(nev);
               }
+              resolve();
             } catch (err) {
               if (abortHandled) return;
               emit({

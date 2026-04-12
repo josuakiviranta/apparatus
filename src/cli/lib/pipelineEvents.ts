@@ -22,6 +22,7 @@ export type NodeEvent =
   | { kind: "trace-path"; sessionId: string }
   | { kind: "text"; role: "you" | "claude" | "system"; text: string }
   | { kind: "tool_use"; name: string; summary: string }
+  | { kind: "stats"; tokensIn: number; tokensOut: number }
   | { kind: "interactive-ready"; child: ChildHandle; onDone: () => void }
   | { kind: "end"; outcome: Outcome; stats?: Partial<Stats> };
 

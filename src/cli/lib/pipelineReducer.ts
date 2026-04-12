@@ -53,6 +53,16 @@ export function pipelineReducer(state: PipelineState, event: NodeEvent): Pipelin
       return { ...state, live: { ...state.live, body } };
     }
 
+    case "stats": {
+      if (!state.live) return state;
+      const prev = state.live.stats;
+      return { ...state, live: { ...state.live, stats: {
+        turns: prev.turns + 1,
+        tokensIn: prev.tokensIn + event.tokensIn,
+        tokensOut: prev.tokensOut + event.tokensOut,
+      }}};
+    }
+
     case "interactive-ready": {
       if (!state.live) return state;
       return {
