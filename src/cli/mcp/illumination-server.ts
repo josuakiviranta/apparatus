@@ -1,4 +1,5 @@
 import { mkdirSync, writeFileSync, statSync, readFileSync, readdirSync, existsSync } from "fs";
+import { execSync } from "node:child_process";
 import { join, resolve, isAbsolute, relative } from "path";
 import ignore from "ignore";
 import fg from "fast-glob";
@@ -29,6 +30,16 @@ export function writeIllumination(
   mkdirSync(dir, { recursive: true });
   const filePath = join(dir, filename);
   writeFileSync(filePath, frontmatter + content, "utf8");
+  try {
+    execSync(`git -C "${projectRoot}" add "${filePath}"`, { stdio: "ignore" });
+    execSync(
+      `git -C "${projectRoot}" commit -m "meditate: add illumination ${filename}"`,
+      { stdio: "ignore" },
+    );
+  } catch {
+    // git not available, not a git repo, or nothing to commit (idempotent re-run).
+    // The file is already written; commit failure must not break the tool call.
+  }
   return filePath;
 }
 

@@ -1,7 +1,16 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtempSync, rmSync, existsSync, readFileSync, realpathSync, mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
+
+const { mockExecSync } = vi.hoisted(() => {
+  const mockExecSync = vi.fn();
+  return { mockExecSync };
+});
+vi.mock("node:child_process", () => ({
+  execSync: mockExecSync,
+}));
+
 import { validateFilename, writeIllumination, assertWithinRoot, readFile, validateGlobPattern, globFiles, projectTree, listMetaMeditations, readMetaMeditation, listIlluminations, markImplemented } from "../mcp/illumination-server";
 
 let tmpDir: string;
@@ -86,6 +95,44 @@ describe("writeIllumination", () => {
   it("throws when description is empty", () => {
     expect(() => writeIllumination(tmpDir, "test.md", "", "content")).toThrow("description is required");
     expect(() => writeIllumination(tmpDir, "test.md", "   ", "content")).toThrow("description is required");
+  });
+});
+
+describe("writeIllumination auto-commit", () => {
+  beforeEach(() => {
+    mockExecSync.mockClear();
+  });
+
+  it("calls git add then git commit after writing the file", () => {
+    const filePath = writeIllumination(tmpDir, "2026-04-12T1000-auto-commit.md", "Test auto-commit", "# Body");
+    expect(mockExecSync).toHaveBeenCalledTimes(2);
+    const addCall = mockExecSync.mock.calls[0][0] as string;
+    const commitCall = mockExecSync.mock.calls[1][0] as string;
+    expect(addCall).toContain("git -C");
+    expect(addCall).toContain(tmpDir);
+    expect(addCall).toContain("add");
+    expect(addCall).toContain(filePath);
+    expect(commitCall).toContain("git -C");
+    expect(commitCall).toContain(tmpDir);
+    expect(commitCall).toContain("commit");
+    expect(commitCall).toContain("meditate: add illumination 2026-04-12T1000-auto-commit.md");
+  });
+
+  it("returns success even when git commands fail (fail-open)", () => {
+    mockExecSync.mockImplementation(() => {
+      throw new Error("git not found");
+    });
+    const filePath = writeIllumination(tmpDir, "2026-04-12T1100-fail-open.md", "Fail open test", "# Body");
+    expect(existsSync(filePath)).toBe(true);
+  });
+
+  it("handles 'nothing to commit' gracefully on re-write", () => {
+    mockExecSync.mockImplementation((cmd: string) => {
+      if (cmd.includes("commit")) throw new Error("nothing to commit");
+      return undefined;
+    });
+    const filePath = writeIllumination(tmpDir, "2026-04-12T1200-rewrite.md", "Rewrite test", "# Body");
+    expect(filePath).toContain("2026-04-12T1200-rewrite.md");
   });
 });
 
