@@ -121,7 +121,7 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
       project: opts.project,
       resume: opts.resume,
 
-      onInteractiveRequest: ({ child }) =>
+      onInteractiveRequest: ({ child, session }) =>
         new Promise<void>((resolve) => {
           emit({ kind: "interactive-ready", child, onDone: resolve });
           if (child.sessionId) {
@@ -130,9 +130,13 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
           // Pipe the child's event stream into the reducer.
           (async () => {
             try {
+              let lastStopReason: string | undefined;
               for await (const raw of child.events) {
+                if (raw.type === "result") lastStopReason = raw.stopReason;
                 for (const nev of parseClaudeEvent(raw)) emit(nev);
               }
+              // turn_limit is success; everything else is a voluntary /end
+              session.exitReason = lastStopReason === "turn_limit" ? "turn_limit" : "user_end";
               resolve();
             } catch (err) {
               if (abortHandled) return;
