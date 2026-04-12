@@ -38,6 +38,11 @@ function statusLine(block: LiveBlockWithInput): string {
 }
 
 export function LiveFooter({ block, index }: { block: LiveBlockWithInput; index: number }) {
+  const [, tick] = React.useState(0);
+  React.useEffect(() => {
+    const id = setInterval(() => tick(n => n + 1), 100);
+    return () => clearInterval(id);
+  }, []);
   return (
     <Box flexDirection="column">
       <Text>{headerLine(index, block.nodeId, block.label)}</Text>

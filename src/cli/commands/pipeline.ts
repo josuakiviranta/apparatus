@@ -53,14 +53,6 @@ export async function pipelineValidateCommand(dotFile: string, opts: PipelineVal
   return 1;
 }
 
-function shapeToType(shape?: string): string {
-  switch (shape) {
-    case "box": return "agent";
-    case "hexagon": return "gate";
-    case "diamond": return "cond";
-    default: return shape ?? "node";
-  }
-}
 
 export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptions = {}): Promise<void> {
   const project = opts.project ? resolve(opts.project) : process.cwd();
@@ -159,7 +151,7 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
         emit({
           kind: "start",
           nodeId: node.id,
-          label: node.label ?? shapeToType(node.shape),
+          label: node.label ?? blockKind,
           blockKind,
         });
       },
