@@ -205,7 +205,7 @@ export function parseDot(src: string): Graph {
 
 const KNOWN_TYPES = new Set([
   "codergen", "tool", "wait.human", "conditional", "parallel", "parallel.fan_in",
-  "start", "exit",
+  "start", "exit", "store",
   "ralph.implement", "ralph.meditate", "ralph.run-scenarios",
   "agent", "stack.manager_loop",
 ]);
@@ -221,6 +221,7 @@ const SHAPE_TO_TYPE: Record<string, string> = {
   hexagon: "wait.human", diamond: "conditional", component: "parallel",
   tripleoctagon: "parallel.fan_in", parallelogram: "tool", house: "stack.manager_loop",
   circle: "ralph.implement", octagon: "ralph.meditate", square: "ralph.run-scenarios",
+  cylinder: "store",
 };
 
 export function resolveHandlerType(node: Node): string {

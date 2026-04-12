@@ -14,6 +14,7 @@ import { RalphScenariosHandler } from "../handlers/ralph-scenarios.js";
 import { ParallelHandler, FanInHandler } from "../handlers/parallel.js";
 import { AgentHandler } from "../handlers/agent-handler.js";
 import type { OnInteractiveRequest } from "../handlers/agent-handler.js";
+import { StoreHandler } from "../handlers/store.js";
 import type { NodeHandler } from "../handlers/registry.js";
 
 export interface EngineOptions {
@@ -51,6 +52,7 @@ function buildHandlerMap(opts: EngineOptions): Map<string, NodeHandler> {
   m.set("ralph.run-scenarios", new RalphScenariosHandler());
   m.set("parallel", new ParallelHandler());
   m.set("parallel.fan_in", new FanInHandler());
+  m.set("store", new StoreHandler());
   m.set("agent", agentHandler);
   return m;
 }
