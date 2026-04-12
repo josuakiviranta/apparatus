@@ -113,3 +113,47 @@ describe("isPidAlive", () => {
   });
 });
 
+describe("meditate agent tool whitelist", () => {
+  it("includes list_illuminations in the tools list", () => {
+    const agentMd = readFileSync(
+      join(__dirname, "..", "agents", "meditate.md"),
+      "utf-8",
+    );
+    const toolsMatch = agentMd.match(/^tools:\n((?:\s+-\s+.+\n)+)/m);
+    expect(toolsMatch).not.toBeNull();
+    const tools = toolsMatch![1]
+      .split("\n")
+      .map((l) => l.replace(/^\s+-\s+/, "").trim())
+      .filter(Boolean);
+    expect(tools).toContain("mcp__illumination__list_illuminations");
+  });
+
+  it("whitelists all 8 illumination server tools", () => {
+    const agentMd = readFileSync(
+      join(__dirname, "..", "agents", "meditate.md"),
+      "utf-8",
+    );
+    const toolsMatch = agentMd.match(/^tools:\n((?:\s+-\s+.+\n)+)/m);
+    expect(toolsMatch).not.toBeNull();
+    const tools = toolsMatch![1]
+      .split("\n")
+      .map((l) => l.replace(/^\s+-\s+/, "").trim())
+      .filter(Boolean);
+    expect(tools).toHaveLength(8);
+
+    const expected = [
+      "mcp__illumination__list_illuminations",
+      "mcp__illumination__read_file",
+      "mcp__illumination__glob_files",
+      "mcp__illumination__project_tree",
+      "mcp__illumination__write_illumination",
+      "mcp__illumination__mark_implemented",
+      "mcp__illumination__list_meta_meditations",
+      "mcp__illumination__read_meta_meditation",
+    ];
+    for (const tool of expected) {
+      expect(tools).toContain(tool);
+    }
+  });
+});
+
