@@ -1,0 +1,18 @@
+digraph gate_test {
+  goal="Minimal approval_gate isolation test"
+
+  start [shape=Mdiamond]
+
+  approval_gate [shape=hexagon, label="Do you approve?\n\nAction: Test gate rendering in TUI."]
+
+  approved [agent="implement", prompt="The user approved. Output exactly one line: 'Gate approved.' Do NOT use any tools."]
+  declined [agent="implement", prompt="The user declined. Output exactly one line: 'Gate declined.' Do NOT use any tools."]
+
+  done [shape=Msquare]
+
+  start -> approval_gate
+  approval_gate -> approved [label="Approve"]
+  approval_gate -> declined [label="Decline"]
+  approved -> done
+  declined -> done
+}
