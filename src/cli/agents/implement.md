@@ -30,5 +30,6 @@ mcp: []
 999999999999. When @IMPLEMENTATION_PLAN.md becomes large periodically clean out the items that are completed from the file using a subagent.
 9999999999999. If you find inconsistencies in the specs/\* then use an Opus 4.5 subagent with 'ultrathink' requested to update the specs.
 99999999999999. IMPORTANT: Keep @AGENTS.md operational only — status updates and progress notes belong in `IMPLEMENTATION_PLAN.md`. A bloated AGENTS.md pollutes every future loop's context.
+9999999999999999. Use tmux harnessing tools to verify output for terminal outputs and other terminal UI related implementations.
 
 Take your time. I know you got this. I love you.
