@@ -1,284 +1,191 @@
-## Status: Chunk 1 COMPLETE (v0.1.5) — all tests pass (645/645)
+# Meditate Tool Whitelist Gap — Implementation Plan
 
-# Portable Pipeline Schema Resolution Implementation Plan
+> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [x]`) syntax for tracking.
 
-> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
+**Goal:** Add `list_illuminations` to the meditate agent's tool whitelist and prompt so the agent can orient itself against prior illuminations in step 1.
 
-**Goal:** Resolve `json_schema_file` paths relative to the `.dot` file's directory so pipelines are self-contained and portable across projects.
+**Architecture:** Two files need a one-line addition each: the agent YAML frontmatter (`meditate.md`) gets `mcp__illumination__list_illuminations` in its `tools:` list, and the prompt file (`PROMPT_meditation.md`) gets `list_illuminations` in its Tools Available section. A unit test verifies the whitelist contains all 8 server-registered tools.
 
-**Architecture:** Thread `dotDir` (dirname of the `.dot` file) from `pipelineRunCommand` through `runPipeline` options and into handler `meta`. In `AgentHandler`, replace `resolve(cwd, jsonSchemaFile)` with `resolve(dotDir, jsonSchemaFile)`. When `dotDir` is absent (e.g. direct `runPipeline` calls in tests), fall back to `cwd` — preserving all existing behaviour.
+**Status:** ✅ Complete — all tasks implemented and tested. Tag: v0.1.6
 
-**Tech Stack:** TypeScript, Node.js `path.dirname`, vitest, tmux harness (`docs/harness/tmux-drive.md`)
+**Tech Stack:** TypeScript, Vitest, YAML frontmatter parsing.
 
 ---
 
-## Chunk 1: Engine + handler + CLI wiring (TDD)
+## Files
+
+| Action | Path | What changes |
+|---|---|---|
+| Modify | `src/cli/agents/meditate.md` | Add `list_illuminations` to `tools:` whitelist |
+| Modify | `src/cli/prompts/PROMPT_meditation.md` | Add `list_illuminations` to Tools Available section |
+| Modify | `src/cli/tests/meditate.test.ts` | Add whitelist-completeness test |
+
+---
+
+## Chunk 1: Whitelist fix with TDD
+
+### Task 1: Write failing test for whitelist completeness
 
 **Files:**
-- Modify: `src/attractor/core/engine.ts` — add `dotDir?: string` to `EngineOptions`, inject into handler `meta`
-- Modify: `src/attractor/handlers/agent-handler.ts` — use `meta["dotDir"]` for schema resolution
-- Modify: `src/cli/commands/pipeline.ts` — compute `dotDir`, pass to `runPipeline`
-- Modify: `src/attractor/tests/agent-handler-json-constraint.test.ts` — add dotDir separation test
+- Modify: `src/cli/tests/meditate.test.ts`
 
-### Task 1.1: Write the failing test
+- [x] **Step 1: Write failing test that asserts `list_illuminations` is in the whitelist**
 
-Add this test to `src/attractor/tests/agent-handler-json-constraint.test.ts` inside the existing `describe` block (after line 341, before the closing `}`):
+Add a new `describe` block at the end of `src/cli/tests/meditate.test.ts`:
 
-- [x] **Step 1: Add the test**
-
-```ts
-it("resolves json_schema_file relative to dotDir, not cwd", async () => {
-  const schema = JSON.stringify({ type: "object", properties: { verdict: { type: "string" } }, required: ["verdict"] });
-  const dotDir = mkdtempSync(join(tmpdir(), "ralph-dotdir-"));
-  const projectDir = mkdtempSync(join(tmpdir(), "ralph-project-"));
-  const schemaDir = join(dotDir, "pipelines", "schemas");
-  mkdirSync(schemaDir, { recursive: true });
-  writeFileSync(join(schemaDir, "test.json"), schema);
-  // NOTE: schema is in dotDir, NOT in projectDir — resolution must use dotDir
-
-  mockResolve.mockReturnValue({ ...baseConfig });
-  mockAgentRun.mockResolvedValue({
-    exitCode: 0, sessionId: null, stdout: null,
-    output: JSON.stringify([{ type: "result", result: "", structured_output: { verdict: "pass" } }]),
-  });
-
-  const handler = new AgentHandler({
-    resolveAgent: mockResolve,
-    createAgent: () => ({ run: mockAgentRun, kill: mockAgentKill, config: {} } as any),
-  });
-
-  try {
-    const outcome = await handler.execute(
-      makeNode({ prompt: "Verify", jsonSchemaFile: "pipelines/schemas/test.json" } as any),
-      baseCtx(),
-      {
-        logsRoot: projectDir,
-        cwd: projectDir,   // project dir — does NOT contain the schema
-        dotDir: dotDir,    // dot file dir — DOES contain the schema
-        signal: undefined,
-        outgoingLabels: [],
-        completedNodes: [],
-        nodeRetries: {},
-      },
+```typescript
+describe("meditate agent tool whitelist", () => {
+  it("includes list_illuminations in the tools list", () => {
+    const agentMd = readFileSync(
+      join(__dirname, "..", "agents", "meditate.md"),
+      "utf-8",
     );
+    const toolsMatch = agentMd.match(/^tools:\n((?:\s+-\s+.+\n)+)/m);
+    expect(toolsMatch).not.toBeNull();
+    const tools = toolsMatch![1]
+      .split("\n")
+      .map((l) => l.replace(/^\s+-\s+/, "").trim())
+      .filter(Boolean);
+    expect(tools).toContain("mcp__illumination__list_illuminations");
+  });
 
-    expect(outcome.status).toBe("success");
-  } finally {
-    rmSync(dotDir, { recursive: true, force: true });
-    rmSync(projectDir, { recursive: true, force: true });
-  }
+  it("whitelists all 8 illumination server tools", () => {
+    const agentMd = readFileSync(
+      join(__dirname, "..", "agents", "meditate.md"),
+      "utf-8",
+    );
+    const toolsMatch = agentMd.match(/^tools:\n((?:\s+-\s+.+\n)+)/m);
+    expect(toolsMatch).not.toBeNull();
+    const tools = toolsMatch![1]
+      .split("\n")
+      .map((l) => l.replace(/^\s+-\s+/, "").trim())
+      .filter(Boolean);
+    expect(tools).toHaveLength(8);
+
+    const expected = [
+      "mcp__illumination__list_illuminations",
+      "mcp__illumination__read_file",
+      "mcp__illumination__glob_files",
+      "mcp__illumination__project_tree",
+      "mcp__illumination__write_illumination",
+      "mcp__illumination__mark_implemented",
+      "mcp__illumination__list_meta_meditations",
+      "mcp__illumination__read_meta_meditation",
+    ];
+    for (const tool of expected) {
+      expect(tools).toContain(tool);
+    }
+  });
 });
 ```
 
-- [x] **Step 2: Run the test to confirm it fails**
+Note: `readFileSync` and `join` are already imported at the top of the file. No new imports needed.
+
+- [x] **Step 2: Run test to verify it fails**
 
 ```bash
-cd /Users/josu/Documents/projects/ralph-cli
-npx vitest run src/attractor/tests/agent-handler-json-constraint.test.ts --reporter=verbose 2>&1 | tail -20
+npx vitest run src/cli/tests/meditate.test.ts --reporter=verbose 2>&1 | tail -20
 ```
 
-Expected: FAIL — `dotDir` is not a recognized meta key yet, schema lookup falls back to `cwd` (projectDir) and throws ENOENT.
+Expected: the `list_illuminations` test fails — the tool is not in the current whitelist. The "all 8 tools" test also fails (only 7 present).
 
-### Task 1.2: Add `dotDir` to `EngineOptions` and inject into meta
-
-- [x] **Step 1: Open `src/attractor/core/engine.ts`**
-
-In the `EngineOptions` interface (line 19), add one field after `resume?`:
-
-```ts
-dotDir?: string;
-```
-
-- [x] **Step 2: Inject `dotDir` into handler `meta`**
-
-In the `handler.execute(...)` call block (around line 200–209), add `dotDir` to the meta object:
-
-```ts
-const outcome = await handler.execute(node, ctx, {
-  logsRoot: opts.logsRoot,
-  cwd: opts.cwd,
-  dotDir: opts.dotDir ?? opts.cwd,   // ← add this line
-  signal: opts.signal,
-  outgoingLabels,
-  completedNodes,
-  nodeRetries,
-  onStdout: opts.onStdout,
-  onInteractiveRequest: opts.onInteractiveRequest,
-});
-```
-
-### Task 1.3: Use `dotDir` in `AgentHandler`
-
-- [x] **Step 1: Open `src/attractor/handlers/agent-handler.ts`**
-
-Around line 50–62, replace the schema resolution block:
-
-```ts
-// Before
-if (jsonSchemaFile) {
-  try {
-    jsonSchema = readFileSync(resolve(cwd, jsonSchemaFile), "utf8");
-  } catch (err) {
-    return { status: "fail", failureReason: `Failed to read json_schema_file "${jsonSchemaFile}": ${(err as Error).message}` };
-  }
-}
-```
-
-```ts
-// After
-if (jsonSchemaFile) {
-  const dotDir = (meta["dotDir"] ?? meta["cwd"]) as string;
-  try {
-    jsonSchema = readFileSync(resolve(dotDir, jsonSchemaFile), "utf8");
-  } catch (err) {
-    return { status: "fail", failureReason: `Failed to read json_schema_file "${jsonSchemaFile}": ${(err as Error).message}` };
-  }
-}
-```
-
-> **Why `?? meta["cwd"]`:** The engine always injects `dotDir` when running a pipeline, but tests that call `handler.execute()` directly without a `dotDir` key in meta must not break. The fallback mirrors the engine's own `opts.dotDir ?? opts.cwd` logic.
-
-### Task 1.4: Pass `dotDir` from `pipeline.ts`
-
-- [x] **Step 1: Open `src/cli/commands/pipeline.ts`**
-
-Add `dirname` to the existing path import (line 2):
-
-```ts
-import { resolve, join, basename, dirname } from "path";
-```
-
-- [x] **Step 2: Compute `dotDir` after `absPath` is resolved (around line 67)**
-
-After `const src = readFileSync(absPath, "utf8");`, add:
-
-```ts
-const dotDir = dirname(absPath);
-```
-
-- [x] **Step 3: Pass `dotDir` to `runPipeline` (around line 140)**
-
-```ts
-const result = await runPipeline(graph, {
-  logsRoot,
-  cwd: project,
-  dotDir,           // ← add this line
-  interviewer: process.stdin.isTTY
-    ? new InkInterviewer(callbacks.emit)
-    : new AutoApproveInterviewer(),
-  signal: ac.signal,
-  project: opts.project,
-  resume: opts.resume,
-  // ... rest unchanged
-```
-
-### Task 1.5: Run all tests
-
-- [x] **Step 1: Run the new test to verify it passes**
+- [x] **Step 3: Commit the failing tests**
 
 ```bash
-npx vitest run src/attractor/tests/agent-handler-json-constraint.test.ts --reporter=verbose 2>&1 | tail -20
+git add src/cli/tests/meditate.test.ts
+git commit -m "test(meditate): add failing tests for tool whitelist completeness"
 ```
 
-Expected: ALL PASS — including the new `dotDir` test.
+---
 
-- [x] **Step 2: Run the full test suite to confirm no regressions**
+### Task 2: Add `list_illuminations` to agent whitelist
+
+**Files:**
+- Modify: `src/cli/agents/meditate.md:6-13`
+
+- [x] **Step 1: Add `mcp__illumination__list_illuminations` as first entry in the tools list**
+
+The `tools:` section currently starts at line 6. Insert `list_illuminations` as the first tool entry (reflecting its role as the session-orientation tool called in step 1):
+
+```yaml
+tools:
+  - mcp__illumination__list_illuminations
+  - mcp__illumination__read_file
+  - mcp__illumination__glob_files
+  - mcp__illumination__project_tree
+  - mcp__illumination__write_illumination
+  - mcp__illumination__mark_implemented
+  - mcp__illumination__list_meta_meditations
+  - mcp__illumination__read_meta_meditation
+```
+
+- [x] **Step 2: Run tests to verify they pass**
 
 ```bash
-npm test 2>&1 | tail -30
+npx vitest run src/cli/tests/meditate.test.ts --reporter=verbose 2>&1 | tail -20
 ```
 
-Expected: all existing tests continue to pass. The `dotDir ?? cwd` fallback in the engine means existing tests that don't pass `dotDir` resolve schemas from `cwd` as before.
+Expected: both new tests pass. All existing tests still pass.
 
 - [x] **Step 3: Commit**
 
 ```bash
-git add src/attractor/core/engine.ts \
-        src/attractor/handlers/agent-handler.ts \
-        src/cli/commands/pipeline.ts \
-        src/attractor/tests/agent-handler-json-constraint.test.ts
-git commit -m "feat(engine): resolve json_schema_file relative to dot file directory
+git add src/cli/agents/meditate.md
+git commit -m "feat(meditate): add list_illuminations to agent tool whitelist
 
-Fixes portability: ralph pipeline run ./pipelines/foo.dot --project ../other
-now resolves schemas from the dot file's directory, not the target project.
-Fallback to cwd when dotDir is absent preserves all existing behaviour.
-
-Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
+The tool was registered in the MCP server and referenced in prompt
+instructions but missing from the dontAsk whitelist, causing silent
+auto-denial every session."
 ```
 
 ---
 
-## Chunk 2: Tmux smoke verification
-
-This chunk is a manual verification step using the tmux harness. It is NOT a vitest test — it drives a real ralph process and visually confirms the schema resolves correctly.
-
-**Prerequisite:** `../jobs-post-worker` must exist and have a `meditations/illuminations/` directory (can be empty — the `verifier` node handles the empty case and routes to `done` without error).
+### Task 3: Add `list_illuminations` to PROMPT_meditation.md Tools Available section
 
 **Files:**
-- Read: `docs/harness/tmux-drive.md` — source the bash block before proceeding
+- Modify: `src/cli/prompts/PROMPT_meditation.md`
 
-### Task 2.1: Set up the target project
-
-- [ ] **Step 1: Ensure `../jobs-post-worker` has an illuminations folder**
+- [x] **Step 1: Read the file to confirm current state**
 
 ```bash
-mkdir -p ../jobs-post-worker/meditations/illuminations
+cat src/cli/prompts/PROMPT_meditation.md
 ```
 
-If the folder is empty, `illumination-to-plan.dot`'s verifier node returns `preferred_label: empty` and routes to `done` — a clean exit that still proves schema resolution succeeded.
+Confirm: the Tools Available section lists `project_tree`, `glob_files`, `read_file`, `list_meta_meditations`, `read_meta_meditation`, and `write_illumination` / `mark_implemented` — but not `list_illuminations`.
 
-### Task 2.2: Source the harness and start a run
+- [x] **Step 2: Add `list_illuminations` to the Tools Available section**
 
-- [ ] **Step 1: Source the tmux harness**
+After the line `You have tools for exploring the project:` and before `project_tree`, add:
 
-Open `docs/harness/tmux-drive.md`, copy the fenced bash block into your shell, and source it.
+```markdown
+- `list_illuminations` — call with no arguments to see a summary of all existing illuminations
+  (filename and description). Use this first to orient against prior observations.
+```
 
-- [ ] **Step 2: Build ralph**
+This matches the instruction in step 1 which already says "Call `list_illuminations` with no arguments".
+
+- [x] **Step 3: Run full test suite to verify no regressions**
 
 ```bash
-npm run build
+npx vitest run 2>&1 | tail -20
 ```
 
-- [ ] **Step 3: Start the run inside tmux**
+Expected: all tests pass.
+
+- [x] **Step 4: Build to verify no compilation errors**
 
 ```bash
-start_run "ralph pipeline run $(pwd)/pipelines/illumination-to-plan.dot --project ../jobs-post-worker"
+npm run build 2>&1 | tail -10
 ```
 
-### Task 2.3: Assert schema resolution succeeds
+Expected: clean build.
 
-- [ ] **Step 1: Wait for the TUI to stabilise**
+- [x] **Step 5: Commit**
 
 ```bash
-wait_stable 15000
-```
+git add src/cli/prompts/PROMPT_meditation.md
+git commit -m "feat(meditate): add list_illuminations to prompt Tools Available section
 
-- [ ] **Step 2: Capture the TUI output**
-
-```bash
-capture
-```
-
-- [ ] **Step 3: Assert no schema error**
-
-Inspect the capture. It must NOT contain the string:
-
-```
-Failed to read json_schema_file
-```
-
-- [ ] **Step 4: Assert the pipeline progressed past `verifier`**
-
-The TUI should show either:
-- `verifier` marked done + `done` node reached (empty illuminations path), OR
-- `verifier` marked done + `explainer` or `explain_removal` started (non-empty path)
-
-Neither outcome is possible if the schema failed to load — a schema failure routes to an immediate pipeline `fail`.
-
-### Task 2.4: Teardown
-
-- [ ] **Step 1: Clean up**
-
-```bash
-cleanup_run
+Syncs PROMPT_meditation.md with the agent whitelist and MCP server
+registration. Both files now document all 8 illumination tools."
 ```
