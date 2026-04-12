@@ -4,6 +4,7 @@ description: Reflective analysis of project patterns
 model: sonnet
 permissionMode: dontAsk
 tools:
+  - mcp__illumination__list_illuminations
   - mcp__illumination__read_file
   - mcp__illumination__glob_files
   - mcp__illumination__project_tree
