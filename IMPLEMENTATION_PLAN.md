@@ -1017,7 +1017,7 @@ Chunk 3 adds the two pure Ink view components that render `Block` and `LiveBlock
 - Create: `src/cli/components/BlockView.tsx`
 - Create: `src/cli/tests/BlockView.test.tsx`
 
-- [ ] **Step 1: Write the failing snapshot-style test**
+- [x] **Step 1: Write the failing snapshot-style test**
 
 Create `src/cli/tests/BlockView.test.tsx`:
 
@@ -1140,12 +1140,12 @@ describe("BlockView", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run src/cli/tests/BlockView.test.tsx`
 Expected: FAIL — `Cannot find module '../components/BlockView.js'`
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `src/cli/components/BlockView.tsx`:
 
@@ -1205,12 +1205,12 @@ export function BlockView({ block, index }: { block: Block; index: number }) {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run src/cli/tests/BlockView.test.tsx`
 Expected: PASS (9/9)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/cli/components/BlockView.tsx src/cli/tests/BlockView.test.tsx
@@ -1231,7 +1231,7 @@ git commit -m "feat(components): add BlockView for frozen pipeline blocks"
 
 For testing, we render `LiveFooter` with hand-built `LiveBlock` shapes plus an optional `input` handler triple. The `TextInput` is already covered by its own test suite, so we only assert that it renders (by checking for the `> ` prompt marker) and we do not simulate keystrokes here.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `src/cli/tests/LiveFooter.test.tsx`:
 
@@ -1318,12 +1318,12 @@ describe("LiveFooter", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run src/cli/tests/LiveFooter.test.tsx`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `src/cli/components/LiveFooter.tsx`:
 
@@ -1380,17 +1380,17 @@ export function LiveFooter({
 
 > **Important:** `LiveBlockWithInput` is a local extension used only by the rendering layer. The reducer state type `LiveBlock` (in `pipelineEvents.ts`) does **not** carry the `input` field — that binding is stitched in by `PipelineApp` right before rendering (Chunk 4 Task 4.1), because the `onChange`/`onSubmit` closures depend on React state (the input buffer) and the `live.child` reference. This keeps `pipelineEvents.ts` pure-data.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run src/cli/tests/LiveFooter.test.tsx`
 Expected: PASS (7/7)
 
-- [ ] **Step 5: Run combined Chunk 3 test suite**
+- [x] **Step 5: Run combined Chunk 3 test suite**
 
 Run: `npx vitest run src/cli/tests/BlockView.test.tsx src/cli/tests/LiveFooter.test.tsx`
 Expected: PASS (16/16: 9 BlockView + 7 LiveFooter)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/cli/components/LiveFooter.tsx src/cli/tests/LiveFooter.test.tsx
