@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync, statSync, readFileSync, readdirSync } from "fs";
+import { mkdirSync, writeFileSync, statSync, readFileSync, readdirSync, existsSync } from "fs";
 import { join, resolve, isAbsolute, relative } from "path";
 import ignore from "ignore";
 import fg from "fast-glob";
@@ -30,6 +30,60 @@ export function writeIllumination(
   const filePath = join(dir, filename);
   writeFileSync(filePath, frontmatter + content, "utf8");
   return filePath;
+}
+
+export function markImplemented(
+  projectRoot: string,
+  filename: string,
+): { success: true; filename: string; previous_status: string; new_status: string }
+  | { success: false; error: string } {
+  const illumDir = join(projectRoot, "meditations", "illuminations");
+  const filePath = join(illumDir, filename);
+
+  if (!existsSync(filePath)) {
+    return { success: false, error: "Illumination file not found" };
+  }
+
+  const raw = readFileSync(filePath, "utf-8");
+
+  // Parse frontmatter block: content between first --- and second ---
+  const fmMatch = raw.match(/^---\n([\s\S]*?)\n---\n/);
+  if (!fmMatch) {
+    return { success: false, error: "No frontmatter found in illumination file" };
+  }
+
+  const fmBlock = fmMatch[1];
+  const body = raw.slice(fmMatch[0].length);
+
+  // Extract current status
+  const statusMatch = fmBlock.match(/^status:\s*(.+)$/m);
+  const currentStatus = statusMatch ? statusMatch[1].trim() : "open";
+
+  // Validate transition
+  const allowed = ["open", "dispatched"];
+  if (!allowed.includes(currentStatus)) {
+    return {
+      success: false,
+      error: `Cannot mark as implemented: current status is ${currentStatus}`,
+    };
+  }
+
+  // Update frontmatter
+  const today = new Date().toISOString().slice(0, 10);
+  let updatedFm = statusMatch
+    ? fmBlock.replace(/^status:\s*.+$/m, "status: implemented")
+    : fmBlock + "\nstatus: implemented";
+  updatedFm += `\nimplemented_at: ${today}`;
+
+  const updatedContent = `---\n${updatedFm}\n---\n${body}`;
+  writeFileSync(filePath, updatedContent);
+
+  return {
+    success: true,
+    filename,
+    previous_status: currentStatus,
+    new_status: "implemented",
+  };
 }
 
 export function assertWithinRoot(inputPath: string, projectRoot: string): void {

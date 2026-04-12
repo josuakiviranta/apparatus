@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, existsSync, readFileSync, realpathSync, mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { validateFilename, writeIllumination, assertWithinRoot, readFile, validateGlobPattern, globFiles, projectTree, listMetaMeditations, readMetaMeditation, listIlluminations } from "../mcp/illumination-server";
+import { validateFilename, writeIllumination, assertWithinRoot, readFile, validateGlobPattern, globFiles, projectTree, listMetaMeditations, readMetaMeditation, listIlluminations, markImplemented } from "../mcp/illumination-server";
 
 let tmpDir: string;
 
@@ -394,5 +394,92 @@ describe("listIlluminations", () => {
     expect(result).toBe(
       "2026-04-08T0900-first.md — First insight.\n2026-04-08T1100-second.md — Second insight."
     );
+  });
+});
+
+describe("markImplemented", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = realpathSync(mkdtempSync(join(tmpdir(), "ralph-test-")));
+    mkdirSync(join(tmpDir, "meditations", "illuminations"), { recursive: true });
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  function writeIlluminationFile(filename: string, frontmatter: string, body: string) {
+    const content = `---\n${frontmatter}\n---\n\n${body}`;
+    writeFileSync(join(tmpDir, "meditations", "illuminations", filename), content);
+  }
+
+  it("transitions dispatched → implemented", () => {
+    writeIlluminationFile("insight.md", "status: dispatched", "# Body");
+    const result = markImplemented(tmpDir, "insight.md");
+    expect(result).toEqual({
+      success: true,
+      filename: "insight.md",
+      previous_status: "dispatched",
+      new_status: "implemented",
+    });
+    const content = readFileSync(join(tmpDir, "meditations", "illuminations", "insight.md"), "utf-8");
+    expect(content).toContain("status: implemented");
+  });
+
+  it("transitions open → implemented", () => {
+    writeIlluminationFile("open-insight.md", "status: open", "# Open Body");
+    const result = markImplemented(tmpDir, "open-insight.md");
+    expect(result).toEqual({
+      success: true,
+      filename: "open-insight.md",
+      previous_status: "open",
+      new_status: "implemented",
+    });
+  });
+
+  it("rejects already-implemented illumination", () => {
+    writeIlluminationFile("done.md", "status: implemented", "# Done");
+    const result = markImplemented(tmpDir, "done.md");
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toContain("Cannot mark as implemented");
+      expect(result.error).toContain("implemented");
+    }
+  });
+
+  it("rejects archived illumination", () => {
+    writeIlluminationFile("archived.md", "status: archived", "# Archived");
+    const result = markImplemented(tmpDir, "archived.md");
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toContain("Cannot mark as implemented");
+      expect(result.error).toContain("archived");
+    }
+  });
+
+  it("returns error when file not found", () => {
+    const result = markImplemented(tmpDir, "nonexistent.md");
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toContain("not found");
+    }
+  });
+
+  it("preserves body content unchanged", () => {
+    const body = "# My Insight\n\nSome detailed content here.\n\n- bullet 1\n- bullet 2";
+    writeIlluminationFile("preserve.md", "status: dispatched", body);
+    markImplemented(tmpDir, "preserve.md");
+    const content = readFileSync(join(tmpDir, "meditations", "illuminations", "preserve.md"), "utf-8");
+    expect(content).toContain(body);
+  });
+
+  it("adds implemented_at as UTC date in YYYY-MM-DD format", () => {
+    writeIlluminationFile("dated.md", "status: open", "# Body");
+    markImplemented(tmpDir, "dated.md");
+    const content = readFileSync(join(tmpDir, "meditations", "illuminations", "dated.md"), "utf-8");
+    const today = new Date().toISOString().slice(0, 10);
+    expect(content).toContain(`implemented_at: ${today}`);
+    expect(content).toMatch(/implemented_at: \d{4}-\d{2}-\d{2}/);
   });
 });
