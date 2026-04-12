@@ -61,7 +61,7 @@ function isDevMode(): boolean {
 
 // ─── Session runner ───────────────────────────────────────────────────────────
 
-export async function runMeditationSession(absPath: string): Promise<void> {
+export async function runMeditationSession(absPath: string, steer?: string): Promise<void> {
   writePid(absPath, process.pid);
 
   await output.header({ mode: "meditate", project: absPath, pid: process.pid });
@@ -92,6 +92,7 @@ export async function runMeditationSession(absPath: string): Promise<void> {
         PROJECT_ROOT: absPath,
         META_MEDITATIONS_DIR: getMetaMeditationsDir(),
       },
+      message: steer,
       onStdout: async (stdout) => {
         await output.stream(streamEvents(stdout, {}));
       },
@@ -109,7 +110,7 @@ export async function runMeditationSession(absPath: string): Promise<void> {
 
 // ─── Command entry point ──────────────────────────────────────────────────────
 
-export async function meditateCommand(projectFolder: string): Promise<void> {
+export async function meditateCommand(projectFolder: string, opts: { steer?: string } = {}): Promise<void> {
   const absPath = resolve(projectFolder);
   if (!existsSync(absPath)) {
     await output.error(`Error: project folder not found: ${absPath}`);
@@ -127,5 +128,5 @@ export async function meditateCommand(projectFolder: string): Promise<void> {
   }
   ensureMeditationDirs(absPath);
   appendMeditateGitignore(absPath);
-  await runMeditationSession(absPath);
+  await runMeditationSession(absPath, opts.steer);
 }

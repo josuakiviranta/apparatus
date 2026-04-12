@@ -129,6 +129,34 @@ describe("ralph heartbeat meditate", () => {
   });
 });
 
+describe("ralph heartbeat meditate --steer", () => {
+  it("includes --steer in args when provided", async () => {
+    vi.mocked(request).mockResolvedValue({ type: "ok", taskId: "meditate:test" });
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    await makeProgram().parseAsync([
+      "node", "ralph", "heartbeat", "meditate", FIXTURE_DIR,
+      "--every", "30", "--steer", "focus on auth",
+    ]);
+    expect(request).toHaveBeenCalledWith("register_task", {
+      command: "meditate",
+      args: [FIXTURE_DIR, "--steer", "focus on auth"],
+      interval: 30,
+    });
+    logSpy.mockRestore();
+  });
+
+  it("omits --steer from args when not provided", async () => {
+    vi.mocked(request).mockResolvedValue({ type: "ok", taskId: "meditate:test" });
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    await makeProgram().parseAsync([
+      "node", "ralph", "heartbeat", "meditate", FIXTURE_DIR, "--every", "30",
+    ]);
+    const callArgs = (vi.mocked(request).mock.calls[0][1] as any).args as string[];
+    expect(callArgs).not.toContain("--steer");
+    logSpy.mockRestore();
+  });
+});
+
 describe("ralph heartbeat stop", () => {
   it("sends stop_task", async () => {
     vi.mocked(request).mockResolvedValue({ type: "ok" });

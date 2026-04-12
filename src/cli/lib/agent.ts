@@ -34,6 +34,8 @@ export interface RunOptions {
   /** When provided, the caller consumes stdout (e.g. via streamEvents).
    *  The internal readline session-id extractor is skipped. */
   onStdout?: (stdout: NodeJS.ReadableStream) => Promise<void>;
+  /** When provided, appended to the system prompt written to stdin. */
+  message?: string;
 }
 
 export interface ChildHandle {
@@ -211,7 +213,10 @@ export class Agent {
 
       // Pipe prompt to stdin for non-interactive, non-resume
       if (!isInteractive && !isResume && child.stdin) {
-        child.stdin.write(expandedPrompt);
+        const stdinContent = options.message
+          ? `${expandedPrompt}\n\n${options.message}`
+          : expandedPrompt;
+        child.stdin.write(stdinContent);
         child.stdin.end();
       }
 

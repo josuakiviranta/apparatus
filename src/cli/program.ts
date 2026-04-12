@@ -116,8 +116,9 @@ Agent management:
 
   med
     .argument("<project-folder>")
-    .action(async (projectFolder: string) => {
-      await meditateCommand(projectFolder);
+    .option("--steer <text>", "initial steering message injected as first user turn")
+    .action(async (projectFolder: string, opts: { steer?: string }) => {
+      await meditateCommand(projectFolder, opts);
     });
 
   med

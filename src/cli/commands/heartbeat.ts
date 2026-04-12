@@ -93,13 +93,17 @@ Examples:
       if (isNaN(n) || n < 1) throw new Error("--every must be a positive integer");
       return n;
     })
-    .action(async (folder: string, opts: { every: number }) => {
+    .option("--steer <text>", "initial steering message for the session")
+    .action(async (folder: string, opts: { every: number; steer?: string }) => {
       const absPath = resolve(folder);
       validatePathArg(folder, absPath, "directory", "Project folder");
       try {
+        const taskArgs = opts.steer
+          ? [absPath, "--steer", opts.steer]
+          : [absPath];
         const res = await request("register_task", {
           command: "meditate",
-          args: [absPath],
+          args: taskArgs,
           interval: opts.every,
         });
         await output.success(`Registered: ${res.taskId} (every ${opts.every} min)`);

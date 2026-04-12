@@ -14,6 +14,38 @@ vi.mock("../lib/output.js", () => ({
   stream: vi.fn(async () => {}),
 }));
 
+// Capture RunOptions passed to agent.run()
+let lastRunOptions: import("../lib/agent.js").RunOptions | undefined;
+const mockAgentRun = vi.fn(async (opts: import("../lib/agent.js").RunOptions) => {
+  lastRunOptions = opts;
+  return { exitCode: 0, sessionId: null, stdout: null };
+});
+
+vi.mock("../lib/agent.js", () => ({
+  Agent: vi.fn().mockImplementation(() => ({
+    run: mockAgentRun,
+    kill: vi.fn(),
+  })),
+  validateAgentConfig: vi.fn((c) => c),
+}));
+
+vi.mock("../lib/agent-registry.js", () => ({
+  resolveAgent: vi.fn(() => ({
+    name: "meditate",
+    description: "test",
+    model: "opus",
+    permissionMode: "dangerouslySkipPermissions",
+    tools: [],
+    mcp: [],
+    prompt: "system prompt",
+  })),
+}));
+
+vi.mock("../lib/assets.js", () => ({
+  getIlluminationServerPath: vi.fn(() => "/fake/server.js"),
+  getMetaMeditationsDir: vi.fn(() => "/fake/meditations"),
+}));
+
 import {
   pidPath,
   writePid,
@@ -22,6 +54,8 @@ import {
   isPidAlive,
   ensureMeditationDirs,
   appendMeditateGitignore,
+  runMeditationSession,
+  meditateCommand,
 } from "../commands/meditate";
 
 let tmpDir: string;
@@ -154,6 +188,40 @@ describe("meditate agent tool whitelist", () => {
     for (const tool of expected) {
       expect(tools).toContain(tool);
     }
+  });
+});
+
+describe("runMeditationSession steer", () => {
+  beforeEach(() => {
+    lastRunOptions = undefined;
+    mockAgentRun.mockClear();
+  });
+
+  it("passes message to agent.run() when steer is provided", async () => {
+    await runMeditationSession(tmpDir, "focus on auth");
+    expect(lastRunOptions?.message).toBe("focus on auth");
+  });
+
+  it("does not set message when steer is omitted", async () => {
+    await runMeditationSession(tmpDir);
+    expect(lastRunOptions?.message).toBeUndefined();
+  });
+});
+
+describe("meditateCommand --steer passthrough", () => {
+  beforeEach(() => {
+    lastRunOptions = undefined;
+    mockAgentRun.mockClear();
+  });
+
+  it("passes steer to runMeditationSession when provided", async () => {
+    await meditateCommand(tmpDir, { steer: "focus on auth" });
+    expect(lastRunOptions?.message).toBe("focus on auth");
+  });
+
+  it("does not set message when steer is omitted", async () => {
+    await meditateCommand(tmpDir);
+    expect(lastRunOptions?.message).toBeUndefined();
   });
 });
 
