@@ -163,3 +163,95 @@ describe("Agent.run", () => {
     expect(result.exitCode).toBe(1);
   });
 });
+
+describe("Agent.run with jsonSchema", () => {
+  const jsonSchemaConfig: AgentConfig = {
+    name: "runner",
+    description: "Runs stuff",
+    model: "sonnet",
+    permissionMode: "dangerouslySkipPermissions",
+    tools: [],
+    mcp: [],
+    prompt: "Do the thing for {{PROJECT}}.",
+    jsonSchema: "/tmp/schema.json",
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("calls onStdout with synthetic stream-json events when jsonSchema is set", async () => {
+    const jsonOutputLine = JSON.stringify({
+      type: "result",
+      subtype: "success",
+      is_error: false,
+      num_turns: 1,
+      result: '{"summary":"test output"}',
+      session_id: "sess-json-001",
+      usage: { input_tokens: 42, output_tokens: 17 },
+    });
+    const child = createMockChild(0, jsonOutputLine + "\n");
+    mockSpawn.mockReturnValue(child);
+
+    const receivedLines: string[] = [];
+    const agent = new Agent(jsonSchemaConfig);
+    await agent.run({
+      cwd: "/tmp/project",
+      onStdout: async (stdout) => {
+        for await (const chunk of stdout) {
+          receivedLines.push(...chunk.toString().split("\n").filter(Boolean));
+        }
+      },
+    });
+
+    // Should have received a system event with session_id
+    const systemEvent = receivedLines
+      .map((l) => { try { return JSON.parse(l); } catch { return null; } })
+      .find((e) => e?.type === "system");
+    expect(systemEvent?.session_id).toBe("sess-json-001");
+
+    // Should have received an assistant event with result text
+    const assistantEvent = receivedLines
+      .map((l) => { try { return JSON.parse(l); } catch { return null; } })
+      .find((e) => e?.type === "assistant");
+    expect(assistantEvent?.message?.content?.[0]?.text).toBe('{"summary":"test output"}');
+
+    // Should have received the result event (pass-through)
+    const resultEvent = receivedLines
+      .map((l) => { try { return JSON.parse(l); } catch { return null; } })
+      .find((e) => e?.type === "result");
+    expect(resultEvent?.usage?.input_tokens).toBe(42);
+    expect(resultEvent?.usage?.output_tokens).toBe(17);
+  });
+
+  it("does NOT call onStdout when jsonSchema output has no result line", async () => {
+    const child = createMockChild(0, "not json\n");
+    mockSpawn.mockReturnValue(child);
+
+    let onStdoutCalled = false;
+    const agent = new Agent(jsonSchemaConfig);
+    await agent.run({
+      cwd: "/tmp/project",
+      onStdout: async () => { onStdoutCalled = true; },
+    });
+
+    expect(onStdoutCalled).toBe(false);
+  });
+
+  it("still buffers output and returns it as RunResult.output", async () => {
+    const jsonOutputLine = JSON.stringify({
+      type: "result",
+      result: '{"key":"val"}',
+      session_id: "s1",
+      usage: {},
+    });
+    const child = createMockChild(0, jsonOutputLine + "\n");
+    mockSpawn.mockReturnValue(child);
+
+    const agent = new Agent(jsonSchemaConfig);
+    const result = await agent.run({ cwd: "/tmp/project" });
+
+    expect(result.output).toContain('"session_id":"s1"');
+    expect(result.sessionId).toBe("s1");
+  });
+});

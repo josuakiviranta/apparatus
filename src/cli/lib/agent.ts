@@ -210,8 +210,7 @@ export class Agent {
       let capturedOutput = "";
 
       if (this.config.jsonSchema && !isInteractive && child.stdout) {
-        // Structured output: buffer stdout for JSON parsing.
-        // Skip onStdout — structured nodes produce a single JSON blob, not a stream.
+        // Buffer stdout for JSON parsing; replay events via onStdout after buffering.
         const rl = readline.createInterface({ input: child.stdout });
         const rlDone = new Promise<void>((resolve) => rl.on("close", resolve));
         rl.on("line", (line) => {
@@ -228,6 +227,41 @@ export class Agent {
         });
         // Ensure all buffered lines are processed before returning
         await rlDone;
+
+        // If caller wants events for pipeline TUI, synthesize a stream-json-compatible
+        // stream: system event (→ trace-path), assistant event (→ body text), and the
+        // original result line (→ stats). onStdout handles these identically to a real
+        // stream-json stream.
+        if (options.onStdout) {
+          const syntheticLines: string[] = [];
+          if (sessionId) {
+            syntheticLines.push(JSON.stringify({ type: "system", session_id: sessionId }));
+          }
+          for (const line of capturedOutput.split("\n")) {
+            if (!line.trim()) continue;
+            try {
+              const parsed = JSON.parse(line) as Record<string, unknown>;
+              if (parsed.type === "result") {
+                const resultText = typeof parsed.result === "string" ? parsed.result : undefined;
+                if (resultText) {
+                  syntheticLines.push(
+                    JSON.stringify({
+                      type: "assistant",
+                      message: { content: [{ type: "text", text: resultText }] },
+                    })
+                  );
+                }
+                syntheticLines.push(line); // pass-through result line for usage stats
+                break;
+              }
+            } catch {
+              // not a parseable JSON line — skip
+            }
+          }
+          if (syntheticLines.length > 0) {
+            await options.onStdout(Readable.from(syntheticLines.map((l) => l + "\n")));
+          }
+        }
       } else if (!isInteractive && child.stdout && options.onStdout) {
         // Caller consumes stdout (e.g. streamEvents → output.stream)
         await options.onStdout(child.stdout);
