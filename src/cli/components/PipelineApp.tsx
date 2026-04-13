@@ -116,7 +116,7 @@ export function PipelineApp({ pipelineName, pid, goal, nodes, onReady }: Props) 
   return (
     <>
       <Static items={staticItems}>
-        {(item) => {
+        {(item, index) => {
           if (item.kind === "header") {
             return (
               <Box key={item.id} flexDirection="column" marginBottom={1}>
@@ -129,8 +129,7 @@ export function PipelineApp({ pipelineName, pid, goal, nodes, onReady }: Props) 
               </Box>
             );
           }
-          const blockIndex = staticItems.findIndex((it) => it.id === item.id);
-          return <BlockView key={item.id} block={item.block} index={blockIndex} />;
+          return <BlockView key={item.id} block={item.block} index={index} />;
         }}
       </Static>
       {liveForRender && (
