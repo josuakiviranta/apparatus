@@ -14,3 +14,4 @@ scenario-runs/
 # tsx runner cache
 tsx-*/
 meditations/.triage/
+.worktrees
