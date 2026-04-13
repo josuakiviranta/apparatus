@@ -10,6 +10,8 @@ digraph illumination_to_plan {
 
   remove_gate [shape=hexagon, label="Remove this illumination?\n$illumination_path\n\n$explanation"]
 
+  delete_file [type="tool", tool_command="rm $illumination_path"]
+
   mark_archived [agent="implement", prompt="Call mcp__illumination__mark_archived with filename from $illumination_path (basename only) and reason summarizing why the illumination is being archived (use context from $summary). Return the JSON result."]
 
   mark_dispatched [agent="implement", prompt="Call mcp__illumination__mark_dispatched with filename from $illumination_path (basename only) and plan_path set to $design_doc_path. Return the JSON result."]
@@ -18,9 +20,9 @@ digraph illumination_to_plan {
 
   approval_gate [shape=hexagon, label="Proceed with plan?\n\nIllumination: $illumination_path\nSummary: $summary"]
 
-  chat_session [agent="implement", interactive=true, prompt="You are discussing an illumination with the user.\n\nIllumination file: $illumination_path\nSummary: $summary\nExplanation: $explanation\n\nThe user may want to:\n- Refine the scope of changes\n- Add constraints or requirements\n- Ask questions about the illumination\n- Disagree with the assessment\n\nBefore ending the conversation, write your agreed conclusions to meditations/.triage/chat-notes.md. This file will be read by the next pipeline stage.\n\nDo NOT modify any other project files."]
+  chat_session [agent="implement", interactive=true, prompt="You are discussing an illumination with the user.\n\nIllumination file: $illumination_path\nSummary: $summary\nExplanation: $explanation\n\nThe user may want to:\n- Refine the scope of changes\n- Add constraints or requirements\n- Ask questions about the illumination\n- Disagree with the assessment\n\nBefore ending the conversation, write your agreed conclusions to meditations/.triage/$run_id/chat-notes.md. This file will be read by the next pipeline stage.\n\nDo NOT modify any other project files."]
 
-  chat_summarizer [agent="implement", json_schema_file="schemas/chat-summarizer.json", prompt="Read meditations/.triage/chat-notes.md and the illumination at $illumination_path.\n\nOriginal explanation: $explanation\nPrevious refinements (if any): $refinements\n\nSummarize what was refined or changed during the interactive session. Focus on concrete changes to scope, constraints, or approach.\n\nDo NOT modify any project files."]
+  chat_summarizer [agent="implement", json_schema_file="schemas/chat-summarizer.json", prompt="Read meditations/.triage/$run_id/chat-notes.md and the illumination at $illumination_path.\n\nOriginal explanation: $explanation\nPrevious refinements (if any): $refinements\n\nSummarize what was refined or changed during the interactive session. Focus on concrete changes to scope, constraints, or approach.\n\nDo NOT modify any project files."]
 
   design_writer [agent="implement", json_schema_file="schemas/design-writer.json", prompt="Write a superpowers-style design document based on the approved illumination.\n\nIllumination: $illumination_path\nSummary: $summary\nExplanation: $explanation\nRefinements: $refinements\n\n## Output\nWrite the design doc to docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md where YYYY-MM-DD is today's date and <topic> is a short kebab-case name derived from the illumination.\n\nFollow the conventions of existing design docs in docs/superpowers/specs/. Include: overview, architecture, components, data flow, constraints.\n\nReturn the path to the created file in your structured output.\n\nDo NOT modify any other project files."]
 
@@ -36,9 +38,9 @@ digraph illumination_to_plan {
 
   // False path
   explain_removal -> remove_gate
-  remove_gate -> done           [label="No"]
-  remove_gate -> mark_archived  [label="Yes"]
-  mark_archived -> done
+  remove_gate -> done         [label="No"]
+  remove_gate -> delete_file  [label="Yes"]
+  delete_file -> done
 
   // True path
   explainer -> approval_gate

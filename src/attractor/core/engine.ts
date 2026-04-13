@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from "fs/promises";
 import { join } from "path";
+import { randomUUID } from "crypto";
 import type { Graph, Node, Edge, Outcome, PipelineContext } from "../types.js";
 import type { Interviewer } from "../interviewer/index.js";
 import { evaluateCondition } from "./conditions.js";
@@ -121,6 +122,7 @@ export async function runPipeline(graph: Graph, opts: EngineOptions): Promise<Pi
   let completedNodes: string[] = [];
   let context: Record<string, unknown> = { "$goal": graph.goal ?? "" };
   if (opts.project) context["$project"] = opts.project;
+  context["run_id"] = randomUUID();
   let nodeRetries: Record<string, number> = {};
 
   // Resume from checkpoint if requested

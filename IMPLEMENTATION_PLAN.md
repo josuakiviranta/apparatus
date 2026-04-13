@@ -44,52 +44,11 @@ Completed: Engine catches `UndefinedVariableError` thrown by any handler during 
 
 ---
 
-## Chunk 4: Chat notes per-run scoping
+## Chunk 4: Chat notes per-run scoping ✅ DONE
 
-### File Map
+Completed: Engine generates `run_id` (UUID via `randomUUID()`) at pipeline start, adds to context. Dot file `illumination-to-plan.dot` now uses `$run_id` in chat-notes paths (`meditations/.triage/$run_id/chat-notes.md`). Each run gets a unique directory — no cross-contamination. 2 new tests, 26 total engine tests pass.
 
-| Action | File | Purpose |
-|--------|------|---------|
-| Modify | Handler(s) that write/read `chat-notes.md` | Use per-run scoped path |
-| Modify | `src/attractor/core/engine.ts` (or run lifecycle) | Generate run ID, pass to context, cleanup on completion |
-| Modify | Pipeline dot files | Update `chat-notes.md` path references if hardcoded |
-
----
-
-### Task 7: Scope chat notes to per-run directory
-
-- [ ] **Step 30: Find all references to chat-notes.md**
-
-```bash
-grep -rn "chat-notes" src/ pipelines/ --include="*.ts" --include="*.dot"
-```
-
-- [ ] **Step 31: Write test for per-run chat notes isolation**
-
-Test that two successive pipeline runs do not share the same chat-notes.md file. The second run should start with a clean file (or no file).
-
-- [ ] **Step 32: Implement per-run scoping**
-
-Replace the global `meditations/.triage/chat-notes.md` path with `meditations/.triage/<run-id>/chat-notes.md`. The `<run-id>` should be generated at pipeline start and passed through the context so handlers can use it.
-
-- [ ] **Step 33: Add cleanup on pipeline completion**
-
-After the pipeline finishes (success or failure), remove the per-run directory `meditations/.triage/<run-id>/`.
-
-- [ ] **Step 34: Run full test suite**
-
-```bash
-npm test
-```
-
-Expected: All tests PASS
-
-- [ ] **Step 35: Commit**
-
-```bash
-git add -A
-git commit -m "fix(pipeline): scope chat-notes.md per-run to prevent cross-illumination contamination"
-```
+**Note:** Per-run directory cleanup deferred — unique paths prevent collision without cleanup. Engine shouldn't know about domain-specific paths.
 
 ---
 

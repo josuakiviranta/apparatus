@@ -419,6 +419,30 @@ describe("runPipeline", () => {
     expect(result.completedNodes).toContain("step1");
   });
 
+  it("generates a unique run_id in pipeline context", async () => {
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      done  [shape=Msquare]
+      start -> done
+    }`;
+    const result = await runPipeline(parseDot(dot), makeOpts(dir));
+    expect(result.context["run_id"]).toBeDefined();
+    expect(typeof result.context["run_id"]).toBe("string");
+    expect((result.context["run_id"] as string).length).toBeGreaterThan(0);
+  });
+
+  it("generates different run_ids for successive runs", async () => {
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      done  [shape=Msquare]
+      start -> done
+    }`;
+    const graph = parseDot(dot);
+    const r1 = await runPipeline(graph, makeOpts(dir));
+    const r2 = await runPipeline(graph, makeOpts(dir));
+    expect(r1.context["run_id"]).not.toBe(r2.context["run_id"]);
+  });
+
   it("does not dispatch further nodes after UndefinedVariableError", async () => {
     mockAgentRun.mockRejectedValueOnce(new UndefinedVariableError("missing_var"));
     const dot = `digraph g {
