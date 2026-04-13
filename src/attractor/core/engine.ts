@@ -14,6 +14,7 @@ import { RalphScenariosHandler } from "../handlers/ralph-scenarios.js";
 import { ParallelHandler, FanInHandler } from "../handlers/parallel.js";
 import { AgentHandler } from "../handlers/agent-handler.js";
 import { StoreHandler } from "../handlers/store.js";
+import { UndefinedVariableError } from "../transforms/variable-expansion.js";
 import type { NodeHandler, HandlerExecutionContext, OnInteractiveRequest } from "../handlers/registry.js";
 
 export interface EngineOptions {
@@ -210,7 +211,27 @@ export async function runPipeline(graph: Graph, opts: EngineOptions): Promise<Pi
       onStdout: opts.onStdout,
       onInteractiveRequest: opts.onInteractiveRequest,
     };
-    const outcome = await handler.execute(node, ctx, meta);
+    let outcome: Outcome;
+    try {
+      outcome = await handler.execute(node, ctx, meta);
+    } catch (err) {
+      if (err instanceof UndefinedVariableError) {
+        const pathTaken = [...completedNodes, node.id].join(" → ");
+        const varDump = Object.entries(context)
+          .map(([k, v]) => `  ${k} = ${v === undefined ? "<UNDEFINED>" : JSON.stringify(v)}`)
+          .join("\n");
+        const reason = [
+          `Undefined variable $${err.variableName}`,
+          `Node: ${node.id}`,
+          `Path: ${pathTaken}`,
+          `Variable context at failure:`,
+          varDump,
+        ].join("\n");
+        opts.onNodeEnd?.(node, { status: "fail", failureReason: reason });
+        return { status: "fail", completedNodes, context, failureReason: reason };
+      }
+      throw err; // re-throw non-variable errors
+    }
 
     // Merge context updates
     if (outcome.contextUpdates) {

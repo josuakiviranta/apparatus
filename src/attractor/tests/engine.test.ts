@@ -3,6 +3,7 @@ import { runPipeline, type EngineOptions } from "../core/engine.js";
 import { parseDot } from "../core/graph.js";
 import { AutoApproveInterviewer } from "../interviewer/auto-approve.js";
 import { QueueInterviewer } from "../interviewer/queue.js";
+import { UndefinedVariableError } from "../transforms/variable-expansion.js";
 import { mkdtempSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
@@ -384,5 +385,50 @@ describe("runPipeline", () => {
     const workCalls = calls.filter((c) => c.id === "work");
     expect(workCalls).toHaveLength(1);
     expect(workCalls[0].status).toBe("success");
+  });
+
+  it("halts pipeline and returns fail on UndefinedVariableError", async () => {
+    mockAgentRun.mockRejectedValueOnce(new UndefinedVariableError("missing_var"));
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      work  [shape=box]
+      done  [shape=Msquare]
+      start -> work -> done
+    }`;
+    const result = await runPipeline(parseDot(dot), makeOpts(dir));
+    expect(result.status).toBe("fail");
+    expect(result.failureReason).toContain("missing_var");
+    expect(result.failureReason).toContain("work");
+  });
+
+  it("includes path taken in UndefinedVariableError failure reason", async () => {
+    mockAgentRun
+      .mockResolvedValueOnce({ exitCode: 0, sessionId: "s1", stdout: null })
+      .mockRejectedValueOnce(new UndefinedVariableError("refinements"));
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      step1 [shape=box]
+      step2 [shape=box]
+      done  [shape=Msquare]
+      start -> step1 -> step2 -> done
+    }`;
+    const result = await runPipeline(parseDot(dot), makeOpts(dir));
+    expect(result.status).toBe("fail");
+    expect(result.failureReason).toContain("step2");
+    expect(result.failureReason).toContain("refinements");
+    expect(result.completedNodes).toContain("step1");
+  });
+
+  it("does not dispatch further nodes after UndefinedVariableError", async () => {
+    mockAgentRun.mockRejectedValueOnce(new UndefinedVariableError("missing_var"));
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      work1 [shape=box]
+      work2 [shape=box]
+      done  [shape=Msquare]
+      start -> work1 -> work2 -> done
+    }`;
+    await runPipeline(parseDot(dot), makeOpts(dir));
+    expect(mockAgentRun).toHaveBeenCalledTimes(1);
   });
 });

@@ -20,208 +20,27 @@ Completed: `expandVariables` now throws `UndefinedVariableError` on undefined va
 
 ---
 
-## Chunk 2: Static validation — `variable_coverage` rule in `validateGraph()`
+## Chunk 2: Static validation — `variable_coverage` rule in `validateGraph()` ✅ DONE
 
-### File Map
+Completed: `validateGraph()` now includes a `variable_coverage` rule that warns when a `$variable` used in a node's prompt/toolCommand may be undefined because all producer nodes can be bypassed via conditional routing. Uses BFS reachability algorithm (remove all producers, check if consumer still reachable from start).
 
-| Action | File | Purpose |
-|--------|------|---------|
-| Modify | `src/attractor/core/graph.ts` | Add variable_coverage diagnostic rule to `validateGraph()` |
-| Create or Modify | `src/attractor/tests/graph.test.ts` | Tests for variable_coverage rule |
+**Producer detection:** handler type conventions (tool→tool.output, store→store.path, wait.human→chat.output), interactive nodes→chat.output, explicit `produces` attribute on nodes. Consumer `default_<var>` attributes suppress warnings.
 
----
+**Also completed:** ToolHandler now calls `expandVariables` on `toolCommand` at runtime.
 
-### Task 3: Write variable_coverage tests (red)
-
-**Files:**
-- Create or Modify: `src/attractor/tests/graph.test.ts`
-
-- [ ] **Step 13: Read the current graph test file (if it exists)**
-
-```bash
-find src/attractor -name "graph.test.ts" -o -name "graph.test.ts"
-```
-
-- [ ] **Step 14: Write test for unreachable variable producer detection**
-
-Create a test graph where node B references `$output` produced by node C, but node C is on a branch that can be skipped. `validateGraph` should return a warning about `$output` in node B.
-
-```typescript
-it("warns when variable producer is unreachable on some paths", () => {
-  // Graph: start -> conditional -> [path A -> consumer] | [path B -> producer -> consumer]
-  // consumer references $output, producer sets it, path A skips producer
-  const result = validateGraph(graph);
-  const warnings = result.filter(d => d.rule === "variable_coverage");
-  expect(warnings).toHaveLength(1);
-  expect(warnings[0].message).toContain("$output");
-});
-```
-
-- [ ] **Step 15: Write test for fully-covered variables (no warning)**
-
-```typescript
-it("does not warn when all paths to consumer pass through producer", () => {
-  // Graph: start -> producer -> consumer -> exit
-  // consumer references $output, producer always runs before it
-  const result = validateGraph(graph);
-  const warnings = result.filter(d => d.rule === "variable_coverage");
-  expect(warnings).toHaveLength(0);
-});
-```
-
-- [ ] **Step 16: Run tests to confirm they fail**
-
-```bash
-npx vitest run src/attractor/tests/graph.test.ts
-```
-
-Expected: FAIL — no `variable_coverage` rule exists
+8 new test cases, all 48 graph tests pass. Tagged v0.1.14.
 
 ---
 
-### Task 4: Implement variable_coverage rule (green)
+## Chunk 3: Graceful shutdown + structured error trace ✅ DONE
 
-**Files:**
-- Modify: `src/attractor/core/graph.ts`
+Completed: Engine catches `UndefinedVariableError` thrown by any handler during `handler.execute()`. On catch: immediately returns `{ status: "fail" }` with structured `failureReason` containing variable name, node name, execution path, and full variable context dump. Fires `onNodeEnd` with fail status for TUI updates. Non-variable errors re-thrown. 3 new tests (24 total engine tests), all pass.
 
-- [ ] **Step 17: Read `validateGraph` in graph.ts**
-
-```bash
-cat -n src/attractor/core/graph.ts
-```
-
-- [ ] **Step 18: Add variable_coverage rule to validateGraph**
-
-Inside `validateGraph()`, after the existing rules, add:
-
-**Algorithm:**
-1. For each node, extract `$variableName` references from its `prompt` field using the regex `/\$([a-zA-Z_][\w.]*)/g`.
-2. Skip reserved variables (`$goal`, `$project`).
-3. For each referenced variable, find nodes whose `contextUpdates` (or whose handler type is known to produce that key) could set it.
-4. For each consuming node, check if all paths from `start` to that node pass through at least one producer. If not, emit a warning diagnostic.
-
-The warning diagnostic should use the same format as existing diagnostics, with `rule: "variable_coverage"` and `severity: "warning"`.
-
-- [ ] **Step 19: Run tests to confirm they pass**
-
-```bash
-npx vitest run src/attractor/tests/graph.test.ts
-```
-
-Expected: All tests PASS
-
-- [ ] **Step 20: Run full test suite**
-
-```bash
-npm test
-```
-
-Expected: All tests PASS
-
-- [ ] **Step 21: Commit**
-
-```bash
-git add src/attractor/core/graph.ts src/attractor/tests/graph.test.ts
-git commit -m "feat(pipeline): add variable_coverage validation rule to validateGraph"
-```
-
----
-
-## Chunk 3: Graceful shutdown + structured error trace
-
-### File Map
-
-| Action | File | Purpose |
-|--------|------|---------|
-| Modify | `src/attractor/core/engine.ts` | Catch UndefinedVariableError, halt dispatch, tear down agents, emit trace |
-| Create | `src/attractor/errors.ts` | (optional) Centralize error trace formatting if not inline |
-| Modify | `src/attractor/tests/engine.test.ts` | Tests for graceful shutdown on variable error |
-
----
-
-### Task 5: Write graceful shutdown tests (red)
-
-**Files:**
-- Create or Modify: `src/attractor/tests/engine.test.ts`
-
-- [ ] **Step 22: Read existing engine test file**
-
-```bash
-find src/attractor -name "engine.test.ts"
-cat -n src/attractor/tests/engine.test.ts  # if it exists
-```
-
-- [ ] **Step 23: Write test for graceful shutdown on UndefinedVariableError**
-
-Test that when a node's prompt expansion throws `UndefinedVariableError`:
-1. The pipeline stops dispatching new nodes
-2. The pipeline exits with a failure status
-3. An error trace is emitted containing the variable name, node name, and path taken
-
-```typescript
-it("halts pipeline and emits error trace on UndefinedVariableError", async () => {
-  // Set up a graph where a node references $missing which is never produced
-  // Run the pipeline
-  // Verify: pipeline status is "fail", error trace contains "$missing", no further nodes dispatched
-});
-```
-
-- [ ] **Step 24: Run tests to confirm they fail**
-
-```bash
-npx vitest run src/attractor/tests/engine.test.ts
-```
-
-Expected: FAIL
-
----
-
-### Task 6: Implement graceful shutdown (green)
-
-**Files:**
-- Modify: `src/attractor/core/engine.ts`
-
-- [ ] **Step 25: Read the engine execution loop**
-
-```bash
-cat -n src/attractor/core/engine.ts
-```
-
-- [ ] **Step 26: Add error boundary around node execution**
-
-In the node dispatch/execution loop, wrap the prompt expansion + handler execution in a try/catch for `UndefinedVariableError`. On catch:
-
-1. **Halt dispatch** — set a flag to prevent further node scheduling
-2. **Tear down running agents** — iterate over in-flight child processes and send SIGTERM (reuse Ctrl+C kill pattern from `agent.ts` if applicable)
-3. **Emit structured error trace** — write to stderr with format from design spec section 7:
-   - Node name
-   - Variable name
-   - Producer node (if identifiable)
-   - Path taken through the graph
-   - Full variable context at failure point
-
-- [ ] **Step 27: Run tests to confirm they pass**
-
-```bash
-npx vitest run src/attractor/tests/engine.test.ts
-```
-
-Expected: All tests PASS
-
-- [ ] **Step 28: Run full test suite**
-
-```bash
-npm test
-```
-
-Expected: All tests PASS
-
-- [ ] **Step 29: Commit**
-
-```bash
-git add src/attractor/core/engine.ts src/attractor/tests/engine.test.ts
-git commit -m "feat(pipeline): graceful shutdown with structured error trace on variable errors"
-```
+**Remaining spec items deferred to future work:**
+- Producer node detection (requires graph analysis from variable_coverage rule)
+- Skipped node analysis (requires comparing actual vs possible paths)
+- Trace file output to `meditations/.triage/<run-id>/error-trace.json`
+- Agent teardown is a no-op in the current sequential engine (no concurrent in-flight agents)
 
 ---
 
