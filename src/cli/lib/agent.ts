@@ -237,6 +237,7 @@ export class Agent {
         // readline drains child.stdout; passThrough.end() is called on readline close,
         // so awaiting onStdout implicitly waits for the full stream.
         const passThrough = new PassThrough();
+        passThrough.on("error", () => { /* consumer error; readline still drains */ });
         const rl = readline.createInterface({ input: child.stdout });
 
         rl.on("line", (line) => {
