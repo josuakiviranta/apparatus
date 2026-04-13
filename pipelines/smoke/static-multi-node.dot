@@ -1,0 +1,24 @@
+digraph static_multi_node {
+  goal="Smoke test: three sequential nodes — verify frozen blocks do not repaint"
+
+  start [shape=Mdiamond]
+
+  node_a [
+    agent="implement",
+    prompt="Output exactly one line: 'node-a: ok'. Do NOT use any tools."
+  ]
+
+  node_b [
+    agent="implement",
+    prompt="Output exactly one line: 'node-b: ok'. Do NOT use any tools."
+  ]
+
+  node_c [
+    agent="implement",
+    prompt="Output exactly one line: 'node-c: ok'. Do NOT use any tools."
+  ]
+
+  done [shape=Msquare]
+
+  start -> node_a -> node_b -> node_c -> done
+}
