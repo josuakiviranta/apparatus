@@ -1,63 +1,57 @@
-# Undefined Variable Backpressure Guard Implementation Plan
+# Pipeline Static Rendering + Streaming Text Implementation Plan
 
-> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Status: COMPLETE** — All tasks implemented and verified. Tag: v0.1.17
 
-**Goal:** Make pipeline variable expansion fail loudly on undefined variables, add static validation to catch coverage gaps before execution, and scope chat notes per-run to prevent cross-illumination contamination.
+**Goal:** Fix pipeline TUI flicker by using Ink's built-in index in `<Static>` blocks, and enable streaming text for `json_schema_file` nodes by switching from `--output-format json` to `stream-json`.
 
-**Architecture:** Three layers — (1) `expandVariables` throws `UndefinedVariableError` instead of silent passthrough, (2) a `variable_coverage` rule in `validateGraph()` warns about unreachable producers, (3) the engine catches pipeline-fatal errors, tears down agents, and emits a structured error trace. Chat notes move from a global path to a per-run scoped path.
-
-**Tech Stack:** TypeScript, vitest
-
-**Design Spec:** `docs/superpowers/specs/2026-04-13-undefined-variable-backpressure-guard-design.md`
+**Architecture:** `PipelineApp.tsx` uses `<Static>` for frozen blocks with built-in index. `agent.ts` streams NDJSON through a `PassThrough` tee — events flow to the TUI while being accumulated into `capturedOutput` for `agent-handler.ts`, which falls back to `event.result` when `structured_output` is null.
 
 ---
 
-## Chunk 1: Runtime guard — `expandVariables` throws on undefined variables ✅ DONE
+## Chunk 1: Code changes — DONE
 
-Completed: `expandVariables` now throws `UndefinedVariableError` on undefined variables with optional `defaults` parameter support. `variableExpansionTransform` catches the error gracefully (pre-expansion pass). All 45 transform tests pass.
+### Task 1: Fix `findIndex` in PipelineApp.tsx — DONE
 
-**Note:** Runtime callers (tool.ts, agent-handler.ts, wait-human.ts, store.ts) will throw unhandled `UndefinedVariableError` until Chunk 3 adds the engine-level catch boundary. This is the intended intermediate state.
+- [x] Updated Static render callback to use `(item, index)` instead of `findIndex`
+- [x] Tests pass (4/4)
+- [x] Committed: `7fdbf39`
 
----
+### Task 2: Switch json_schema nodes to stream-json in agent.ts — DONE
 
-## Chunk 2: Static validation — `variable_coverage` rule in `validateGraph()` ✅ DONE
-
-Completed: `validateGraph()` now includes a `variable_coverage` rule that warns when a `$variable` used in a node's prompt/toolCommand may be undefined because all producer nodes can be bypassed via conditional routing. Uses BFS reachability algorithm (remove all producers, check if consumer still reachable from start).
-
-**Producer detection:** handler type conventions (tool→tool.output, store→store.path, wait.human→chat.output), interactive nodes→chat.output, explicit `produces` attribute on nodes. Consumer `default_<var>` attributes suppress warnings.
-
-**Also completed:** ToolHandler now calls `expandVariables` on `toolCommand` at runtime.
-
-8 new test cases, all 48 graph tests pass. Tagged v0.1.14.
-
----
-
-## Chunk 3: Graceful shutdown + structured error trace ✅ DONE
-
-Completed: Engine catches `UndefinedVariableError` thrown by any handler during `handler.execute()`. On catch: immediately returns `{ status: "fail" }` with structured `failureReason` containing variable name, node name, execution path, and full variable context dump. Fires `onNodeEnd` with fail status for TUI updates. Non-variable errors re-thrown. 3 new tests (24 total engine tests), all pass.
-
-**Remaining spec items deferred to future work:**
-- Producer node detection (requires graph analysis from variable_coverage rule)
-- Skipped node analysis (requires comparing actual vs possible paths)
-- Trace file output to `meditations/.triage/<run-id>/error-trace.json`
-- Agent teardown is a no-op in the current sequential engine (no concurrent in-flight agents)
+- [x] Updated test (TDD red step)
+- [x] Added PassThrough import, removed parseStructuredOutput import
+- [x] Simplified buildArgs — all non-interactive runs use `stream-json`
+- [x] Replaced 85-line buffering block with 22-line PassThrough tee
+- [x] Added error listener on PassThrough for robustness
+- [x] All 714 tests pass
+- [x] Committed: `11c23d7`, `e2feaae`
 
 ---
 
-## Chunk 4: Chat notes per-run scoping ✅ DONE
+## Chunk 2: Smoke pipelines — DONE
 
-Completed: Engine generates `run_id` (UUID via `randomUUID()`) at pipeline start, adds to context. Dot file `illumination-to-plan.dot` now uses `$run_id` in chat-notes paths (`meditations/.triage/$run_id/chat-notes.md`). Each run gets a unique directory — no cross-contamination. 2 new tests, 26 total engine tests pass.
+### Task 3: static-multi-node smoke pipeline — DONE
 
-**Note:** Per-run directory cleanup deferred — unique paths prevent collision without cleanup. Engine shouldn't know about domain-specific paths.
+- [x] Created `pipelines/smoke/static-multi-node.dot`
+- [x] Committed: `2fce843`
+
+### Task 4: json-schema-stream smoke pipeline — DONE
+
+- [x] Created `pipelines/smoke/schemas/file-list.json`
+- [x] Created `pipelines/smoke/json-schema-stream.dot`
+- [x] Committed: `bd3e79c`
 
 ---
 
-## Chunk 5: Pipeline dot file defaults for optional variables ✅ DONE
+## How to test with tmux
 
-Completed: Added `extractDefaults(node)` utility that extracts camelCase `default*` node attributes into a flat `Record<string, string>`. Wired into AgentHandler and ToolHandler as 3rd arg to `expandVariables()`. Added `default_refinements` to `design_writer` in `illumination-to-plan.dot`. The Approve-without-Chat path now gets "No interactive refinements were requested." instead of throwing. 5 new extractDefaults tests, 713 total tests pass.
+Read `docs/harness/tmux-drive.md` for the full harness. Quick reference:
 
----
+```bash
+ralph pipeline run pipelines/smoke/static-multi-node.dot
+# → nodes 1+2 should never repaint after completing
 
-## All Chunks Complete
-
-Smoke tests (manual validation) remain for end-to-end verification when running the full pipeline.
+ralph pipeline run pipelines/smoke/json-schema-stream.dot
+# → streaming text (file descriptions) should appear in live block
+#   before the node completes and the JSON result is processed
+```
