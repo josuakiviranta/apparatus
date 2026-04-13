@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { variableExpansionTransform, expandVariables } from "../transforms/variable-expansion.js";
+import { variableExpansionTransform, expandVariables, UndefinedVariableError } from "../transforms/variable-expansion.js";
 import { buildPreamble } from "../transforms/preamble.js";
 import type { Graph, CheckpointState } from "../types.js";
 
@@ -74,9 +74,18 @@ describe("expandVariables", () => {
     expect(result).toBe("Goal: $goal, Path: /foo.md");
   });
 
-  it("leaves unknown variables as-is", () => {
-    const result = expandVariables("Value: $missing.key", {});
-    expect(result).toBe("Value: $missing.key");
+  it("throws UndefinedVariableError for undefined context variables", () => {
+    expect(() => expandVariables("Value: $unknown", {})).toThrow(UndefinedVariableError);
+  });
+
+  it("substitutes default value when variable is undefined but default is provided", () => {
+    const result = expandVariables("Refinements: $refinements", {}, { refinements: "No refinements provided." });
+    expect(result).toBe("Refinements: No refinements provided.");
+  });
+
+  it("expands defined variables without requiring defaults", () => {
+    const result = expandVariables("Hello $name", { name: "world" }, { name: "fallback" });
+    expect(result).toBe("Hello world");
   });
 
   it("returns input unchanged when context is empty", () => {
