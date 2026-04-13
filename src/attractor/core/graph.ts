@@ -290,6 +290,116 @@ export function validateGraph(graph: Graph): Diagnostic[] {
     if (UNIMPLEMENTED_TYPES.has(t)) diags.push({ rule: "type_unsupported", severity: "error", message: `Node type "${t}" is declared but not yet implemented (node "${node.id}")` });
   }
 
+  // variable_coverage — warn when a $variable may not be defined on all paths
+  const RESERVED_VARS = new Set(["goal", "project"]);
+  const VAR_RE = /\$([a-zA-Z_][\w.]*)/g;
+
+  // Handler-type implicit productions
+  const TYPE_PRODUCES: Record<string, string[]> = {
+    "tool": ["tool.output"],
+    "store": ["store.path"],
+    "wait.human": ["chat.output"],
+  };
+
+  // Build adjacency list for forward BFS
+  const adj = new Map<string, string[]>();
+  for (const n of nodes.keys()) adj.set(n, []);
+  for (const e of edges) {
+    if (adj.has(e.from)) adj.get(e.from)!.push(e.to);
+  }
+
+  // Collect what each node produces
+  const nodeProduces = new Map<string, Set<string>>();
+  for (const [id, node] of nodes) {
+    const produced = new Set<string>();
+    const handlerType = resolveHandlerType(node);
+    // Implicit productions from handler type
+    if (TYPE_PRODUCES[handlerType]) {
+      for (const v of TYPE_PRODUCES[handlerType]) produced.add(v);
+    }
+    // Interactive nodes produce chat.output
+    if (node.interactive) produced.add("chat.output");
+    // Explicit produces attribute (comma-separated)
+    if (typeof node.produces === "string") {
+      for (const v of (node.produces as string).split(",").map(s => s.trim()).filter(Boolean)) {
+        produced.add(v);
+      }
+    }
+    nodeProduces.set(id, produced);
+  }
+
+  // Check if a node has a default for a given variable
+  function hasDefault(node: Node, varName: string): boolean {
+    // DOT: default_myvar="x" → camelCased to defaultMyvar
+    const key = "default" + varName.charAt(0).toUpperCase() + varName.slice(1);
+    return node[key] !== undefined;
+  }
+
+  // BFS reachability check: can `target` be reached from `source` without visiting any node in `excluded`?
+  function reachableWithout(source: string, target: string, excluded: Set<string>): boolean {
+    if (source === target) return true;
+    const visited = new Set<string>();
+    const queue = [source];
+    while (queue.length > 0) {
+      const cur = queue.shift()!;
+      if (visited.has(cur)) continue;
+      visited.add(cur);
+      if (cur === target) return true;
+      for (const next of (adj.get(cur) ?? [])) {
+        if (!excluded.has(next)) queue.push(next);
+      }
+    }
+    return false;
+  }
+
+  if (startNodes.length === 1) {
+    const startId = startNodes[0].id;
+    for (const [consumerId, consumer] of nodes) {
+      // Extract variable references from prompt and toolCommand
+      const fields = [consumer.prompt, consumer.toolCommand].filter(Boolean) as string[];
+      const vars = new Set<string>();
+      for (const field of fields) {
+        let m: RegExpExecArray | null;
+        const re = new RegExp(VAR_RE.source, VAR_RE.flags);
+        while ((m = re.exec(field)) !== null) {
+          vars.add(m[1]);
+        }
+      }
+
+      for (const varName of vars) {
+        if (RESERVED_VARS.has(varName)) continue;
+        if (hasDefault(consumer, varName)) continue;
+
+        // Find all producer nodes for this variable
+        const producers = new Set<string>();
+        for (const [nodeId, produced] of nodeProduces) {
+          if (produced.has(varName)) producers.add(nodeId);
+        }
+
+        // If no producers exist at all, warn
+        if (producers.size === 0) {
+          diags.push({
+            rule: "variable_coverage",
+            severity: "warning",
+            message: `Variable "$${varName}" referenced by node "${consumerId}" has no known producer`,
+          });
+          continue;
+        }
+
+        // Check: is consumer reachable from start when all producers are removed?
+        // If yes, there's a path that skips all producers → warn
+        if (reachableWithout(startId, consumerId, producers)) {
+          const producerList = [...producers].join(", ");
+          diags.push({
+            rule: "variable_coverage",
+            severity: "warning",
+            message: `Variable "$${varName}" referenced by node "${consumerId}" may be undefined on path(s) that skip node "${producerList}"`,
+          });
+        }
+      }
+    }
+  }
+
   return diags;
 }
 

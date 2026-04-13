@@ -471,3 +471,134 @@ describe("validateGraph", () => {
     expect(diags.some(d => d.message.includes("stack.manager_loop"))).toBe(true);
   });
 });
+
+describe("validateGraph — variable_coverage", () => {
+  it("warns when variable producer is unreachable on some paths", () => {
+    // Graph: start -> router(diamond) -> [pathA: skip -> consumer] | [pathB: producer -> consumer]
+    // consumer references $tool.output in prompt, producer is a tool node
+    // Path A skips the tool node, so $tool.output may be undefined
+    const graph = parseDot(`digraph g {
+      start [shape=Mdiamond]
+      router [shape=diamond]
+      skip [shape=box, prompt="no vars here"]
+      producer [shape=parallelogram, tool_command="echo hello"]
+      consumer [shape=box, prompt="Result: $tool.output"]
+      done [shape=Msquare]
+      start -> router
+      router -> skip [condition="choice=a"]
+      router -> producer [condition="choice=b"]
+      skip -> consumer
+      producer -> consumer
+      consumer -> done
+    }`);
+    const diags = validateGraph(graph);
+    const warnings = diags.filter(d => d.rule === "variable_coverage");
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0].message).toContain("tool.output");
+    expect(warnings[0].message).toContain("producer");
+    expect(warnings[0].severity).toBe("warning");
+  });
+
+  it("does not warn when all paths to consumer pass through producer", () => {
+    // Linear: start -> producer(tool) -> consumer -> done
+    const graph = parseDot(`digraph g {
+      start [shape=Mdiamond]
+      producer [shape=parallelogram, tool_command="echo hello"]
+      consumer [shape=box, prompt="Result: $tool.output"]
+      done [shape=Msquare]
+      start -> producer -> consumer -> done
+    }`);
+    const diags = validateGraph(graph);
+    const warnings = diags.filter(d => d.rule === "variable_coverage");
+    expect(warnings).toHaveLength(0);
+  });
+
+  it("does not warn when consumer has default for the variable", () => {
+    // consumer references $myvar but has default_myvar attribute
+    const graph = parseDot(`digraph g {
+      start [shape=Mdiamond]
+      consumer [shape=box, prompt="Value: $myvar", default_myvar="fallback"]
+      done [shape=Msquare]
+      start -> consumer -> done
+    }`);
+    const diags = validateGraph(graph);
+    const warnings = diags.filter(d => d.rule === "variable_coverage");
+    expect(warnings).toHaveLength(0);
+  });
+
+  it("does not warn for $goal or $project variables", () => {
+    const graph = parseDot(`digraph g {
+      start [shape=Mdiamond]
+      consumer [shape=box, prompt="Goal: $goal, Project: $project"]
+      done [shape=Msquare]
+      start -> consumer -> done
+    }`);
+    const diags = validateGraph(graph);
+    const warnings = diags.filter(d => d.rule === "variable_coverage");
+    expect(warnings).toHaveLength(0);
+  });
+
+  it("warns for each uncovered variable separately", () => {
+    const graph = parseDot(`digraph g {
+      start [shape=Mdiamond]
+      consumer [shape=box, prompt="A: $varA, B: $varB"]
+      done [shape=Msquare]
+      start -> consumer -> done
+    }`);
+    const diags = validateGraph(graph);
+    const warnings = diags.filter(d => d.rule === "variable_coverage");
+    expect(warnings).toHaveLength(2);
+  });
+
+  it("recognizes explicit produces attribute on nodes", () => {
+    const graph = parseDot(`digraph g {
+      start [shape=Mdiamond]
+      producer [shape=box, agent="impl", produces="summary,explanation"]
+      consumer [shape=box, prompt="Summary: $summary"]
+      done [shape=Msquare]
+      start -> producer -> consumer -> done
+    }`);
+    const diags = validateGraph(graph);
+    const warnings = diags.filter(d => d.rule === "variable_coverage");
+    expect(warnings).toHaveLength(0);
+  });
+
+  it("recognizes store handler as producing store.path", () => {
+    const graph = parseDot(`digraph g {
+      start [shape=Mdiamond]
+      saver [shape=cylinder]
+      consumer [shape=box, prompt="Saved at: $store.path"]
+      done [shape=Msquare]
+      start -> saver -> consumer -> done
+    }`);
+    const diags = validateGraph(graph);
+    const warnings = diags.filter(d => d.rule === "variable_coverage");
+    expect(warnings).toHaveLength(0);
+  });
+
+  it("recognizes wait.human handler as producing chat.output", () => {
+    const graph = parseDot(`digraph g {
+      start [shape=Mdiamond]
+      ask [shape=hexagon]
+      consumer [shape=box, prompt="User said: $chat.output"]
+      done [shape=Msquare]
+      start -> ask -> consumer -> done
+    }`);
+    const diags = validateGraph(graph);
+    const warnings = diags.filter(d => d.rule === "variable_coverage");
+    expect(warnings).toHaveLength(0);
+  });
+
+  it("recognizes interactive node as producing chat.output", () => {
+    const graph = parseDot(`digraph g {
+      start [shape=Mdiamond]
+      interact [shape=box, interactive=true]
+      consumer [shape=box, prompt="User said: $chat.output"]
+      done [shape=Msquare]
+      start -> interact -> consumer -> done
+    }`);
+    const diags = validateGraph(graph);
+    const warnings = diags.filter(d => d.rule === "variable_coverage");
+    expect(warnings).toHaveLength(0);
+  });
+});
