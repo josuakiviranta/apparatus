@@ -180,26 +180,25 @@ describe("Agent.run with jsonSchema", () => {
     vi.clearAllMocks();
   });
 
-  it("calls onStdout with synthetic stream-json events when jsonSchema is set", async () => {
-    const jsonOutputLine = JSON.stringify([
-      {
-        type: "system",
-        subtype: "init",
-        session_id: "sess-json-001",
-        cwd: "/tmp/project",
-      },
-      {
-        type: "result",
-        subtype: "success",
-        is_error: false,
-        num_turns: 1,
-        result: "",
-        structured_output: { summary: "test output" },
-        session_id: "sess-json-001",
-        usage: { input_tokens: 42, output_tokens: 17 },
-      },
-    ]);
-    const child = createMockChild(0, jsonOutputLine + "\n");
+  it("tees NDJSON lines to onStdout and captures output when jsonSchema is set", async () => {
+    // With stream-json, each event is a separate NDJSON line (not a JSON array)
+    const systemLine = JSON.stringify({
+      type: "system",
+      subtype: "init",
+      session_id: "sess-json-001",
+      cwd: "/tmp/project",
+    });
+    const resultLine = JSON.stringify({
+      type: "result",
+      subtype: "success",
+      is_error: false,
+      num_turns: 1,
+      result: "",
+      structured_output: { summary: "test output" },
+      session_id: "sess-json-001",
+      usage: { input_tokens: 42, output_tokens: 17 },
+    });
+    const child = createMockChild(0, systemLine + "\n" + resultLine + "\n");
     mockSpawn.mockReturnValue(child);
 
     const receivedLines: string[] = [];
@@ -213,19 +212,12 @@ describe("Agent.run with jsonSchema", () => {
       },
     });
 
-    // Should have received a system event with session_id
+    // Raw NDJSON lines are forwarded directly (no synthetic reconstruction)
     const systemEvent = receivedLines
       .map((l) => { try { return JSON.parse(l); } catch { return null; } })
       .find((e) => e?.type === "system");
     expect(systemEvent?.session_id).toBe("sess-json-001");
 
-    // Should have received an assistant event with structured_output as JSON string
-    const assistantEvent = receivedLines
-      .map((l) => { try { return JSON.parse(l); } catch { return null; } })
-      .find((e) => e?.type === "assistant");
-    expect(assistantEvent?.message?.content?.[0]?.text).toBe(JSON.stringify({ summary: "test output" }));
-
-    // Should have received the result event (synthesized for stats)
     const resultEvent = receivedLines
       .map((l) => { try { return JSON.parse(l); } catch { return null; } })
       .find((e) => e?.type === "result");
@@ -233,7 +225,7 @@ describe("Agent.run with jsonSchema", () => {
     expect(resultEvent?.usage?.output_tokens).toBe(17);
   });
 
-  it("does NOT call onStdout when jsonSchema output has no result line", async () => {
+  it("always calls onStdout (even for non-JSON lines) when jsonSchema is set", async () => {
     const child = createMockChild(0, "not json\n");
     mockSpawn.mockReturnValue(child);
 
@@ -244,20 +236,19 @@ describe("Agent.run with jsonSchema", () => {
       onStdout: async () => { onStdoutCalled = true; },
     });
 
-    expect(onStdoutCalled).toBe(false);
+    // With stream-json tee, onStdout is always called (passThrough is always provided)
+    expect(onStdoutCalled).toBe(true);
   });
 
-  it("still buffers output and returns it as RunResult.output", async () => {
-    const jsonOutputLine = JSON.stringify([
-      {
-        type: "result",
-        result: "",
-        structured_output: { key: "val" },
-        session_id: "s1",
-        usage: {},
-      },
-    ]);
-    const child = createMockChild(0, jsonOutputLine + "\n");
+  it("still buffers output and extracts sessionId from NDJSON lines", async () => {
+    const resultLine = JSON.stringify({
+      type: "result",
+      result: "",
+      structured_output: { key: "val" },
+      session_id: "s1",
+      usage: {},
+    });
+    const child = createMockChild(0, resultLine + "\n");
     mockSpawn.mockReturnValue(child);
 
     const agent = new Agent(jsonSchemaConfig);

@@ -1,12 +1,11 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { Readable } from "node:stream";
+import { Readable, PassThrough } from "node:stream";
 import * as readline from "node:readline";
 import type { Session } from "./session.js";
 import { formatUserTurn } from "./stream-json-input.js";
 import { parseStreamJsonEvents, type StreamJsonEvent } from "./stream-formatter.js";
-import { parseStructuredOutput } from "./parse-structured-output.js";
 
 export interface McpServerConfig {
   name: string;
@@ -108,14 +107,11 @@ export class Agent {
   buildArgs(options: RunOptions): string[] {
     const args = this.buildCommonArgs();
 
-    // Output format (non-interactive only)
+    // Output format (non-interactive only).
+    // When jsonSchema is set, schema is embedded in the prompt by agent-handler.ts;
+    // we use stream-json so text deltas reach the TUI in real-time.
     if (!options.interactive) {
-      if (this.config.jsonSchema) {
-        args.push("--output-format", "json");
-        args.push("--json-schema", this.config.jsonSchema);
-      } else {
-        args.push("--output-format", "stream-json");
-      }
+      args.push("--output-format", "stream-json");
     }
 
     // Resume or prompt
@@ -236,89 +232,34 @@ export class Agent {
       let capturedOutput = "";
 
       if (this.config.jsonSchema && !isInteractive && child.stdout) {
-        // Buffer stdout for JSON parsing; replay events via onStdout after buffering.
+        // Tee stdout: forward all NDJSON lines to onStdout (for TUI streaming)
+        // while accumulating into capturedOutput (for agent-handler JSON extraction).
+        // readline drains child.stdout; passThrough.end() is called on readline close,
+        // so awaiting onStdout implicitly waits for the full stream.
+        const passThrough = new PassThrough();
         const rl = readline.createInterface({ input: child.stdout });
-        const rlDone = new Promise<void>((resolve) => rl.on("close", resolve));
+
         rl.on("line", (line) => {
           capturedOutput += line + "\n";
+          passThrough.push(line + "\n");
           try {
-            const parsed = JSON.parse(line) as unknown;
-            // Output may be a single-line JSON array (--output-format json) or a plain object (NDJSON)
-            const eventsArr: Array<Record<string, unknown>> = Array.isArray(parsed)
-              ? (parsed as Array<Record<string, unknown>>)
-              : [parsed as Record<string, unknown>];
-            const found = eventsArr.find((e) => typeof e.session_id === "string");
-            if (found?.session_id && !sessionId) {
-              sessionId = found.session_id as string;
-              options.onSessionId?.(sessionId!);
+            const parsed = JSON.parse(line) as Record<string, unknown>;
+            if (typeof parsed.session_id === "string" && !sessionId) {
+              sessionId = parsed.session_id;
+              options.onSessionId?.(sessionId);
             }
-          } catch {
-            // Not JSON line, still captured
-          }
+          } catch { /* not JSON */ }
         });
-        // Ensure all buffered lines are processed before returning
-        await rlDone;
+        rl.on("close", () => passThrough.end());
 
-        // If caller wants events for the pipeline TUI, synthesize a stream-json-compatible
-        // stream from the buffered output. --output-format json emits a single-line JSON
-        // array of events; fall back to NDJSON for other callers.
         if (options.onStdout) {
-          try {
-            const events = parseStructuredOutput(capturedOutput) as Array<Record<string, unknown>>;
-
-            const syntheticLines: string[] = [];
-
-            // session_id can live on any event (system or result)
-            const evtSessionId =
-              events.find((e) => typeof e.session_id === "string")?.session_id ??
-              sessionId;
-            if (evtSessionId) {
-              syntheticLines.push(
-                JSON.stringify({ type: "system", session_id: evtSessionId }),
-              );
-            }
-
-            const resultEvt = events.find((e) => e.type === "result");
-            if (resultEvt) {
-              // structured_output takes priority (json-schema mode); fall back to result
-              const structuredOut = resultEvt.structured_output;
-              const bodyText: string | undefined =
-                structuredOut != null
-                  ? typeof structuredOut === "string"
-                    ? structuredOut
-                    : JSON.stringify(structuredOut)
-                  : typeof resultEvt.result === "string" && resultEvt.result
-                    ? resultEvt.result
-                    : undefined;
-
-              if (bodyText) {
-                syntheticLines.push(
-                  JSON.stringify({
-                    type: "assistant",
-                    message: { content: [{ type: "text", text: bodyText }] },
-                  }),
-                );
-              }
-
-              // Synthesize a stream-json result event for stats
-              syntheticLines.push(
-                JSON.stringify({
-                  type: "result",
-                  stop_reason: resultEvt.stop_reason ?? "end_turn",
-                  result: bodyText ?? "",
-                  usage: resultEvt.usage ?? {},
-                }),
-              );
-            }
-
-            if (syntheticLines.length > 0) {
-              await options.onStdout(
-                Readable.from(syntheticLines.map((l) => l + "\n")),
-              );
-            }
-          } catch {
-            // Outer guard: if synthesis fails entirely, skip silently
-          }
+          await options.onStdout(passThrough);
+        } else {
+          // Drain passThrough so readline can finish and capturedOutput is complete.
+          await new Promise<void>((resolve) => {
+            passThrough.resume();
+            passThrough.once("end", resolve);
+          });
         }
       } else if (!isInteractive && child.stdout && options.onStdout) {
         // Caller consumes stdout (e.g. streamEvents → output.stream)
