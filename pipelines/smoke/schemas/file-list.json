@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["files", "summary"],
+  "properties": {
+    "files": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "List of file names found"
+    },
+    "summary": {
+      "type": "string",
+      "description": "One-sentence summary of what was found"
+    }
+  },
+  "additionalProperties": false
+}
