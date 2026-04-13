@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { variableExpansionTransform, expandVariables, UndefinedVariableError } from "../transforms/variable-expansion.js";
+import { variableExpansionTransform, expandVariables, extractDefaults, UndefinedVariableError } from "../transforms/variable-expansion.js";
 import { buildPreamble } from "../transforms/preamble.js";
 import type { Graph, CheckpointState } from "../types.js";
 
@@ -143,6 +143,36 @@ describe("buildPreamble coerces non-string context values", () => {
     const out = buildPreamble(base({ "k.null": null, "k.undef": undefined }), "compact");
     expect(out).toContain("k.null: null");
     expect(out).toContain("k.undef: undefined");
+  });
+});
+
+describe("extractDefaults", () => {
+  it("extracts default_* camelCase properties from node-like object", () => {
+    const node = { id: "test", defaultRefinements: "No refinements", defaultFoo: "bar", prompt: "hello" };
+    const defaults = extractDefaults(node);
+    expect(defaults).toEqual({ refinements: "No refinements", foo: "bar" });
+  });
+
+  it("returns empty object when no defaults exist", () => {
+    const node = { id: "test", prompt: "hello" };
+    expect(extractDefaults(node)).toEqual({});
+  });
+
+  it("ignores properties named exactly 'default'", () => {
+    const node = { id: "test", default: "something" };
+    expect(extractDefaults(node)).toEqual({});
+  });
+
+  it("lowercases the first character after 'default' prefix", () => {
+    const node = { defaultMyVar: "value" };
+    const defaults = extractDefaults(node);
+    expect(defaults).toEqual({ myVar: "value" });
+  });
+
+  it("coerces non-string values to strings", () => {
+    const node = { defaultCount: 42, defaultEnabled: true };
+    const defaults = extractDefaults(node);
+    expect(defaults).toEqual({ count: "42", enabled: "true" });
   });
 });
 

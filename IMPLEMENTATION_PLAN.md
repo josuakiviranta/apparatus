@@ -52,70 +52,12 @@ Completed: Engine generates `run_id` (UUID via `randomUUID()`) at pipeline start
 
 ---
 
-## Chunk 5: Pipeline dot file defaults for optional variables
+## Chunk 5: Pipeline dot file defaults for optional variables ✅ DONE
 
-### File Map
-
-| Action | File | Purpose |
-|--------|------|---------|
-| Modify | `pipelines/illumination-to-plan.dot` | Add `default_refinements` attribute to `design_writer` node |
+Completed: Added `extractDefaults(node)` utility that extracts camelCase `default*` node attributes into a flat `Record<string, string>`. Wired into AgentHandler and ToolHandler as 3rd arg to `expandVariables()`. Added `default_refinements` to `design_writer` in `illumination-to-plan.dot`. The Approve-without-Chat path now gets "No interactive refinements were requested." instead of throwing. 5 new extractDefaults tests, 713 total tests pass.
 
 ---
 
-### Task 8: Add default value for $refinements in illumination-to-plan.dot
+## All Chunks Complete
 
-- [ ] **Step 36: Read the pipeline dot file**
-
-```bash
-cat -n pipelines/illumination-to-plan.dot
-```
-
-- [ ] **Step 37: Add default_refinements attribute to design_writer**
-
-On the `design_writer` node, add:
-
-```dot
-default_refinements="No interactive refinements were requested."
-```
-
-This ensures the Approve-without-Chat path produces a sensible prompt instead of throwing.
-
-- [ ] **Step 38: Run pipeline validation**
-
-```bash
-ralph pipeline validate pipelines/illumination-to-plan.dot
-```
-
-Expected: No errors. The `variable_coverage` rule may emit a warning about `$refinements` being optional with a default — this is informational.
-
-- [ ] **Step 39: Run full test suite**
-
-```bash
-npm test
-```
-
-Expected: All tests PASS
-
-- [ ] **Step 40: Commit**
-
-```bash
-git add pipelines/illumination-to-plan.dot
-git commit -m "fix(pipeline): add default_refinements to design_writer for Approve-without-Chat path"
-```
-
----
-
-## Smoke Test
-
-After all chunks, validate end-to-end:
-
-1. **Approve-without-Chat path:** Run `illumination-to-plan.dot` and take the Approve path. Verify `design_writer` receives the default refinements text instead of `$refinements` literal.
-
-2. **Undefined variable error:** Create a test dot file with a node that references `$nonexistent` with no default. Run it and verify:
-   - Pipeline stops with a clear error message
-   - Error trace includes node name, variable name, and path taken
-   - No orphan processes remain
-
-3. **Static validation:** Run `ralph pipeline validate` against the test dot file and verify the `variable_coverage` warning appears.
-
-4. **Chat notes isolation:** Run the pipeline twice in succession. Verify the second run's chat notes are clean (no leftover from the first run).
+Smoke tests (manual validation) remain for end-to-end verification when running the full pipeline.

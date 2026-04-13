@@ -31,6 +31,21 @@ export function expandVariables(
   });
 }
 
+/**
+ * Extract default_* node attributes into a flat Record<string, string>.
+ * E.g. { defaultRefinements: "none" } → { refinements: "none" }
+ */
+export function extractDefaults(obj: Record<string, unknown>): Record<string, string> {
+  const defaults: Record<string, string> = {};
+  for (const [key, val] of Object.entries(obj)) {
+    if (key.startsWith("default") && key.length > 7 && key[7] === key[7].toUpperCase()) {
+      const varName = key[7].toLowerCase() + key.slice(8);
+      defaults[varName] = String(val);
+    }
+  }
+  return defaults;
+}
+
 export function variableExpansionTransform(graph: Graph, vars: { project?: string; context?: Record<string, unknown> }): Graph {
   const goal = graph.goal ?? "";
   const project = vars.project ?? "";

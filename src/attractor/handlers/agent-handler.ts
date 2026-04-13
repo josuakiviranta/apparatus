@@ -6,7 +6,7 @@ import type { Node, Outcome, PipelineContext, CheckpointState } from "../types.j
 import { Agent, type AgentConfig, type RunResult, type ChildHandle } from "../../cli/lib/agent.js";
 import { resolveAgent as defaultResolveAgent } from "../../cli/lib/agent-registry.js";
 import { buildPreamble } from "../transforms/preamble.js";
-import { expandVariables } from "../transforms/variable-expansion.js";
+import { expandVariables, extractDefaults } from "../transforms/variable-expansion.js";
 import { parseStructuredOutput } from "../../cli/lib/parse-structured-output.js";
 import { Session, buildSessionDigest } from "../../cli/lib/session.js";
 
@@ -59,7 +59,7 @@ export class AgentHandler implements NodeHandler {
     const nodeDir = join(logsRoot, node.id);
     mkdirSync(nodeDir, { recursive: true });
     const rawPrompt = node.prompt ?? node.label ?? config.prompt;
-    const expandedRawPrompt = expandVariables(rawPrompt, ctx.values);
+    const expandedRawPrompt = expandVariables(rawPrompt, ctx.values, extractDefaults(node as unknown as Record<string, unknown>));
     const fidelity = (node.fidelity as string | undefined) ?? "compact";
     const preamble = buildPreamble(
       { timestamp: "", currentNode: node.id, completedNodes, nodeRetries, context: ctx.values } as CheckpointState,
