@@ -92,6 +92,19 @@ describe("expandVariables", () => {
     const result = expandVariables("No vars here", {});
     expect(result).toBe("No vars here");
   });
+
+  it("does not consume a trailing dot as part of the variable name", () => {
+    const result = expandVariables(
+      "Read the illumination at $illumination_path. It is important.",
+      { illumination_path: "/meditations/foo.md" },
+    );
+    expect(result).toBe("Read the illumination at /meditations/foo.md. It is important.");
+  });
+
+  it("still expands dotted names like agent.success", () => {
+    const result = expandVariables("Status: $agent.success.", { "agent.success": "true" });
+    expect(result).toBe("Status: true.");
+  });
 });
 
 describe("buildPreamble", () => {

@@ -17,7 +17,7 @@ export function expandVariables(
   ctx: Record<string, unknown>,
   defaults?: Record<string, string>,
 ): string {
-  return s.replace(/\$([a-zA-Z_][\w.]*)/g, (match, key) => {
+  return s.replace(/\$([a-zA-Z_]\w*(?:\.\w+)*)/g, (match, key) => {
     if (key === "goal" || key === "project") return match;
     const v = ctx[key];
     if (v === undefined) {
