@@ -171,6 +171,12 @@ export function PipelineApp({ pipelineName, pid, goal, nodes, onReady }: Props) 
           }
           // Plain message
           if (parsed.text.trim().length === 0) return;
+          const msgIndex = liveBodyCountRef.current++;
+          setStaticItems(prev => [
+            ...prev,
+            { kind: "body-line", id: `${liveBlockIdRef.current!}-body-${msgIndex}`,
+              line: { kind: "text", role: "you", text: parsed.text } },
+          ]);
           dispatch({ kind: "text", role: "you", text: parsed.text });
           try { await child.submit(parsed.text); } catch (err) {
             dispatch({

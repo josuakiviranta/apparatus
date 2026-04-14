@@ -145,6 +145,32 @@ describe("PipelineApp", () => {
     expect(onDoneCalls).toBe(1);
   });
 
+  it("user message typed in text input appears permanently in static output after submit", async () => {
+    const { instance, cbs } = mount();
+    const fakeChild: ChildHandle = {
+      sessionId: "test-session",
+      events: (async function* () { })(),
+      submit: vi.fn().mockResolvedValue(undefined),
+      end: vi.fn().mockResolvedValue(undefined),
+      kill: vi.fn().mockResolvedValue(undefined),
+      exited: new Promise<{ code: number | null; signal: NodeJS.Signals | null; stderrTail: string }>(() => {}),
+    };
+
+    cbs.emit({ kind: "start", nodeId: "chat", label: "interactive-agent", blockKind: "interactive-agent" });
+    cbs.emit({ kind: "interactive-ready", child: fakeChild, onDone: () => {} });
+    await flush();
+
+    // Type message then submit via Enter (simulate user typing in TextInput)
+    (instance as any).stdin.write("hello world");
+    await flush();  // let React process the typed characters
+    (instance as any).stdin.write("\r");
+    await flush();  // let React process submit + state updates
+
+    const frame = instance.lastFrame() ?? "";
+    expect(frame).toContain("you:");
+    expect(frame).toContain("hello world");
+  });
+
   it("renders trace path exactly once even when multiple trace-path events fire", async () => {
     const { instance, cbs } = mount();
     cbs.emit({ kind: "start", nodeId: "work", label: "agent", blockKind: "agent" });
