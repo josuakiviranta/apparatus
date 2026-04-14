@@ -50,10 +50,11 @@ export function PipelineApp({ pipelineName, pid, goal, nodes, onReady }: Props) 
   ]);
 
   // Refs for constructing stable IDs in the emit wrapper (no stale closures).
-  const liveBlockIdRef  = useRef<string | null>(null);
-  const liveBodyCountRef = useRef(0);
-  const frozenCountRef  = useRef(0);
-  const blockSeqRef     = useRef(0);  // monotonic block counter for display index
+  const liveBlockIdRef    = useRef<string | null>(null);
+  const liveBodyCountRef  = useRef(0);
+  const frozenCountRef    = useRef(0);
+  const blockSeqRef       = useRef(0);  // monotonic block counter for display index
+  const traceAppendedRef  = useRef(false); // emit at most one trace-line per block
 
   // Track which frozen blocks have had their block-close item appended.
   const staticCloseSeen = useRef<Set<string>>(new Set());
@@ -102,12 +103,14 @@ export function PipelineApp({ pipelineName, pid, goal, nodes, onReady }: Props) 
           const id = `${event.nodeId}-${blockSeqRef.current}`;
           liveBlockIdRef.current = id;
           liveBodyCountRef.current = 0;
+          traceAppendedRef.current = false;
           const displayIndex = blockSeqRef.current;
           setStaticItems(prev => [
             ...prev,
             { kind: "block-open", id, displayIndex, nodeId: event.nodeId, label: event.label },
           ]);
-        } else if (event.kind === "trace-path" && liveBlockIdRef.current) {
+        } else if (event.kind === "trace-path" && liveBlockIdRef.current && !traceAppendedRef.current) {
+          traceAppendedRef.current = true;
           const tracePath = claudeTracePath(event.sessionId);
           setStaticItems(prev => [
             ...prev,
