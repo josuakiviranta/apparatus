@@ -1,7 +1,6 @@
 import React from "react";
 import { Box, Text } from "ink";
 import type { LiveBlock } from "../lib/pipelineEvents.js";
-import { BodyLineView } from "./BlockView.js";
 import { TextInput } from "./TextInput.js";
 import { GateSelector } from "./GateSelector.js";
 
@@ -50,12 +49,6 @@ export function LiveFooter({ block, index }: { block: LiveBlockWithInput; index:
   return (
     <Box flexDirection="column">
       <Text>{headerLine(index, block.nodeId, block.label)}</Text>
-      {(block.kind === "agent" || block.kind === "interactive-agent") && (
-        <Text dimColor>
-          {"  trace: "}{block.tracePath ?? "…"}
-        </Text>
-      )}
-      {block.body.map((line, i) => <BodyLineView key={i} line={line} />)}
       {block.gate && (
         <GateSelector options={block.gate.options} onChoose={block.gate.onChoose} />
       )}

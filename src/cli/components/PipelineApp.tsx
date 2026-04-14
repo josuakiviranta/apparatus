@@ -1,10 +1,11 @@
 import React, { useEffect, useReducer, useRef, useState } from "react";
 import { render as inkRender, Box, Static, Text, useApp, useInput } from "ink";
 import { pipelineReducer } from "../lib/pipelineReducer.js";
-import { initialPipelineState, type NodeEvent, type Block } from "../lib/pipelineEvents.js";
-import { BlockView } from "./BlockView.js";
+import { initialPipelineState, type NodeEvent, type Block, type BodyLine } from "../lib/pipelineEvents.js";
+import { BodyLineView } from "./BlockView.js";
 import { LiveFooter, type LiveBlockWithInput } from "./LiveFooter.js";
 import { parseSlashCommand } from "../lib/slash-commands.js";
+import { claudeTracePath } from "../lib/claudeTracePath.js";
 
 export interface PipelineAppCallbacks {
   emit: (event: NodeEvent) => void;
@@ -19,26 +20,64 @@ interface Props {
   onReady: (cbs: PipelineAppCallbacks) => void;
 }
 
+const HEADER_WIDTH = 80;
+
 type StaticItem =
-  | { kind: "header"; id: string; pipelineName: string; pid: number; goal?: string; nodes: string[] }
-  | { kind: "block"; id: string; block: Block };
+  | { kind: "header";     id: string; pipelineName: string; pid: number; goal?: string; nodes: string[] }
+  | { kind: "block-open"; id: string; displayIndex: number; nodeId: string; label: string }
+  | { kind: "trace-line"; id: string; tracePath: string }
+  | { kind: "body-line";  id: string; line: BodyLine }
+  | { kind: "block-close"; id: string; block: Block };
+
+function BlockCloseView({ block }: { block: Block }) {
+  const glyph = block.outcome.status === "success" ? "✓" : "✗";
+  const parts = [`  ${glyph} ${block.outcome.status}`];
+  if (block.outcome.reason) parts.push(block.outcome.reason);
+  parts.push(`${block.stats.turns} turns`);
+  parts.push(`${block.stats.tokensIn}/${block.stats.tokensOut} tok`);
+  parts.push((block.stats.durationMs / 1000).toFixed(1) + "s");
+  return <Text dimColor>{parts.join(" · ")}</Text>;
+}
 
 export function PipelineApp({ pipelineName, pid, goal, nodes, onReady }: Props) {
   const { exit } = useApp();
   const [state, dispatch] = useReducer(pipelineReducer, initialPipelineState);
   const [inputBuffer, setInputBuffer] = useState("");
 
+  // Grow-only static items — append-only, never removed or mutated.
+  const [staticItems, setStaticItems] = useState<StaticItem[]>(() => [
+    { kind: "header", id: "__header__", pipelineName, pid, goal, nodes },
+  ]);
+
+  // Refs for constructing stable IDs in the emit wrapper (no stale closures).
+  const liveBlockIdRef  = useRef<string | null>(null);
+  const liveBodyCountRef = useRef(0);
+  const frozenCountRef  = useRef(0);
+  const blockSeqRef     = useRef(0);  // monotonic block counter for display index
+
+  // Track which frozen blocks have had their block-close item appended.
+  const staticCloseSeen = useRef<Set<string>>(new Set());
+
   // Tracks which frozen blocks have already had their onDone dispatched.
   const doneDispatched = useRef<Set<string>>(new Set());
 
-  // Post-commit effect: scan frozen for any block with an undispatched onDone
-  // and call it exactly once.
+  // Post-commit effect: append block-close items for newly frozen blocks
+  // and dispatch onDone callbacks exactly once.
   useEffect(() => {
+    const newCloseItems: StaticItem[] = [];
     for (const block of state.frozen) {
+      if (!staticCloseSeen.current.has(block.id)) {
+        staticCloseSeen.current.add(block.id);
+        frozenCountRef.current = state.frozen.length;
+        newCloseItems.push({ kind: "block-close", id: `${block.id}-close`, block });
+      }
       if (block.onDone && !doneDispatched.current.has(block.id)) {
         doneDispatched.current.add(block.id);
         try { block.onDone(); } catch { /* swallow */ }
       }
+    }
+    if (newCloseItems.length > 0) {
+      setStaticItems(prev => [...prev, ...newCloseItems]);
     }
   }, [state.frozen]);
 
@@ -48,7 +87,7 @@ export function PipelineApp({ pipelineName, pid, goal, nodes, onReady }: Props) 
     if (key.ctrl && input === "c") {
       process.kill(process.pid, "SIGINT");
     }
-  });
+  }, { isActive: !!process.stdin.isTTY });
 
   // Fire onReady exactly once.
   const readyOnce = useRef(false);
@@ -56,7 +95,41 @@ export function PipelineApp({ pipelineName, pid, goal, nodes, onReady }: Props) 
     if (readyOnce.current) return;
     readyOnce.current = true;
     onReady({
-      emit: (event) => dispatch(event),
+      emit: (event) => {
+        // Append static items for content-producing events.
+        if (event.kind === "start") {
+          blockSeqRef.current++;
+          const id = `${event.nodeId}-${blockSeqRef.current}`;
+          liveBlockIdRef.current = id;
+          liveBodyCountRef.current = 0;
+          const displayIndex = blockSeqRef.current;
+          setStaticItems(prev => [
+            ...prev,
+            { kind: "block-open", id, displayIndex, nodeId: event.nodeId, label: event.label },
+          ]);
+        } else if (event.kind === "trace-path" && liveBlockIdRef.current) {
+          const tracePath = claudeTracePath(event.sessionId);
+          setStaticItems(prev => [
+            ...prev,
+            { kind: "trace-line", id: `${liveBlockIdRef.current}-trace`, tracePath },
+          ]);
+        } else if (event.kind === "text" && liveBlockIdRef.current) {
+          const i = liveBodyCountRef.current++;
+          setStaticItems(prev => [
+            ...prev,
+            { kind: "body-line", id: `${liveBlockIdRef.current}-body-${i}`,
+              line: { kind: "text", role: event.role, text: event.text } },
+          ]);
+        } else if (event.kind === "tool_use" && liveBlockIdRef.current) {
+          const i = liveBodyCountRef.current++;
+          setStaticItems(prev => [
+            ...prev,
+            { kind: "body-line", id: `${liveBlockIdRef.current}-body-${i}`,
+              line: { kind: "tool_use", name: event.name, summary: event.summary } },
+          ]);
+        }
+        dispatch(event);
+      },
       done: () => exit(),
     });
   }, []);
@@ -107,16 +180,10 @@ export function PipelineApp({ pipelineName, pid, goal, nodes, onReady }: Props) 
     };
   })();
 
-  // Assemble static items: header is always item 0, followed by frozen blocks.
-  const staticItems: StaticItem[] = [
-    { kind: "header", id: "__header__", pipelineName, pid, goal, nodes },
-    ...state.frozen.map((b) => ({ kind: "block" as const, id: b.id, block: b })),
-  ];
-
   return (
     <>
       <Static items={staticItems}>
-        {(item, index) => {
+        {(item) => {
           if (item.kind === "header") {
             return (
               <Box key={item.id} flexDirection="column" marginBottom={1}>
@@ -129,11 +196,29 @@ export function PipelineApp({ pipelineName, pid, goal, nodes, onReady }: Props) 
               </Box>
             );
           }
-          return <BlockView key={item.id} block={item.block} index={index} />;
+          if (item.kind === "block-open") {
+            const prefix = `━━ [${item.displayIndex}] ${item.nodeId} · ${item.label} `;
+            const pad = Math.max(0, HEADER_WIDTH - prefix.length);
+            return <Text key={item.id}>{prefix + "━".repeat(pad)}</Text>;
+          }
+          if (item.kind === "trace-line") {
+            return <Text key={item.id} dimColor>{`  trace: ${item.tracePath}`}</Text>;
+          }
+          if (item.kind === "body-line") {
+            return <BodyLineView key={item.id} line={item.line} />;
+          }
+          if (item.kind === "block-close") {
+            return (
+              <Box key={item.id} flexDirection="column" marginBottom={1}>
+                <BlockCloseView block={item.block} />
+              </Box>
+            );
+          }
+          return null;
         }}
       </Static>
       {liveForRender && (
-        <LiveFooter block={liveForRender} index={state.frozen.length + 1} />
+        <LiveFooter block={liveForRender} index={blockSeqRef.current} />
       )}
     </>
   );

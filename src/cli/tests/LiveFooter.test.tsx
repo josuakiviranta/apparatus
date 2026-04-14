@@ -32,28 +32,17 @@ describe("LiveFooter", () => {
     expect(frame).toContain("━━");
   });
 
-  it("shows trace path when present", () => {
+  it("does not render trace — trace is handled by PipelineApp Static", () => {
     const block = makeLive({
       tracePath: "/Users/josu/.claude/projects/-cwd/sid-a.jsonl",
     });
     const { lastFrame } = render(<LiveFooter block={block} index={1} />);
     const frame = lastFrame() ?? "";
-    expect(frame).toContain("trace:");
-    expect(frame).toContain("sid-a.jsonl");
+    expect(frame).not.toContain("trace:");
+    expect(frame).not.toContain("sid-a.jsonl");
   });
 
-  it("shows a placeholder trace line when kind is agent/interactive-agent and tracePath is absent", () => {
-    const block = makeLive({ tracePath: undefined });
-    const { lastFrame } = render(<LiveFooter block={block} index={1} />);
-    const frame = lastFrame() ?? "";
-    // A placeholder trace row must exist to keep line count stable
-    expect(frame).toMatch(/trace:/);
-    expect(frame).toContain("…");
-    // But it must NOT show a real path
-    expect(frame).not.toMatch(/\.jsonl/);
-  });
-
-  it("renders body lines using BodyLineView", () => {
+  it("does not render body lines — body is handled by PipelineApp Static", () => {
     const block = makeLive({
       body: [
         { kind: "text", role: "you", text: "summarize the repo" },
@@ -62,19 +51,9 @@ describe("LiveFooter", () => {
     });
     const { lastFrame } = render(<LiveFooter block={block} index={1} />);
     const frame = lastFrame() ?? "";
-    expect(frame).toContain("you:");
-    expect(frame).toContain("summarize the repo");
-    expect(frame).toContain("claude:");
-    expect(frame).toContain("ralph-cli has 4 layers");
-  });
-
-  it("indents body text lines with 2 spaces", () => {
-    const block = makeLive({
-      body: [{ kind: "text", role: "you", text: "hello" }],
-    });
-    const { lastFrame } = render(<LiveFooter block={block} index={1} />);
-    const frame = lastFrame() ?? "";
-    expect(frame).toMatch(/^  you:/m);
+    expect(frame).not.toContain("you:");
+    expect(frame).not.toContain("summarize the repo");
+    expect(frame).not.toContain("claude:");
   });
 
   it("renders status line with turn count and token stats", () => {
@@ -120,23 +99,14 @@ describe("LiveFooter", () => {
     expect(frame).toContain("turns");
   });
 
-  it("shows trace placeholder for agent kind before tracePath arrives", () => {
-    const block = makeAgentLive({ tracePath: undefined });
-    const { lastFrame } = render(<LiveFooter block={block} index={2} />);
-    const frame = lastFrame() ?? "";
-    expect(frame).toMatch(/trace:/);
-    expect(frame).toContain("…");
-    expect(frame).not.toMatch(/\.jsonl/);
-  });
-
-  it("shows real trace path for agent kind once tracePath is set", () => {
+  it("does not render trace for agent kind — trace is handled by PipelineApp Static", () => {
     const block = makeAgentLive({
       tracePath: "/Users/x/.claude/projects/-cwd/abc.jsonl",
     });
     const { lastFrame } = render(<LiveFooter block={block} index={2} />);
     const frame = lastFrame() ?? "";
-    expect(frame).toContain("trace:");
-    expect(frame).toContain("abc.jsonl");
+    expect(frame).not.toContain("trace:");
+    expect(frame).not.toContain("abc.jsonl");
   });
 
   it("does not show trace row for non-agent kinds (wait-human)", () => {

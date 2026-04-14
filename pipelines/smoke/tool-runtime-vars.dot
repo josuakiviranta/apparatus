@@ -1,0 +1,21 @@
+digraph tool_runtime_vars_smoke {
+  goal="Smoke test: tool node expands runtime context variables in tool_command"
+
+  start [shape=Mdiamond]
+
+  // Seed a context variable by printing a temp path (no trailing newline)
+  seed [
+    shape=parallelogram,
+    tool_command="printf '/tmp/ralph-smoke-tool-rm'"
+  ]
+
+  // Runtime variable expansion: $tool.output is set by the seed node above
+  delete_file [
+    type="tool",
+    tool_command="touch $tool.output && rm $tool.output && test ! -f $tool.output && echo 'runtime-var-expand: ok'"
+  ]
+
+  done [shape=Msquare]
+
+  start -> seed -> delete_file -> done
+}

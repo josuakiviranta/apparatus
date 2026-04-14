@@ -222,7 +222,11 @@ export class AgentHandler implements NodeHandler {
           };
         }
 
-        const parsed = JSON.parse(resultPayload);
+        // Claude sometimes outputs prose before the JSON object (e.g. in stream-json mode).
+        // Extract the first {...} block to tolerate that prefix.
+        const jsonMatch = resultPayload.match(/\{[\s\S]*\}/);
+        const jsonStr = jsonMatch ? jsonMatch[0] : resultPayload;
+        const parsed = JSON.parse(jsonStr);
         for (const [key, value] of Object.entries(parsed)) {
           structuredUpdates[key] = String(value);
         }

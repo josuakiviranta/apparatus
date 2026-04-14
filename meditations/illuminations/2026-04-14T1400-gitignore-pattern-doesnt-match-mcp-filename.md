@@ -1,7 +1,9 @@
 ---
 date: 2026-04-13
-status: open
+status: dispatched
 description: The gitignore entry added by appendMeditateGitignore uses `.mcp.ralph-*.json` (dots, "ralph" prefix) but agent.ts generates `.mcp-{name}-{timestamp}.json` (hyphens, agent-name prefix), so MCP config files are never gitignored and orphaned files show up as untracked in git.
+dispatched_at: 2026-04-14
+plan_path: docs/superpowers/specs/2026-04-14-mcp-gitignore-pattern-fix-design.md
 ---
 
 ## Core Idea

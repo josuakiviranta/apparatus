@@ -505,6 +505,41 @@ describe("AgentHandler", () => {
     }
   });
 
+  it("parses JSON from result field when Claude prefixes prose before JSON (stream-json mode)", async () => {
+    const schema = JSON.stringify({ type: "object", properties: { preferred_label: { type: "string" }, summary: { type: "string" } } });
+    const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-test-"));
+    const schemaDir = join(logsDir, "schemas");
+    mkdirSync(schemaDir, { recursive: true });
+    writeFileSync(join(schemaDir, "test.json"), schema);
+
+    mockResolve.mockReturnValue({ ...baseConfig });
+    // stream-json mode: structured_output is absent; result contains prose + JSON
+    const proseResult = 'All three claims verified. Here\'s the verdict:\n\n{"preferred_label":"true","summary":"gap confirmed"}';
+    const output = JSON.stringify([
+      { type: "result", result: proseResult },
+    ]);
+    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output });
+
+    const handler = new AgentHandler({
+      resolveAgent: mockResolve,
+      createAgent: () => ({ run: mockAgentRun, kill: mockAgentKill, config: {} } as any),
+    });
+
+    try {
+      const outcome = await handler.execute(
+        makeNode({ jsonSchemaFile: "schemas/test.json" } as any),
+        baseCtx(),
+        makeContext({ logsRoot: logsDir, cwd: logsDir, dotDir: logsDir }),
+      );
+
+      expect(outcome.status).toBe("success");
+      expect(outcome.preferredLabel).toBe("true");
+      expect(outcome.contextUpdates?.["summary"]).toBe("gap confirmed");
+    } finally {
+      rmSync(logsDir, { recursive: true, force: true });
+    }
+  });
+
   it("stops iteration when signal is aborted", async () => {
     mockResolve.mockReturnValue({ ...baseConfig });
     const ac = new AbortController();
