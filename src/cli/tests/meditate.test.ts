@@ -27,6 +27,7 @@ vi.mock("../lib/agent.js", () => ({
     kill: vi.fn(),
   })),
   validateAgentConfig: vi.fn((c) => c),
+  MCP_CONFIG_GLOB: ".mcp-*-*.json",
 }));
 
 vi.mock("../lib/agent-registry.js", () => ({
@@ -56,7 +57,6 @@ import {
   appendMeditateGitignore,
   runMeditationSession,
   meditateCommand,
-  meditateKillCommand,
 } from "../commands/meditate";
 
 let tmpDir: string;
@@ -104,10 +104,10 @@ describe("appendMeditateGitignore", () => {
     expect(count).toBe(1);
   });
 
-  it("adds .mcp.ralph-*.json to .gitignore", () => {
+  it("adds .mcp-*-*.json to .gitignore", () => {
     appendMeditateGitignore(tmpDir);
     const content = readFileSync(join(tmpDir, ".gitignore"), "utf8");
-    expect(content).toContain(".mcp.ralph-*.json");
+    expect(content).toContain(".mcp-*-*.json");
   });
 });
 

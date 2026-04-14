@@ -4,7 +4,7 @@ docs/superpowers/plans/
 .meditate.json
 .meditate.log
 .meditate.pid
-.mcp.ralph-*.json
+.mcp-*-*.json
 node-compile-cache/
 jiti/
 context-mode-guidance-*/

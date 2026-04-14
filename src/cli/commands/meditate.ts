@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from "fs";
 import { join, resolve } from "path";
 import { spawnSync } from "child_process";
-import { Agent } from "../lib/agent.js";
+import { Agent, MCP_CONFIG_GLOB } from "../lib/agent.js";
 import { resolveAgent } from "../lib/agent-registry.js";
 import { getIlluminationServerPath, getMetaMeditationsDir } from "../lib/assets.js";
 import { streamEvents } from "../lib/stream-formatter.js";
@@ -43,7 +43,7 @@ export function ensureMeditationDirs(projectFolder: string): void {
 }
 
 export function appendMeditateGitignore(projectFolder: string): void {
-  const entries = [".meditate.json", ".meditate.log", ".meditate.pid", ".mcp.ralph-*.json"];
+  const entries = [".meditate.json", ".meditate.log", ".meditate.pid", MCP_CONFIG_GLOB];
   const gitignorePath = join(projectFolder, ".gitignore");
   const existing = existsSync(gitignorePath) ? readFileSync(gitignorePath, "utf8") : "";
   const lines = existing.split("\n");
