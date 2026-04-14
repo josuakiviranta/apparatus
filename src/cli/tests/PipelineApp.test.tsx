@@ -144,6 +144,19 @@ describe("PipelineApp", () => {
     await flush();
     expect(onDoneCalls).toBe(1);
   });
+
+  it("renders trace path exactly once even when multiple trace-path events fire", async () => {
+    const { instance, cbs } = mount();
+    cbs.emit({ kind: "start", nodeId: "work", label: "agent", blockKind: "agent" });
+    // Claude CLI emits multiple system events with the same sessionId per session.
+    for (let i = 0; i < 7; i++) {
+      cbs.emit({ kind: "trace-path", sessionId: "abc123" });
+    }
+    await flush();
+    const frame = instance.lastFrame() ?? "";
+    const matches = (frame.match(/abc123/g) ?? []).length;
+    expect(matches).toBe(1);
+  });
 });
 
 function makeLiveBlock(overrides: Partial<LiveBlock> = {}): LiveBlock {
