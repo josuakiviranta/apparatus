@@ -128,6 +128,30 @@ describe("ParallelHandler", () => {
     expect(outcome.status).toBe("success");
     expect(outcome.contextUpdates?.["parallel.results"]).toBeDefined();
   });
+
+  it("serializes branch outcomes as JSON array", async () => {
+    const h = new ParallelHandler();
+    const node: Node = { id: "fan", shape: "component" };
+    const outcome = await h.execute(node, baseCtx(), makeContext({
+      branchOutcomes: { a: { status: "success" }, b: { status: "fail" } },
+    }));
+    const parsed = JSON.parse(outcome.contextUpdates!["parallel.results"] as string);
+    expect(parsed).toHaveLength(2);
+  });
+
+  it("handles empty branchOutcomes gracefully", async () => {
+    const h = new ParallelHandler();
+    const outcome = await h.execute({ id: "fan", shape: "component" }, baseCtx(), makeContext({ branchOutcomes: {} }));
+    expect(outcome.status).toBe("success");
+    expect(outcome.contextUpdates?.["parallel.results"]).toBe("[]");
+  });
+
+  it("handles undefined branchOutcomes (falls back to empty)", async () => {
+    const h = new ParallelHandler();
+    const outcome = await h.execute({ id: "fan", shape: "component" }, baseCtx(), makeContext());
+    expect(outcome.status).toBe("success");
+    expect(outcome.contextUpdates?.["parallel.results"]).toBe("[]");
+  });
 });
 
 describe("FanInHandler", () => {
@@ -151,6 +175,19 @@ describe("FanInHandler", () => {
     const outcome = await h.execute({ id: "join", shape: "tripleoctagon" }, ctx, makeContext());
     expect(outcome.status).toBe("fail");
   });
+
+  it("returns success for empty results (vacuous truth)", async () => {
+    const h = new FanInHandler();
+    const ctx = { values: { "parallel.results": "[]" } };
+    const outcome = await h.execute({ id: "join", shape: "tripleoctagon" }, ctx, makeContext());
+    expect(outcome.status).toBe("success");
+  });
+
+  it("returns success when parallel.results is missing", async () => {
+    const h = new FanInHandler();
+    const outcome = await h.execute({ id: "join", shape: "tripleoctagon" }, baseCtx(), makeContext());
+    expect(outcome.status).toBe("success");
+  });
 });
 
 describe("ManagerLoopHandler", () => {
@@ -162,6 +199,16 @@ describe("ManagerLoopHandler", () => {
     const node: Node = { id: "mgr", shape: "house" };
     const outcome = await h.execute(node, baseCtx(), makeContext());
     expect(outcome.status).toBe("success");
+    expect(outcome.contextUpdates).toEqual({ "stack.child.status": "success", "stack.child.outcome": "success" });
+  });
+
+  it("returns fail when child fails", async () => {
+    const fakeChild = vi.fn().mockResolvedValueOnce({ status: "fail" });
+    const h = new ManagerLoopHandler(fakeChild, { pollIntervalMs: 0, maxCycles: 10 });
+    const outcome = await h.execute({ id: "mgr", shape: "house" }, baseCtx(), makeContext());
+    expect(outcome.status).toBe("fail");
+    expect(outcome.failureReason).toBe("Child pipeline failed");
+    expect(outcome.contextUpdates).toEqual({ "stack.child.status": "fail", "stack.child.outcome": "fail" });
   });
 
   it("returns fail when max_cycles exceeded", async () => {
@@ -170,6 +217,15 @@ describe("ManagerLoopHandler", () => {
     const node: Node = { id: "mgr", shape: "house" };
     const outcome = await h.execute(node, baseCtx(), makeContext());
     expect(outcome.status).toBe("fail");
+    expect(outcome.failureReason).toContain("max_cycles");
     expect(fakeChild).toHaveBeenCalledTimes(3);
+  });
+
+  it("returns success immediately if child succeeds on first poll", async () => {
+    const fakeChild = vi.fn().mockResolvedValueOnce({ status: "success" });
+    const h = new ManagerLoopHandler(fakeChild, { pollIntervalMs: 0, maxCycles: 10 });
+    const outcome = await h.execute({ id: "mgr", shape: "house" }, baseCtx(), makeContext());
+    expect(outcome.status).toBe("success");
+    expect(fakeChild).toHaveBeenCalledTimes(1);
   });
 });

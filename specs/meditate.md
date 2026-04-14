@@ -9,7 +9,7 @@ Launches a sandboxed meditation Claude session.
 ### Startup Sequence
 
 1. Validate project folder exists; exit if missing
-2. Write PID lock file at `<project-folder>/.ralph-meditate.pid`
+2. Write PID lock file at `<project-folder>/.meditate.pid`
 3. Write per-PID MCP config for the illumination server
 4. Spawn Claude with strict `dontAsk` permissions:
    - `Read` — globally allowed
@@ -22,18 +22,18 @@ Claude can read any file in the project but can only write to `<project-folder>/
 
 ### MCP Integration
 
-The illumination server is spawned as a child process using stdio transport. It provides 5 MCP tools for reading the project, writing illuminations, and accessing meta-meditation lenses. See [mcp-illumination.md](mcp-illumination.md) for details.
+The illumination server is spawned as a child process using stdio transport. It provides 10 MCP tools for reading the project, writing illuminations, managing illumination lifecycle, and accessing meta-meditation lenses. See [mcp-illumination.md](mcp-illumination.md) for details.
 
 ### PID Management
 
-- Lock file: `<project-folder>/.ralph-meditate.pid`
+- Lock file: `<project-folder>/.meditate.pid`
 - Contains the meditation session's process ID
-- Used by `ralph meditate kill <folder>` to send SIGTERM
 - Prevents duplicate sessions on the same project
+- Stopping is handled via the heartbeat system (`ralph heartbeat stop meditate:<project>`) or Ctrl-C
 
-### Stopping
+### Cleanup
 
-`ralph meditate kill <project-folder>` reads the PID from the lock file and sends SIGTERM.
+On exit, the meditate command removes: `.meditate.json`, `.meditate.log`, `.meditate.pid`, and MCP config files (matching `.mcp-*-*.json` glob).
 
 ## `ralph meditate create <project-folder>`
 

@@ -19,7 +19,7 @@ Scenarios are discovered from `<project-folder>/scenario-tests/*.md`. Each `.md`
 ## Execution Flow
 
 1. Scan `scenario-tests/` for `.md` files
-2. **Without `--all`:** Present interactive multi-select (via @clack/prompts) for the user to choose which scenarios to run
+2. **Without `--all`:** Present interactive selection (via readline) for the user to choose which scenarios to run
 3. **With `--all`:** Run every discovered scenario
 4. For each selected scenario:
    - Run as an isolated non-interactive Claude session

@@ -16,7 +16,7 @@ Validates `projectRoot` exists; exits with code 1 if missing.
 - Version: `"1.0.0"`
 - Transport: `StdioServerTransport` (stdin/stdout)
 
-## MCP Tools (7)
+## MCP Tools (10)
 
 ### `write_illumination`
 
@@ -78,6 +78,27 @@ Reads a specific meditation lens file.
 - **Params:** `{ filename: string }`
 - **Reads from** `meditationsDir`
 
+### `mark_implemented`
+
+Marks an illumination as implemented. Valid from status `open` or `dispatched`.
+
+- **Params:** `{ filename: string }`
+- **Modifies** frontmatter `status` field in the illumination file
+
+### `mark_dispatched`
+
+Marks an illumination as dispatched after a plan has been generated. Valid only from status `open`.
+
+- **Params:** `{ filename: string, plan_path: string }`
+- **Modifies** frontmatter `status` and `plan_path` fields in the illumination file
+
+### `mark_archived`
+
+Archives an illumination. Moves the file to an `archive/` subdirectory. Valid from any status except `archived`.
+
+- **Params:** `{ filename: string, reason: string }`
+- **Moves** file to `<projectRoot>/meditations/illuminations/archive/<filename>`
+
 ## Path Restrictions
 
 | Tool | Scope |
@@ -89,6 +110,9 @@ Reads a specific meditation lens file.
 | `project_tree` | Anywhere inside `projectRoot` |
 | `list_meta_meditations` | `meditationsDir` (read-only) |
 | `read_meta_meditation` | `meditationsDir` (read-only) |
+| `mark_implemented` | `<projectRoot>/meditations/illuminations/` (modify frontmatter) |
+| `mark_dispatched` | `<projectRoot>/meditations/illuminations/` (modify frontmatter) |
+| `mark_archived` | `<projectRoot>/meditations/illuminations/` → `archive/` (move) |
 
 ## Dependencies
 
