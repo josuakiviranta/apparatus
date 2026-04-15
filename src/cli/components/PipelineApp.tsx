@@ -6,6 +6,8 @@ import { BodyLineView } from "./BlockView.js";
 import { LiveFooter, type LiveBlockWithInput } from "./LiveFooter.js";
 import { parseSlashCommand } from "../lib/slash-commands.js";
 import { claudeTracePath } from "../lib/claudeTracePath.js";
+import type { StreamEvent } from "../lib/stream-formatter.js";
+import { StreamLine } from "./ui.js";
 
 export interface PipelineAppCallbacks {
   emit: (event: NodeEvent) => void;
@@ -27,6 +29,7 @@ type StaticItem =
   | { kind: "block-open"; id: string; displayIndex: number; nodeId: string; label: string }
   | { kind: "trace-line"; id: string; tracePath: string }
   | { kind: "body-line";  id: string; line: BodyLine }
+  | { kind: "stream-event"; id: string; event: StreamEvent }
   | { kind: "block-close"; id: string; block: Block };
 
 function BlockCloseView({ block }: { block: Block }) {
@@ -130,6 +133,12 @@ export function PipelineApp({ pipelineName, pid, goal, nodes, onReady }: Props) 
             { kind: "body-line", id: `${liveBlockIdRef.current}-body-${i}`,
               line: { kind: "tool_use", name: event.name, summary: event.summary } },
           ]);
+        } else if (event.kind === "stream-line" && liveBlockIdRef.current) {
+          const i = liveBodyCountRef.current++;
+          setStaticItems(prev => [
+            ...prev,
+            { kind: "stream-event", id: `${liveBlockIdRef.current}-body-${i}`, event: event.event },
+          ]);
         }
         dispatch(event);
       },
@@ -215,6 +224,9 @@ export function PipelineApp({ pipelineName, pid, goal, nodes, onReady }: Props) 
           }
           if (item.kind === "body-line") {
             return <BodyLineView key={item.id} line={item.line} />;
+          }
+          if (item.kind === "stream-event") {
+            return <StreamLine key={item.id} event={item.event} />;
           }
           if (item.kind === "block-close") {
             return (
