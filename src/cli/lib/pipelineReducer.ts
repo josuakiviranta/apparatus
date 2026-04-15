@@ -79,6 +79,9 @@ export function pipelineReducer(state: PipelineState, event: NodeEvent): Pipelin
       };
     }
 
+    case "stream-line":
+      return state;
+
     case "end": {
       if (!state.live) return state;
       const filled = fillStats(state.live, event.stats);

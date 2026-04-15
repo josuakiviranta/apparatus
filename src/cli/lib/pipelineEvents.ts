@@ -1,5 +1,6 @@
 import type { ChildHandle } from "./agent.js";
 import type { BlockKind } from "./classifyNode.js";
+import type { StreamEvent } from "./stream-formatter.js";
 
 export type BodyLine =
   | { kind: "text"; role: "you" | "claude" | "system"; text: string }
@@ -25,6 +26,7 @@ export type NodeEvent =
   | { kind: "stats"; tokensIn: number; tokensOut: number }
   | { kind: "interactive-ready"; child: ChildHandle; onDone: () => void }
   | { kind: "gate-ready"; options: string[]; onChoose: (choice: string) => void }
+  | { kind: "stream-line"; event: StreamEvent }
   | { kind: "end"; outcome: Outcome; stats?: Partial<Stats> };
 
 export type Block = {

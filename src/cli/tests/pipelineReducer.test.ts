@@ -244,6 +244,17 @@ describe("pipelineReducer — trace-path derivation", () => {
   });
 });
 
+describe("pipelineReducer — stream-line", () => {
+  it("stream-line event is a no-op (does not mutate state)", () => {
+    let s: PipelineState = pipelineReducer(initialPipelineState, {
+      kind: "start", nodeId: "run", label: "agent", blockKind: "agent",
+    });
+    const before = s;
+    s = pipelineReducer(s, { kind: "stream-line", event: { type: "main_agent_open" } });
+    expect(s).toBe(before); // same reference — no mutation
+  });
+});
+
 describe("pipelineReducer — gate-ready", () => {
   it("stores options and onChoose on live.gate", () => {
     let s = pipelineReducer(initialPipelineState, {
