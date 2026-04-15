@@ -8,6 +8,7 @@ import { InkInterviewer } from "../../attractor/interviewer/ink.js";
 import { AutoApproveInterviewer } from "../../attractor/interviewer/auto-approve.js";
 import { getPipelinesDir, resolvePipelineArg, isNameShorthand } from "../lib/pipeline-resolver.js";
 import { spawn, spawnSync } from "child_process";
+import { PassThrough } from "stream";
 import { streamEvents, parseStreamJsonEvents } from "../lib/stream-formatter.js";
 import { getPipelineCreatePromptPath } from "../lib/assets.js";
 import * as output from "../lib/output.js";
@@ -227,9 +228,24 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
       },
 
       onStdout: async (stdout) => {
-        for await (const raw of parseStreamJsonEvents(stdout)) {
-          for (const nev of parseClaudeEvent(raw)) emit(nev);
-        }
+        const statsStream = new PassThrough();
+        const renderStream = new PassThrough();
+        stdout.pipe(statsStream);
+        stdout.pipe(renderStream);
+        await Promise.all([
+          (async () => {
+            for await (const raw of parseStreamJsonEvents(statsStream)) {
+              for (const nev of parseClaudeEvent(raw)) {
+                if (nev.kind === "stats" || nev.kind === "trace-path") emit(nev);
+              }
+            }
+          })(),
+          (async () => {
+            for await (const ev of streamEvents(renderStream)) {
+              emit({ kind: "stream-line", event: ev });
+            }
+          })(),
+        ]);
       },
     });
 
