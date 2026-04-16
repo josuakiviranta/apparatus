@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Box, Text, useApp, Static } from "ink";
 import InkSpinner from "ink-spinner";
 import type { StreamEvent } from "../lib/stream-formatter.js";
+import { renderMarkdown } from "../lib/render-markdown.js";
 
 export function Step({ text }: { text: string }) {
   return <Text color="cyan">❯ {text}</Text>;
@@ -50,7 +51,7 @@ export function StreamLine({ event }: { event: StreamEvent }) {
     case "subagent_close":
       return <Text color="yellow">◀ SUBAGENT</Text>;
     case "text":
-      return <Text>{event.indented ? "  " : ""}{event.content}</Text>;
+      return <Text>{event.indented ? "  " : ""}{renderMarkdown(event.content)}</Text>;
     case "tool":
       return <Text dimColor>{event.indented ? "  " : ""}→ [{event.name}] {event.label}</Text>;
     case "ctx":
