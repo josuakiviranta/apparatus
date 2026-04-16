@@ -554,3 +554,96 @@ export async function pipelineCreateCommand(name: string, opts: PipelineCreateOp
   const exitCode = await pipelineValidateCommand(dotPath);
   process.exit(exitCode);
 }
+
+export interface PipelineRefineOptions {
+  project?: string;
+}
+
+export async function pipelineRefineCommand(name: string, opts: PipelineRefineOptions = {}): Promise<void> {
+  const which = spawnSync("which", ["claude"], { encoding: "utf8" });
+  if (which.status !== 0) {
+    await output.error("Error: claude CLI not found.\nInstall it: npm install -g @anthropic-ai/claude-code");
+    process.exit(1);
+  }
+
+  const project = resolve(opts.project ?? process.cwd());
+  const pipelinesDir = getPipelinesDir(project);
+  const dotPath = join(pipelinesDir, `${name}.dot`);
+
+  // Validate name via resolvePipelineArg (same rules as create)
+  try {
+    resolvePipelineArg(name, project);
+  } catch (err) {
+    await output.error((err as Error).message);
+    process.exit(1);
+  }
+
+  // Must exist (inverse of create's conflict check)
+  if (!existsSync(dotPath)) {
+    await output.error(
+      `Pipeline not found: ${dotPath}\n` +
+        `Use 'ralph pipeline create ${name}' to create it.`,
+    );
+    process.exit(1);
+  }
+
+  const existingContent = readFileSync(dotPath, "utf8");
+  const relativePath = dotPath.startsWith(project + "/") ? dotPath.slice(project.length + 1) : dotPath;
+
+  const basePrompt = composeCreatePrompt(project);
+  const refineFraming =
+    `Here is the current pipeline workflow at ${relativePath}:\n\n` +
+    "```dot\n" +
+    existingContent +
+    (existingContent.endsWith("\n") ? "" : "\n") +
+    "```\n\n" +
+    `The user wants to refine it. Discuss what they want to change, propose targeted edits ` +
+    `to the existing graph (do not redesign from scratch), then write the updated version back ` +
+    `to ${dotPath}. Preserve node IDs and edge labels that the user does not explicitly want ` +
+    `changed — downstream tooling routes on edge labels.`;
+
+  const trigger = `${basePrompt}\n\n---\n${refineFraming}`;
+
+  await output.step(`Refining pipeline: ${name}`);
+  await output.step(`Target: ${dotPath}`);
+
+  // Phase 1: non-interactive kickoff to obtain session ID
+  let sessionId: string | null = null;
+  const child = spawn(
+    "claude",
+    ["-p", trigger, "--output-format", "stream-json", "--dangerously-skip-permissions"],
+    { cwd: project, env: process.env, stdio: ["ignore", "pipe", "pipe"] },
+  );
+  const exitPromise = new Promise<void>((res) => child.on("close", () => res()));
+  await output.stream(
+    streamEvents(child.stdout as NodeJS.ReadableStream, {
+      onSessionId: (id) => { sessionId = id; },
+    }),
+  );
+  await exitPromise;
+
+  // Phase 2: interactive resume
+  await output.step("━━━ Launching interactive session ━━━");
+  const resumeArgs = [
+    "--dangerously-skip-permissions",
+    ...(sessionId ? ["--resume", sessionId] : []),
+  ];
+  const result = spawnSync("claude", resumeArgs, {
+    cwd: project,
+    stdio: "inherit",
+    env: process.env,
+  });
+
+  if ((result.status ?? 1) !== 0) {
+    process.exit(result.status ?? 1);
+  }
+
+  if (!existsSync(dotPath)) {
+    await output.warn(`Session ended but ${dotPath} was removed.`);
+    process.exit(1);
+  }
+
+  await output.step("Validating pipeline...");
+  const exitCode = await pipelineValidateCommand(dotPath);
+  process.exit(exitCode);
+}

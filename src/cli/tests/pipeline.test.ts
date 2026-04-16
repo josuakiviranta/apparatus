@@ -49,7 +49,13 @@ vi.mock("../lib/stream-formatter.js", () => ({
   parseStreamJsonEvents: vi.fn(async function* () {}),
 }));
 
-import { pipelineRunCommand, pipelineValidateCommand, pipelineListCommand, pipelineCreateCommand } from "../commands/pipeline.js";
+import {
+  pipelineRunCommand,
+  pipelineValidateCommand,
+  pipelineListCommand,
+  pipelineCreateCommand,
+  pipelineRefineCommand,
+} from "../commands/pipeline.js";
 import * as childProcess from "child_process";
 import { composeCreatePrompt } from "../lib/pipeline-create-prompt.js";
 import * as engine from "../../attractor/core/engine.js";
@@ -318,5 +324,127 @@ describe("pipelineCreateCommand", () => {
     expect(childProcess.spawnSync).toHaveBeenCalled();
     exitSpy.mockRestore();
     (childProcess.spawnSync as ReturnType<typeof vi.fn>).mockImplementation(() => ({ status: 0 }));
+  });
+});
+
+describe("pipelineRefineCommand", () => {
+  let dir: string;
+  beforeEach(() => {
+    vi.clearAllMocks();
+    dir = mkdtempSync(join(tmpdir(), "ralph-pipeline-refine-"));
+    (childProcess.spawnSync as ReturnType<typeof vi.fn>).mockImplementation(() => ({ status: 0 }));
+  });
+  afterEach(() => { rmSync(dir, { recursive: true }); });
+
+  it("errors if claude CLI not found", async () => {
+    (childProcess.spawnSync as ReturnType<typeof vi.fn>).mockReturnValueOnce({ status: 1 });
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("exit"); });
+    await expect(
+      pipelineRefineCommand("review", { project: dir }),
+    ).rejects.toThrow();
+    expect(out.error).toHaveBeenCalledWith(expect.stringContaining("claude CLI not found"));
+    exitSpy.mockRestore();
+  });
+
+  it("errors when pipeline does not exist and points at create", async () => {
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("exit"); });
+    await expect(
+      pipelineRefineCommand("review", { project: dir }),
+    ).rejects.toThrow();
+    expect(out.error).toHaveBeenCalledWith(expect.stringContaining("Pipeline not found"));
+    expect(out.error).toHaveBeenCalledWith(expect.stringContaining("ralph pipeline create review"));
+    exitSpy.mockRestore();
+  });
+
+  it("errors on invalid pipeline name", async () => {
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("exit"); });
+    await expect(
+      pipelineRefineCommand("bad name!", { project: dir }),
+    ).rejects.toThrow();
+    expect(out.error).toHaveBeenCalled();
+    exitSpy.mockRestore();
+  });
+
+  it("injects existing .dot content verbatim into the kickoff trigger", async () => {
+    mkdirSync(join(dir, "pipelines"));
+    const dotPath = join(dir, "pipelines", "review.dot");
+    writeFileSync(dotPath, VALID_DOT);
+    (composeCreatePrompt as ReturnType<typeof vi.fn>).mockReturnValue("# Base prompt");
+
+    const spawnMock = childProcess.spawn as ReturnType<typeof vi.fn>;
+    spawnMock.mockClear();
+
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("exit"); });
+    await expect(
+      pipelineRefineCommand("review", { project: dir }),
+    ).rejects.toThrow("exit");
+    exitSpy.mockRestore();
+
+    expect(spawnMock).toHaveBeenCalled();
+    const args = spawnMock.mock.calls[0][1] as string[];
+    const trigger = args[1];
+    expect(trigger).toContain("# Base prompt");
+    expect(trigger).toContain("Here is the current pipeline");
+    expect(trigger).toContain("```dot");
+    expect(trigger).toContain(VALID_DOT);
+    expect(trigger).toContain(dotPath);
+  });
+
+  it("runs validate after a clean session exit", async () => {
+    mkdirSync(join(dir, "pipelines"));
+    const dotPath = join(dir, "pipelines", "review.dot");
+    writeFileSync(dotPath, VALID_DOT);
+
+    (childProcess.spawnSync as ReturnType<typeof vi.fn>).mockImplementation(() => ({ status: 0 }));
+
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(((code?: number | string | null) => {
+      throw new Error(`exit:${code ?? 0}`);
+    }) as (code?: number | string | null | undefined) => never);
+    await expect(
+      pipelineRefineCommand("review", { project: dir }),
+    ).rejects.toThrow("exit:0");
+    expect(out.success).toHaveBeenCalledWith(expect.stringContaining("Pipeline valid"));
+    exitSpy.mockRestore();
+  });
+
+  it("warns and exits non-zero if the file is gone after a clean session", async () => {
+    mkdirSync(join(dir, "pipelines"));
+    const dotPath = join(dir, "pipelines", "review.dot");
+    writeFileSync(dotPath, VALID_DOT);
+
+    (childProcess.spawnSync as ReturnType<typeof vi.fn>).mockImplementation((cmd: string) => {
+      if (cmd === "claude") rmSync(dotPath);
+      return { status: 0 };
+    });
+
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(((code?: number | string | null) => {
+      throw new Error(`exit:${code ?? 0}`);
+    }) as (code?: number | string | null | undefined) => never);
+    await expect(
+      pipelineRefineCommand("review", { project: dir }),
+    ).rejects.toThrow("exit:1");
+    expect(out.warn).toHaveBeenCalledWith(expect.stringContaining("was removed"));
+    exitSpy.mockRestore();
+  });
+
+  it("exits non-zero without validating when claude resume returns non-zero", async () => {
+    mkdirSync(join(dir, "pipelines"));
+    const dotPath = join(dir, "pipelines", "review.dot");
+    writeFileSync(dotPath, VALID_DOT);
+
+    let nthCall = 0;
+    (childProcess.spawnSync as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      nthCall += 1;
+      return nthCall === 1 ? { status: 0 } : { status: 2 };
+    });
+
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(((code?: number | string | null) => {
+      throw new Error(`exit:${code ?? 0}`);
+    }) as (code?: number | string | null | undefined) => never);
+    await expect(
+      pipelineRefineCommand("review", { project: dir }),
+    ).rejects.toThrow("exit:2");
+    expect(out.success).not.toHaveBeenCalledWith(expect.stringContaining("Pipeline valid"));
+    exitSpy.mockRestore();
   });
 });
