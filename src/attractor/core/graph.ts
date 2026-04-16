@@ -307,6 +307,7 @@ export function validateGraph(graph: Graph): Diagnostic[] {
 
   // variable_coverage — warn when a $variable may not be defined on all paths
   const RESERVED_VARS = new Set(["goal", "project", "run_id"]);
+  const callerInputs = new Set(graph.inputs ?? []);
   const VAR_RE = /\$([a-zA-Z_][\w.]*)/g;
 
   // Handler-type implicit productions
@@ -383,6 +384,7 @@ export function validateGraph(graph: Graph): Diagnostic[] {
 
       for (const varName of vars) {
         if (RESERVED_VARS.has(varName)) continue;
+        if (callerInputs.has(varName)) continue;
         if (hasDefault(consumer, varName)) continue;
 
         // Find all producer nodes for this variable
