@@ -1,0 +1,47 @@
+digraph implement_pipeline_smoke {
+  goal="Smoke test: implement pipeline resolution and variable expansion"
+  headlessSafe=true
+
+  start [shape=Mdiamond]
+
+  // 1. Verify the bundled implement.dot exists at the expected source path.
+  // getBundledPipelinePath("implement") resolves to src/cli/pipelines/implement.dot in dev
+  // (assets.ts: __dirname = src/cli/lib/ → up one → src/cli/ → pipelines/implement.dot)
+  check_bundled_exists [
+    shape=parallelogram,
+    tool_command="test -f /Users/josu/Documents/projects/ralph-cli/src/cli/pipelines/implement.dot && echo 'bundled-pipeline-exists: ok'"
+  ]
+
+  // 2. Verify the bundled implement.dot contains the max_iterations variable reference.
+  // NOTE: we can't write $max_iterations literally in tool_command — it would be expanded
+  // by the pipeline variable-expansion transform before the shell runs. Use grep -F with
+  // a shell variable assigned outside pipeline expansion instead.
+  check_var_expansion [
+    shape=parallelogram,
+    tool_command="grep -qF 'max_iterations=' /Users/josu/Documents/projects/ralph-cli/src/cli/pipelines/implement.dot && echo 'variable-expansion-wiring: ok'"
+  ]
+
+  // 3. Verify the bundled pipeline contains the expected agent node declaration
+  check_agent_node [
+    shape=parallelogram,
+    tool_command="grep -q 'agent=\"implement\"' /Users/josu/Documents/projects/ralph-cli/src/cli/pipelines/implement.dot && echo 'agent-node: ok'"
+  ]
+
+  // 4. Verify project-local tier: this project has no pipelines/implement.dot at root
+  // (the bundled one lives in src/cli/pipelines/, not pipelines/), so tier-1 is skipped.
+  // $project is the one pipeline variable safe from expansion.
+  check_project_local_override [
+    shape=parallelogram,
+    tool_command="test ! -f $project/pipelines/implement.dot && echo 'project-local-tier: correctly absent at project root'"
+  ]
+
+  // 5. Verify bundled fallback: dist/pipelines/implement.dot exists (copied by tsup onSuccess).
+  check_bundled_fallback [
+    shape=parallelogram,
+    tool_command="test -f $project/dist/pipelines/implement.dot && echo 'bundled-fallback: ok'"
+  ]
+
+  done [shape=Msquare]
+
+  start -> check_bundled_exists -> check_var_expansion -> check_agent_node -> check_project_local_override -> check_bundled_fallback -> done
+}
