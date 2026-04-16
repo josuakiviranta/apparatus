@@ -19,7 +19,7 @@ export type Outcome = {
 };
 
 export type NodeEvent =
-  | { kind: "start"; nodeId: string; label: string; blockKind: BlockKind; nodeReceiveId: string; hasContext: boolean }
+  | { kind: "start"; nodeId: string; label: string; blockKind: BlockKind; nodeReceiveId?: string; hasContext?: boolean }
   | { kind: "trace-path"; sessionId: string }
   | { kind: "text"; role: "you" | "claude" | "system"; text: string }
   | { kind: "tool_use"; name: string; summary: string }

@@ -111,17 +111,19 @@ export function PipelineApp({ pipelineName, pid, goal, nodes, runId, tracePath, 
           liveBodyCountRef.current = 0;
           traceAppendedRef.current = false;
           const displayIndex = blockSeqRef.current;
-          setStaticItems(prev => [
-            ...prev,
+          const newItems: StaticItem[] = [
             { kind: "block-open", id, displayIndex, nodeId: event.nodeId, label: event.label },
-            {
+          ];
+          if (event.nodeReceiveId !== undefined) {
+            newItems.push({
               kind: "received-context",
               id: `${id}-ctx`,
               nodeReceiveId: event.nodeReceiveId,
               runId,
-              hasContext: event.hasContext,
-            },
-          ]);
+              hasContext: event.hasContext ?? false,
+            });
+          }
+          setStaticItems(prev => [...prev, ...newItems]);
         } else if (event.kind === "trace-path" && liveBlockIdRef.current && !traceAppendedRef.current) {
           traceAppendedRef.current = true;
           const tracePath = claudeTracePath(event.sessionId);
