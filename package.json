@@ -26,6 +26,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@types/marked-terminal": "^6.1.1",
     "@types/node": "^20.0.0",
     "@types/react": "^19.2.14",
     "ink-testing-library": "^4.0.0",
