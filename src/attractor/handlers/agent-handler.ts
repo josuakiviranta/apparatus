@@ -143,7 +143,7 @@ export class AgentHandler implements NodeHandler {
     const parsedIter = typeof rawIter === "string" ? parseInt(rawIter, 10)
                      : typeof rawIter === "number"  ? rawIter
                      : undefined;
-    const maxIterations = parsedIter == null || isNaN(parsedIter) ? 1
+    const maxIterations = parsedIter == null || isNaN(parsedIter) || parsedIter < 0 ? 1
                         : parsedIter === 0 ? Infinity
                         : parsedIter;
 
