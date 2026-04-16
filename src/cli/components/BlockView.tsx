@@ -1,6 +1,7 @@
 import React from "react";
 import { Box, Text } from "ink";
 import type { Block, BodyLine } from "../lib/pipelineEvents.js";
+import { renderMarkdown } from "../lib/render-markdown.js";
 
 const HEADER_WIDTH = 80;
 
@@ -17,7 +18,7 @@ export function BodyLineView({ line }: { line: BodyLine }) {
     return (
       <Box marginLeft={2}>
         <Text>
-          <Text bold color={roleColor(line.role)}>{line.role}:</Text> {line.text}
+          <Text bold color={roleColor(line.role)}>{line.role}:</Text> {renderMarkdown(line.text)}
         </Text>
       </Box>
     );
