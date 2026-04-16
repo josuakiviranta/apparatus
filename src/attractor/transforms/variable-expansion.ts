@@ -66,6 +66,7 @@ export function variableExpansionTransform(graph: Graph, vars: { project?: strin
       const n = { ...node };
       if (n.prompt) n.prompt = expand(n.prompt);
       if (n.toolCommand) n.toolCommand = expand(n.toolCommand);
+      if (typeof n.maxIterations === "string") n.maxIterations = expand(n.maxIterations);
       return [id, n];
     })
   );
