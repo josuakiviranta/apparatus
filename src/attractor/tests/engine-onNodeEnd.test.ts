@@ -10,7 +10,8 @@ describe("engine onNodeEnd callback", () => {
   it("has _willRetry gate around onNodeEnd invocation (source-level contract)", async () => {
     const src = await readFile(join(__dirname, "../core/engine.ts"), "utf8");
     expect(src).toMatch(/_willRetry/);
-    expect(src).toMatch(/if \(!_willRetry\)\s*\{\s*opts\.onNodeEnd/);
+    // _willRetry gate must exist and opts.onNodeEnd must appear after it
+    expect(src.indexOf("if (!_willRetry)")).toBeLessThan(src.indexOf("opts.onNodeEnd?."));
   });
 
   it("fires onNodeEnd after each handler resolves with its outcome", async () => {
