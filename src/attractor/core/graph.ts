@@ -95,6 +95,20 @@ function applyStylesheet(
   return { ...resolved, ...node };
 }
 
+function parseInputsAttr(raw: unknown): string[] | undefined {
+  if (typeof raw !== "string") return undefined;
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const part of raw.split(",")) {
+    const name = part.trim();
+    if (!name) continue;
+    if (seen.has(name)) continue;
+    seen.add(name);
+    out.push(name);
+  }
+  return out.length > 0 ? out : undefined;
+}
+
 export function parseDot(src: string): Graph {
   src = stripComments(src);
 
@@ -198,6 +212,7 @@ export function parseDot(src: string): Graph {
     retryTarget: graphAttrs["retryTarget"] as string | undefined,
     fallbackRetryTarget: graphAttrs["fallbackRetryTarget"] as string | undefined,
     headlessSafe: graphAttrs["headlessSafe"] as boolean | undefined,
+    inputs: parseInputsAttr(graphAttrs["inputs"]),
     nodes,
     edges,
   };

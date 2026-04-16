@@ -602,3 +602,48 @@ describe("validateGraph — variable_coverage", () => {
     expect(warnings).toHaveLength(0);
   });
 });
+
+describe("parseDot inputs= attribute", () => {
+  it("parses comma-separated names into graph.inputs", () => {
+    const src = `digraph p {
+      inputs="illumination_path, model, output_dir"
+      start [shape=Mdiamond]
+      done [shape=Msquare]
+      start -> done
+    }`;
+    const g = parseDot(src);
+    expect(g.inputs).toEqual(["illumination_path", "model", "output_dir"]);
+  });
+
+  it("trims whitespace and ignores empty entries", () => {
+    const src = `digraph p {
+      inputs=" a ,, b , "
+      start [shape=Mdiamond]
+      done [shape=Msquare]
+      start -> done
+    }`;
+    const g = parseDot(src);
+    expect(g.inputs).toEqual(["a", "b"]);
+  });
+
+  it("deduplicates names, preserving first occurrence order", () => {
+    const src = `digraph p {
+      inputs="a, b, a"
+      start [shape=Mdiamond]
+      done [shape=Msquare]
+      start -> done
+    }`;
+    const g = parseDot(src);
+    expect(g.inputs).toEqual(["a", "b"]);
+  });
+
+  it("leaves graph.inputs undefined when attribute absent", () => {
+    const src = `digraph p {
+      start [shape=Mdiamond]
+      done [shape=Msquare]
+      start -> done
+    }`;
+    const g = parseDot(src);
+    expect(g.inputs).toBeUndefined();
+  });
+});
