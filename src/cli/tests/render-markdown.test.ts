@@ -5,7 +5,7 @@ describe("renderMarkdown", () => {
   it("converts bold syntax to ANSI bold", () => {
     const result = renderMarkdown("**bold text**");
     expect(result).not.toContain("**");
-    expect(result.length).toBeGreaterThan(0);
+    expect(result).toContain("bold text");  // markdown stripped, underlying text preserved
   });
 
   it("converts heading syntax — no literal # in output", () => {
