@@ -18,7 +18,7 @@ import { getPipelinesDir, resolvePipelineArg, isNameShorthand } from "../lib/pip
 import { spawn, spawnSync } from "child_process";
 import { PassThrough } from "stream";
 import { streamEvents, parseStreamJsonEvents } from "../lib/stream-formatter.js";
-import { getPipelineCreatePromptPath } from "../lib/assets.js";
+import { composeCreatePrompt } from "../lib/pipeline-create-prompt.js";
 import * as output from "../lib/output.js";
 import { renderPipelineApp } from "../components/PipelineApp.js";
 import { classifyNode } from "../lib/classifyNode.js";
@@ -500,9 +500,8 @@ export async function pipelineCreateCommand(name: string, opts: PipelineCreateOp
     }
   }
 
-  // Read prompt
-  const promptPath = getPipelineCreatePromptPath();
-  const promptContent = readFileSync(promptPath, "utf8");
+  // Read prompt (with dynamically injected project agents)
+  const promptContent = composeCreatePrompt(project);
 
   const trigger = `${promptContent}\n\n---\nCreate a new pipeline named "${name}". Write it to: ${dotPath}`;
 

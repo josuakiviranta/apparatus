@@ -42,6 +42,9 @@ vi.mock("../lib/assets.js", () => ({
   getPipelineCreatePromptPath: vi.fn(() => "/fake/PROMPT_pipeline_create.md"),
   getBundledPipelinePath: vi.fn((name: string) => `/fake/pipelines/${name}.dot`),
 }));
+vi.mock("../lib/pipeline-create-prompt.js", () => ({
+  composeCreatePrompt: vi.fn().mockReturnValue("# Test prompt"),
+}));
 vi.mock("../lib/stream-formatter.js", () => ({
   streamEvents: vi.fn(async function* () {}),
   parseStreamJsonEvents: vi.fn(async function* () {}),
@@ -49,7 +52,7 @@ vi.mock("../lib/stream-formatter.js", () => ({
 
 import { pipelineRunCommand, pipelineValidateCommand, pipelineListCommand, pipelineCreateCommand } from "../commands/pipeline.js";
 import * as childProcess from "child_process";
-import { getPipelineCreatePromptPath } from "../lib/assets.js";
+import { composeCreatePrompt } from "../lib/pipeline-create-prompt.js";
 import * as engine from "../../attractor/core/engine.js";
 import * as out from "../lib/output.js";
 
@@ -290,9 +293,7 @@ describe("pipelineCreateCommand", () => {
   });
 
   it("creates pipelines/ directory if missing and spawns claude", async () => {
-    const promptFile = join(dir, "fake-prompt.md");
-    writeFileSync(promptFile, "# Fake prompt");
-    (getPipelineCreatePromptPath as ReturnType<typeof vi.fn>).mockReturnValue(promptFile);
+    (composeCreatePrompt as ReturnType<typeof vi.fn>).mockReturnValue("# Fake prompt");
     const dotPath = join(dir, "pipelines", "review.dot");
     // Mock spawnSync: first call is `which claude` (just pass), second is the actual claude spawn
     (childProcess.spawnSync as ReturnType<typeof vi.fn>).mockImplementation((cmd: string) => {
