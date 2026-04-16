@@ -19,10 +19,10 @@ Opens an interactive Claude session in the project folder for planning/spec writ
 Uses `PROMPT_plan.md` as the system prompt.
 
 ```bash
-ralph implement <project-folder> [--max N]
+ralph implement <project-folder> [--max N] [--model <name>]
 ```
 Runs the agentic build loop. Claude iterates, commits, and pushes changes until done (or `N` iterations).
-Uses `PROMPT_build.md` as the loop prompt.
+Uses `PROMPT_build.md` as the loop prompt. `--model` overrides the LLM model for the session.
 
 Each agent turn is annotated with:
 - `→ [read] path`, `→ [write] path`, `→ [edit] path` — file operations
@@ -34,6 +34,52 @@ Each agent turn is annotated with:
 ralph <project-folder>
 ```
 Shorthand for `implement`.
+
+```bash
+ralph new <project-name>
+```
+Scaffold a new ralph project in `./<project-name>/`. Creates `AGENTS.md`, `IMPLEMENTATION_PLAN.md`, prompt files, `specs/`, and `src/tests/` directories, runs `git init -b main`, then launches an interactive Claude kickoff session to populate `README.md` and initial specs.
+
+```bash
+ralph meditate <project-folder> [--steer <text>]
+```
+Runs a meditate session against the project's meditations. `--steer` injects an initial steering message at session start.
+
+```bash
+ralph run-scenarios <project-folder> [--all]
+```
+Discovers `scenario-tests/*.md` files and runs them with Claude, writing reports to `scenario-runs/`. Without `--all`, presents an interactive selection menu.
+
+```bash
+ralph pipeline run <pipeline.dot> [--var <key=value>...]
+```
+Execute a `.dot` pipeline file. Use `--var` (repeatable) to pass caller variables:
+
+```bash
+ralph pipeline run pipelines/my-pipeline.dot \
+  --var meditations_dir=meditations \
+  --var specs_dir=docs/specs
+```
+
+```bash
+ralph pipeline validate <pipeline.dot>
+```
+Check a pipeline for structural errors and `portability_heuristic` warnings (hardcoded paths that would break when the pipeline runs in a different environment).
+
+```bash
+ralph pipeline create <project-folder>
+```
+Open an interactive Claude session to author a new pipeline. Available local agents (`.ralph/agents/*.md`) are automatically injected into the authoring prompt.
+
+```bash
+ralph pipeline list <project-folder>
+```
+List all `.dot` pipeline files found in the project.
+
+```bash
+ralph pipeline trace <runId> [--node-receive <nodeId>] [--full]
+```
+Inspect the context and trace logs for a completed pipeline run. `--node-receive` filters to a specific node execution; `--full` shows the raw JSONL trace.
 
 ## Stopping the loop
 
