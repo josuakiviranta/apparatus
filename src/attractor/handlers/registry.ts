@@ -21,6 +21,12 @@ export interface HandlerExecutionContext {
   branchOutcomes?: Record<string, Outcome>;
   onStdout?: (s: NodeJS.ReadableStream) => Promise<void>;
   onInteractiveRequest?: OnInteractiveRequest;
+  /** Called before iteration i (i > 0) — pipeline.ts opens a new TUI block */
+  onIterationStart?: (nodeId: string, iterationIndex: number) => void;
+  /** Called after iteration i when more iterations will follow — pipeline.ts closes current TUI block */
+  onIterationEnd?: (nodeId: string, iterationIndex: number) => void;
+  /** Absolute path to the project root — used for project-local agent resolution */
+  projectDir?: string;
 }
 
 export interface NodeHandler {

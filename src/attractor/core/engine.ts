@@ -29,6 +29,8 @@ export interface EngineOptions {
   onNodeStart?: (node: Node) => void;
   onStdout?: (stdout: NodeJS.ReadableStream) => Promise<void>;
   onInteractiveRequest?: OnInteractiveRequest;
+  onIterationStart?: (nodeId: string, iterationIndex: number) => void;
+  onIterationEnd?: (nodeId: string, iterationIndex: number) => void;
   onNodeEnd?: (node: Node, outcome: Outcome) => void;
 }
 
@@ -212,6 +214,9 @@ export async function runPipeline(graph: Graph, opts: EngineOptions): Promise<Pi
       nodeRetries,
       onStdout: opts.onStdout,
       onInteractiveRequest: opts.onInteractiveRequest,
+      onIterationStart: opts.onIterationStart,
+      onIterationEnd: opts.onIterationEnd,
+      projectDir: opts.project,
     };
     let outcome: Outcome;
     try {
