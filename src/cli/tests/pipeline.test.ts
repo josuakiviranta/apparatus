@@ -154,6 +154,15 @@ describe("pipelineRunCommand", () => {
     expect(opts.logsRoot).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
   });
 
+  it("passes --var values as callerContext to runPipeline", async () => {
+    const dotFile = join(dir, "test.dot");
+    writeFileSync(dotFile, VALID_DOT);
+    await pipelineRunCommand(dotFile, { logsRoot: dir, variables: { specs_dir: "/tmp/specs", foo: "bar" } });
+    const call = (engine.runPipeline as ReturnType<typeof vi.fn>).mock.calls[0];
+    const opts = call[1];
+    expect(opts.callerContext).toEqual({ specs_dir: "/tmp/specs", foo: "bar" });
+  });
+
   it("nodes overview uses node IDs, not raw labels", async () => {
     const dot = `digraph my_pipeline {
       start [shape=Mdiamond]
@@ -281,6 +290,7 @@ describe("pipelineCreateCommand", () => {
     const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("exit"); });
     await expect(pipelineCreateCommand("review", { project: dir })).rejects.toThrow();
     expect(out.error).toHaveBeenCalledWith(expect.stringContaining("already exists"));
+    expect(out.error).toHaveBeenCalledWith(expect.stringContaining("ralph pipeline refine review"));
     exitSpy.mockRestore();
   });
 

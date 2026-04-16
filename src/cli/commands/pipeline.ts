@@ -205,6 +205,7 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
       signal: ac.signal,
       project: opts.project,
       resume: opts.resume,
+      callerContext: opts.variables,
       traceWriter: tracer,
 
       onInteractiveRequest: ({ child, session }) =>
@@ -486,7 +487,11 @@ export async function pipelineCreateCommand(name: string, opts: PipelineCreateOp
 
   // Conflict check
   if (existsSync(dotPath)) {
-    await output.error(`Pipeline already exists: ${dotPath}\nDelete or rename it before running create.`);
+    await output.error(
+      `Pipeline already exists: ${dotPath}\n` +
+        `Use 'ralph pipeline refine ${name}' to modify it, ` +
+        `or delete the file first to start over.`,
+    );
     process.exit(1);
   }
 
