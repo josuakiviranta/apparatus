@@ -1,6 +1,9 @@
 import { readFileSync, existsSync, readdirSync, mkdirSync, rmSync } from "fs";
 import { resolve, join, basename, dirname } from "path";
 import { homedir } from "os";
+import { randomUUID } from "crypto";
+import { JsonlPipelineTracer } from "../../attractor/tracer/jsonl-pipeline-tracer.js";
+import type { PipelineTracer } from "../../attractor/tracer/pipeline-tracer.js";
 import { parseDot, validateGraph, validateOrRaise } from "../../attractor/core/graph.js";
 import { runPipeline } from "../../attractor/core/engine.js";
 import { variableExpansionTransform } from "../../attractor/transforms/variable-expansion.js";
@@ -96,6 +99,21 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
     rmSync(logsRoot, { recursive: true, force: true });
   }
 
+  const runId = randomUUID().slice(0, 8);
+  const tracePath = join(homedir(), ".ralph", "runs", runId, "pipeline.jsonl");
+  const jsonlTracer = new JsonlPipelineTracer(tracePath);
+  let latestContext: Record<string, unknown> = {};
+
+  const tracer: PipelineTracer = {
+    onPipelineStart(meta) { jsonlTracer.onPipelineStart(meta); },
+    onNodeStart(meta) {
+      latestContext = meta.ctx.values;
+      jsonlTracer.onNodeStart(meta);
+    },
+    onNodeEnd(meta) { jsonlTracer.onNodeEnd(meta); },
+    onPipelineEnd(meta) { jsonlTracer.onPipelineEnd(meta); },
+  };
+
   // Mount the new single-<Static> PipelineApp.
   const overviewNodeIds = [...graph.nodes.values()]
     .filter((n) => n.shape !== "Mdiamond" && n.shape !== "Msquare")
@@ -106,6 +124,8 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
     pid: process.pid,
     goal: graph.goal,
     nodes: overviewNodeIds,
+    runId,
+    tracePath,
   });
   const { emit, done } = callbacks;
 
@@ -154,6 +174,7 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
       signal: ac.signal,
       project: opts.project,
       resume: opts.resume,
+      traceWriter: tracer,
 
       onInteractiveRequest: ({ child, session }) =>
         new Promise<void>((resolve) => {
@@ -203,7 +224,7 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
           })();
         }),
 
-      onNodeStart: (node) => {
+      onNodeStart: (node, { nodeReceiveId }) => {
         const blockKind = classifyNode(node);
         if (blockKind === "marker") return;
         currentBlockNodeId = node.id;
@@ -212,6 +233,8 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
           nodeId: node.id,
           label: node.label ?? blockKind,
           blockKind,
+          nodeReceiveId,
+          hasContext: Object.keys(latestContext).length > 0,
         });
       },
 
