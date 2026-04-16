@@ -1,4 +1,7 @@
 import { resolve, join, sep } from "path";
+import { existsSync } from "fs";
+import { homedir } from "os";
+import { getBundledPipelinePath } from "./assets.js";
 
 const VALID_NAME = /^[a-zA-Z0-9_-]+$/;
 
@@ -17,7 +20,19 @@ export function resolvePipelineArg(arg: string, project: string): string {
     return resolve(arg);
   }
   if (!VALID_NAME.test(arg)) {
-    throw new Error(`Invalid pipeline name "${arg}": only letters, numbers, hyphens, and underscores are allowed`);
+    throw new Error(
+      `Invalid pipeline name "${arg}": only letters, numbers, hyphens, and underscores are allowed`
+    );
   }
-  return join(getPipelinesDir(project), `${arg}.dot`);
+
+  // 1. Project-local
+  const projectPath = join(getPipelinesDir(project), `${arg}.dot`);
+  if (existsSync(projectPath)) return projectPath;
+
+  // 2. User home
+  const userPath = join(homedir(), ".ralph", "pipelines", `${arg}.dot`);
+  if (existsSync(userPath)) return userPath;
+
+  // 3. Bundled
+  return getBundledPipelinePath(arg);
 }

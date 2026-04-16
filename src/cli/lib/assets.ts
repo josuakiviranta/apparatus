@@ -49,6 +49,10 @@ export function getBundledAgentsDir(): string {
   return getAssetPath("agents");
 }
 
+export function getBundledPipelinePath(name: string): string {
+  return getAssetPath(join("pipelines", `${name}.dot`));
+}
+
 export function getMetaMeditationsDir(): string {
   // prod: dist/cli/ → up two → package root
   // dev:  src/cli/lib/ → up three → package root

@@ -40,6 +40,7 @@ vi.mock("../components/PipelineApp.js", () => ({
 }));
 vi.mock("../lib/assets.js", () => ({
   getPipelineCreatePromptPath: vi.fn(() => "/fake/PROMPT_pipeline_create.md"),
+  getBundledPipelinePath: vi.fn((name: string) => `/fake/pipelines/${name}.dot`),
 }));
 vi.mock("../lib/stream-formatter.js", () => ({
   streamEvents: vi.fn(async function* () {}),
