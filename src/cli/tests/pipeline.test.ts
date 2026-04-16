@@ -39,7 +39,6 @@ vi.mock("../components/PipelineApp.js", () => ({
   })),
 }));
 vi.mock("../lib/assets.js", () => ({
-  getPipelineCreatePromptPath: vi.fn(() => "/fake/PROMPT_pipeline_create.md"),
   getBundledPipelinePath: vi.fn((name: string) => `/fake/pipelines/${name}.dot`),
 }));
 vi.mock("../lib/pipeline-create-prompt.js", () => ({

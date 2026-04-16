@@ -35,9 +35,7 @@ vi.mock("../components/PipelineApp.js", () => ({
     waitUntilExit: vi.fn(async () => {}),
   })),
 }));
-vi.mock("../lib/assets.js", () => ({
-  getPipelineCreatePromptPath: vi.fn(() => "/fake/PROMPT_pipeline_create.md"),
-}));
+vi.mock("../lib/assets.js", () => ({}));
 vi.mock("../lib/pipeline-create-prompt.js", () => ({
   composeCreatePrompt: vi.fn().mockReturnValue("# Test prompt"),
 }));
