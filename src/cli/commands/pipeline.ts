@@ -350,6 +350,83 @@ export interface PipelineCreateOptions {
   project?: string;
 }
 
+export async function pipelineTraceCommand(
+  runId: string,
+  opts: { nodeReceive?: string } = {}
+): Promise<void> {
+  const tracePath = join(homedir(), ".ralph", "runs", runId, "pipeline.jsonl");
+
+  let raw: string;
+  try {
+    raw = readFileSync(tracePath, "utf-8");
+  } catch {
+    await output.error(`No trace found for run: ${runId}`);
+    await output.error(`Expected: ${tracePath}`);
+    process.exit(1);
+    return; // unreachable, satisfies TS
+  }
+
+  const lines = raw.trim().split("\n").map(l => JSON.parse(l) as Record<string, unknown>);
+
+  if (opts.nodeReceive) {
+    const event = lines.find(
+      l => l.kind === "node-start" && l.nodeReceiveId === opts.nodeReceive
+    );
+    if (!event) {
+      await output.error(`No node-start event found for: ${opts.nodeReceive}`);
+      process.exit(1);
+      return;
+    }
+    const snapshot = (event.contextSnapshot as Record<string, unknown>) ?? {};
+    const keys = Object.keys(snapshot);
+
+    const thisIdx = lines.indexOf(event);
+    const completedStages = lines
+      .slice(0, thisIdx)
+      .filter(l => l.kind === "node-end" && l.success === true)
+      .map(l => String(l.nodeId));
+
+    console.log(`\nnode:     ${event.nodeId}`);
+    console.log(`kind:     ${event.nodeKind}`);
+    console.log(`received: ${event.timestamp}`);
+    console.log(`\ncontext snapshot (${keys.length} key${keys.length === 1 ? "" : "s"}):`);
+    if (keys.length === 0) {
+      console.log("  (empty — first node)");
+    } else {
+      const maxLen = Math.max(...keys.map(k => k.length));
+      for (const key of keys) {
+        const val = JSON.stringify(snapshot[key]);
+        const truncated = val.length > 80 ? val.slice(0, 77) + "..." : val;
+        console.log(`  ${key.padEnd(maxLen + 2)}${truncated}`);
+      }
+    }
+    console.log(`\ncompleted stages: ${completedStages.length > 0 ? completedStages.join(" · ") : "(none)"}`);
+    console.log();
+    return;
+  }
+
+  // List all node invocations
+  const pipelineEnd = lines.find(l => l.kind === "pipeline-end");
+  const nodeStarts = lines.filter(l => l.kind === "node-start");
+  const nodeEnds = lines.filter(l => l.kind === "node-end") as Array<Record<string, unknown>>;
+
+  console.log(`\nrun:     ${runId}`);
+  console.log(`outcome: ${pipelineEnd?.outcome ?? "in-progress"}`);
+  console.log("nodes:");
+
+  for (const ns of nodeStarts) {
+    const ne = nodeEnds.find(e => e.nodeReceiveId === ns.nodeReceiveId);
+    const snapshot = (ns.contextSnapshot as Record<string, unknown>) ?? {};
+    const ctxKeys = Object.keys(snapshot);
+    const ctxDisplay = ctxKeys.length === 0
+      ? "{}"
+      : `{${ctxKeys.slice(0, 3).join(", ")}${ctxKeys.length > 3 ? ", ..." : ""}}`;
+    const status = ne ? (ne.success ? "✓" : "✗") : "…";
+    console.log(`  ${String(ns.nodeReceiveId).padEnd(20)} ${String(ns.nodeId).padEnd(12)} ${String(ns.nodeKind).padEnd(18)} ${status}  ctx: ${ctxDisplay}`);
+  }
+  console.log();
+}
+
 export async function pipelineCreateCommand(name: string, opts: PipelineCreateOptions = {}): Promise<void> {
   const which = spawnSync("which", ["claude"], { encoding: "utf8" });
   if (which.status !== 0) {

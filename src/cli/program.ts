@@ -6,7 +6,7 @@ import { meditateCommand } from "./commands/meditate";
 import { registerHeartbeatCommand } from "./commands/heartbeat";
 import { meditateCreateCommand } from "./commands/meditate-create";
 import { runScenariosCommand } from "./commands/run-scenarios";
-import { pipelineRunCommand, pipelineValidateCommand, pipelineCreateCommand, pipelineListCommand } from "./commands/pipeline";
+import { pipelineRunCommand, pipelineValidateCommand, pipelineCreateCommand, pipelineListCommand, pipelineTraceCommand } from "./commands/pipeline";
 import { agentListAction, agentShowAction, agentCreateAction } from "./commands/agent";
 
 export function createProgram(): Command {
@@ -94,10 +94,11 @@ Agent management:
 
   program
     .command("implement <project-folder>")
-    .description("Run the agentic build loop — Claude reads prompts, writes code, commits, and pushes")
-    .addHelpText("after", "\nExamples:\n  ralph implement my-app\n  ralph implement my-app --max 5\n")
-    .option("--max <n>", "Maximum number of loop iterations", parseInt)
-    .action(async (projectFolder: string, options: { max?: number }) => {
+    .description("Run the implement pipeline — Claude reads prompts, writes code, commits, and pushes")
+    .addHelpText("after", "\nExamples:\n  ralph implement my-app\n  ralph implement my-app --max 5\n  ralph implement my-app --max 0   # unlimited iterations\n\nThe pipeline can be overridden by placing pipelines/implement.dot in your project folder.\n")
+    .option("--max <n>", "Maximum iterations (0 = unlimited, default: 0)", parseInt)
+    .option("--model <name>", "LLM model override (e.g. claude-opus-4-6)")
+    .action(async (projectFolder: string, options: { max?: number; model?: string }) => {
       await implementCommand(projectFolder, options);
     });
 
@@ -206,6 +207,14 @@ Scans <project>/pipelines/*.dot and prints each workflow's name and goal.
     .option("--project <folder>", "Project folder (defaults to cwd)")
     .action(async (opts: { project?: string }) => {
       await pipelineListCommand(opts);
+    });
+
+  pipeline
+    .command("trace <runId>")
+    .description("inspect a pipeline run trace")
+    .option("--node-receive <nodeReceiveId>", "show context snapshot for a specific node invocation")
+    .action(async (runId: string, opts: { nodeReceive?: string }) => {
+      await pipelineTraceCommand(runId, opts);
     });
 
   const agent = program.command("agent").description("Manage agent definitions");
