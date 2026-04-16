@@ -1,0 +1,32 @@
+digraph poc_implement {
+  goal="POC: implement loop as a pipeline (v1 single iteration)"
+
+  start [shape=Mdiamond]
+
+  // Runs the implement agent in the project folder.
+  // The agent reads IMPLEMENTATION_PLAN.md + specs/* itself and does git push.
+  // cwd is set to $project by the engine (passed via --project flag).
+  run [
+    agent="implement"
+  ]
+
+  // Safety-net push in case the agent forgot or the session ended early.
+  // Note: agent already pushes itself (implement.md line 17), so this is a belt+suspenders.
+  // tool_command runs via sh -c, so $(git branch --show-current) expands correctly.
+  // cd is required: tool handler has no cwd option, runs in process working directory.
+  push [
+    shape=parallelogram,
+    tool_command="cd $project && git push origin $(git branch --show-current) || git push -u origin $(git branch --show-current)"
+  ]
+
+  done [shape=Msquare]
+
+  start -> run
+  run   -> push
+  push  -> done
+
+  // TO ENABLE LOOPING (infinite like ralph implement):
+  // Remove the push -> done edge and add:
+  //   push -> run
+  // Then stop the loop with Ctrl+C. The engine supports back-edges natively.
+}
