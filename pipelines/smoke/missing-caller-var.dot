@@ -1,0 +1,17 @@
+digraph missing_caller_var {
+  goal="Smoke: pipeline with undeclared caller var fails mid-run (not at startup)"
+
+  start [shape=Mdiamond]
+
+  // This node uses $required_input — a caller variable never provided via --var.
+  // Pre-flight check (not yet implemented) should catch this at startup.
+  // Current behavior: Ink UI mounts, node executes, then fails mid-run.
+  use_var [
+    shape=parallelogram,
+    tool_command="echo $required_input"
+  ]
+
+  done [shape=Msquare]
+
+  start -> use_var -> done
+}
