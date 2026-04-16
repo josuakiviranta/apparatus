@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { runPipeline, type EngineOptions } from "../core/engine.js";
 import { parseDot } from "../core/graph.js";
+import type { PipelineTracer } from "../tracer/pipeline-tracer.js";
 import { AutoApproveInterviewer } from "../interviewer/auto-approve.js";
 import { QueueInterviewer } from "../interviewer/queue.js";
 import { UndefinedVariableError } from "../transforms/variable-expansion.js";
@@ -301,7 +302,7 @@ describe("runPipeline", () => {
     expect(cp.currentNode).toBe("done");
   });
 
-  it("calls onNodeStart for each node (exit node skipped — handled before handler dispatch)", async () => {
+  it("calls onNodeStart for each node including exit node", async () => {
     const started: string[] = [];
     const dot = `digraph g {
       start [shape=Mdiamond]
@@ -314,8 +315,7 @@ describe("runPipeline", () => {
     }));
     expect(started).toContain("start");
     expect(started).toContain("work");
-    // Exit node is processed before handler dispatch, so onNodeStart is not called for it
-    expect(started).not.toContain("done");
+    expect(started).toContain("done");
   });
 
   it("passes onStdout in meta to handlers without error", async () => {
@@ -454,5 +454,61 @@ describe("runPipeline", () => {
     }`;
     await runPipeline(parseDot(dot), makeOpts(dir));
     expect(mockAgentRun).toHaveBeenCalledTimes(1);
+  });
+
+  it("calls traceWriter.onNodeStart and onNodeEnd for each node", async () => {
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      work  [shape=box, prompt="do work"]
+      done  [shape=Msquare]
+      start -> work
+      work  -> done
+    }`;
+    const graph = parseDot(dot);
+
+    const tracer: PipelineTracer = {
+      onPipelineStart: vi.fn(),
+      onNodeStart: vi.fn(),
+      onNodeEnd: vi.fn(),
+      onPipelineEnd: vi.fn(),
+    };
+
+    mockAgentRun.mockResolvedValueOnce({ exitCode: 0, sessionId: "s1", stdout: null });
+    await runPipeline(graph, makeOpts(dir, { traceWriter: tracer }));
+
+    expect(tracer.onPipelineStart).toHaveBeenCalledOnce();
+    expect(tracer.onPipelineEnd).toHaveBeenCalledOnce();
+
+    // onNodeStart called for start, work, done (3 nodes)
+    expect(tracer.onNodeStart).toHaveBeenCalledTimes(3);
+    // All calls include nodeReceiveId with pattern <nodeId>-<4hexchars>
+    const startCalls = (tracer.onNodeStart as ReturnType<typeof vi.fn>).mock.calls;
+    for (const [meta] of startCalls) {
+      expect(meta.nodeReceiveId).toMatch(/^.+-[0-9a-f]{4}$/);
+      expect(meta.node).toBeDefined();
+      expect(meta.ctx).toBeDefined();
+    }
+  });
+
+  it("passes nodeReceiveId to onNodeStart callback", async () => {
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      work  [shape=box, prompt="do work"]
+      done  [shape=Msquare]
+      start -> work
+      work  -> done
+    }`;
+    const graph = parseDot(dot);
+    const nodeStartMeta: Array<{ nodeReceiveId: string }> = [];
+
+    mockAgentRun.mockResolvedValueOnce({ exitCode: 0, sessionId: "s1", stdout: null });
+    await runPipeline(graph, makeOpts(dir, {
+      onNodeStart: (_node: unknown, meta: { nodeReceiveId: string }) => { nodeStartMeta.push(meta); },
+    }));
+
+    expect(nodeStartMeta).toHaveLength(3);
+    for (const meta of nodeStartMeta) {
+      expect(meta.nodeReceiveId).toMatch(/^.+-[0-9a-f]{4}$/);
+    }
   });
 });

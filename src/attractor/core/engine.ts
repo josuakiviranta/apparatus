@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from "fs/promises";
 import { join } from "path";
-import { randomUUID } from "crypto";
+import { randomUUID, randomBytes } from "crypto";
 import type { Graph, Node, Edge, Outcome, PipelineContext } from "../types.js";
 import type { Interviewer } from "../interviewer/index.js";
 import { evaluateCondition } from "./conditions.js";
@@ -26,12 +26,13 @@ export interface EngineOptions {
   project?: string;
   resume?: boolean;
   dotDir?: string;
-  onNodeStart?: (node: Node) => void;
+  onNodeStart?: (node: Node, meta: { nodeReceiveId: string }) => void;
   onStdout?: (stdout: NodeJS.ReadableStream) => Promise<void>;
   onInteractiveRequest?: OnInteractiveRequest;
   onIterationStart?: (nodeId: string, iterationIndex: number) => void;
   onIterationEnd?: (nodeId: string, iterationIndex: number) => void;
   onNodeEnd?: (node: Node, outcome: Outcome) => void;
+  traceWriter?: import("../tracer/pipeline-tracer.js").PipelineTracer;
 }
 
 export interface PipelineResult {
@@ -112,6 +113,14 @@ function selectNextEdge(
   return unconditional[0];
 }
 
+function finalize(result: PipelineResult, opts: EngineOptions, runId: string): PipelineResult {
+  opts.traceWriter?.onPipelineEnd({
+    runId,
+    outcome: result.status === "success" ? "success" : "failure",
+  });
+  return result;
+}
+
 export async function runPipeline(graph: Graph, opts: EngineOptions): Promise<PipelineResult> {
   const handlers = buildHandlerMap(opts);
   const { nodes, edges } = graph;
@@ -124,7 +133,9 @@ export async function runPipeline(graph: Graph, opts: EngineOptions): Promise<Pi
   let completedNodes: string[] = [];
   let context: Record<string, unknown> = { "$goal": graph.goal ?? "" };
   if (opts.project) context["$project"] = opts.project;
-  context["run_id"] = randomUUID();
+  const runId = randomUUID();
+  context["run_id"] = runId;
+  opts.traceWriter?.onPipelineStart({ runId, graph, ctx: { values: context } });
   let nodeRetries: Record<string, number> = {};
 
   // Resume from checkpoint if requested
@@ -146,13 +157,17 @@ export async function runPipeline(graph: Graph, opts: EngineOptions): Promise<Pi
 
   while (true) {
     if (opts.signal?.aborted) {
-      return { status: "fail", completedNodes, context, failureReason: "Aborted" };
+      return finalize({ status: "fail", completedNodes, context, failureReason: "Aborted" }, opts, runId);
     }
 
     const node = nodes.get(currentNodeId);
     if (!node) {
-      return { status: "fail", completedNodes, context, failureReason: `Node not found: ${currentNodeId}` };
+      return finalize({ status: "fail", completedNodes, context, failureReason: `Node not found: ${currentNodeId}` }, opts, runId);
     }
+
+    const nodeReceiveId = `${node.id}-${randomBytes(2).toString("hex")}`;
+    opts.traceWriter?.onNodeStart({ nodeReceiveId, node, ctx: { values: context } });
+    opts.onNodeStart?.(node, { nodeReceiveId });
 
     if (isExitNode(node)) {
       // Goal gate enforcement: before allowing exit, verify all goal_gate=true nodes succeeded
@@ -173,12 +188,12 @@ export async function runPipeline(graph: Graph, opts: EngineOptions): Promise<Pi
         }
 
         const gateNames = unsatisfiedGates.map(n => n.id).join(", ");
-        return {
+        return finalize({
           status: "fail",
           completedNodes,
           context,
           failureReason: `Goal gate(s) not satisfied: ${gateNames}`,
-        };
+        }, opts, runId);
       }
 
       if (!completedNodes.includes(node.id)) completedNodes = [...completedNodes, node.id];
@@ -189,16 +204,15 @@ export async function runPipeline(graph: Graph, opts: EngineOptions): Promise<Pi
         nodeRetries,
         context,
       });
-      return { status: "success", completedNodes, context };
+      opts.traceWriter?.onNodeEnd({ nodeReceiveId, node, outcome: { status: "success" } });
+      return finalize({ status: "success", completedNodes, context }, opts, runId);
     }
 
     const handlerType = resolveHandlerType(node);
     const handler = handlers.get(handlerType);
     if (!handler) {
-      return { status: "fail", completedNodes, context, failureReason: `No handler for type "${handlerType}"` };
+      return finalize({ status: "fail", completedNodes, context, failureReason: `No handler for type "${handlerType}"` }, opts, runId);
     }
-
-    opts.onNodeStart?.(node);
 
     // Gather outgoing labels for wait.human
     const outgoingLabels = edges.filter(e => e.from === node.id).map(e => e.label ?? e.to).filter(Boolean);
@@ -234,8 +248,9 @@ export async function runPipeline(graph: Graph, opts: EngineOptions): Promise<Pi
           `Variable context at failure:`,
           varDump,
         ].join("\n");
+        opts.traceWriter?.onNodeEnd({ nodeReceiveId, node, outcome: { status: "fail", failureReason: reason } });
         opts.onNodeEnd?.(node, { status: "fail", failureReason: reason });
-        return { status: "fail", completedNodes, context, failureReason: reason };
+        return finalize({ status: "fail", completedNodes, context, failureReason: reason }, opts, runId);
       }
       throw err; // re-throw non-variable errors
     }
@@ -257,6 +272,7 @@ export async function runPipeline(graph: Graph, opts: EngineOptions): Promise<Pi
           (outcome.status === "fail" && _maxRetries > 0)) &&
         _retryCount < _maxRetries;
       if (!_willRetry) {
+        opts.traceWriter?.onNodeEnd({ nodeReceiveId, node, outcome });
         opts.onNodeEnd?.(node, outcome);
       }
     }
@@ -281,14 +297,14 @@ export async function runPipeline(graph: Graph, opts: EngineOptions): Promise<Pi
         currentNodeId = fallback;
         continue;
       }
-      return { status: "fail", completedNodes, context, failureReason: `Node "${node.id}" failed after ${maxRetries} retries` };
+      return finalize({ status: "fail", completedNodes, context, failureReason: `Node "${node.id}" failed after ${maxRetries} retries` }, opts, runId);
     }
 
     if (outcome.status === "fail") {
       // Before terminating, try to route through a conditioned fail-path edge.
       const failEdge = selectFailEdge(node, outcome, context, edges);
       if (!failEdge) {
-        return { status: "fail", completedNodes, context, failureReason: outcome.failureReason ?? `Node "${node.id}" failed` };
+        return finalize({ status: "fail", completedNodes, context, failureReason: outcome.failureReason ?? `Node "${node.id}" failed` }, opts, runId);
       }
       if (!completedNodes.includes(node.id)) completedNodes = [...completedNodes, node.id];
       await saveCheckpoint(opts.logsRoot, { timestamp: new Date().toISOString(), currentNode: failEdge.to, completedNodes, nodeRetries, context });
@@ -301,7 +317,7 @@ export async function runPipeline(graph: Graph, opts: EngineOptions): Promise<Pi
 
     const nextEdge = selectNextEdge(node, outcome, context, edges);
     if (!nextEdge) {
-      return { status: "fail", completedNodes, context, failureReason: `No outgoing edge from "${node.id}"` };
+      return finalize({ status: "fail", completedNodes, context, failureReason: `No outgoing edge from "${node.id}"` }, opts, runId);
     }
 
     // loop_restart: reset traversal state but preserve accumulated context
