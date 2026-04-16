@@ -19,18 +19,21 @@ interface Props {
   pid: number;
   goal?: string;
   nodes: string[];
+  runId: string;
+  tracePath: string;
   onReady: (cbs: PipelineAppCallbacks) => void;
 }
 
 const HEADER_WIDTH = 80;
 
 type StaticItem =
-  | { kind: "header";     id: string; pipelineName: string; pid: number; goal?: string; nodes: string[] }
-  | { kind: "block-open"; id: string; displayIndex: number; nodeId: string; label: string }
-  | { kind: "trace-line"; id: string; tracePath: string }
-  | { kind: "body-line";  id: string; line: BodyLine }
-  | { kind: "stream-event"; id: string; event: StreamEvent }
-  | { kind: "block-close"; id: string; block: Block };
+  | { kind: "header";           id: string; pipelineName: string; pid: number; goal?: string; nodes: string[]; tracePath: string }
+  | { kind: "block-open";       id: string; displayIndex: number; nodeId: string; label: string }
+  | { kind: "received-context"; id: string; nodeReceiveId: string; runId: string; hasContext: boolean }
+  | { kind: "trace-line";       id: string; tracePath: string }
+  | { kind: "body-line";        id: string; line: BodyLine }
+  | { kind: "stream-event";     id: string; event: StreamEvent }
+  | { kind: "block-close";      id: string; block: Block };
 
 function BlockCloseView({ block }: { block: Block }) {
   const glyph = block.outcome.status === "success" ? "✓" : "✗";
@@ -42,14 +45,14 @@ function BlockCloseView({ block }: { block: Block }) {
   return <Text dimColor>{parts.join(" · ")}</Text>;
 }
 
-export function PipelineApp({ pipelineName, pid, goal, nodes, onReady }: Props) {
+export function PipelineApp({ pipelineName, pid, goal, nodes, runId, tracePath, onReady }: Props) {
   const { exit } = useApp();
   const [state, dispatch] = useReducer(pipelineReducer, initialPipelineState);
   const [inputBuffer, setInputBuffer] = useState("");
 
   // Grow-only static items — append-only, never removed or mutated.
   const [staticItems, setStaticItems] = useState<StaticItem[]>(() => [
-    { kind: "header", id: "__header__", pipelineName, pid, goal, nodes },
+    { kind: "header", id: "__header__", pipelineName, pid, goal, nodes, tracePath },
   ]);
 
   // Refs for constructing stable IDs in the emit wrapper (no stale closures).
@@ -111,6 +114,13 @@ export function PipelineApp({ pipelineName, pid, goal, nodes, onReady }: Props) 
           setStaticItems(prev => [
             ...prev,
             { kind: "block-open", id, displayIndex, nodeId: event.nodeId, label: event.label },
+            {
+              kind: "received-context",
+              id: `${id}-ctx`,
+              nodeReceiveId: event.nodeReceiveId,
+              runId,
+              hasContext: event.hasContext,
+            },
           ]);
         } else if (event.kind === "trace-path" && liveBlockIdRef.current && !traceAppendedRef.current) {
           traceAppendedRef.current = true;
@@ -211,6 +221,7 @@ export function PipelineApp({ pipelineName, pid, goal, nodes, onReady }: Props) 
                 {item.nodes.length > 0 && (
                   <Text dimColor>{` nodes: ${item.nodes.join(" → ")}`}</Text>
                 )}
+                <Text dimColor>{` run:   `}<Text dimColor={false}>{item.tracePath}</Text></Text>
               </Box>
             );
           }
@@ -218,6 +229,17 @@ export function PipelineApp({ pipelineName, pid, goal, nodes, onReady }: Props) 
             const prefix = `━━ [${item.displayIndex}] ${item.nodeId} · ${item.label} `;
             const pad = Math.max(0, HEADER_WIDTH - prefix.length);
             return <Text key={item.id}>{prefix + "━".repeat(pad)}</Text>;
+          }
+          if (item.kind === "received-context") {
+            const cmd = `ralph pipeline trace ${item.runId} --node-receive ${item.nodeReceiveId}`;
+            const suffix = item.hasContext ? "" : "  (empty)";
+            return (
+              <Text key={item.id} dimColor>
+                {"  received context: "}
+                <Text dimColor={false}>{cmd}</Text>
+                {suffix}
+              </Text>
+            );
           }
           if (item.kind === "trace-line") {
             return <Text key={item.id} dimColor>{`  trace: ${item.tracePath}`}</Text>;
