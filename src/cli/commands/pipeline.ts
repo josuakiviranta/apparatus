@@ -352,7 +352,7 @@ export interface PipelineCreateOptions {
 
 export async function pipelineTraceCommand(
   runId: string,
-  opts: { nodeReceive?: string } = {}
+  opts: { nodeReceive?: string; full?: boolean } = {}
 ): Promise<void> {
   const tracePath = join(homedir(), ".ralph", "runs", runId, "pipeline.jsonl");
 
@@ -396,8 +396,12 @@ export async function pipelineTraceCommand(
       const maxLen = Math.max(...keys.map(k => k.length));
       for (const key of keys) {
         const val = JSON.stringify(snapshot[key]);
-        const truncated = val.length > 80 ? val.slice(0, 77) + "..." : val;
-        console.log(`  ${key.padEnd(maxLen + 2)}${truncated}`);
+        if (opts.full || val.length <= 80) {
+          console.log(`  ${key.padEnd(maxLen + 2)}${val}`);
+        } else {
+          console.log(`  ${key}`);
+          console.log(`    ${val}`);
+        }
       }
     }
     console.log(`\ncompleted stages: ${completedStages.length > 0 ? completedStages.join(" · ") : "(none)"}`);
