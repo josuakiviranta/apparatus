@@ -23,7 +23,7 @@ export interface Node {
   threadId?: string;
   llmModel?: string;
   llmProvider?: string;
-  maxIterations?: number;
+  maxIterations?: number | string;
   reasoningEffort?: string;
   retryTarget?: string;
   fallbackRetryTarget?: string;
