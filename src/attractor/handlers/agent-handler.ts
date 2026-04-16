@@ -11,7 +11,7 @@ import { parseStructuredOutput } from "../../cli/lib/parse-structured-output.js"
 import { Session, buildSessionDigest } from "../../cli/lib/session.js";
 
 export interface AgentHandlerDeps {
-  resolveAgent?: (name: string) => AgentConfig;
+  resolveAgent?: (name: string, opts?: import("../../cli/lib/agent-registry.js").RegistryOptions) => AgentConfig;
   createAgent?: (config: AgentConfig) => Agent;
 }
 
@@ -32,7 +32,8 @@ export class AgentHandler implements NodeHandler {
 
     let config: AgentConfig;
     try {
-      config = this.resolve(agentName);
+      const projectAgentsDir = meta.projectDir ? join(meta.projectDir, ".ralph", "agents") : undefined;
+      config = this.resolve(agentName, { projectDir: projectAgentsDir });
     } catch (err) {
       return { status: "fail", failureReason: `Failed to resolve agent "${agentName}": ${(err as Error).message}` };
     }
@@ -138,7 +139,13 @@ export class AgentHandler implements NodeHandler {
     }
     // --- end interactive branch; legacy path below is unchanged ---
 
-    const maxIterations = (node.maxIterations as number | undefined) ?? 1;
+    const rawIter = node.maxIterations;
+    const parsedIter = typeof rawIter === "string" ? parseInt(rawIter, 10)
+                     : typeof rawIter === "number"  ? rawIter
+                     : undefined;
+    const maxIterations = parsedIter == null || isNaN(parsedIter) ? 1
+                        : parsedIter === 0 ? Infinity
+                        : parsedIter;
 
     let lastResult: RunResult | null = null;
     let lastSessionId: string | null = null;
@@ -146,6 +153,11 @@ export class AgentHandler implements NodeHandler {
 
     for (let i = 0; i < maxIterations; i++) {
       if (signal?.aborted) break;
+
+      // Iterations 1+: open a new TUI block (iteration 0's block opened by onNodeStart)
+      if (i > 0) {
+        meta.onIterationStart?.(node.id, i);
+      }
 
       const result = await agent.run({
         cwd,
@@ -158,7 +170,13 @@ export class AgentHandler implements NodeHandler {
       iteration++;
       if (result.sessionId) lastSessionId = result.sessionId;
 
-      // Single iteration: fail immediately on non-zero exit
+      // More iterations will follow: close current TUI block
+      const willContinue = !signal?.aborted && i < maxIterations - 1;
+      if (willContinue) {
+        meta.onIterationEnd?.(node.id, i);
+      }
+
+      // Only fail-fast on non-zero exit for single-iteration nodes
       if (result.exitCode !== 0 && maxIterations === 1) {
         return {
           status: "fail",

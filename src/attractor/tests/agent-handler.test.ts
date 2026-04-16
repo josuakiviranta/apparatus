@@ -128,7 +128,7 @@ describe("AgentHandler", () => {
     );
 
     expect(outcome.status).toBe("success");
-    expect(mockResolve).toHaveBeenCalledWith("implement");
+    expect(mockResolve).toHaveBeenCalledWith("implement", expect.objectContaining({ projectDir: undefined }));
   });
 
   it("returns fail when agent resolution fails", async () => {
@@ -558,5 +558,65 @@ describe("AgentHandler", () => {
     // Should stop after first iteration since signal was aborted
     expect(mockAgentRun).toHaveBeenCalledTimes(1);
     expect(outcome.status).toBe("success");
+  });
+
+  it("max_iterations=0 runs until signal aborted", async () => {
+    mockResolve.mockReturnValue({ ...baseConfig });
+    const ac = new AbortController();
+    let callCount = 0;
+    mockAgentRun.mockImplementation(async () => {
+      callCount++;
+      if (callCount === 3) ac.abort();
+      return { exitCode: 0, output: "", sessionId: "s1" };
+    });
+
+    const handler = makeHandler();
+    const outcome = await handler.execute(
+      makeNode({ maxIterations: 0 }),
+      baseCtx(),
+      makeContext({ signal: ac.signal }),
+    );
+
+    expect(callCount).toBe(3);
+    expect(outcome.status).toBe("success");
+  });
+
+  it("max_iterations string '3' is parsed as number after variable expansion", async () => {
+    mockResolve.mockReturnValue({ ...baseConfig });
+    mockAgentRun.mockResolvedValue({ exitCode: 0, output: "", sessionId: "s1" });
+
+    const handler = makeHandler();
+    await handler.execute(
+      makeNode({ maxIterations: "3" as unknown as number }),
+      baseCtx(),
+      makeContext({}),
+    );
+
+    expect(mockAgentRun).toHaveBeenCalledTimes(3);
+  });
+
+  it("calls onIterationStart for iterations 1+ and onIterationEnd for all but last", async () => {
+    mockResolve.mockReturnValue({ ...baseConfig });
+    const starts: number[] = [];
+    const ends: number[] = [];
+    const ctx = makeContext({
+      onIterationStart: (_nodeId: string, i: number) => starts.push(i),
+      onIterationEnd: (_nodeId: string, i: number) => ends.push(i),
+    });
+    mockAgentRun.mockResolvedValue({ exitCode: 0, output: "", sessionId: "s1" });
+
+    const handler = makeHandler();
+    await handler.execute(
+      makeNode({ maxIterations: 3 }),
+      baseCtx(),
+      ctx,
+    );
+
+    // iteration 0: onNodeStart opens block (no onIterationStart)
+    // iteration 1: onIterationStart(nodeId,1) before; onIterationEnd(nodeId,0) after iter 0
+    // iteration 2: onIterationStart(nodeId,2) before; onIterationEnd(nodeId,1) after iter 1
+    // iteration 2 end: onNodeEnd closes block (no onIterationEnd)
+    expect(starts).toEqual([1, 2]);
+    expect(ends).toEqual([0, 1]);
   });
 });
