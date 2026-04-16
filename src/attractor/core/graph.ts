@@ -415,6 +415,24 @@ export function validateGraph(graph: Graph): Diagnostic[] {
     }
   }
 
+  // portability_heuristic — warn when node attributes embed project-specific path substrings
+  const PORTABILITY_PATH_PATTERNS = ["meditations/", "docs/superpowers/"];
+  for (const node of nodes.values()) {
+    const fields = [node.prompt, node.toolCommand].filter((f): f is string => typeof f === "string");
+    for (const field of fields) {
+      for (const pat of PORTABILITY_PATH_PATTERNS) {
+        if (field.includes(pat)) {
+          diags.push({
+            rule: "portability_heuristic",
+            severity: "warning",
+            message: `Node "${node.id}" hardcodes project path "${pat}" — use $variable and declare in inputs=`,
+          });
+          break; // one warning per node per field is enough
+        }
+      }
+    }
+  }
+
   return diags;
 }
 
