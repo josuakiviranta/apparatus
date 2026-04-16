@@ -72,6 +72,22 @@ If the pipeline takes no caller inputs, omit the attribute. The runtime fails fa
 - `max_retries=N` — number of times to retry on failure
 - `retry_target="nodeId"` — node to jump to on retry instead of retrying in place
 
+### Portability rule
+
+Every project-specific value must be a `$variable`. Never embed paths, agent names, or
+directory conventions as string literals. A pipeline with `agent="implement"` cannot run in a
+project that registers the agent as `"code-review"`. A prompt that hardcodes
+`meditations/illuminations/` is useless outside ralph-cli.
+
+| Wrong (hardcoded) | Right (portable) |
+|-------------------|-----------------|
+| `agent="implement"` | `agent="$implement_agent"` |
+| `prompt="Read docs/superpowers/specs/"` | `prompt="Read $specs_dir"` + add to `inputs=` |
+| `tool_command="ls meditations/"` | `tool_command="ls $illuminations_dir"` + `inputs=` |
+
+Rule: if a value would differ between two projects using this pipeline, it must be a `$variable`
+declared in `inputs=`.
+
 ### Edge attributes
 
 - `label="..."` — used for routing from hexagon (wait.human) nodes; the edge whose label matches the human's answer is taken
@@ -96,6 +112,7 @@ If the pipeline takes no caller inputs, omit the attribute. The runtime fails fa
 ```dot
 digraph review_pipeline {
   goal="Run scenarios, meditate on results, then approve or fix"
+  inputs="review_agent"
 
   // Entry and exit (required in every pipeline)
   start  [shape=Mdiamond]
@@ -110,8 +127,8 @@ digraph review_pipeline {
   // Automatic check — did meditate find issues?
   check [shape=diamond, label="Issues found?"]
 
-  // Named agent from registry — runs code review
-  review [agent="reviewer", prompt="Review the latest changes"]
+  // Named agent — use $variable so this pipeline works in any project's agent registry
+  review [agent="$review_agent", prompt="Review the latest changes"]
 
   // Agentic loop — applies fixes, capped at 3 iterations
   fix [shape=box, prompt="Apply the fixes recommended in the latest meditation illumination.", max_iterations=3]
