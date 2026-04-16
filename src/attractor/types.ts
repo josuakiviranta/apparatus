@@ -57,6 +57,8 @@ export interface Graph {
   retryTarget?: string;
   fallbackRetryTarget?: string;
   headlessSafe?: boolean;
+  /** Caller-provided variable names declared via the `inputs=` graph attribute. */
+  inputs?: string[];
   nodes: Map<string, Node>;
   edges: Edge[];
 }

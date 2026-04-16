@@ -1,4 +1,4 @@
-import type { Graph } from "../types.js";
+import type { Graph, Node } from "../types.js";
 
 export class UndefinedVariableError extends Error {
   constructor(public readonly variableName: string) {
@@ -71,4 +71,58 @@ export function variableExpansionTransform(graph: Graph, vars: { project?: strin
     })
   );
   return { ...graph, nodes: newNodes };
+}
+
+const VAR_RE = /\$([a-zA-Z_][\w.]*)/g;
+const RESERVED = new Set(["goal", "project"]);
+// String-valued node attributes the scanner must walk for $var references.
+const STRING_ATTRS = ["prompt", "toolCommand"];
+
+function collectVarRefs(node: Node, out: Set<string>): void {
+  for (const key of STRING_ATTRS) {
+    const v = (node as Record<string, unknown>)[key];
+    if (typeof v !== "string") continue;
+    const re = new RegExp(VAR_RE.source, VAR_RE.flags);
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(v)) !== null) {
+      const name = m[1];
+      if (!RESERVED.has(name)) out.add(name);
+    }
+  }
+}
+
+function collectProducers(node: Node, out: Set<string>): void {
+  if (typeof (node as Record<string, unknown>)["produces"] === "string") {
+    const produces = (node as Record<string, unknown>)["produces"] as string;
+    for (const name of produces.split(",").map((s) => s.trim()).filter(Boolean)) {
+      out.add(name);
+    }
+  }
+}
+
+export function scanUndeclaredCallerVars(
+  graph: Graph,
+  initialContext: Record<string, unknown>,
+): { missing: string[]; declared: string[]; undeclared: string[] } {
+  const refs = new Set<string>();
+  const producers = new Set<string>();
+  for (const node of graph.nodes.values()) {
+    collectVarRefs(node, refs);
+    collectProducers(node, producers);
+  }
+
+  const ctxKeys = new Set(Object.keys(initialContext));
+  const missing: string[] = [];
+  for (const name of refs) {
+    if (ctxKeys.has(name)) continue;
+    if (producers.has(name)) continue;
+    missing.push(name);
+  }
+  missing.sort();
+
+  const declaredSet = new Set(graph.inputs ?? []);
+  const declared = missing.filter((n) => declaredSet.has(n));
+  const undeclared = missing.filter((n) => !declaredSet.has(n));
+
+  return { missing, declared, undeclared };
 }

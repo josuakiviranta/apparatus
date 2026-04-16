@@ -25,6 +25,20 @@ digraph my_pipeline {
 }
 ```
 
+**Declare caller inputs.** Add an `inputs=` attribute to your `digraph` listing every `$variable` your pipeline expects the caller to provide via `--var`. Variables produced internally by prior nodes (via `json_schema_file` outputs, `produces=` attributes, or `store` nodes) are internal — do not list those. Example:
+
+```dot
+digraph my_pipeline {
+  goal="What this pipeline achieves"
+  inputs="illumination_path, model"
+
+  start [shape=Mdiamond]
+  ...
+}
+```
+
+If the pipeline takes no caller inputs, omit the attribute. The runtime fails fast with a `--var key=value` example when a declared input is missing.
+
 ### Node types (shape → purpose)
 
 | shape | type | purpose |

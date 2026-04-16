@@ -7,6 +7,7 @@ import { registerHeartbeatCommand } from "./commands/heartbeat";
 import { meditateCreateCommand } from "./commands/meditate-create";
 import { runScenariosCommand } from "./commands/run-scenarios";
 import { pipelineRunCommand, pipelineValidateCommand, pipelineCreateCommand, pipelineListCommand, pipelineTraceCommand } from "./commands/pipeline";
+import { collectKV } from "./lib/collect-kv.js";
 import { agentListAction, agentShowAction, agentCreateAction } from "./commands/agent";
 
 export function createProgram(): Command {
@@ -155,8 +156,13 @@ Add max_iterations=N to cap how many agentic loop iterations a node can run.
 `)
     .option("--project <folder>", "Project folder ($project variable and cwd for work nodes)")
     .option("--resume", "Resume from last checkpoint")
+    .option("--var <key=value>", "pass caller variable (repeatable)", collectKV, {} as Record<string, string>)
     .action(async (dotFile: string, opts: { project?: string; resume?: boolean }) => {
-      await pipelineRunCommand(dotFile, opts);
+      await pipelineRunCommand(dotFile, {
+        project: opts.project,
+        resume: opts.resume,
+        variables: (opts as Record<string, unknown>)["var"] as Record<string, string> | undefined,
+      });
     });
 
   pipeline

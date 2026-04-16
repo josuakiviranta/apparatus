@@ -6,7 +6,12 @@ import { JsonlPipelineTracer } from "../../attractor/tracer/jsonl-pipeline-trace
 import type { PipelineTracer } from "../../attractor/tracer/pipeline-tracer.js";
 import { parseDot, validateGraph, validateOrRaise } from "../../attractor/core/graph.js";
 import { runPipeline } from "../../attractor/core/engine.js";
-import { variableExpansionTransform } from "../../attractor/transforms/variable-expansion.js";
+import { variableExpansionTransform, scanUndeclaredCallerVars } from "../../attractor/transforms/variable-expansion.js";
+import {
+  formatMissingInputsError,
+  formatLegacyMissingWarning,
+  formatUndeclaredWarning,
+} from "../lib/preflight-format.js";
 import { InkInterviewer } from "../../attractor/interviewer/ink.js";
 import { AutoApproveInterviewer } from "../../attractor/interviewer/auto-approve.js";
 import { getPipelinesDir, resolvePipelineArg, isNameShorthand } from "../lib/pipeline-resolver.js";
@@ -76,6 +81,32 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
 
   try { validateOrRaise(graph); }
   catch (err) { await output.error((err as Error).message); process.exit(1); }
+
+  // Pre-flight: scan for missing caller-supplied variables before expansion
+  const preflight = scanUndeclaredCallerVars(graph, opts.variables ?? {});
+
+  if (graph.inputs && preflight.declared.length > 0) {
+    console.error(
+      formatMissingInputsError({
+        pipelineName: graph.name,
+        declared: graph.inputs,
+        provided: opts.variables ?? {},
+        missing: preflight.declared,
+        invokedAs: dotFile,
+      }),
+    );
+    process.exit(1);
+  }
+
+  if (!graph.inputs && preflight.missing.length > 0) {
+    console.error(formatLegacyMissingWarning(preflight.missing));
+    // continue — legacy pipelines without inputs= still run
+  }
+
+  if (graph.inputs && preflight.undeclared.length > 0) {
+    console.error(formatUndeclaredWarning(preflight.undeclared));
+    // continue — author oversight, not a caller-facing failure
+  }
 
   graph = variableExpansionTransform(graph, {
     project: opts.project,
@@ -335,14 +366,17 @@ export async function pipelineListCommand(opts: PipelineListOptions = {}): Promi
     const name = basename(file, ".dot");
     const absFile = join(pipelinesDir, file);
     let goal = "(no goal defined)";
+    let requires: string[] | undefined;
     try {
       const src = readFileSync(absFile, "utf8");
       const graph = parseDot(src);
       if (graph.goal) goal = `"${graph.goal}"`;
+      if (graph.inputs && graph.inputs.length > 0) requires = graph.inputs;
     } catch {
       goal = "(unreadable)";
     }
     await output.info(`  ${name.padEnd(20)} ${goal}`);
+    if (requires) await output.info(`  ${"".padEnd(20)} requires: ${requires.join(", ")}`);
   }
 }
 
