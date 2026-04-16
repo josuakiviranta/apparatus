@@ -6,7 +6,14 @@ import { meditateCommand } from "./commands/meditate";
 import { registerHeartbeatCommand } from "./commands/heartbeat";
 import { meditateCreateCommand } from "./commands/meditate-create";
 import { runScenariosCommand } from "./commands/run-scenarios";
-import { pipelineRunCommand, pipelineValidateCommand, pipelineCreateCommand, pipelineListCommand, pipelineTraceCommand } from "./commands/pipeline";
+import {
+  pipelineRunCommand,
+  pipelineValidateCommand,
+  pipelineCreateCommand,
+  pipelineRefineCommand,
+  pipelineListCommand,
+  pipelineTraceCommand,
+} from "./commands/pipeline";
 import { collectKV } from "./lib/collect-kv.js";
 import { agentListAction, agentShowAction, agentCreateAction } from "./commands/agent";
 
@@ -42,6 +49,7 @@ Background scheduling (heartbeat):
 
 Pipeline engine (DOT-graph workflows):
   ralph pipeline create review --project my-app    Create a new workflow with Claude
+  ralph pipeline refine review --project my-app    Refine an existing workflow with Claude
   ralph pipeline list --project my-app             List workflows in a project
   ralph pipeline validate workflow.dot             Check a pipeline file for errors
   ralph pipeline validate review --project my-app  Validate by workflow name
@@ -198,6 +206,24 @@ The attractor scheme is injected automatically. Validates the file on exit.
     .option("--project <folder>", "Project folder (pipelines/ lives here, defaults to cwd)")
     .action(async (name: string, opts: { project?: string }) => {
       await pipelineCreateCommand(name, opts);
+    });
+
+  pipeline
+    .command("refine <name>")
+    .description("Refine an existing pipeline with an interactive Claude session")
+    .addHelpText("after", `
+Examples:
+  ralph pipeline refine review --project my-app
+  ralph pipeline refine deploy
+
+Loads <project>/pipelines/<name>.dot, opens an agent-assisted Claude session
+with the existing graph injected, then validates the edited file on exit.
+Use this for every change to an existing pipeline — hand-editing the .dot file
+bypasses the scheme guidance and validation loop.
+`)
+    .option("--project <folder>", "Project folder (pipelines/ lives here, defaults to cwd)")
+    .action(async (name: string, opts: { project?: string }) => {
+      await pipelineRefineCommand(name, opts);
     });
 
   pipeline
