@@ -2,6 +2,7 @@ import { appendFileSync, mkdirSync } from "fs";
 import { dirname } from "path";
 import type { PipelineTracer } from "./pipeline-tracer.js";
 import type { Graph, Node, PipelineContext, Outcome } from "../types.js";
+import { resolveHandlerType } from "../core/graph.js";
 
 export class JsonlPipelineTracer implements PipelineTracer {
   constructor(private tracePath: string) {
@@ -26,7 +27,7 @@ export class JsonlPipelineTracer implements PipelineTracer {
       kind: "node-start",
       nodeReceiveId,
       nodeId: node.id,
-      nodeKind: node.type,
+      nodeKind: resolveHandlerType(node),
       timestamp: new Date().toISOString(),
       contextSnapshot: ctx.values,
     });
