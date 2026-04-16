@@ -20,6 +20,8 @@ export interface PipelineRunOptions {
   project?: string;
   resume?: boolean;
   logsRoot?: string;
+  /** Extra key=value pairs injected as $variable context for variableExpansionTransform */
+  variables?: Record<string, string>;
 }
 
 export interface PipelineValidateOptions {
@@ -72,7 +74,10 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
   try { validateOrRaise(graph); }
   catch (err) { await output.error((err as Error).message); process.exit(1); }
 
-  graph = variableExpansionTransform(graph, { project: opts.project });
+  graph = variableExpansionTransform(graph, {
+    project: opts.project,
+    context: opts.variables,
+  });
 
   // Headless safety: refuse to run headless_safe=false pipelines without a TTY
   if (graph.headlessSafe === false && !process.stdin.isTTY) {
@@ -223,6 +228,23 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
             status,
             reason: outcome.failureReason ?? (outcome.status === "partial_success" ? "partial success" : undefined),
           },
+        });
+        currentBlockNodeId = null;
+      },
+
+      onIterationStart: (nodeId, iterationIndex) => {
+        emit({
+          kind: "start",
+          nodeId,
+          label: `agent · iteration ${iterationIndex + 1}`,
+          blockKind: "agent",
+        });
+      },
+
+      onIterationEnd: (_nodeId, _iterationIndex) => {
+        emit({
+          kind: "end",
+          outcome: { status: "success" },
         });
         currentBlockNodeId = null;
       },
