@@ -206,13 +206,12 @@ describe("LiveFooter", () => {
         { kind: "tool_use", name: "Read", summary: "reading file" },
       ],
     });
-    const { lastFrame } = render(<LiveFooter block={block} index={1} />);
+    const { lastFrame } = render(<LiveFooter block={block} />);
     const frame = lastFrame() ?? "";
     expect(frame).not.toContain("streamed content");
     expect(frame).not.toContain("claude:");
     expect(frame).not.toContain("[tool_use: Read]");
-    // But it must still show the header and status
-    expect(frame).toContain("[1] work");
+    // But it must still show the status line
     expect(frame).toContain("streaming");
   });
 });

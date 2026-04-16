@@ -239,7 +239,7 @@ export function PipelineApp({ pipelineName, pid, goal, nodes, onReady }: Props) 
         }}
       </Static>
       {liveForRender && (
-        <LiveFooter block={liveForRender} index={blockSeqRef.current} />
+        <LiveFooter block={liveForRender} />
       )}
     </>
   );
