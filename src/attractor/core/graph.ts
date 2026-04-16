@@ -306,7 +306,7 @@ export function validateGraph(graph: Graph): Diagnostic[] {
   }
 
   // variable_coverage — warn when a $variable may not be defined on all paths
-  const RESERVED_VARS = new Set(["goal", "project"]);
+  const RESERVED_VARS = new Set(["goal", "project", "run_id"]);
   const VAR_RE = /\$([a-zA-Z_][\w.]*)/g;
 
   // Handler-type implicit productions
@@ -377,7 +377,7 @@ export function validateGraph(graph: Graph): Diagnostic[] {
         let m: RegExpExecArray | null;
         const re = new RegExp(VAR_RE.source, VAR_RE.flags);
         while ((m = re.exec(field)) !== null) {
-          vars.add(m[1]);
+          vars.add(m[1].replace(/\.+$/, ""));
         }
       }
 
