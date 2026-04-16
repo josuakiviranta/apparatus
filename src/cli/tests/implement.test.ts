@@ -17,7 +17,7 @@ import { pipelineRunCommand } from "../commands/pipeline.js";
 
 const mockPipeline = pipelineRunCommand as ReturnType<typeof vi.fn>;
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => { vi.clearAllMocks(); });
 
 describe("implementCommand", () => {
   it("calls pipelineRunCommand with 'implement' and the project path", async () => {
