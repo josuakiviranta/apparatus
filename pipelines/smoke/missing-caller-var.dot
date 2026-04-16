@@ -1,0 +1,18 @@
+digraph missing_caller_var {
+  goal="Smoke: pipeline with declared input fails fast at startup when --var omitted"
+  inputs="required_input"
+
+  start [shape=Mdiamond]
+
+  // This node uses $required_input — declared in `inputs=`.
+  // Pre-flight check rejects the run with exit 1 before the Ink UI mounts
+  // when --var required_input=... is not supplied.
+  use_var [
+    shape=parallelogram,
+    tool_command="echo $required_input"
+  ]
+
+  done [shape=Msquare]
+
+  start -> use_var -> done
+}
