@@ -1,0 +1,50 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+vi.mock("fs", () => ({ existsSync: vi.fn().mockReturnValue(true) }));
+vi.mock("../lib/prompts.js", () => ({
+  bootstrapPrompts: vi.fn().mockResolvedValue({ needsSetup: false, injected: [] }),
+}));
+vi.mock("../commands/pipeline.js", () => ({
+  pipelineRunCommand: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock("../lib/output.js", () => ({
+  error: vi.fn(),
+  info: vi.fn(),
+}));
+
+import { implementCommand } from "../commands/implement.js";
+import { pipelineRunCommand } from "../commands/pipeline.js";
+
+const mockPipeline = pipelineRunCommand as ReturnType<typeof vi.fn>;
+
+beforeEach(() => vi.clearAllMocks());
+
+describe("implementCommand", () => {
+  it("calls pipelineRunCommand with 'implement' and the project path", async () => {
+    await implementCommand("/my/project", {});
+    expect(mockPipeline).toHaveBeenCalledWith(
+      "implement",
+      expect.objectContaining({ project: expect.stringContaining("my/project") })
+    );
+  });
+
+  it("passes max_iterations='0' by default (unlimited)", async () => {
+    await implementCommand("/my/project", {});
+    expect(mockPipeline).toHaveBeenCalledWith(
+      "implement",
+      expect.objectContaining({
+        variables: expect.objectContaining({ max_iterations: "0" }),
+      })
+    );
+  });
+
+  it("passes --max N as max_iterations variable", async () => {
+    await implementCommand("/my/project", { max: 5 });
+    expect(mockPipeline).toHaveBeenCalledWith(
+      "implement",
+      expect.objectContaining({
+        variables: expect.objectContaining({ max_iterations: "5" }),
+      })
+    );
+  });
+});
