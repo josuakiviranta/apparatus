@@ -1,0 +1,10 @@
+digraph implement {
+  goal="Autonomous implementation loop"
+
+  start [shape=Mdiamond]
+  run   [agent="implement", max_iterations="$max_iterations"]
+  done  [shape=Msquare]
+
+  start -> run
+  run   -> done
+}

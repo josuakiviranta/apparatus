@@ -26,6 +26,11 @@ export default defineConfig({
     for (const file of readdirSync("src/cli/agents")) {
       copyFileSync(`src/cli/agents/${file}`, `dist/agents/${file}`);
     }
+    // Copy bundled pipelines
+    mkdirSync("dist/pipelines", { recursive: true });
+    for (const file of readdirSync("src/cli/pipelines")) {
+      copyFileSync(`src/cli/pipelines/${file}`, `dist/pipelines/${file}`);
+    }
     console.log("Assets copied to dist/");
   },
 });
