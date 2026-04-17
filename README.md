@@ -88,6 +88,10 @@ ralph pipeline trace <runId> [--node-receive <nodeId>] [--full]
 ```
 Inspect the context and trace logs for a completed pipeline run. `--node-receive` filters to a specific node execution; `--full` shows the raw JSONL trace.
 
+### Pipeline script files
+
+Tool nodes can externalise their logic into `pipelines/scripts/<name>.<ext>` rather than embedding shell in the `.dot` file. Reference the script from a node with `script_file="pipelines/scripts/<name>.mjs"` (plus optional `script_args="..."` and `produces_from_stdout="<context-key>"`). See [`pipelines/scripts/mark-dispatched.mjs`](pipelines/scripts/mark-dispatched.mjs) for a working example, and the [design doc](docs/superpowers/specs/2026-04-17-pipeline-script-files-design.md) for the full attribute surface and rationale.
+
 ## Stopping the loop
 
 Press `Ctrl+C`. Ralph cleanly terminates its own claude subprocess without affecting any other running claude sessions.

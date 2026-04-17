@@ -110,6 +110,8 @@ ralph-cli/
 └── dist/                               # published artifact (not committed)
 ```
 
+Tool nodes (handled by `attractor/handlers/tool.ts`) may externalise their logic to a script on disk via the `script_file=` DOT attribute (resolved relative to the pipeline file, conventionally under `pipelines/scripts/`) — see [`docs/superpowers/specs/2026-04-17-pipeline-script-files-design.md`](../docs/superpowers/specs/2026-04-17-pipeline-script-files-design.md).
+
 ## Build Entry Points
 
 tsup compiles 4 entries:
