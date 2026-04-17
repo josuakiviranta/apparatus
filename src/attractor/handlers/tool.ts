@@ -35,7 +35,7 @@ function isTruthyAttr(val: unknown): boolean {
 // via console.warn and returns undefined. Empty stdout returns undefined with
 // no warning.
 function parseLastLineJson(stdout: string, nodeId: string): Record<string, unknown> | undefined {
-  const lines = stdout.split("\n").map((l) => l).filter((l) => l.trim() !== "");
+  const lines = stdout.split("\n").filter((l) => l.trim() !== "");
   if (lines.length === 0) return undefined;
   const last = lines[lines.length - 1];
   try {
@@ -71,6 +71,10 @@ export class ToolHandler implements NodeHandler {
       if (producesFromStdout) {
         const parsed = parseLastLineJson(stdout, node.id);
         if (parsed) {
+          // Native types preserved (numbers stay numbers, booleans stay booleans).
+          // Agent-handler coerces to String(); we intentionally diverge so tool nodes
+          // can emit typed values downstream. Consumers reading $key through
+          // expandVariables coerce back to string via template concatenation.
           for (const [k, v] of Object.entries(parsed)) {
             updates[k] = v;
           }
