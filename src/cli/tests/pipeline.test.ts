@@ -56,6 +56,7 @@ import {
   pipelineCreateCommand,
   pipelineRefineCommand,
 } from "../commands/pipeline.js";
+import type { Graph, Node, Edge } from "../../attractor/types.js";
 import * as childProcess from "child_process";
 import { composeCreatePrompt } from "../lib/pipeline-create-prompt.js";
 import * as engine from "../../attractor/core/engine.js";
@@ -446,6 +447,152 @@ describe("pipelineRefineCommand", () => {
     ).rejects.toThrow("exit:2");
     expect(out.success).not.toHaveBeenCalledWith(expect.stringContaining("Pipeline valid"));
     exitSpy.mockRestore();
+  });
+});
+
+describe("pipelineValidateCommand — edge-label diff", () => {
+  let dir: string;
+  let dotPath: string;
+  beforeEach(() => {
+    vi.clearAllMocks();
+    dir = mkdtempSync(join(tmpdir(), "ralph-pipeline-diff-"));
+    dotPath = join(dir, "test.dot");
+    writeFileSync(dotPath, VALID_DOT);
+  });
+  afterEach(() => { rmSync(dir, { recursive: true }); });
+
+  function makeNode(id: string, extra: Partial<Node> = {}): Node {
+    return { id, shape: "box", ...extra } as Node;
+  }
+  function makeGraph(nodes: Node[], edges: Edge[]): Graph {
+    return {
+      name: "g",
+      nodes: new Map(nodes.map(n => [n.id, n])),
+      edges,
+    };
+  }
+
+  it("warns on label rename with stable topology", async () => {
+    // Current dot file has start->done topology — irrelevant for the diff.
+    // Diff compares previousGraph (in memory) against the CURRENT parsed graph.
+    // For this test, we don't need the dot to match prev/curr exactly; we want to
+    // observe that diffEdgeLabels is called with the supplied previousGraph.
+    // Rebuild current graph in-memory and pass via a write-then-read of a real dot.
+    writeFileSync(dotPath, `digraph g {
+      start [shape=Mdiamond]
+      a [shape=box]
+      b [shape=box]
+      done [shape=Msquare]
+      start -> a
+      a -> b [label="approved"]
+      b -> done
+    }`);
+    const previousGraph = makeGraph(
+      [makeNode("start"), makeNode("a"), makeNode("b"), makeNode("done")],
+      [
+        { from: "start", to: "a" },
+        { from: "a", to: "b", label: "ok" },
+        { from: "b", to: "done" },
+      ],
+    );
+    const code = await pipelineValidateCommand(dotPath, { previousGraph });
+    expect(code).toBe(0);
+    const warnCalls = (out.warn as ReturnType<typeof vi.fn>).mock.calls.flat();
+    const hit = warnCalls.find(c => typeof c === "string" && c.includes('"ok"') && c.includes('"approved"') && c.includes("Edge labels are routing keys"));
+    expect(hit).toBeTruthy();
+  });
+
+  it("errors when the old label is still referenced elsewhere", async () => {
+    writeFileSync(dotPath, `digraph g {
+      start [shape=Mdiamond]
+      a [shape=box]
+      b [shape=box]
+      recovery [shape=box, agent="ok"]
+      done [shape=Msquare]
+      start -> a
+      a -> b [label="approved"]
+      b -> done
+      start -> recovery
+    }`);
+    const previousGraph = makeGraph(
+      [makeNode("start"), makeNode("a"), makeNode("b"), makeNode("recovery", { agent: "ok" }), makeNode("done")],
+      [
+        { from: "start", to: "a" },
+        { from: "a", to: "b", label: "ok" },
+        { from: "b", to: "done" },
+        { from: "start", to: "recovery" },
+      ],
+    );
+    const code = await pipelineValidateCommand(dotPath, { previousGraph });
+    expect(code).toBe(1);
+    const errorCalls = (out.error as ReturnType<typeof vi.fn>).mock.calls.flat();
+    const hit = errorCalls.find(c => typeof c === "string" && c.includes('"ok"') && c.includes("routing keys"));
+    expect(hit).toBeTruthy();
+  });
+
+  it("emits no rename diagnostic when topology changed", async () => {
+    writeFileSync(dotPath, `digraph g {
+      start [shape=Mdiamond]
+      a [shape=box]
+      c [shape=box]
+      done [shape=Msquare]
+      start -> a
+      a -> c [label="approved"]
+      c -> done
+    }`);
+    const previousGraph = makeGraph(
+      [makeNode("start"), makeNode("a"), makeNode("b"), makeNode("done")],
+      [
+        { from: "start", to: "a" },
+        { from: "a", to: "b", label: "ok" },
+        { from: "b", to: "done" },
+      ],
+    );
+    const code = await pipelineValidateCommand(dotPath, { previousGraph });
+    expect(code).toBe(0);
+    const warnCalls = (out.warn as ReturnType<typeof vi.fn>).mock.calls.flat();
+    const renameWarn = warnCalls.find(c => typeof c === "string" && c.includes("routing keys"));
+    expect(renameWarn).toBeFalsy();
+  });
+
+  it("emits no diagnostic when label is identical", async () => {
+    writeFileSync(dotPath, `digraph g {
+      start [shape=Mdiamond]
+      a [shape=box]
+      b [shape=box]
+      done [shape=Msquare]
+      start -> a
+      a -> b [label="ok"]
+      b -> done
+    }`);
+    const previousGraph = makeGraph(
+      [makeNode("start"), makeNode("a"), makeNode("b"), makeNode("done")],
+      [
+        { from: "start", to: "a" },
+        { from: "a", to: "b", label: "ok" },
+        { from: "b", to: "done" },
+      ],
+    );
+    const code = await pipelineValidateCommand(dotPath, { previousGraph });
+    expect(code).toBe(0);
+    const warnCalls = (out.warn as ReturnType<typeof vi.fn>).mock.calls.flat();
+    expect(warnCalls.find(c => typeof c === "string" && c.includes("routing keys"))).toBeFalsy();
+  });
+
+  it("emits no diff diagnostic when previousGraph is omitted", async () => {
+    writeFileSync(dotPath, `digraph g {
+      start [shape=Mdiamond]
+      a [shape=box]
+      b [shape=box]
+      done [shape=Msquare]
+      start -> a
+      a -> b [label="approved"]
+      b -> done
+    }`);
+    const code = await pipelineValidateCommand(dotPath);
+    expect(code).toBe(0);
+    const warnCalls = (out.warn as ReturnType<typeof vi.fn>).mock.calls.flat();
+    expect(warnCalls.find(c => typeof c === "string" && c.includes("routing keys"))).toBeFalsy();
   });
 });
 
