@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync, chmodSync, mkdirSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -196,5 +196,168 @@ describe("ToolHandler — script_file dispatch", () => {
     const outcome = await h.execute(node, baseCtx(), makeContext({ dotDir }));
     expect(outcome.status).toBe("fail");
     expect(outcome.failureReason).toMatch(/script_command_conflict/);
+  });
+});
+
+describe("ToolHandler — produces_from_stdout", () => {
+  let dotDir: string;
+  let scriptsDir: string;
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeAll(() => {
+    dotDir = mkdtempSync(join(tmpdir(), "tool-stdout-json-test-"));
+    scriptsDir = join(dotDir, "scripts");
+    mkdirSync(scriptsDir, { recursive: true });
+
+    // Script prints a chatty line, then a final-line JSON object
+    writeFileSync(
+      join(scriptsDir, "emit-json.mjs"),
+      "console.log('hello');\nconsole.log(JSON.stringify({a:1,b:2}));\n",
+    );
+    // Script prints only non-JSON content
+    writeFileSync(
+      join(scriptsDir, "emit-plain.mjs"),
+      "console.log('just plain text on the last line');\n",
+    );
+    // Script prints nothing (empty stdout)
+    writeFileSync(
+      join(scriptsDir, "emit-empty.mjs"),
+      "// no output at all\n",
+    );
+    // Script with invalid JSON but non-zero exit
+    writeFileSync(
+      join(scriptsDir, "emit-junk-fail.mjs"),
+      "console.log('not-json');\nprocess.exit(7);\n",
+    );
+  });
+
+  beforeEach(() => {
+    warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    warnSpy.mockRestore();
+  });
+
+  afterAll(() => {
+    rmSync(dotDir, { recursive: true, force: true });
+  });
+
+  it("produces_from_stdout=true + last-line JSON → flattens top-level keys + keeps tool.output", async () => {
+    const h = new ToolHandler();
+    const node: Node = {
+      id: "t",
+      shape: "parallelogram",
+      scriptFile: "scripts/emit-json.mjs",
+      producesFromStdout: true,
+    } as Node;
+    const outcome = await h.execute(node, baseCtx(), makeContext({ dotDir }));
+    expect(outcome.status).toBe("success");
+    expect(outcome.contextUpdates?.a).toBe(1);
+    expect(outcome.contextUpdates?.b).toBe(2);
+    expect(outcome.contextUpdates?.["tool.output"]).toContain("hello");
+    expect(outcome.contextUpdates?.["tool.output"]).toContain('{"a":1,"b":2}');
+  });
+
+  it("produces_from_stdout as string 'true' (DOT-coerced) also triggers parsing", async () => {
+    const h = new ToolHandler();
+    const node: Node = {
+      id: "t",
+      shape: "parallelogram",
+      scriptFile: "scripts/emit-json.mjs",
+      producesFromStdout: "true",
+    } as unknown as Node;
+    const outcome = await h.execute(node, baseCtx(), makeContext({ dotDir }));
+    expect(outcome.status).toBe("success");
+    expect(outcome.contextUpdates?.a).toBe(1);
+    expect(outcome.contextUpdates?.b).toBe(2);
+  });
+
+  it("produces_from_stdout=true + invalid JSON on last line → warn, only tool.output set, status still success", async () => {
+    const h = new ToolHandler();
+    const node: Node = {
+      id: "t",
+      shape: "parallelogram",
+      scriptFile: "scripts/emit-plain.mjs",
+      producesFromStdout: true,
+    } as Node;
+    const outcome = await h.execute(node, baseCtx(), makeContext({ dotDir }));
+    expect(outcome.status).toBe("success");
+    expect(outcome.contextUpdates?.["tool.output"]).toContain("just plain text");
+    // No extra keys beyond tool.output
+    expect(Object.keys(outcome.contextUpdates ?? {})).toEqual(["tool.output"]);
+    expect(warnSpy).toHaveBeenCalled();
+  });
+
+  it("produces_from_stdout=true + empty stdout → no crash, no extra keys, status preserved", async () => {
+    const h = new ToolHandler();
+    const node: Node = {
+      id: "t",
+      shape: "parallelogram",
+      scriptFile: "scripts/emit-empty.mjs",
+      producesFromStdout: true,
+    } as Node;
+    const outcome = await h.execute(node, baseCtx(), makeContext({ dotDir }));
+    expect(outcome.status).toBe("success");
+    expect(Object.keys(outcome.contextUpdates ?? {})).toEqual(["tool.output"]);
+    expect(outcome.contextUpdates?.["tool.output"]).toBe("");
+  });
+
+  it("produces_from_stdout=true + non-zero exit + invalid JSON → status fail, tool.output retained, no flattened keys", async () => {
+    const h = new ToolHandler();
+    const node: Node = {
+      id: "t",
+      shape: "parallelogram",
+      scriptFile: "scripts/emit-junk-fail.mjs",
+      producesFromStdout: true,
+    } as Node;
+    const outcome = await h.execute(node, baseCtx(), makeContext({ dotDir }));
+    expect(outcome.status).toBe("fail");
+    expect(outcome.contextUpdates?.["tool.output"]).toContain("not-json");
+    expect(Object.keys(outcome.contextUpdates ?? {})).toEqual(["tool.output"]);
+  });
+
+  it("absence of produces_from_stdout → stdout never parsed (regression)", async () => {
+    const h = new ToolHandler();
+    const node: Node = {
+      id: "t",
+      shape: "parallelogram",
+      scriptFile: "scripts/emit-json.mjs",
+      // producesFromStdout intentionally omitted
+    };
+    const outcome = await h.execute(node, baseCtx(), makeContext({ dotDir }));
+    expect(outcome.status).toBe("success");
+    // Only tool.output — no a/b flattened
+    expect(Object.keys(outcome.contextUpdates ?? {})).toEqual(["tool.output"]);
+    expect(outcome.contextUpdates?.a).toBeUndefined();
+    expect(outcome.contextUpdates?.b).toBeUndefined();
+  });
+
+  it("produces_from_stdout=false → stdout never parsed", async () => {
+    const h = new ToolHandler();
+    const node: Node = {
+      id: "t",
+      shape: "parallelogram",
+      scriptFile: "scripts/emit-json.mjs",
+      producesFromStdout: false,
+    } as Node;
+    const outcome = await h.execute(node, baseCtx(), makeContext({ dotDir }));
+    expect(outcome.status).toBe("success");
+    expect(Object.keys(outcome.contextUpdates ?? {})).toEqual(["tool.output"]);
+  });
+
+  it("produces_from_stdout=true works with tool_command branch too", async () => {
+    const h = new ToolHandler();
+    const node: Node = {
+      id: "t",
+      shape: "parallelogram",
+      toolCommand: `printf '%s\\n%s\\n' 'prelude' '{"x":42,"y":"ok"}'`,
+      producesFromStdout: true,
+    } as Node;
+    const outcome = await h.execute(node, baseCtx(), makeContext({ dotDir }));
+    expect(outcome.status).toBe("success");
+    expect(outcome.contextUpdates?.x).toBe(42);
+    expect(outcome.contextUpdates?.y).toBe("ok");
+    expect(outcome.contextUpdates?.["tool.output"]).toContain("prelude");
   });
 });

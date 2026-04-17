@@ -24,12 +24,60 @@ function shellQuote(s: string): string {
   return `'${s.replace(/'/g, `'\\''`)}'`;
 }
 
+// Coerce a node attribute that may be either a real boolean (unquoted DOT value)
+// or the string "true"/"false" (quoted DOT value or hand-written).
+function isTruthyAttr(val: unknown): boolean {
+  return val === true || val === "true";
+}
+
+// Parse the last non-empty line of stdout as JSON. On success, returns the
+// parsed top-level object as a string-keyed record. On failure, emits a warning
+// via console.warn and returns undefined. Empty stdout returns undefined with
+// no warning.
+function parseLastLineJson(stdout: string, nodeId: string): Record<string, unknown> | undefined {
+  const lines = stdout.split("\n").map((l) => l).filter((l) => l.trim() !== "");
+  if (lines.length === 0) return undefined;
+  const last = lines[lines.length - 1];
+  try {
+    const parsed = JSON.parse(last);
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      console.warn(
+        `[tool:${nodeId}] produces_from_stdout: last line parsed but is not a JSON object — skipping flatten`,
+      );
+      return undefined;
+    }
+    return parsed as Record<string, unknown>;
+  } catch (err) {
+    console.warn(
+      `[tool:${nodeId}] produces_from_stdout: failed to parse last line as JSON — ${(err as Error).message}`,
+    );
+    return undefined;
+  }
+}
+
 export class ToolHandler implements NodeHandler {
   async execute(node: Node, ctx: PipelineContext, meta: HandlerExecutionContext): Promise<Outcome> {
     const nodeRecord = node as unknown as Record<string, unknown>;
     const scriptFile = typeof nodeRecord.scriptFile === "string" ? nodeRecord.scriptFile : undefined;
     const scriptArgs = typeof nodeRecord.scriptArgs === "string" ? nodeRecord.scriptArgs : undefined;
+    const producesFromStdout = isTruthyAttr(nodeRecord.producesFromStdout);
     const defaults = extractDefaults(nodeRecord);
+
+    // Build stdout-derived context updates. tool.output is always present;
+    // when produces_from_stdout=true we additionally flatten the last-line JSON
+    // object's top-level keys (flat, no node-ID prefix — matches agent-handler).
+    const buildUpdates = (stdout: string): Record<string, unknown> => {
+      const updates: Record<string, unknown> = { "tool.output": stdout };
+      if (producesFromStdout) {
+        const parsed = parseLastLineJson(stdout, node.id);
+        if (parsed) {
+          for (const [k, v] of Object.entries(parsed)) {
+            updates[k] = v;
+          }
+        }
+      }
+      return updates;
+    };
 
     if (scriptFile) {
       if (node.toolCommand) {
@@ -61,10 +109,10 @@ export class ToolHandler implements NodeHandler {
         return {
           status: "fail",
           failureReason: `Script exited with code ${result.status}: ${stderr}`,
-          contextUpdates: { "tool.output": stdout },
+          contextUpdates: buildUpdates(stdout),
         };
       }
-      return { status: "success", contextUpdates: { "tool.output": stdout } };
+      return { status: "success", contextUpdates: buildUpdates(stdout) };
     }
 
     if (!node.toolCommand) {
@@ -77,9 +125,9 @@ export class ToolHandler implements NodeHandler {
       return {
         status: "fail",
         failureReason: `Command exited with code ${result.status}: ${result.stderr ?? ""}`,
-        contextUpdates: { "tool.output": stdout },
+        contextUpdates: buildUpdates(stdout),
       };
     }
-    return { status: "success", contextUpdates: { "tool.output": stdout } };
+    return { status: "success", contextUpdates: buildUpdates(stdout) };
   }
 }
