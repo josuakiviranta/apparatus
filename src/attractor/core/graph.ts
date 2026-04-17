@@ -253,7 +253,7 @@ const SUPPORTED_SCRIPT_EXTS = [".mjs", ".js", ".cjs", ".ts", ".mts", ".sh", ".ba
 
 const INLINE_SCRIPT_PATTERNS: RegExp[] = [
   /\bnode\s+-e\b/,
-  /\bpython3?\s+-c\b/,
+  /\bpython[23]?\s+-c\b/,
   /\bbash\s+-c\b/,
   /<<\s*['"]?[A-Z]/, // heredoc marker
 ];

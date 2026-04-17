@@ -682,6 +682,12 @@ describe("validateGraph — inline_script_smell", () => {
     expect(diags.some(d => d.rule === "inline_script_smell")).toBe(true);
   });
 
+  it("warns on python2 -c inline scripts", () => {
+    const g = parseDot(wrap("python2 -c 'print(1)'"));
+    const diags = validateGraph(g);
+    expect(diags.some(d => d.rule === "inline_script_smell")).toBe(true);
+  });
+
   it("warns on bash -c inline scripts", () => {
     const g = parseDot(wrap("bash -c 'echo hi'"));
     const diags = validateGraph(g);
