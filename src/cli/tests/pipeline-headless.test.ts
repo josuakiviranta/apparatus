@@ -89,11 +89,21 @@ describe("pipelineRunCommand headless safety", () => {
 
     Object.defineProperty(process.stdin, "isTTY", { value: undefined, writable: true, configurable: true });
 
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
     await expect(pipelineRunCommand(dotPath, { logsRoot: dir })).rejects.toThrow("process.exit called");
     expect(output.error).toHaveBeenCalledWith(
-      expect.stringContaining("headless_safe=false")
+      expect.stringContaining("headless_safe=false"),
     );
     expect(exitSpy).toHaveBeenCalledWith(1);
+
+    const tipLine = logSpy.mock.calls
+      .map((c) => c[0])
+      .find((line): line is string => typeof line === "string" && line.startsWith("Tip: ralph pipeline refine"));
+    expect(tipLine).toBeDefined();
+    expect(tipLine).toContain("unsafe");
+
+    logSpy.mockRestore();
   });
 
   it("does not block when headlessSafe is absent and not TTY", async () => {

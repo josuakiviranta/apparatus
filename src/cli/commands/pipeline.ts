@@ -112,6 +112,13 @@ export async function pipelineValidateCommand(dotFile: string, opts: PipelineVal
 }
 
 
+function printRefineTip(invokedAs: string): void {
+  const name = isNameShorthand(invokedAs) ? invokedAs : basename(invokedAs, ".dot");
+  console.log(
+    `Tip: ralph pipeline refine ${name} to improve this pipeline with agent assistance.`,
+  );
+}
+
 export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptions = {}): Promise<void> {
   const project = opts.project ? resolve(opts.project) : process.cwd();
   const absPath = isNameShorthand(dotFile)
@@ -127,7 +134,11 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
   let graph = parseDot(src);
 
   try { validateOrRaise(graph); }
-  catch (err) { await output.error((err as Error).message); process.exit(1); }
+  catch (err) {
+    await output.error((err as Error).message);
+    printRefineTip(dotFile);
+    process.exit(1);
+  }
 
   // Pre-flight: scan for missing caller-supplied variables before expansion
   const preflight = scanUndeclaredCallerVars(graph, opts.variables ?? {});
@@ -142,6 +153,7 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
         invokedAs: dotFile,
       }),
     );
+    printRefineTip(dotFile);
     process.exit(1);
   }
 
@@ -166,6 +178,7 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
       `This pipeline has headless_safe=false and cannot run without a TTY.\n` +
       `Run it interactively: ralph pipeline run ${dotFile}`
     );
+    printRefineTip(dotFile);
     process.exit(1);
   }
 
@@ -220,6 +233,7 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
   // Immediately kills the interactive child so agent-handler doesn't wait 5s.
   let killInteractiveChild: (() => void) | null = null;
 
+  let pipelineFailed = false;
   const ac = new AbortController();
   const onSignal = () => {
     if (currentBlockNodeId !== null) {
@@ -380,12 +394,16 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
       });
       currentBlockNodeId = null;
     }
+    if (result.status !== "success") {
+      pipelineFailed = true;
+    }
   } finally {
     process.off("SIGINT", onSignal);
     process.off("SIGTERM", onSignal);
     await new Promise((resolve) => setImmediate(resolve));
     done();
     await waitUntilExit();
+    if (pipelineFailed) printRefineTip(dotFile);
   }
 }
 
