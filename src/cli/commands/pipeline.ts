@@ -15,10 +15,11 @@ import {
 import { InkInterviewer } from "../../attractor/interviewer/ink.js";
 import { AutoApproveInterviewer } from "../../attractor/interviewer/auto-approve.js";
 import { getPipelinesDir, resolvePipelineArg, isNameShorthand } from "../lib/pipeline-resolver.js";
-import { spawn, spawnSync } from "child_process";
+import { spawnSync } from "child_process";
 import { PassThrough } from "stream";
-import { streamEvents, parseStreamJsonEvents } from "../lib/stream-formatter.js";
+import { parseStreamJsonEvents, streamEvents } from "../lib/stream-formatter.js";
 import { composeCreatePrompt } from "../lib/pipeline-create-prompt.js";
+import { runTwoPhaseClaudeSession } from "../lib/session.js";
 import * as output from "../lib/output.js";
 import { renderPipelineApp } from "../components/PipelineApp.js";
 import { classifyNode } from "../lib/classifyNode.js";
@@ -513,36 +514,10 @@ export async function pipelineCreateCommand(name: string, opts: PipelineCreateOp
   await output.step(`Creating pipeline: ${name}`);
   await output.step(`Target: ${dotPath}`);
 
-  // Phase 1: non-interactive kickoff to get session ID
-  let sessionId: string | null = null;
-  const child = spawn(
-    "claude",
-    ["-p", trigger, "--output-format", "stream-json", "--dangerously-skip-permissions"],
-    { cwd: project, env: process.env, stdio: ["ignore", "pipe", "pipe"] }
-  );
-  const exitPromise = new Promise<void>(res => child.on("close", () => res()));
-  await output.stream(
-    streamEvents(child.stdout as NodeJS.ReadableStream, {
-      onSessionId: id => { sessionId = id; },
-    })
-  );
-  await exitPromise;
+  const { exitCode } = await runTwoPhaseClaudeSession({ cwd: project, trigger });
 
-  // Phase 2: interactive resume
-  await output.step("━━━ Launching interactive session ━━━");
-  const resumeArgs = [
-    "--dangerously-skip-permissions",
-    ...(sessionId ? ["--resume", sessionId] : []),
-  ];
-  const result = spawnSync("claude", resumeArgs, {
-    cwd: project,
-    stdio: "inherit",
-    env: process.env,
-  });
-
-  // Post-session: validate
-  if ((result.status ?? 1) !== 0) {
-    process.exit(result.status ?? 1);
+  if (exitCode !== 0) {
+    process.exit(exitCode);
   }
 
   if (!existsSync(dotPath)) {
@@ -551,8 +526,8 @@ export async function pipelineCreateCommand(name: string, opts: PipelineCreateOp
   }
 
   await output.step("Validating pipeline...");
-  const exitCode = await pipelineValidateCommand(dotPath);
-  process.exit(exitCode);
+  const validateExit = await pipelineValidateCommand(dotPath);
+  process.exit(validateExit);
 }
 
 export interface PipelineRefineOptions {
@@ -607,35 +582,10 @@ export async function pipelineRefineCommand(name: string, opts: PipelineRefineOp
   await output.step(`Refining pipeline: ${name}`);
   await output.step(`Target: ${dotPath}`);
 
-  // Phase 1: non-interactive kickoff to obtain session ID
-  let sessionId: string | null = null;
-  const child = spawn(
-    "claude",
-    ["-p", trigger, "--output-format", "stream-json", "--dangerously-skip-permissions"],
-    { cwd: project, env: process.env, stdio: ["ignore", "pipe", "pipe"] },
-  );
-  const exitPromise = new Promise<void>((res) => child.on("close", () => res()));
-  await output.stream(
-    streamEvents(child.stdout as NodeJS.ReadableStream, {
-      onSessionId: (id) => { sessionId = id; },
-    }),
-  );
-  await exitPromise;
+  const { exitCode } = await runTwoPhaseClaudeSession({ cwd: project, trigger });
 
-  // Phase 2: interactive resume
-  await output.step("━━━ Launching interactive session ━━━");
-  const resumeArgs = [
-    "--dangerously-skip-permissions",
-    ...(sessionId ? ["--resume", sessionId] : []),
-  ];
-  const result = spawnSync("claude", resumeArgs, {
-    cwd: project,
-    stdio: "inherit",
-    env: process.env,
-  });
-
-  if ((result.status ?? 1) !== 0) {
-    process.exit(result.status ?? 1);
+  if (exitCode !== 0) {
+    process.exit(exitCode);
   }
 
   if (!existsSync(dotPath)) {
@@ -644,6 +594,6 @@ export async function pipelineRefineCommand(name: string, opts: PipelineRefineOp
   }
 
   await output.step("Validating pipeline...");
-  const exitCode = await pipelineValidateCommand(dotPath);
-  process.exit(exitCode);
+  const validateExit = await pipelineValidateCommand(dotPath);
+  process.exit(validateExit);
 }

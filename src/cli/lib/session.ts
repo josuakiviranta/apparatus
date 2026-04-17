@@ -1,3 +1,7 @@
+import { spawn, spawnSync } from "child_process";
+import { streamEvents } from "./stream-formatter.js";
+import * as output from "./output.js";
+
 export type Turn =
   | { role: "user"; text: string; at: number }
   | {
@@ -95,6 +99,55 @@ export class Session {
     }
     return Array.from(counts, ([name, count]) => ({ name, count }));
   }
+}
+
+export interface TwoPhaseSessionOptions {
+  cwd: string;
+  trigger: string;
+}
+
+export interface TwoPhaseSessionResult {
+  sessionId: string | null;
+  exitCode: number;
+}
+
+export async function runTwoPhaseClaudeSession(
+  opts: TwoPhaseSessionOptions,
+): Promise<TwoPhaseSessionResult> {
+  let sessionId: string | null = null;
+  const child = spawn(
+    "claude",
+    ["-p", opts.trigger, "--output-format", "stream-json", "--dangerously-skip-permissions"],
+    { cwd: opts.cwd, env: process.env, stdio: ["ignore", "pipe", "pipe"] },
+  );
+  const exitPromise = new Promise<number>((res) => {
+    child.on("close", (code) => res(code ?? 0));
+  });
+  await output.stream(
+    streamEvents(child.stdout as NodeJS.ReadableStream, {
+      onSessionId: (id) => {
+        sessionId = id;
+      },
+    }),
+  );
+  const phase1Exit = await exitPromise;
+
+  if (phase1Exit !== 0) {
+    return { sessionId, exitCode: phase1Exit };
+  }
+
+  await output.step("━━━ Launching interactive session ━━━");
+  const resumeArgs = [
+    "--dangerously-skip-permissions",
+    ...(sessionId ? ["--resume", sessionId] : []),
+  ];
+  const result = spawnSync("claude", resumeArgs, {
+    cwd: opts.cwd,
+    stdio: "inherit",
+    env: process.env,
+  });
+
+  return { sessionId, exitCode: result.status ?? 1 };
 }
 
 export function buildSessionDigest(session: Session): InteractiveSessionDigest {
