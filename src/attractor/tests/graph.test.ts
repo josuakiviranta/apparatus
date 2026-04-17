@@ -1,5 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "fs";
+import { tmpdir } from "os";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 import { parseDot, validateGraph, resolveHandlerType } from "../core/graph.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 describe("parseDot", () => {
   it("parses a minimal digraph with start and exit nodes", () => {
@@ -645,5 +651,188 @@ describe("parseDot inputs= attribute", () => {
     }`;
     const g = parseDot(src);
     expect(g.inputs).toBeUndefined();
+  });
+});
+
+describe("validateGraph — inline_script_smell", () => {
+  function wrap(toolCommand: string): string {
+    return `digraph g {
+      start [shape=Mdiamond]
+      done [shape=Msquare]
+      t [type="tool", tool_command="${toolCommand.replace(/"/g, '\\"')}"]
+      start -> t -> done
+    }`;
+  }
+
+  it("warns on node -e inline scripts", () => {
+    const g = parseDot(wrap("node -e 'console.log(1)'"));
+    const diags = validateGraph(g);
+    expect(diags.some(d => d.rule === "inline_script_smell" && d.severity === "warning")).toBe(true);
+  });
+
+  it("warns on python -c inline scripts", () => {
+    const g = parseDot(wrap("python -c 'print(1)'"));
+    const diags = validateGraph(g);
+    expect(diags.some(d => d.rule === "inline_script_smell")).toBe(true);
+  });
+
+  it("warns on python3 -c inline scripts", () => {
+    const g = parseDot(wrap("python3 -c 'print(1)'"));
+    const diags = validateGraph(g);
+    expect(diags.some(d => d.rule === "inline_script_smell")).toBe(true);
+  });
+
+  it("warns on bash -c inline scripts", () => {
+    const g = parseDot(wrap("bash -c 'echo hi'"));
+    const diags = validateGraph(g);
+    expect(diags.some(d => d.rule === "inline_script_smell")).toBe(true);
+  });
+
+  it("warns on heredoc marker", () => {
+    const g = parseDot(wrap("cat <<'EOF'"));
+    const diags = validateGraph(g);
+    expect(diags.some(d => d.rule === "inline_script_smell")).toBe(true);
+  });
+
+  it("does not warn at boundary of 120 chars", () => {
+    // Exactly 120 chars, no trigger substrings
+    const cmd = "a".repeat(120);
+    expect(cmd.length).toBe(120);
+    const g = parseDot(wrap(cmd));
+    const diags = validateGraph(g);
+    expect(diags.some(d => d.rule === "inline_script_smell")).toBe(false);
+  });
+
+  it("warns at 121 chars", () => {
+    const cmd = "a".repeat(121);
+    expect(cmd.length).toBe(121);
+    const g = parseDot(wrap(cmd));
+    const diags = validateGraph(g);
+    expect(diags.some(d => d.rule === "inline_script_smell")).toBe(true);
+  });
+
+  it("does not warn on short commands", () => {
+    const g = parseDot(wrap("cd $project && git push"));
+    const diags = validateGraph(g);
+    expect(diags.some(d => d.rule === "inline_script_smell")).toBe(false);
+  });
+
+  it("applies length check against pre-expansion text ($vars stay literal)", () => {
+    // Short runtime-expanded value but literal is > 120: must warn.
+    const literal = "echo " + "$x".repeat(80); // 5 + 160 = 165 chars of literal
+    expect(literal.length).toBeGreaterThan(120);
+    const g = parseDot(wrap(literal));
+    const diags = validateGraph(g);
+    expect(diags.some(d => d.rule === "inline_script_smell")).toBe(true);
+  });
+
+  it("only applies to tool-handler nodes, not codergen", () => {
+    const g = parseDot(`digraph g {
+      start [shape=Mdiamond]
+      done [shape=Msquare]
+      work [shape=box, prompt="node -e 'foo'"]
+      start -> work -> done
+    }`);
+    const diags = validateGraph(g);
+    expect(diags.some(d => d.rule === "inline_script_smell")).toBe(false);
+  });
+});
+
+describe("validateGraph — script_file rules", () => {
+  let tmp: string;
+
+  beforeEach(() => {
+    tmp = mkdtempSync(join(tmpdir(), "ralph-graph-validate-"));
+  });
+  afterEach(() => {
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it("does not throw when dotDir is omitted (script_file_exists skipped)", () => {
+    const g = parseDot(`digraph g {
+      start [shape=Mdiamond]
+      done [shape=Msquare]
+      t [type="tool", script_file="scripts/missing.mjs"]
+      start -> t -> done
+    }`);
+    expect(() => validateGraph(g)).not.toThrow();
+    const diags = validateGraph(g);
+    expect(diags.some(d => d.rule === "script_file_exists")).toBe(false);
+  });
+
+  it("errors when script_file points to a missing file (dotDir given)", () => {
+    const g = parseDot(`digraph g {
+      start [shape=Mdiamond]
+      done [shape=Msquare]
+      t [type="tool", script_file="scripts/missing.mjs"]
+      start -> t -> done
+    }`);
+    const diags = validateGraph(g, tmp);
+    const errs = diags.filter(d => d.rule === "script_file_exists" && d.severity === "error");
+    expect(errs).toHaveLength(1);
+    expect(errs[0].message).toContain("scripts/missing.mjs");
+  });
+
+  it("does not error when script_file exists (using repo fixture)", () => {
+    // Use the real repo fixture path so the test exercises the fixture as well.
+    const fixturesDir = join(__dirname, "fixtures", "pipelines");
+    const g = parseDot(`digraph g {
+      start [shape=Mdiamond]
+      done [shape=Msquare]
+      t [type="tool", script_file="hello.mjs"]
+      start -> t -> done
+    }`);
+    const diags = validateGraph(g, fixturesDir);
+    expect(diags.some(d => d.rule === "script_file_exists")).toBe(false);
+  });
+
+  it("errors when both script_file and tool_command are set", () => {
+    // Write a real fixture so script_file_exists doesn't also fire
+    mkdirSync(join(tmp, "scripts"), { recursive: true });
+    writeFileSync(join(tmp, "scripts", "x.mjs"), "");
+    const g = parseDot(`digraph g {
+      start [shape=Mdiamond]
+      done [shape=Msquare]
+      t [type="tool", script_file="scripts/x.mjs", tool_command="echo hi"]
+      start -> t -> done
+    }`);
+    const diags = validateGraph(g, tmp);
+    const errs = diags.filter(d => d.rule === "script_command_conflict" && d.severity === "error");
+    expect(errs).toHaveLength(1);
+  });
+
+  it("errors on unsupported script extension (.rb)", () => {
+    mkdirSync(join(tmp, "scripts"), { recursive: true });
+    writeFileSync(join(tmp, "scripts", "x.rb"), "");
+    const g = parseDot(`digraph g {
+      start [shape=Mdiamond]
+      done [shape=Msquare]
+      t [type="tool", script_file="scripts/x.rb"]
+      start -> t -> done
+    }`);
+    const diags = validateGraph(g, tmp);
+    const errs = diags.filter(d => d.rule === "unsupported_script_extension" && d.severity === "error");
+    expect(errs).toHaveLength(1);
+    expect(errs[0].message).toContain(".rb");
+  });
+
+  it("accepts all supported extensions", () => {
+    const supported = [".mjs", ".js", ".cjs", ".ts", ".mts", ".sh", ".bash", ".py"];
+    for (const ext of supported) {
+      mkdirSync(join(tmp, "scripts"), { recursive: true });
+      const rel = `scripts/x${ext}`;
+      writeFileSync(join(tmp, rel), "");
+      const g = parseDot(`digraph g {
+        start [shape=Mdiamond]
+        done [shape=Msquare]
+        t [type="tool", script_file="${rel}"]
+        start -> t -> done
+      }`);
+      const diags = validateGraph(g, tmp);
+      expect(
+        diags.some(d => d.rule === "unsupported_script_extension"),
+        `ext ${ext} should be accepted`,
+      ).toBe(false);
+    }
   });
 });

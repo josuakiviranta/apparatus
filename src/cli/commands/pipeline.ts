@@ -88,7 +88,7 @@ export async function pipelineValidateCommand(dotFile: string, opts: PipelineVal
   catch { await output.error(`Cannot read file: ${absPath}`); return 1; }
 
   const graph = parseDot(src);
-  const diags = validateGraph(graph);
+  const diags = validateGraph(graph, dirname(absPath));
   const errors   = diags.filter(d => d.severity === "error");
   const warnings = diags.filter(d => d.severity === "warning");
 

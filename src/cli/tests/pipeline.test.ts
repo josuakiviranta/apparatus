@@ -70,7 +70,10 @@ const VALID_DOT = `digraph g {
 
 describe("pipelineValidateCommand", () => {
   let dir: string;
-  beforeEach(() => { dir = mkdtempSync(join(tmpdir(), "ralph-pipeline-test-")); });
+  beforeEach(() => {
+    vi.clearAllMocks();
+    dir = mkdtempSync(join(tmpdir(), "ralph-pipeline-test-"));
+  });
   afterEach(() => { rmSync(dir, { recursive: true }); });
 
   it("returns 0 for a valid dot file", async () => {
@@ -99,6 +102,24 @@ describe("pipelineValidateCommand", () => {
     writeFileSync(join(dir, "pipelines", "review.dot"), VALID_DOT);
     const code = await pipelineValidateCommand("review", { project: dir });
     expect(code).toBe(0);
+  });
+
+  it("wires dotDir through so script_file_exists fires on missing script", async () => {
+    // This test proves validateGraph is invoked with dirname(absPath): the
+    // script_file_exists diagnostic is ONLY emitted when dotDir is non-undefined.
+    const dotFile = join(dir, "scripts-missing.dot");
+    writeFileSync(dotFile, `digraph g {
+      start [shape=Mdiamond]
+      done [shape=Msquare]
+      t [type="tool", script_file="scripts/missing.mjs"]
+      start -> t -> done
+    }`);
+    const code = await pipelineValidateCommand(dotFile);
+    expect(code).toBe(1);
+    const errorCalls = (out.error as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+    const messages = errorCalls.map((c) => String(c[0]));
+    expect(messages.some((m) => m.includes("[script_file_exists]"))).toBe(true);
+    expect(messages.some((m) => m.includes("scripts/missing.mjs"))).toBe(true);
   });
 });
 
