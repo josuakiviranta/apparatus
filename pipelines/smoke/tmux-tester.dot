@@ -1,0 +1,15 @@
+digraph tmux_tester_smoke {
+  graph [goal="Verify tmux_tester node runs build+test via tmux harness"]
+
+  start [shape=Mdiamond]
+
+  launch_tmux [type="tool", tool_command="tmux new-window -c \"$project\" -n \"pipe-tmux-tester-inner-$run_id\""]
+
+  tmux_tester [agent="implement", json_schema_file="../schemas/tmux-test-result.json", produces="test_result, summary", prompt="Read docs/harness/tmux-drive.md first — it contains the authoritative bash harness patterns.\n\nA tmux test window named 'pipe-tmux-tester-inner-$run_id' was just opened in the current session for project $project.\n\nYour job: drive that window to run the build and test suite, then report the outcome.\n\nSteps:\n1. Source the harness block from the doc.\n2. Set SESSION=$(tmux display-message -p '#S') and WIN=pipe-tmux-tester-inner-$run_id.\n3. Run the following in the window via the harness:\n   npm run build && npm test\n4. Use wait_for_string to wait for the test suite to finish (wait for 'Test Files' or 'Tests' summary line, budget 300000ms).\n5. Capture and read current.txt.\n6. Output test_result='pass' if all tests passed, 'fail' otherwise.\n7. Include a 1-2 sentence summary of what ran and how many tests passed/failed.\n\nDo NOT run interactive commands. Do NOT git push. Only build and test."]
+
+  done [shape=Msquare]
+
+  start -> launch_tmux
+  launch_tmux -> tmux_tester
+  tmux_tester -> done
+}

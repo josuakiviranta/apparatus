@@ -3,6 +3,7 @@ import { render } from "ink-testing-library";
 import { describe, it, expect, vi } from "vitest";
 import { LiveFooter } from "../components/LiveFooter.js";
 import type { LiveBlockWithInput } from "../components/LiveFooter.js";
+import { plainFrame } from "./helpers/plain-frame.js";
 
 function makeLive(overrides: Partial<LiveBlockWithInput> = {}): LiveBlockWithInput {
   return {
@@ -83,7 +84,7 @@ describe("LiveFooter", () => {
   it("shows a disabled input placeholder when kind is interactive-agent and input is absent", () => {
     const block = makeLive({ input: undefined });
     const { lastFrame } = render(<LiveFooter block={block} />);
-    const frame = lastFrame() ?? "";
+    const frame = plainFrame(lastFrame());
     // Placeholder prompt row must exist to keep line count stable
     expect(frame).toMatch(/^>/m);
     // But there must be no interactive value content
@@ -130,7 +131,7 @@ describe("LiveFooter", () => {
   it("does not show input row for agent (non-interactive) kind", () => {
     const block = makeAgentLive({ tracePath: undefined });
     const { lastFrame } = render(<LiveFooter block={block} />);
-    const frame = lastFrame() ?? "";
+    const frame = plainFrame(lastFrame());
     expect(frame).not.toMatch(/^> /m);
   });
 });

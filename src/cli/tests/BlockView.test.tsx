@@ -3,6 +3,7 @@ import { render } from "ink-testing-library";
 import { describe, it, expect } from "vitest";
 import { BlockView, BodyLineView } from "../components/BlockView.js";
 import type { Block, BodyLine } from "../lib/pipelineEvents.js";
+import { plainFrame } from "./helpers/plain-frame.js";
 
 function makeBlock(overrides: Partial<Block> = {}): Block {
   return {
@@ -116,7 +117,7 @@ describe("BlockView", () => {
   it("indents outcome line with 2 spaces", () => {
     const block = makeBlock();
     const { lastFrame } = render(<BlockView block={block} index={1} />);
-    const frame = lastFrame() ?? "";
+    const frame = plainFrame(lastFrame());
     expect(frame).toMatch(/^  ✓/m);
   });
 
@@ -125,7 +126,7 @@ describe("BlockView", () => {
       body: [{ kind: "text", role: "you", text: "hello" }],
     });
     const { lastFrame } = render(<BlockView block={block} index={1} />);
-    const frame = lastFrame() ?? "";
+    const frame = plainFrame(lastFrame());
     expect(frame).toMatch(/^  you:/m);
   });
 

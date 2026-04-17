@@ -69,12 +69,16 @@ wait_stable() {
 }
 
 # ---------- Pattern 1: start_run ----------
-# Usage: start_run "<command to run in the new window>"
+# Usage: start_run "<command>" [label]
+# If label is given, the window is named "ralph-<label>-<shortid>" (e.g.
+# "ralph-pipe-tmux-tester-8f3c") so you can spot it in `Ctrl-b w`. Without a
+# label it falls back to the legacy "ralph-drive-<ts>-<pid>" format.
 # Side effects: sets SESSION, WIN, RUN_DIR, RUN_ID, CAPTURE_INDEX; creates the
 # scratchpad directory; creates a new tmux window in the current session; writes
 # meta.json; launches the command.
 start_run() {
   local cmd=$1
+  local label=${2:-}
   if [ -z "$cmd" ]; then
     echo "start_run: command is required" >&2
     return 2
@@ -82,7 +86,16 @@ start_run() {
 
   RUN_ID="drive-$(date +%s)-$$"
   SESSION=$(tmux display-message -p '#S')
-  WIN="ralph-$RUN_ID"
+  if [ -n "$label" ]; then
+    # sanitize: [A-Za-z0-9._-] only
+    local safe_label
+    safe_label=$(printf '%s' "$label" | tr -c 'A-Za-z0-9._-' '-' | sed 's/-\+/-/g; s/^-//; s/-$//')
+    local shortid
+    shortid=$(printf '%04x' "$((RANDOM * RANDOM & 0xFFFF))")
+    WIN="ralph-${safe_label}-${shortid}"
+  else
+    WIN="ralph-$RUN_ID"
+  fi
   RUN_DIR="$HOME/.ralph/harness/$RUN_ID"
   CAPTURE_INDEX=0
   mkdir -p "$RUN_DIR"
@@ -279,13 +292,19 @@ recover_orphans() {
 
 ## Pattern 1 — Start a run
 
-`start_run "<cmd>"` creates a new tmux window in your current session (without stealing focus), waits for the shell to print its prompt, records run metadata, and launches the command.
+`start_run "<cmd>" [label]` creates a new tmux window in your current session (without stealing focus), waits for the shell to print its prompt, records run metadata, and launches the command.
+
+**Always pass a `label`** when you want the observer (you or the user) to find the window quickly in `Ctrl-b w`. The label becomes part of the window name: `ralph-<label>-<shortid>` (e.g. `ralph-pipe-tmux-tester-8f3c`). Omitting the label falls back to the legacy `ralph-drive-<ts>-<pid>` format, which is harder to eyeball when multiple runs coexist.
+
+Label guidance:
+- Use kebab-case, describe what's running (`pipe-illumination-to-plan`, `meditate-session`, `implement-loop`).
+- Keep it under ~30 chars; non-alphanumeric characters are collapsed to `-` automatically.
 
 After it returns, these globals are set and are used implicitly by every other pattern:
 
-- `RUN_ID` — `drive-<unix-seconds>-<pid>`, unique even when two runs start in the same second.
+- `RUN_ID` — `drive-<unix-seconds>-<pid>`, unique even when two runs start in the same second (used for the scratchpad path, not the window name when a label is given).
 - `SESSION` — the tmux session you were attached to.
-- `WIN` — the new window's name, `ralph-<run-id>`.
+- `WIN` — the new window's name. With a label: `ralph-<label>-<shortid>`. Without: `ralph-<run-id>`.
 - `RUN_DIR` — `~/.ralph/harness/<run-id>/`, the scratchpad for this run.
 - `CAPTURE_INDEX` — starts at `0`; Pattern 2 increments it.
 
@@ -383,7 +402,7 @@ orphan: /Users/you/.ralph/harness/drive-1712950000-38291/ window=ralph-drive-171
 orphan: /Users/you/.ralph/harness/drive-1712950123-40104/ window=ralph-drive-1712950123-40104
 
 To kill all orphan windows:
-  tmux list-windows -a -F '#S:#W' | grep ':ralph-drive-' | xargs -n1 tmux kill-window -t
+  tmux list-windows -a -F '#S:#W' | grep ':ralph-' | xargs -n1 tmux kill-window -t
 
 To prune orphan scratch dirs:
   find ~/.ralph/harness -maxdepth 1 -type d -name 'drive-*' \
