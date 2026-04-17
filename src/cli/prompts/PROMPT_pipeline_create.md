@@ -88,6 +88,32 @@ project that registers the agent as `"code-review"`. A prompt that hardcodes
 Rule: if a value would differ between two projects using this pipeline, it must be a `$variable`
 declared in `inputs=`.
 
+## Tool-node side effects
+
+If a tool node needs shell logic beyond a single command with trivial arguments,
+externalise it:
+
+1. Write the script to `pipelines/scripts/<node-id>.<ext>` using `.mjs`, `.sh`,
+   or `.py`.
+2. Reference it from the node:
+
+   ```dot
+   my_node [type="tool",
+            script_file="scripts/<node-id>.mjs",
+            script_args="$foo $bar"]
+   ```
+
+3. (Optional) emit a single JSON line as the **last** line of stdout and add
+   `produces_from_stdout=true` + `produces="key1, key2"` — the engine will
+   flatten those keys into the pipeline context.
+
+Do **not** inline `node -e '…'`, `python -c '…'`, `bash -c "…"`, or heredocs
+inside `tool_command=`. DOT's quoting cannot hold them safely, and the
+validator will warn (`inline_script_smell`). Scripts receive their arguments
+positionally (`process.argv` / `$1 $2`) and signal failure with a non-zero
+exit code. Non-zero exit fails the node and halts the pipeline (or triggers
+`max_retries` if set).
+
 ### Edge attributes
 
 - `label="..."` — used for routing from hexagon (wait.human) nodes; the edge whose label matches the human's answer is taken

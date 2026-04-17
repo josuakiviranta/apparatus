@@ -28,4 +28,13 @@ describe("composeCreatePrompt", () => {
     const tmpDir = mkdtempSync(join(tmpdir(), "compose-"));
     expect(() => composeCreatePrompt(tmpDir)).not.toThrow();
   });
+
+  it("includes tool-node side effects guidance steering to script_file=", () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), "compose-"));
+    const result = composeCreatePrompt(tmpDir);
+    expect(result).toContain("Tool-node side effects");
+    expect(result).toContain("script_file=");
+    expect(result).toContain("Do **not** inline");
+    expect(result).toContain("process.argv");
+  });
 });
