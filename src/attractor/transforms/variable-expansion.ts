@@ -74,7 +74,7 @@ export function variableExpansionTransform(graph: Graph, vars: { project?: strin
 }
 
 const VAR_RE = /\$([a-zA-Z_][\w.]*)/g;
-const RESERVED = new Set(["goal", "project"]);
+const RESERVED = new Set(["goal", "project", "run_id"]);
 // String-valued node attributes the scanner must walk for $var references.
 const STRING_ATTRS = ["prompt", "toolCommand"];
 
@@ -85,7 +85,7 @@ function collectVarRefs(node: Node, out: Set<string>): void {
     const re = new RegExp(VAR_RE.source, VAR_RE.flags);
     let m: RegExpExecArray | null;
     while ((m = re.exec(v)) !== null) {
-      const name = m[1];
+      const name = m[1].replace(/\.+$/, "");
       if (!RESERVED.has(name)) out.add(name);
     }
   }

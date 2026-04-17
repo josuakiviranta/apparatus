@@ -90,4 +90,21 @@ describe("scanUndeclaredCallerVars", () => {
     const r = scanUndeclaredCallerVars(g, {});
     expect(r.missing.sort()).toEqual(["one", "two"]);
   });
+
+  it("strips trailing dots from $var names extracted from prose (e.g. $plan_path.)", () => {
+    const g = makeGraphMulti([
+      { id: "p", produces: "plan_path" } as unknown as Node,
+      { id: "c", prompt: "Read the plan at $plan_path. Then implement it." } as unknown as Node,
+    ]);
+    const r = scanUndeclaredCallerVars(g, {});
+    expect(r.missing).toEqual([]);
+  });
+
+  it("treats run_id as a reserved variable (engine-injected)", () => {
+    const g = makeGraphMulti([
+      { id: "a", toolCommand: "tmux new-window -n test-$run_id" } as unknown as Node,
+    ]);
+    const r = scanUndeclaredCallerVars(g, {});
+    expect(r.missing).toEqual([]);
+  });
 });

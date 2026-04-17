@@ -24,6 +24,8 @@ export interface EngineOptions {
   interviewer: Interviewer;
   signal?: AbortSignal;
   project?: string;
+  /** Caller-supplied variables from --var flags; seeded into pipeline context at start. */
+  callerContext?: Record<string, unknown>;
   resume?: boolean;
   dotDir?: string;
   onNodeStart?: (node: Node, meta: { nodeReceiveId: string }) => void;
@@ -133,6 +135,7 @@ export async function runPipeline(graph: Graph, opts: EngineOptions): Promise<Pi
   let completedNodes: string[] = [];
   let context: Record<string, unknown> = { "$goal": graph.goal ?? "" };
   if (opts.project) context["$project"] = opts.project;
+  if (opts.callerContext) context = { ...context, ...opts.callerContext };
   const runId = randomUUID();
   context["run_id"] = runId;
   opts.traceWriter?.onPipelineStart({ runId, graph, ctx: { values: context } });
