@@ -1,0 +1,94 @@
+digraph illumination_to_implementation {
+  goal="Triage an illumination into an approved design doc, implementation plan, and committed code"
+  headless_safe=false
+  inputs="project, meditations_dir, specs_dir, plans_dir"
+
+  start [shape=Mdiamond]
+
+  // ── Phase 1: Illumination triage (from illumination-to-plan) ──────────────
+
+  verifier [agent="implement", json_schema_file="schemas/verifier.json", produces="preferred_label, illumination_path, summary, explanation", prompt="You are a verification agent for the ralph-cli project.\n\n## Task\n\n1. Run glob on $meditations_dir/illuminations/*.md to list all illumination files.\n2. If no files exist, return preferred_label: empty, illumination_path: empty, summary: No illuminations found, explanation: The illuminations directory is empty.\n3. Pick ONE illumination to verify. Read it carefully.\n4. Spawn subagents (up to 50) to verify the illumination against the current codebase:\n   - Check src/ to verify technical claims about code behavior\n   - Check specs/*.md to verify claims about specifications\n   - Verify the issue described has NOT already been fixed\n5. Return your structured verdict.\n\n## Verification Criteria\n- Still relevant: the issue or gap described in the illumination exists in the current code\n- Technically accurate: the claims about code behavior match what the source code actually does\n- Both must be true for preferred_label: true\n\n## Rules\n- Do NOT modify any project files\n- Read only — no edits, no deletions, no new files"]
+
+  explain_removal [agent="implement", prompt="Read the illumination at $illumination_path.\n\nVerifier explanation: $explanation\n\nIn ONE sentence, explain to the user why this illumination is no longer valid or technically inaccurate. Be specific — reference the code or spec that contradicts it.\n\nDo NOT modify any project files."]
+
+  remove_gate [shape=hexagon, label="Remove this illumination?\n$illumination_path\n\n$explanation"]
+
+  delete_file [type="tool", tool_command="rm $illumination_path"]
+
+  mark_archived [agent="implement", prompt="Call mcp__illumination__mark_archived with filename from $illumination_path (basename only) and reason summarizing why the illumination is being archived (use context from $summary). Return the JSON result."]
+
+  mark_dispatched [type="tool",
+                   script_file="scripts/mark-dispatched.mjs",
+                   script_args="$illumination_path $plan_path"]
+
+  explainer [agent="implement", prompt="Read the illumination at $illumination_path.\n\nVerifier summary: $summary\nVerifier explanation: $explanation\n\nExplain to the user in simple, clear terms:\n1. What would change in the codebase\n2. Why this change matters\n3. What files or modules would be affected\n\nKeep it concise — aim for 3-5 sentences. Do NOT modify any project files."]
+
+  approval_gate [shape=hexagon, label="Proceed with plan?\n\nIllumination: $illumination_path\nSummary: $summary"]
+
+  chat_session [agent="implement", interactive=true, prompt="You are discussing an illumination with the user.\n\nIllumination file: $illumination_path\nSummary: $summary\nExplanation: $explanation\n\nThe user may want to:\n- Refine the scope of changes\n- Add constraints or requirements\n- Ask questions about the illumination\n- Disagree with the assessment\n\nBefore ending the conversation, write your agreed conclusions to $meditations_dir/.triage/$run_id/chat-notes.md. This file will be read by the next pipeline stage.\n\nDo NOT modify any other project files."]
+
+  chat_summarizer [agent="implement", default_refinements="", json_schema_file="schemas/chat-summarizer.json", produces="refinements, scope_changed", prompt="Read $meditations_dir/.triage/$run_id/chat-notes.md and the illumination at $illumination_path.\n\nOriginal explanation: $explanation\nPrevious refinements (if any): $refinements\n\nSummarize what was refined or changed during the interactive session. Focus on concrete changes to scope, constraints, or approach.\n\nDo NOT modify any project files."]
+
+  design_writer [agent="implement", default_refinements="No interactive refinements were requested.", json_schema_file="schemas/design-writer.json", produces="design_doc_path", prompt="Write a superpowers-style design document based on the approved illumination.\n\nIllumination: $illumination_path\nSummary: $summary\nExplanation: $explanation\nRefinements: $refinements\n\n## Output\nWrite the design doc to $specs_dir/YYYY-MM-DD-<topic>-design.md where YYYY-MM-DD is today's date and <topic> is a short kebab-case name derived from the illumination.\n\nFollow the conventions of existing design docs in $specs_dir/. Include: overview, architecture, components, data flow, constraints.\n\nReturn the path to the created file in your structured output.\n\nDo NOT modify any other project files."]
+
+  plan_writer [agent="implement", json_schema_file="schemas/plan-writer.json", produces="plan_path", prompt="Read the design doc at $design_doc_path.\n\nWrite a superpowers-style implementation plan at $plans_dir/YYYY-MM-DD-<topic>.md where the date and topic match the design doc.\n\nFollow the conventions of existing plans in $plans_dir/. Include: chunks, tasks with TDD steps, exact file paths, commit messages.\n\nReturn the path to the created file in your structured output.\n\nDo NOT modify any other project files."]
+
+  // ── Phase 2: Implementation ───────────────────────────────────────────────
+
+  implement [agent="implement", max_retries=1, retry_target="implement", prompt="Read the implementation plan at $plan_path.\n\nImplement the plan using red/green TDD:\n1. Read the plan carefully\n2. For each chunk: write failing tests first, then implement to make them pass\n3. Commit after each passing chunk\n\nDo NOT push — a separate pipeline node handles that.\nDo NOT modify files outside the scope of the plan."]
+
+  review_gate [shape=hexagon, label="Review implementation\n\nProject: $project\nPlan: $plan_path"]
+
+  launch_tmux [type="tool", tool_command="tmux new-window -c \"$project\" -n \"test-$run_id\""]
+
+  tmux_tester [agent="implement", json_schema_file="schemas/tmux-test-result.json", produces="test_result, summary", prompt="Read docs/harness/tmux-drive.md first — it contains the authoritative bash harness patterns.\n\nA tmux test window named 'test-$run_id' was just opened in the current session for project $project.\n\nYour job: drive that window to run the build and test suite, then report the outcome.\n\nSteps:\n1. Source the harness block from the doc.\n2. Set SESSION=$(tmux display-message -p '#S') and WIN=test-$run_id.\n3. Run the following in the window via the harness:\n   npm run build && npm test\n4. Use wait_for_string to wait for the test suite to finish (wait for 'Test Files' or 'Tests' summary line, budget 300000ms).\n5. Capture and read current.txt.\n6. Output test_result='pass' if all tests passed, 'fail' otherwise.\n7. Include a 1-2 sentence summary of what ran and how many tests passed/failed.\n\nDo NOT run interactive commands. Do NOT git push. Only build and test."]
+
+  tmux_confirm_gate [shape=hexagon, label="Tests ran in tmux window.\nResult: $test_result\n\n$summary\n\nReview then decide."]
+
+  commit_push [type="tool", tool_command="cd $project && git push origin $(git branch --show-current) || git push -u origin $(git branch --show-current)"]
+
+  memory_writer [agent="implement", prompt="Write a memory file documenting this implementation session.\n\nPlan implemented: $plan_path\nDesign doc: $design_doc_path\nIllumination: $illumination_path\n\nWrite to $project/memory/YYYY-MM-DD-<topic>.md where the date is today and topic is a short kebab-case name matching the plan.\n\nInclude:\n- What was implemented (1-2 sentences)\n- Key files created or modified\n- Important decisions made or patterns established\n- Any gotchas or constraints discovered during implementation\n\nKeep it concise — this is a reference for future sessions, not a full report."]
+
+  done [shape=Msquare]
+
+  // ── Routing: Phase 1 ─────────────────────────────────────────────────────
+  start -> verifier
+  verifier -> explain_removal  [condition="preferred_label=false"]
+  verifier -> explainer        [condition="preferred_label=true"]
+  verifier -> done             [condition="preferred_label=empty"]
+
+  // False path
+  explain_removal -> remove_gate
+  remove_gate -> done         [label="No"]
+  remove_gate -> delete_file  [label="Yes"]
+  delete_file -> done
+
+  // True path
+  explainer -> approval_gate
+  approval_gate -> mark_archived  [label="Decline"]
+  approval_gate -> design_writer  [label="Approve"]
+  approval_gate -> chat_session   [label="Chat"]
+
+  // Chat loop
+  chat_session -> chat_summarizer -> approval_gate
+
+  // Plan writing — plan_writer must run before mark_dispatched so the
+  // illumination frontmatter can record the resulting $plan_path.
+  design_writer -> plan_writer -> mark_dispatched
+
+  // ── Routing: Phase 2 ─────────────────────────────────────────────────────
+  mark_dispatched -> implement
+
+  implement -> implement           [condition="agent.success=false"]
+  implement -> review_gate
+  review_gate -> commit_push       [label="Approve"]
+  review_gate -> launch_tmux       [label="Tmux"]
+  review_gate -> implement         [label="Retry"]
+
+  launch_tmux -> tmux_tester
+  tmux_tester -> tmux_confirm_gate
+  tmux_confirm_gate -> commit_push [label="Commit"]
+  tmux_confirm_gate -> implement   [label="Retry"]
+
+  commit_push -> memory_writer -> done
+}
