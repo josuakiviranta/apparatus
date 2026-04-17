@@ -72,9 +72,11 @@ ralph pipeline create <project-folder>
 Open an interactive Claude session to author a new pipeline. Available local agents (`.ralph/agents/*.md`) are automatically injected into the authoring prompt.
 
 ```bash
-ralph pipeline refine <name> [--project <folder>]
+ralph pipeline refine <name> [--project <folder>] [--no-traces]
 ```
 Open an interactive Claude session to iterate on an existing `<project>/pipelines/<name>.dot`. The current graph is injected into the session so the agent can propose targeted edits rather than redesigning from scratch. Use this for every change to an existing pipeline — hand-editing the `.dot` file bypasses the scheme guidance and the post-session validate step. `create` is for new workflows; `refine` is for every subsequent change.
+
+By default, digests of up to 3 recent run traces for this pipeline are injected into the session so the agent can see how the graph has been executing. Pass `--no-traces` to suppress this when experimenting with a half-written pipeline.
 
 ```bash
 ralph pipeline list <project-folder>

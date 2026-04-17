@@ -448,3 +448,130 @@ describe("pipelineRefineCommand", () => {
     exitSpy.mockRestore();
   });
 });
+
+describe("pipelineRefineCommand — trace injection", () => {
+  let dir: string;
+  let tracesRoot: string;
+
+  function seedTrace(runId: string, pipelineName: string, mtimeOffsetMs = 0): string {
+    const traceDir = join(tracesRoot, runId);
+    mkdirSync(traceDir, { recursive: true });
+    const tracePath = join(traceDir, "pipeline.jsonl");
+    const events = [
+      { kind: "pipeline-start", runId, pipelineName, goal: "test goal", nodes: ["start", "work", "done"], timestamp: new Date(Date.now() + mtimeOffsetMs).toISOString() },
+      { kind: "node-start", nodeReceiveId: "n1", nodeId: "work", nodeKind: "agent", timestamp: new Date().toISOString(), contextSnapshot: {} },
+      { kind: "node-end", nodeReceiveId: "n1", nodeId: "work", success: true, contextUpdates: {} },
+      { kind: "pipeline-end", runId, outcome: "success", timestamp: new Date().toISOString() },
+    ];
+    writeFileSync(tracePath, events.map(e => JSON.stringify(e)).join("\n") + "\n");
+    if (mtimeOffsetMs !== 0) {
+      const t = (Date.now() + mtimeOffsetMs) / 1000;
+      // utimesSync expects seconds since epoch
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("fs").utimesSync(tracePath, t, t);
+    }
+    return tracePath;
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    dir = mkdtempSync(join(tmpdir(), "ralph-pipeline-refine-traces-"));
+    tracesRoot = mkdtempSync(join(tmpdir(), "ralph-traces-"));
+    mkdirSync(join(dir, "pipelines"));
+    writeFileSync(join(dir, "pipelines", "review.dot"), VALID_DOT);
+    (childProcess.spawnSync as ReturnType<typeof vi.fn>).mockImplementation(() => ({ status: 0 }));
+    (composeCreatePrompt as ReturnType<typeof vi.fn>).mockReturnValue("# Base prompt");
+  });
+  afterEach(() => {
+    rmSync(dir, { recursive: true });
+    rmSync(tracesRoot, { recursive: true });
+  });
+
+  function captureTrigger(): string {
+    const spawnMock = childProcess.spawn as ReturnType<typeof vi.fn>;
+    const args = spawnMock.mock.calls[0][1] as string[];
+    return args[1];
+  }
+
+  it("includes trace digests in trigger when traces exist", async () => {
+    seedTrace("run-1", "review");
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("exit"); });
+    await expect(
+      pipelineRefineCommand("review", { project: dir, tracesRoot }),
+    ).rejects.toThrow("exit");
+    exitSpy.mockRestore();
+    const trigger = captureTrigger();
+    expect(trigger).toContain("Recent run traces for review:");
+    expect(trigger).toContain("run-1");
+  });
+
+  it("caps injection at REFINE_TRACE_COUNT (3)", async () => {
+    seedTrace("run-old-1", "review", -50000);
+    seedTrace("run-old-2", "review", -40000);
+    seedTrace("run-mid",   "review", -30000);
+    seedTrace("run-new-1", "review", -20000);
+    seedTrace("run-new-2", "review", -10000);
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("exit"); });
+    await expect(
+      pipelineRefineCommand("review", { project: dir, tracesRoot }),
+    ).rejects.toThrow("exit");
+    exitSpy.mockRestore();
+    const trigger = captureTrigger();
+    // 3 newest must appear
+    expect(trigger).toContain("run-new-2");
+    expect(trigger).toContain("run-new-1");
+    expect(trigger).toContain("run-mid");
+    // 2 oldest must NOT appear
+    expect(trigger).not.toContain("run-old-1");
+    expect(trigger).not.toContain("run-old-2");
+  });
+
+  it("skips the trace block entirely when no traces exist", async () => {
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("exit"); });
+    await expect(
+      pipelineRefineCommand("review", { project: dir, tracesRoot }),
+    ).rejects.toThrow("exit");
+    exitSpy.mockRestore();
+    const trigger = captureTrigger();
+    expect(trigger).not.toContain("Recent run traces");
+  });
+
+  it("honors --no-traces option", async () => {
+    seedTrace("run-1", "review");
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("exit"); });
+    await expect(
+      pipelineRefineCommand("review", { project: dir, tracesRoot, traces: false }),
+    ).rejects.toThrow("exit");
+    exitSpy.mockRestore();
+    const trigger = captureTrigger();
+    expect(trigger).not.toContain("Recent run traces");
+  });
+
+  it("trace block precedes the current-graph block", async () => {
+    seedTrace("run-1", "review");
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("exit"); });
+    await expect(
+      pipelineRefineCommand("review", { project: dir, tracesRoot }),
+    ).rejects.toThrow("exit");
+    exitSpy.mockRestore();
+    const trigger = captureTrigger();
+    const tracesIdx = trigger.indexOf("Recent run traces");
+    const graphIdx  = trigger.indexOf("Here is the current pipeline");
+    expect(tracesIdx).toBeGreaterThanOrEqual(0);
+    expect(graphIdx).toBeGreaterThanOrEqual(0);
+    expect(tracesIdx).toBeLessThan(graphIdx);
+  });
+
+  it("filters traces by pipelineName (does not leak other pipelines)", async () => {
+    seedTrace("run-deploy", "deploy");
+    seedTrace("run-review", "review");
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("exit"); });
+    await expect(
+      pipelineRefineCommand("review", { project: dir, tracesRoot }),
+    ).rejects.toThrow("exit");
+    exitSpy.mockRestore();
+    const trigger = captureTrigger();
+    expect(trigger).toContain("run-review");
+    expect(trigger).not.toContain("run-deploy");
+  });
+});

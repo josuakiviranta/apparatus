@@ -222,7 +222,8 @@ Use this for every change to an existing pipeline — hand-editing the .dot file
 bypasses the scheme guidance and validation loop.
 `)
     .option("--project <folder>", "Project folder (pipelines/ lives here, defaults to cwd)")
-    .action(async (name: string, opts: { project?: string }) => {
+    .option("--no-traces", "Skip injecting recent run trace digests into the refine trigger")
+    .action(async (name: string, opts: { project?: string; traces?: boolean }) => {
       await pipelineRefineCommand(name, opts);
     });
 

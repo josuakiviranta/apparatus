@@ -16,6 +16,7 @@ export class JsonlPipelineTracer implements PipelineTracer {
     this.append({
       kind: "pipeline-start",
       runId,
+      pipelineName: graph.name,
       goal: graph.goal,
       nodes,
       timestamp: new Date().toISOString(),

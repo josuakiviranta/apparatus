@@ -1,4 +1,4 @@
-import { readFileSync, existsSync, readdirSync, mkdirSync, rmSync } from "fs";
+import { readFileSync, existsSync, readdirSync, mkdirSync, rmSync, statSync } from "fs";
 import { resolve, join, basename, dirname } from "path";
 import { homedir } from "os";
 import { randomUUID } from "crypto";
@@ -386,6 +386,62 @@ export interface PipelineCreateOptions {
   project?: string;
 }
 
+export const REFINE_TRACE_COUNT = 3;
+
+/**
+ * Return absolute paths to up to `limit` most recent trace files for pipeline `name`,
+ * newest first. Scans `tracesRoot` (default `~/.ralph/runs`) for `<runId>/pipeline.jsonl`
+ * entries whose first event is `pipeline-start` with matching `pipelineName`.
+ */
+export function listRecentTraces(
+  name: string,
+  limit: number,
+  opts: { tracesRoot?: string } = {},
+): string[] {
+  const root = opts.tracesRoot ?? join(homedir(), ".ralph", "runs");
+  if (!existsSync(root)) return [];
+  const entries: { path: string; mtime: number }[] = [];
+  for (const entry of readdirSync(root)) {
+    const tracePath = join(root, entry, "pipeline.jsonl");
+    if (!existsSync(tracePath)) continue;
+    try {
+      const firstLine = readFileSync(tracePath, "utf8").split("\n", 1)[0];
+      if (!firstLine) continue;
+      const start = JSON.parse(firstLine) as Record<string, unknown>;
+      if (start.kind !== "pipeline-start") continue;
+      if (start.pipelineName !== name) continue;
+      entries.push({ path: tracePath, mtime: statSync(tracePath).mtimeMs });
+    } catch {
+      continue;
+    }
+  }
+  return entries.sort((a, b) => b.mtime - a.mtime).slice(0, limit).map(e => e.path);
+}
+
+/** Read a pipeline trace file and return a compact, human-readable digest string. */
+export function digestTraceFile(tracePath: string): string {
+  let raw: string;
+  try { raw = readFileSync(tracePath, "utf8"); }
+  catch { return `Trace: ${tracePath}\n(unreadable)`; }
+  const lines = raw.trim().split("\n").flatMap(l => {
+    try { return [JSON.parse(l) as Record<string, unknown>]; } catch { return []; }
+  });
+  const start = lines.find(l => l.kind === "pipeline-start") ?? {};
+  const end = lines.find(l => l.kind === "pipeline-end") ?? {};
+  const nodeEnds = lines.filter(l => l.kind === "node-end");
+  const succeeded = nodeEnds.filter(e => e.success === true).map(e => String(e.nodeId));
+  const failed    = nodeEnds.filter(e => e.success === false).map(e => String(e.nodeId));
+  const outcome = (end.outcome as string | undefined) ?? "in-progress";
+  const startedAt = (start.timestamp as string | undefined) ?? "unknown";
+  return [
+    `Trace: ${tracePath}`,
+    `Started: ${startedAt}`,
+    `Outcome: ${outcome}`,
+    `Succeeded (${succeeded.length}): ${succeeded.join(", ") || "none"}`,
+    failed.length > 0 ? `Failed (${failed.length}): ${failed.join(", ")}` : "",
+  ].filter(Boolean).join("\n");
+}
+
 export async function pipelineTraceCommand(
   runId: string,
   opts: { nodeReceive?: string; full?: boolean } = {}
@@ -532,6 +588,10 @@ export async function pipelineCreateCommand(name: string, opts: PipelineCreateOp
 
 export interface PipelineRefineOptions {
   project?: string;
+  /** When false, skip recent-trace injection. Default true. */
+  traces?: boolean;
+  /** Override the trace search root (default: `~/.ralph/runs`). */
+  tracesRoot?: string;
 }
 
 export async function pipelineRefineCommand(name: string, opts: PipelineRefineOptions = {}): Promise<void> {
@@ -566,7 +626,21 @@ export async function pipelineRefineCommand(name: string, opts: PipelineRefineOp
   const relativePath = dotPath.startsWith(project + "/") ? dotPath.slice(project.length + 1) : dotPath;
 
   const basePrompt = composeCreatePrompt(project);
+
+  let traceBlock = "";
+  if (opts.traces !== false) {
+    const tracePaths = listRecentTraces(name, REFINE_TRACE_COUNT, { tracesRoot: opts.tracesRoot });
+    if (tracePaths.length > 0) {
+      const digests = tracePaths.map(p => digestTraceFile(p));
+      traceBlock =
+        `Recent run traces for ${name}:\n\n` +
+        digests.join("\n\n") +
+        "\n\n---\n\n";
+    }
+  }
+
   const refineFraming =
+    traceBlock +
     `Here is the current pipeline workflow at ${relativePath}:\n\n` +
     "```dot\n" +
     existingContent +
