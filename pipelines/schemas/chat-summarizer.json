@@ -8,8 +8,12 @@
     "scope_changed": {
       "type": "boolean",
       "description": "Whether the scope of the proposed change was materially altered"
+    },
+    "chat_notes_path": {
+      "type": "string",
+      "description": "Absolute or project-relative path to the chat-notes.md file read by this summarizer, for downstream nodes that need full session context"
     }
   },
-  "required": ["refinements", "scope_changed"],
+  "required": ["refinements", "scope_changed", "chat_notes_path"],
   "additionalProperties": false
 }

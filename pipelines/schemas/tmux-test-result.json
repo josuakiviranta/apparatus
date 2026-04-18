@@ -6,11 +6,11 @@
       "enum": ["pass", "fail"],
       "description": "Whether the build and test suite passed"
     },
-    "summary": {
+    "test_summary": {
       "type": "string",
       "description": "Brief summary of what ran and the outcome (1-3 sentences)"
     }
   },
-  "required": ["test_result", "summary"],
+  "required": ["test_result", "test_summary"],
   "additionalProperties": false
 }
