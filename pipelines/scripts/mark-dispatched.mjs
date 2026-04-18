@@ -16,6 +16,17 @@ if (parts.length < 3) {
 
 const statusMatch = parts[1].match(/status:\s*(.+)\n/);
 const status = statusMatch ? statusMatch[1].trim() : "";
+
+if (status === "dispatched") {
+  const existingPlan = parts[1].match(/plan_path:\s*(.+)\n/)?.[1].trim();
+  if (existingPlan === planPath) {
+    console.log(JSON.stringify({ marked_dispatched: illuminationPath, idempotent: true }));
+    process.exit(0);
+  }
+  console.error(`already dispatched to a different plan: ${existingPlan} (wanted ${planPath})`);
+  process.exit(1);
+}
+
 if (status !== "open") {
   console.error(`status not open: ${status}`);
   process.exit(1);
