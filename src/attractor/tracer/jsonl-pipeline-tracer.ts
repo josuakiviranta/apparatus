@@ -35,13 +35,17 @@ export class JsonlPipelineTracer implements PipelineTracer {
   }
 
   onNodeEnd({ nodeReceiveId, node, outcome }: { nodeReceiveId: string; node: Node; outcome: Outcome }): void {
-    this.append({
+    const event: Record<string, unknown> = {
       kind: "node-end",
       nodeReceiveId,
       nodeId: node.id,
       success: outcome.status === "success",
       contextUpdates: outcome.contextUpdates ?? {},
-    });
+    };
+    if (outcome.failureReason !== undefined) {
+      event.failureReason = outcome.failureReason;
+    }
+    this.append(event);
   }
 
   onPipelineEnd({ runId, outcome }: { runId: string; outcome: "success" | "failure" }): void {

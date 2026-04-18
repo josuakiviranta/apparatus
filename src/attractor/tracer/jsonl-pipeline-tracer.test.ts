@@ -100,4 +100,29 @@ describe("JsonlPipelineTracer", () => {
     const lines = readFileSync(nestedPath, "utf-8").trim().split("\n").map(l => JSON.parse(l));
     expect(lines[0].kind).toBe("pipeline-end");
   });
+
+  it("writes node-end event with failureReason when outcome has one", () => {
+    const tracer = new JsonlPipelineTracer(tracePath);
+    tracer.onNodeEnd({
+      nodeReceiveId: "run-abcd",
+      node: makeNode("run"),
+      outcome: { status: "fail", failureReason: "Script exited with code 1: boom\n", contextUpdates: { "tool.output": "" } },
+    });
+    const lines = readLines();
+    expect(lines[0].kind).toBe("node-end");
+    expect(lines[0].success).toBe(false);
+    expect(lines[0].failureReason).toBe("Script exited with code 1: boom\n");
+  });
+
+  it("omits failureReason from node-end event when outcome has none", () => {
+    const tracer = new JsonlPipelineTracer(tracePath);
+    tracer.onNodeEnd({
+      nodeReceiveId: "run-abcd",
+      node: makeNode("run"),
+      outcome: makeOutcome(true),
+    });
+    const lines = readLines();
+    expect(lines[0].kind).toBe("node-end");
+    expect("failureReason" in lines[0]).toBe(false);
+  });
 });
