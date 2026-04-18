@@ -48,6 +48,7 @@ digraph illumination_to_plan {
   approval_gate -> mark_archived  [label="Decline"]
   approval_gate -> design_writer [label="Approve"]
   approval_gate -> chat_session  [label="Chat"]
+  mark_archived -> done
 
   // Chat loop
   chat_session -> chat_summarizer -> approval_gate

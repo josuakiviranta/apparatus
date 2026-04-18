@@ -296,6 +296,36 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
     diags.push({ rule: "exit_no_outgoing", severity: "error", message: "Exit node must not have outgoing edges" });
   }
 
+  // Reverse-BFS from exit: every non-exit node must be able to reach the exit.
+  // Catches dead-end authoring bugs (e.g. a gate branch points at a node with
+  // no outgoing edges) that forward-reachability alone cannot see.
+  if (exitNodes.length === 1) {
+    const exitId = exitNodes[0].id;
+    const reverseAdj = new Map<string, string[]>();
+    for (const id of nodes.keys()) reverseAdj.set(id, []);
+    for (const e of edges) {
+      if (reverseAdj.has(e.to)) reverseAdj.get(e.to)!.push(e.from);
+    }
+    const reachesExit = new Set<string>();
+    const queue = [exitId];
+    while (queue.length) {
+      const cur = queue.shift()!;
+      if (reachesExit.has(cur)) continue;
+      reachesExit.add(cur);
+      for (const pred of (reverseAdj.get(cur) ?? [])) queue.push(pred);
+    }
+    for (const [id, node] of nodes) {
+      if (isExit(node)) continue;
+      if (!reachesExit.has(id)) {
+        diags.push({
+          rule: "reaches_exit",
+          severity: "error",
+          message: `Node "${id}" has no path to the exit node`,
+        });
+      }
+    }
+  }
+
   // Edge targets exist
   for (const e of edges) {
     if (!nodes.has(e.to)) diags.push({ rule: "edge_target_exists", severity: "error", message: `Edge target "${e.to}" not declared` });

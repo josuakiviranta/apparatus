@@ -476,6 +476,69 @@ describe("validateGraph", () => {
     expect(diags.some(d => d.rule === "type_unsupported" && d.severity === "error")).toBe(true);
     expect(diags.some(d => d.message.includes("stack.manager_loop"))).toBe(true);
   });
+
+  it("errors on non-exit node with zero outgoing edges (dead end)", () => {
+    // dangling [label="Decline"] mirrors the mark_archived authoring miss
+    // in illumination-to-implementation.dot: reachable from start, but has
+    // no outgoing edge, so the engine arrives and has nowhere to go.
+    const graph = parseDot(`digraph g {
+      start [shape=Mdiamond]
+      gate [shape=diamond]
+      work [shape=box]
+      dangling [shape=box]
+      done [shape=Msquare]
+      start -> gate
+      gate -> work [condition="choice=a"]
+      gate -> dangling [condition="choice=b"]
+      work -> done
+    }`);
+    const diags = validateGraph(graph);
+    const errs = diags.filter(d => d.rule === "reaches_exit" && d.severity === "error");
+    expect(errs).toHaveLength(1);
+    expect(errs[0].message).toContain("dangling");
+  });
+
+  it("does not error when every non-exit node can reach the exit", () => {
+    const graph = parseDot(`digraph g {
+      start [shape=Mdiamond]
+      gate [shape=diamond]
+      a [shape=box]
+      b [shape=box]
+      done [shape=Msquare]
+      start -> gate
+      gate -> a [condition="choice=a"]
+      gate -> b [condition="choice=b"]
+      a -> done
+      b -> done
+    }`);
+    const diags = validateGraph(graph);
+    expect(diags.some(d => d.rule === "reaches_exit")).toBe(false);
+  });
+
+  it("flags a cycle with no edge out to the exit as unreachable-to-exit", () => {
+    // start -> a -> b -> a (loop), no path to done
+    // Forward reachability finds a,b,done reachable (well, done is unreachable here).
+    // Let's construct so done is reachable via other path so only the cycle fails.
+    const graph = parseDot(`digraph g {
+      start [shape=Mdiamond]
+      gate [shape=diamond]
+      a [shape=box]
+      b [shape=box]
+      straight [shape=box]
+      done [shape=Msquare]
+      start -> gate
+      gate -> straight [condition="choice=s"]
+      gate -> a [condition="choice=c"]
+      a -> b
+      b -> a
+      straight -> done
+    }`);
+    const diags = validateGraph(graph);
+    const errs = diags.filter(d => d.rule === "reaches_exit" && d.severity === "error");
+    const ids = errs.map(e => e.message);
+    expect(ids.some(m => m.includes("\"a\""))).toBe(true);
+    expect(ids.some(m => m.includes("\"b\""))).toBe(true);
+  });
 });
 
 describe("validateGraph — variable_coverage", () => {
