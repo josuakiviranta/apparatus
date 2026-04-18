@@ -40,7 +40,7 @@ Single source of truth for what a valid pipeline node looks like. Exposes `Graph
 `validateGraph()` runs `GraphSchema.safeParse()` first; zod issues are converted to the existing `ValidationError{ code, nodeId, message, path }` shape with code `schema_error`. The existing semantic pass (topology, reachability, `variable_coverage`, `portability_heuristic`, `script_file_missing`, `inline_script_smell`) runs afterward on the parsed graph and is unchanged in behavior.
 
 **3. Run-time preflight and cwd wiring**
-- `src/cli/commands/pipeline.ts` — `pipelineRunCommand` adds a preflight step between graph load and `variableExpansionTransform`: if any node's `prompt | toolCommand | label | scriptArgs | cwd` string attribute contains a `$project` reference and `opts.project` is `undefined`, exit 1 with a specific message (see §Error surfaces).
+- `src/cli/commands/pipeline.ts` — `pipelineRunCommand` adds a preflight step between graph load and `variableExpansionTransform`: if any node's `prompt | toolCommand | label | scriptArgs | cwd` string attribute contains a `$project` reference and `opts.project` is `undefined`, exit 1 with a specific message (see §Error surfaces). The preflight lives in `pipelineRunCommand` only — `pipelineValidateCommand` intentionally does not run it because `--project` is not a `validate` concern. `pipelineRefineCommand`, which calls `pipelineValidateCommand` internally for its post-session validate step, inherits the same behavior and is therefore unaffected.
 - `src/attractor/handlers/tool.ts` — replaces the typeof-guarded attribute reads and the `isTruthyAttr` helper with straight property access (zod guarantees them). Passes `cwd: expandVariables(node.cwd, ctx.values, defaults)` to `spawnSync`.
 - `src/attractor/transforms/variable-expansion.ts` — adds `"cwd"` to the `STRING_ATTRS` list so `$project` and `$run_id` inside `cwd` resolve at graph-load time, same as `toolCommand`.
 
@@ -176,7 +176,7 @@ Existing `Command exited with code N: <stderr>` path untouched.
 `pipelines/illumination-to-implementation.dot` (migrated) validates clean; a pre-migration snapshot included as a test fixture fails with `schema_error` on `commit_push.cwd`.
 
 **Smoke pipelines:**
-All 7 smoke pipelines (`pipelines/smoke/*.dot`) must pass after migration.
+All smoke pipelines under `pipelines/smoke/*.dot` (15 files at time of writing) must pass after migration.
 
 ---
 
@@ -212,8 +212,8 @@ chunk 6 — update docs + authoring prompts
 
 - `src/attractor/core/schemas.ts` — new
 - `src/attractor/core/graph.ts` — modified (wire zod into `validateGraph`)
-- `src/attractor/handlers/tool.ts` — modified (drop typeof guards; use `node.cwd`)
-- `src/attractor/transforms/variable-expansion.ts` — modified (add `cwd` to `STRING_ATTRS`)
+- `src/attractor/handlers/tool.ts` — modified (drop typeof guards; use `node.cwd` directly, no re-expansion since the graph-load transform already resolved it)
+- `src/attractor/transforms/variable-expansion.ts` — modified (add `cwd` to `STRING_ATTRS`; this is the single expansion site for `cwd`)
 - `src/cli/commands/pipeline.ts` — modified (preflight rule)
 - `src/attractor/tests/schemas.test.ts` — new
 - `src/attractor/tests/graph.test.ts` — extended
