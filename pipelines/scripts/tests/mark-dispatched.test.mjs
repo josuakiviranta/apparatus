@@ -62,13 +62,13 @@ describe("mark-dispatched.mjs", () => {
     expect(parsed).toEqual({ marked_dispatched: target });
   });
 
-  it("fails with exit 1 and 'status not open: dispatched' when already dispatched", () => {
+  it("fails with exit 1 and 'already dispatched to a different plan' when dispatched to a different plan", () => {
     const target = join(tmp, "dispatched.md");
     copyFileSync(join(FIXTURES, "dispatched.md"), target);
 
     const result = runScript([target, "any/plan.md"]);
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain("status not open: dispatched");
+    expect(result.stderr).toContain("already dispatched to a different plan");
   });
 
   it("fails with exit 1 and 'no frontmatter' when the file has no frontmatter", () => {
