@@ -33,13 +33,22 @@ export function expandVariables(
 
 /**
  * Extract default_* node attributes into a flat Record<string, string>.
- * E.g. { defaultRefinements: "none" } → { refinements: "none" }
+ * The DOT parser stores `default_<var>` as camelCase `default<Var>` on the node;
+ * this reverses that back to the snake_case key used in $var interpolation
+ * (ctx + defaults maps are keyed by the literal $var name authors wrote).
+ * E.g. { defaultRefinements: "none" }      → { refinements: "none" }
+ *      { defaultTestResult: "" }           → { test_result: "" }
+ *      { defaultChatNotesPath: "" }        → { chat_notes_path: "" }
  */
 export function extractDefaults(obj: Record<string, unknown>): Record<string, string> {
   const defaults: Record<string, string> = {};
   for (const [key, val] of Object.entries(obj)) {
     if (key.startsWith("default") && key.length > 7 && key[7] === key[7].toUpperCase()) {
-      const varName = key[7].toLowerCase() + key.slice(8);
+      const tail = key.slice(7);
+      const varName = (tail.charAt(0).toLowerCase() + tail.slice(1)).replace(
+        /[A-Z]/g,
+        (c) => "_" + c.toLowerCase(),
+      );
       defaults[varName] = String(val);
     }
   }

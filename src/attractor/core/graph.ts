@@ -356,10 +356,12 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
     nodeProduces.set(id, produced);
   }
 
-  // Check if a node has a default for a given variable
+  // Check if a node has a default for a given variable.
+  // DOT `default_<var>` is normalized to camelCase at parse time via toCamel
+  // (graph.ts:7). Route lookup through the same helper so snake_case var names
+  // like $test_result resolve to defaultTestResult, not defaultTest_result.
   function hasDefault(node: Node, varName: string): boolean {
-    // DOT: default_myvar="x" → camelCased to defaultMyvar
-    const key = "default" + varName.charAt(0).toUpperCase() + varName.slice(1);
+    const key = toCamel("default_" + varName);
     return node[key] !== undefined;
   }
 

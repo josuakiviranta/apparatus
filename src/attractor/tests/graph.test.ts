@@ -607,6 +607,44 @@ describe("validateGraph — variable_coverage", () => {
     const warnings = diags.filter(d => d.rule === "variable_coverage");
     expect(warnings).toHaveLength(0);
   });
+
+  it("recognizes default_<snake_case_var> attribute on consumer", () => {
+    // Regression: hasDefault used to do naive capitalization, so
+    // default_test_result → key defaultTest_result (malformed), never matched
+    // the parser's toCamel-normalized defaultTestResult. Snake_case defaults
+    // silently didn't silence warnings.
+    const graph = parseDot(`digraph g {
+      start [shape=Mdiamond]
+      router [shape=diamond]
+      producer [shape=box, agent="impl", produces="test_result"]
+      consumer [shape=box, default_test_result="", prompt="Result: $test_result"]
+      done [shape=Msquare]
+      start -> router
+      router -> consumer
+      router -> producer -> consumer
+      consumer -> done
+    }`);
+    const diags = validateGraph(graph);
+    const warnings = diags.filter(d => d.rule === "variable_coverage");
+    expect(warnings).toHaveLength(0);
+  });
+
+  it("recognizes default_<singleword> attribute (backward compat)", () => {
+    const graph = parseDot(`digraph g {
+      start [shape=Mdiamond]
+      router [shape=diamond]
+      producer [shape=box, agent="impl", produces="refinements"]
+      consumer [shape=box, default_refinements="", prompt="R: $refinements"]
+      done [shape=Msquare]
+      start -> router
+      router -> consumer
+      router -> producer -> consumer
+      consumer -> done
+    }`);
+    const diags = validateGraph(graph);
+    const warnings = diags.filter(d => d.rule === "variable_coverage");
+    expect(warnings).toHaveLength(0);
+  });
 });
 
 describe("parseDot inputs= attribute", () => {

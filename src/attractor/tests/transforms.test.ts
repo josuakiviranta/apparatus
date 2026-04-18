@@ -176,10 +176,26 @@ describe("extractDefaults", () => {
     expect(extractDefaults(node)).toEqual({});
   });
 
-  it("lowercases the first character after 'default' prefix", () => {
+  it("converts camelCase default_* key back to snake_case var name", () => {
+    // DOT `default_my_var` parses to node.defaultMyVar; ctx/defaults lookup uses
+    // the literal $my_var authors wrote, so we reverse the camelCase here.
     const node = { defaultMyVar: "value" };
     const defaults = extractDefaults(node);
-    expect(defaults).toEqual({ myVar: "value" });
+    expect(defaults).toEqual({ my_var: "value" });
+  });
+
+  it("handles multi-word snake_case var names (test_result, chat_notes_path)", () => {
+    const node = {
+      defaultTestResult: "",
+      defaultTestSummary: "pending",
+      defaultChatNotesPath: "",
+    };
+    const defaults = extractDefaults(node);
+    expect(defaults).toEqual({
+      test_result: "",
+      test_summary: "pending",
+      chat_notes_path: "",
+    });
   });
 
   it("coerces non-string values to strings", () => {
