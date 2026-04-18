@@ -191,7 +191,8 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
   }
 
   const runId = randomUUID().slice(0, 8);
-  const tracePath = join(homedir(), ".ralph", "runs", runId, "pipeline.jsonl");
+  const runsRoot = process.env.RALPH_RUNS_ROOT ?? join(homedir(), ".ralph", "runs");
+  const tracePath = join(runsRoot, runId, "pipeline.jsonl");
   const jsonlTracer = new JsonlPipelineTracer(tracePath);
   let latestContext: Record<string, unknown> = {};
 
@@ -234,6 +235,8 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
   let killInteractiveChild: (() => void) | null = null;
 
   let pipelineFailed = false;
+  let lastFailedNodeId: string | null = null;
+  let lastFailureReason: string | undefined;
   const ac = new AbortController();
   const onSignal = () => {
     if (currentBlockNodeId !== null) {
@@ -345,6 +348,10 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
             reason: outcome.failureReason ?? (outcome.status === "partial_success" ? "partial success" : undefined),
           },
         });
+        if (outcome.status !== "success" && outcome.failureReason) {
+          lastFailedNodeId = node.id;
+          lastFailureReason = outcome.failureReason;
+        }
         currentBlockNodeId = null;
       },
 
@@ -403,7 +410,15 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
     await new Promise((resolve) => setImmediate(resolve));
     done();
     await waitUntilExit();
-    if (pipelineFailed) printRefineTip(dotFile);
+    if (pipelineFailed) {
+      if (lastFailedNodeId) {
+        const firstLine = (lastFailureReason ?? "pipeline failed").split("\n")[0].slice(0, 500);
+        process.stderr.write(`✗ pipeline failed at node ${lastFailedNodeId}: ${firstLine}\n`);
+        process.stderr.write(`  trace: ${tracePath}\n`);
+      }
+      printRefineTip(dotFile);
+      process.exit(1);
+    }
   }
 }
 
