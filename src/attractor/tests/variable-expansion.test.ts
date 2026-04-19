@@ -27,6 +27,14 @@ describe("variableExpansionTransform — maxIterations", () => {
   });
 });
 
+describe("variableExpansionTransform — cwd attribute", () => {
+  it("expands $project inside node.cwd", () => {
+    const graph = makeGraph({ type: "tool", cwd: "$project", toolCommand: "echo" });
+    const out = variableExpansionTransform(graph, { project: "/proj" });
+    expect((out.nodes.get("run") as Node & { cwd?: string }).cwd).toBe("/proj");
+  });
+});
+
 function makeGraphMulti(nodes: Node[], inputs?: string[]): Graph {
   const map = new Map<string, Node>();
   for (const n of nodes) map.set(n.id, n);
