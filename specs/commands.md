@@ -178,6 +178,10 @@ Because `--resume` re-executes the node that was interrupted, scripts referenced
 - Exits with code 0 on engine success (all nodes advanced to an `exit` node without failure).
 - Exits with code 0 on engine failure as well — when a node's retry budget is exhausted the Ink renderer paints `fail`, a post-failure tip suggesting `ralph pipeline refine <name>` is emitted, and the process returns normally. This is a deliberate discoverability choice (see `specs/2026-04-17-refine-run-history-and-failure-tip-design.md`); scripts that need to detect run failure should parse the JSONL trace at `~/.ralph/runs/<runId>/pipeline.jsonl` rather than rely on the exit code.
 
+**Tool-node `cwd`:** every `type="tool"` node must declare a `cwd=` attribute. The command executes with that directory as cwd.
+
+**`--project` preflight:** if the pipeline references `$project` in any node attribute, `pipeline run` requires `--project <folder>` and exits 1 otherwise with rule `project_binding_missing` (printed to stderr as `[project_binding_missing]`). `--var project=...` does not satisfy this.
+
 ### `ralph pipeline list [folder]`
 
 Lists available pipeline DOT files in a folder.
