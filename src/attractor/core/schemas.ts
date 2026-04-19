@@ -11,7 +11,7 @@ export const BaseNodeSchema = z.object({
 
 export const AgentNodeSchema = BaseNodeSchema.extend({
   agent: z.string(),
-  prompt: z.string(),
+  prompt: z.string().optional(),
   jsonSchemaFile: z.string().optional(),
   produces: z.string().optional(),
   maxRetries: z.coerce.number().int().nonnegative().optional(),
