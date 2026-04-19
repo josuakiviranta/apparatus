@@ -1,46 +1,38 @@
 # Implementation Plan
 
-> **For agentic workers:** pick the most important unchecked item, brainstorm a concrete plan from the linked design spec, then execute with superpowers:subagent-driven-development (red/green TDD). Close each item by removing it from this file when shipped.
+> Plans completed since the last reset are recorded in memory under
+> `~/.claude/projects/-Users-josu-Documents-projects-ralph-cli/memory/`.
+> Active backlog lives below; everything else is historical.
 
 ---
 
-## Status (2026-04-19)
+## Recently shipped
 
-- **v0.1.23 shipped** — Pipeline Validator Trust Upgrade (zod schemas per node kind, `$project` preflight, required `cwd=` on tool nodes, `cd $project &&` prefix removed, docs + authoring prompt updated).
-- Build green, 917/917 tests passing, `tsc --noEmit` clean.
-- Seed material for the next three workstreams is already committed (tmux-tester agent, `issues_found` schema field, wait-human `default_*` fallback). The remaining work for each workstream is summarised below and tracked against the corresponding design spec.
+### Fenced Code-Block Variable-Skip (2026-04-19) — DONE
 
----
+All four chunks landed; commit history `1f2b0df…f94d708`. Memory: `2026-04-19-fenced-var-skip-shipped.md`.
 
-## Active Backlog
+Lessons captured during execution:
 
-### 1. Implement-retry tmux context — spec: `specs/2026-04-18-implement-retry-tmux-context-design.md`
-
-**Why:** After `tmux_tester` produces `test_result` + `test_summary` + `issues_found`, the post-tmux Retry edge re-enters `implement` with only `$plan_path`. The agent rediscovers failures from scratch — wastes tokens and often repeats the same mistakes. Need a dedicated `implement_retry` node whose prompt injects the structured test output so retries *start from the diagnosis*.
-
-- [ ] Add `implement_retry` node to `pipelines/illumination-to-implementation.dot` with a prompt that references `$test_result`, `$test_summary`, `$issues_found`, and declares `default_*` fallbacks so first-pass runs don't trip the zod-required-attr check.
-- [ ] Rewire `tmux_confirm_gate -> implement_retry` (Retry edge) while keeping the pre-tmux `review_gate -> implement` Retry path untouched.
-- [ ] Integration test: pipeline where `tmux_tester` emits `test_result=fail`, flow routes to `implement_retry`, observed agent prompt contains the test output verbatim.
-- [ ] Validate end-to-end via smoke run on a pipeline that exercises the loop.
-
-### 2. Pipeline commands spec backfill — spec: `specs/2026-04-18-pipeline-commands-spec-backfill-design.md`
-
-**Why:** `specs/commands.md` covers 3 of 6 implemented `ralph pipeline` subcommands. `validate`, `refine`, `trace` are absent — the illumination verifier has no spec ground truth for any claim about those commands. Pure documentation; no code changes.
-
-- [ ] Add `### ralph pipeline validate`, `### ralph pipeline refine`, `### ralph pipeline trace` sections to `specs/commands.md`.
-- [ ] Add `run` exit-code note (exit 1 on `project_binding_missing`, `schema_error`, etc.).
-- [ ] Cross-check the new sections against the actual CLI help output so spec and help don't drift.
-
-### 3. Refine run history + failure tip — spec: `specs/2026-04-17-refine-run-history-and-failure-tip-design.md`
-
-**Why:** Shipped behaviourally; spec is the belated write-up. Confirm spec matches code, then close.
-
-- [ ] Read `src/cli/commands/pipeline.ts refineCommand` and cross-check the spec against actual behaviour — record any drift as a follow-up illumination, then mark the spec as shipped.
+- **Plan glossed wiring of `unresolved_var_in_agent_prompt` into `pipelineValidateCommand`.** The plan said "wire diagnostic in pipeline.ts around line 157" — that's the run flow. Chunk 4's demo expects validate to fail, so the diagnostic had to be wired into BOTH `pipelineValidateCommand` and `pipelineRunCommand`. Fixed mid-execution; future plans that reuse this layer should be explicit about both entry points.
+- **Inline-backtick `$VAR` in agent prompts is a true positive.** Per spec, only triple-backtick fences are skipped. Inline single-backtick spans still expand — the new validator caught a pre-existing inline `$SESSION:$WIN` example in `tmux-tester.md:141`. Replaced with `<session>:<window>` placeholder. Rule of thumb: shell-syntax examples in agent docs must use placeholders (or live inside a triple-backtick fence) — never inline backticks.
+- **Stale LSP diagnostics misled briefly.** After Task 3.1 the LSP reported 10 errors that `npx tsc --noEmit` did not see. When LSP and tsc disagree, tsc wins.
 
 ---
 
-## Notes for the next loop
+## Active backlog
 
-- Each workstream has its own design spec. Don't expand this file into a multi-task plan — author a short plan in `docs/superpowers/plans/` when you start one.
-- Schema enforcement is strict. Any new `type="tool"` node must declare `cwd=`; zod rejects unknown attributes. Run `npm run build && npx vitest run` before committing.
-- Add ignored temp-dir prefixes to `.gitignore` if a new test introduces one (vitest `mkdtempSync` seeds in cwd).
+### Pre-existing TS error (unrelated, low priority)
+
+- `src/attractor/handlers/agent-handler.ts:36:40` — "Expected 1 arguments, but got 2" (pre-existing on prior commit, vitest passes regardless). Out of scope for fenced-var-skip; pick up next time the agent handler is touched.
+
+### Pre-existing dead code in pipeline.ts (low priority)
+
+After Task 3.2's render hunk shifted line numbers, two pre-existing unreachable-code warnings remain (lines around 599, 611). Pure dead code — remove next time we touch nearby logic. Out of scope for the fence-skip work.
+
+### Specs queued for design review
+
+- `specs/2026-04-19-mark-archived-reason-split-design.md`
+- `specs/2026-04-19-gate-choice-namespacing-design.md`
+
+Decide which to scaffold into a plan next.
