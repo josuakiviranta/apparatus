@@ -4,13 +4,18 @@
     "test_result": {
       "type": "string",
       "enum": ["pass", "fail"],
-      "description": "Whether the build and test suite passed"
+      "description": "Whether the automated tests passed and the smoke exercise produced no crashes"
     },
     "test_summary": {
       "type": "string",
       "description": "Brief summary of what ran and the outcome (1-3 sentences)"
+    },
+    "issues_found": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Observed bugs, regressions, UX gaps, or surprises. Empty array means nothing surprising was found."
     }
   },
-  "required": ["test_result", "test_summary"],
+  "required": ["test_result", "test_summary", "issues_found"],
   "additionalProperties": false
 }
