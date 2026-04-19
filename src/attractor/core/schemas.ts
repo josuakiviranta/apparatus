@@ -72,17 +72,20 @@ const SCHEMAS = {
   exit: ExitNodeSchema,
 } as const;
 
-export function classifyNode(node: Node): NodeKind {
+export function classifyNode(node: Node): NodeKind | null {
   if (node.type === "tool") return "tool";
   if (node.shape === "Mdiamond") return "start";
   if (node.shape === "Msquare") return "exit";
   if (node.shape === "hexagon") return "gate";
   if (typeof node.agent === "string") return "agent";
-  return "agent";
+  // Nodes with custom type= or unrecognized shapes fall through to unknown —
+  // they already receive a `type_known` warning from validateGraph; skip schema.
+  return null;
 }
 
 export function validateNode(node: Node): Diagnostic[] {
   const kind = classifyNode(node);
+  if (kind === null) return [];
   const schema = SCHEMAS[kind];
   const result = schema.safeParse(node);
   if (result.success) return [];

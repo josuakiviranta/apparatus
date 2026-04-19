@@ -5,6 +5,8 @@ digraph tool_smoke {
 
   // Parallelogram shape = tool node; runs tool_command as a subprocess
   run_echo [
+    type="tool",
+    cwd="$project",
     shape=parallelogram,
     tool_command="echo 'tool-node: ok'"
   ]

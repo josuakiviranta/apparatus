@@ -8,6 +8,8 @@ digraph missing_caller_var {
   // Pre-flight check rejects the run with exit 1 before the Ink UI mounts
   // when --var required_input=... is not supplied.
   use_var [
+    type="tool",
+    cwd="$project",
     shape=parallelogram,
     tool_command="echo $required_input"
   ]
