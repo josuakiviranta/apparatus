@@ -1,7 +1,7 @@
 import type { NodeHandler, HandlerExecutionContext } from "./registry.js";
 import type { Node, Outcome, PipelineContext } from "../types.js";
 import type { Interviewer } from "../interviewer/index.js";
-import { expandVariables } from "../transforms/variable-expansion.js";
+import { expandVariables, extractDefaults } from "../transforms/variable-expansion.js";
 
 export class WaitHumanHandler implements NodeHandler {
   constructor(private interviewer: Interviewer) {}
@@ -15,7 +15,7 @@ export class WaitHumanHandler implements NodeHandler {
     }
 
     const rawLabel = node.label ?? node.id;
-    const expandedLabel = expandVariables(rawLabel, ctx.values);
+    const expandedLabel = expandVariables(rawLabel, ctx.values, extractDefaults(node));
     const askPromise = this.interviewer.ask({
       type: "MULTIPLE_CHOICE",
       prompt: expandedLabel,

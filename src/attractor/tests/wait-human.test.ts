@@ -54,4 +54,23 @@ describe("WaitHumanHandler — label variable expansion (Bug B.1)", () => {
     await handler.execute(node, ctx, { outgoingLabels: ["continue"] });
     expect(captured[0].prompt).toBe("gate");
   });
+
+  it("uses default_<var> attribute when the label var is not in context", async () => {
+    const captured: Question[] = [];
+    const interviewer: Interviewer = {
+      ask: async (q: Question): Promise<Answer> => {
+        captured.push(q);
+        return { value: "continue" };
+      },
+    };
+    const handler = new WaitHumanHandler(interviewer);
+    const node: Node = {
+      id: "approval_gate",
+      label: "Refinements: $refinements",
+      defaultRefinements: "(none yet)",
+    };
+    const ctx: PipelineContext = { values: {} };
+    await handler.execute(node, ctx, { outgoingLabels: ["continue"] });
+    expect(captured[0].prompt).toBe("Refinements: (none yet)");
+  });
 });
