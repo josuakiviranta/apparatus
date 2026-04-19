@@ -11,7 +11,7 @@ digraph illumination_to_plan {
 
   remove_gate [shape=hexagon, label="Remove this illumination?\n$illumination_path\n\n$explanation"]
 
-  delete_file [type="tool", tool_command="rm $illumination_path"]
+  delete_file [type="tool", cwd="$project", tool_command="rm $illumination_path"]
 
   mark_archived [agent="implement", prompt="Call mcp__illumination__mark_archived with filename from $illumination_path (basename only) and reason summarizing why the illumination is being archived (use context from $summary). Return the JSON result."]
 
