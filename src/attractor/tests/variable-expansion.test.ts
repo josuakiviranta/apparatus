@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { variableExpansionTransform, scanUndeclaredCallerVars, splitFences } from "../transforms/variable-expansion.js";
+import { variableExpansionTransform, scanUndeclaredCallerVars, splitFences, expandVariables, UndefinedVariableError } from "../transforms/variable-expansion.js";
 import type { Graph, Node } from "../types.js";
 
 function makeGraph(nodeAttrs: Record<string, unknown>): Graph {
@@ -145,5 +145,31 @@ describe("splitFences", () => {
   it("does NOT treat inline single-backtick spans as fenced", () => {
     const out = splitFences("see `$foo` here");
     expect(out).toEqual([{ fenced: false, text: "see `$foo` here" }]);
+  });
+});
+
+describe("expandVariables fence behavior", () => {
+  it("leaves $HOME literal when inside a triple-backtick fence", () => {
+    const src = "prose\n```bash\nRUN=$HOME\n```\n";
+    const out = expandVariables(src, {});
+    expect(out).toBe(src); // no throw; fenced content passed through
+  });
+
+  it("still expands prose $foo outside fences", () => {
+    const out = expandVariables("hello $name", { name: "world" });
+    expect(out).toBe("hello world");
+  });
+
+  it("still expands $foo inside inline single-backtick spans", () => {
+    const out = expandVariables("see `$name`", { name: "w" });
+    expect(out).toBe("see `w`");
+  });
+
+  it("throws UndefinedVariableError for unknown $foo outside fence", () => {
+    expect(() => expandVariables("hi $typo", {})).toThrow(UndefinedVariableError);
+  });
+
+  it("does NOT throw for unknown $foo inside fence", () => {
+    expect(() => expandVariables("```\n$typo\n```", {})).not.toThrow();
   });
 });

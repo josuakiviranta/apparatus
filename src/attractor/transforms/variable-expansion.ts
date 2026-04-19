@@ -39,8 +39,19 @@ export function splitFences(s: string): Array<{ fenced: boolean; text: string }>
  * Expand $key references in a string against a key-value context.
  * Skips $goal and $project (handled by the graph-level transform).
  * Throws UndefinedVariableError if a variable is not in ctx or defaults.
+ * Fenced triple-backtick blocks are passed through unexpanded.
  */
 export function expandVariables(
+  s: string,
+  ctx: Record<string, unknown>,
+  defaults?: Record<string, string>,
+): string {
+  return splitFences(s)
+    .map((seg) => (seg.fenced ? seg.text : expandSegment(seg.text, ctx, defaults)))
+    .join("");
+}
+
+function expandSegment(
   s: string,
   ctx: Record<string, unknown>,
   defaults?: Record<string, string>,
