@@ -798,7 +798,7 @@ describe("validateGraph — inline_script_smell", () => {
     return `digraph g {
       start [shape=Mdiamond]
       done [shape=Msquare]
-      t [type="tool", tool_command="${toolCommand.replace(/"/g, '\\"')}"]
+      t [type="tool", cwd="$project", tool_command="${toolCommand.replace(/"/g, '\\"')}"]
       start -> t -> done
     }`;
   }
@@ -897,7 +897,7 @@ describe("validateGraph — script_file rules", () => {
     const g = parseDot(`digraph g {
       start [shape=Mdiamond]
       done [shape=Msquare]
-      t [type="tool", script_file="scripts/missing.mjs"]
+      t [type="tool", cwd="$project", script_file="scripts/missing.mjs"]
       start -> t -> done
     }`);
     expect(() => validateGraph(g)).not.toThrow();
@@ -909,7 +909,7 @@ describe("validateGraph — script_file rules", () => {
     const g = parseDot(`digraph g {
       start [shape=Mdiamond]
       done [shape=Msquare]
-      t [type="tool", script_file="scripts/missing.mjs"]
+      t [type="tool", cwd="$project", script_file="scripts/missing.mjs"]
       start -> t -> done
     }`);
     const diags = validateGraph(g, tmp);
@@ -924,7 +924,7 @@ describe("validateGraph — script_file rules", () => {
     const g = parseDot(`digraph g {
       start [shape=Mdiamond]
       done [shape=Msquare]
-      t [type="tool", script_file="hello.mjs"]
+      t [type="tool", cwd="$project", script_file="hello.mjs"]
       start -> t -> done
     }`);
     const diags = validateGraph(g, fixturesDir);
@@ -938,7 +938,7 @@ describe("validateGraph — script_file rules", () => {
     const g = parseDot(`digraph g {
       start [shape=Mdiamond]
       done [shape=Msquare]
-      t [type="tool", script_file="scripts/x.mjs", tool_command="echo hi"]
+      t [type="tool", cwd="$project", script_file="scripts/x.mjs", tool_command="echo hi"]
       start -> t -> done
     }`);
     const diags = validateGraph(g, tmp);
@@ -952,7 +952,7 @@ describe("validateGraph — script_file rules", () => {
     const g = parseDot(`digraph g {
       start [shape=Mdiamond]
       done [shape=Msquare]
-      t [type="tool", script_file="scripts/x.rb"]
+      t [type="tool", cwd="$project", script_file="scripts/x.rb"]
       start -> t -> done
     }`);
     const diags = validateGraph(g, tmp);
@@ -970,7 +970,7 @@ describe("validateGraph — script_file rules", () => {
       const g = parseDot(`digraph g {
         start [shape=Mdiamond]
         done [shape=Msquare]
-        t [type="tool", script_file="${rel}"]
+        t [type="tool", cwd="$project", script_file="${rel}"]
         start -> t -> done
       }`);
       const diags = validateGraph(g, tmp);

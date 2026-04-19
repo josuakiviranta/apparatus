@@ -111,7 +111,7 @@ describe("pipelineValidateCommand", () => {
     writeFileSync(dotFile, `digraph g {
       start [shape=Mdiamond]
       done [shape=Msquare]
-      t [type="tool", script_file="scripts/missing.mjs"]
+      t [type="tool", cwd="$project", script_file="scripts/missing.mjs"]
       start -> t -> done
     }`);
     const code = await pipelineValidateCommand(dotFile);
