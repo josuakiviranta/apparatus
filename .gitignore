@@ -11,6 +11,11 @@ context-mode-guidance-*/
 context-mode-healed-*
 ralph-engine-test-*/
 scenario-runs/
+# test temp dir leftovers (vitest mkdtemp)
+ralph-preflight-*/
+ralph-list-*/
+compose-*/
+S-*/
 # tsx runner cache
 tsx-*/
 meditations/.triage/
