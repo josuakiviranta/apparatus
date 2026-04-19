@@ -177,3 +177,6 @@ digraph review_pipeline {
 Write the pipeline to the path the user tells you (shown below). Use the `Write` tool or create the file directly. After writing, tell the user the file is ready and briefly describe the workflow.
 
 Keep pipelines simple: prefer fewer nodes with clear purpose over complex branching unless the user specifically asks for it.
+
+- Every `type="tool"` node MUST declare a `cwd=` attribute (typical value: `cwd="$project"`). Do NOT rely on the ralph process cwd; it differs from the caller's shell.
+- If the pipeline references `$project` in any node attribute, `pipeline run` must be invoked with `--project <folder>` — `--var project=...` is NOT a substitute.
