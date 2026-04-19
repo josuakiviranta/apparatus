@@ -51,7 +51,7 @@ ralph run-scenarios <project-folder> [--all]
 Discovers `scenario-tests/*.md` files and runs them with Claude, writing reports to `scenario-runs/`. Without `--all`, presents an interactive selection menu.
 
 ```bash
-ralph pipeline run <pipeline.dot> [--var <key=value>...]
+ralph pipeline run <pipeline.dot> [--var <key=value>...] [--resume]
 ```
 Execute a `.dot` pipeline file. Use `--var` (repeatable) to pass caller variables:
 
@@ -60,6 +60,8 @@ ralph pipeline run pipelines/my-pipeline.dot \
   --var meditations_dir=meditations \
   --var specs_dir=docs/specs
 ```
+
+Pass `--resume` to continue a pipeline after Ctrl-C, a node failure, or a crash. The engine checkpoints after every node advance to `~/.ralph/runs/<slug>/checkpoint.json`; `--resume` reads that file and picks up at the node that was about to execute when the run stopped (do not confuse this with the per-run `~/.ralph/runs/<runId>/pipeline.jsonl` trace that is regenerated fresh every run). For `--resume` to be useful, tool-node scripts must be idempotent — a script that hard-requires "state before I act" will fail on retry; detect the desired outcome is already present and exit 0 as a no-op instead.
 
 ```bash
 ralph pipeline validate <pipeline.dot>
