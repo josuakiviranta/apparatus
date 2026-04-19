@@ -1,7 +1,9 @@
 ---
 date: 2026-04-18
-status: open
+status: dispatched
 description: specs/commands.md documents only three ralph pipeline subcommands but six are implemented — validate, refine, and trace are absent, leaving the verifier without spec ground truth for any illumination that reasons about those commands' behavior.
+dispatched_at: 2026-04-18
+plan_path: docs/superpowers/plans/2026-04-18-pipeline-commands-spec-backfill.md
 ---
 
 ## Core Idea

@@ -1,7 +1,9 @@
 ---
 date: 2026-04-17
-status: open
+status: dispatched
 description: pipeline refine shifted pipeline authoring from a one-shot creation event to a repeatable iteration loop by applying exemplar injection — injecting the current .dot verbatim into the session trigger — which means agent assistance is now available at every meaningful change, not only at first creation.
+dispatched_at: 2026-04-17
+plan_path: docs/superpowers/plans/2026-04-17-refine-run-history-and-failure-tip.md
 ---
 
 ## Core Idea
