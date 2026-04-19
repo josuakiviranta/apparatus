@@ -1,4 +1,8 @@
+import { readFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
 import type { Graph, Node } from "../types.js";
+import { parseFrontmatter } from "../../cli/lib/frontmatter.js";
+import { getBundledAgentsDir } from "../../cli/lib/assets.js";
 
 export class UndefinedVariableError extends Error {
   constructor(public readonly variableName: string) {
@@ -164,29 +168,93 @@ function collectProducers(node: Node, out: Set<string>): void {
   }
 }
 
+export type MissingRef = {
+  name: string;
+  source?: { file: string; line: number; agentName: string; nodeId: string };
+};
+
+function resolveAgentMdPath(projectDir: string | undefined, agentName: string): string | null {
+  if (projectDir) {
+    const local = join(projectDir, ".ralph/agents", `${agentName}.md`);
+    if (existsSync(local)) return local;
+  }
+  const bundled = join(getBundledAgentsDir(), `${agentName}.md`);
+  if (existsSync(bundled)) return bundled;
+  return null;
+}
+
+type AgentSource = { file: string; line: number; agentName: string; nodeId: string };
+
+function collectAgentBodyRefs(
+  node: Node,
+  projectDir: string | undefined,
+  refs: Map<string, AgentSource[]>,
+): void {
+  const agentName = (node as Record<string, unknown>).agent;
+  if (typeof agentName !== "string") return;
+  // Skip body when an explicit prompt/label is provided — it overrides config.prompt at runtime.
+  if ((node as Record<string, unknown>).prompt) return;
+  if ((node as Record<string, unknown>).label) return;
+  const path = resolveAgentMdPath(projectDir, agentName);
+  if (!path) return;
+  let raw: string;
+  try {
+    raw = readFileSync(path, "utf8");
+  } catch {
+    return;
+  }
+  const { body } = parseFrontmatter(raw);
+  const frontmatterLineOffset = raw.length === body.length
+    ? 0
+    : raw.slice(0, raw.length - body.length).split("\n").length - 1;
+  let segStart = 0;
+  for (const seg of splitFences(body)) {
+    if (!seg.fenced) {
+      const re = new RegExp(VAR_RE.source, VAR_RE.flags);
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(seg.text)) !== null) {
+        const name = m[1].replace(/\.+$/, "");
+        if (RESERVED.has(name)) continue;
+        const line = body.slice(0, segStart + m.index).split("\n").length + frontmatterLineOffset;
+        const entry: AgentSource = { file: path, line, agentName, nodeId: node.id };
+        const existing = refs.get(name);
+        if (existing) existing.push(entry); else refs.set(name, [entry]);
+      }
+    }
+    segStart += seg.text.length;
+  }
+}
+
 export function scanUndeclaredCallerVars(
   graph: Graph,
   initialContext: Record<string, unknown>,
-): { missing: string[]; declared: string[]; undeclared: string[] } {
-  const refs = new Set<string>();
+): { missing: MissingRef[]; declared: MissingRef[]; undeclared: MissingRef[] } {
+  const attrRefs = new Set<string>();
   const producers = new Set<string>();
+  const agentRefs = new Map<string, AgentSource[]>();
+  const projectDir = typeof initialContext.project === "string" ? initialContext.project : undefined;
+
   for (const node of graph.nodes.values()) {
-    collectVarRefs(node, refs);
+    collectVarRefs(node, attrRefs);
     collectProducers(node, producers);
+    collectAgentBodyRefs(node, projectDir, agentRefs);
   }
 
   const ctxKeys = new Set(Object.keys(initialContext));
-  const missing: string[] = [];
-  for (const name of refs) {
-    if (ctxKeys.has(name)) continue;
-    if (producers.has(name)) continue;
-    missing.push(name);
+  const missing: MissingRef[] = [];
+
+  for (const name of attrRefs) {
+    if (ctxKeys.has(name) || producers.has(name)) continue;
+    missing.push({ name });
   }
-  missing.sort();
+  for (const [name, sources] of agentRefs) {
+    if (ctxKeys.has(name) || producers.has(name)) continue;
+    for (const source of sources) missing.push({ name, source });
+  }
+  missing.sort((a, b) => a.name.localeCompare(b.name));
 
   const declaredSet = new Set(graph.inputs ?? []);
-  const declared = missing.filter((n) => declaredSet.has(n));
-  const undeclared = missing.filter((n) => !declaredSet.has(n));
-
+  const declared = missing.filter((r) => declaredSet.has(r.name));
+  const undeclared = missing.filter((r) => !declaredSet.has(r.name));
   return { missing, declared, undeclared };
 }

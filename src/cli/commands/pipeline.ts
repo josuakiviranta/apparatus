@@ -162,7 +162,7 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
         pipelineName: graph.name,
         declared: graph.inputs,
         provided: opts.variables ?? {},
-        missing: preflight.declared,
+        missing: preflight.declared.map((r) => r.name),
         invokedAs: dotFile,
       }),
     );
@@ -171,12 +171,12 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
   }
 
   if (!graph.inputs && preflight.missing.length > 0) {
-    console.error(formatLegacyMissingWarning(preflight.missing));
+    console.error(formatLegacyMissingWarning(preflight.missing.map((r) => r.name)));
     // continue — legacy pipelines without inputs= still run
   }
 
   if (graph.inputs && preflight.undeclared.length > 0) {
-    console.error(formatUndeclaredWarning(preflight.undeclared));
+    console.error(formatUndeclaredWarning(preflight.undeclared.map((r) => r.name)));
     // continue — author oversight, not a caller-facing failure
   }
 

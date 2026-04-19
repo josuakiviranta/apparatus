@@ -1,6 +1,22 @@
 import { describe, it, expect } from "vitest";
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { variableExpansionTransform, scanUndeclaredCallerVars, splitFences, expandVariables, UndefinedVariableError } from "../transforms/variable-expansion.js";
+import { parseDot } from "../core/graph.js";
 import type { Graph, Node } from "../types.js";
+
+function makeTempProjectWithAgent(name: string, body: string): string {
+  const root = mkdtempSync(join(tmpdir(), "ralph-test-"));
+  const agentsDir = join(root, ".ralph/agents");
+  mkdirSync(agentsDir, { recursive: true });
+  writeFileSync(join(agentsDir, `${name}.md`), body);
+  return root;
+}
+
+function parseInlineDot(src: string): Graph {
+  return parseDot(src);
+}
 
 function makeGraph(nodeAttrs: Record<string, unknown>): Graph {
   return {
@@ -61,13 +77,13 @@ describe("scanUndeclaredCallerVars", () => {
   it("reports missing vars not in context", () => {
     const g = makeGraphMulti([{ id: "a", prompt: "use $foo" } as unknown as Node]);
     const r = scanUndeclaredCallerVars(g, {});
-    expect(r.missing).toEqual(["foo"]);
+    expect(r.missing.map((m) => m.name)).toEqual(["foo"]);
   });
 
   it("ignores $goal and $project (reserved)", () => {
     const g = makeGraphMulti([{ id: "a", prompt: "$goal in $project for $bar" } as unknown as Node]);
     const r = scanUndeclaredCallerVars(g, {});
-    expect(r.missing).toEqual(["bar"]);
+    expect(r.missing.map((m) => m.name)).toEqual(["bar"]);
   });
 
   it("ignores variables produced by an upstream node (produces attribute)", () => {
@@ -76,7 +92,7 @@ describe("scanUndeclaredCallerVars", () => {
       { id: "c", prompt: "uses $agent_success and $foo" } as unknown as Node,
     ]);
     const r = scanUndeclaredCallerVars(g, {});
-    expect(r.missing).toEqual(["foo"]);
+    expect(r.missing.map((m) => m.name)).toEqual(["foo"]);
   });
 
   it("partitions missing into declared (in inputs=) vs undeclared (not in inputs=)", () => {
@@ -85,9 +101,9 @@ describe("scanUndeclaredCallerVars", () => {
       ["foo"],
     );
     const r = scanUndeclaredCallerVars(g, {});
-    expect(r.missing.sort()).toEqual(["bar", "foo"]);
-    expect(r.declared).toEqual(["foo"]);
-    expect(r.undeclared).toEqual(["bar"]);
+    expect(r.missing.map((m) => m.name).sort()).toEqual(["bar", "foo"]);
+    expect(r.declared.map((m) => m.name)).toEqual(["foo"]);
+    expect(r.undeclared.map((m) => m.name)).toEqual(["bar"]);
   });
 
   it("walks prompt and toolCommand attributes for $var references", () => {
@@ -96,7 +112,7 @@ describe("scanUndeclaredCallerVars", () => {
       { id: "b", toolCommand: "echo $two" } as unknown as Node,
     ]);
     const r = scanUndeclaredCallerVars(g, {});
-    expect(r.missing.sort()).toEqual(["one", "two"]);
+    expect(r.missing.map((m) => m.name).sort()).toEqual(["one", "two"]);
   });
 
   it("strips trailing dots from $var names extracted from prose (e.g. $plan_path.)", () => {
@@ -171,5 +187,55 @@ describe("expandVariables fence behavior", () => {
 
   it("does NOT throw for unknown $foo inside fence", () => {
     expect(() => expandVariables("```\n$typo\n```", {})).not.toThrow();
+  });
+});
+
+describe("scanUndeclaredCallerVars with agent body", () => {
+  it("flags unfenced $typo inside an agent .md body", async () => {
+    const projectDir = makeTempProjectWithAgent(
+      "fake-agent",
+      "---\nname: fake-agent\n---\n# body\nValue: $typo_var\n",
+    );
+    const graph = parseInlineDot(`
+      digraph test {
+        inputs="project"
+        start -> n1 [label="go"]
+        n1 [agent="fake-agent"]
+        n1 -> exit
+      }
+    `);
+    const res = scanUndeclaredCallerVars(graph, { project: projectDir });
+    expect(res.missing.some((m) =>
+      typeof m === "object" && m.name === "typo_var" && m.source?.file.endsWith("fake-agent.md")
+    )).toBe(true);
+  });
+
+  it("does NOT flag $HOME inside a triple-backtick fence in agent body", async () => {
+    const fenced = "---\nname: fake-agent\n---\nPre-fence prose.\n```bash\nRUN=$HOME\n```\n";
+    const projectDir = makeTempProjectWithAgent("fake-agent", fenced);
+    const graph = parseInlineDot(`
+      digraph test {
+        inputs="project"
+        start -> n1 [label="go"]
+        n1 [agent="fake-agent"]
+        n1 -> exit
+      }
+    `);
+    const res = scanUndeclaredCallerVars(graph, { project: projectDir });
+    expect(res.missing.some((m) => typeof m === "object" && m.name === "HOME")).toBe(false);
+  });
+
+  it("skips agent body when node.prompt is set (override)", async () => {
+    const projectDir = makeTempProjectWithAgent("fake-agent", "$typo_var\n");
+    const graph = parseInlineDot(`
+      digraph test {
+        inputs="project"
+        start -> n1 [label="go"]
+        n1 [agent="fake-agent", prompt="no var here"]
+        n1 -> exit
+      }
+    `);
+    const res = scanUndeclaredCallerVars(graph, { project: projectDir });
+    expect(res.missing.some((m) => typeof m === "object" && m.name === "typo_var")).toBe(false);
   });
 });
