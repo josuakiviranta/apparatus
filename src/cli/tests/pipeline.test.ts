@@ -194,7 +194,7 @@ describe("pipelineRunCommand", () => {
   it("nodes overview uses node IDs, not raw labels", async () => {
     const dot = `digraph my_pipeline {
       start [shape=Mdiamond]
-      worker [shape=box]
+      worker [shape=box, agent="noop", prompt="noop"]
       approval [shape=hexagon, label="Approve?\\n$some_var\\n$other_var"]
       done [shape=Msquare]
       start -> worker -> approval -> done
@@ -483,7 +483,7 @@ describe("pipelineValidateCommand — edge-label diff", () => {
   afterEach(() => { rmSync(dir, { recursive: true }); });
 
   function makeNode(id: string, extra: Partial<Node> = {}): Node {
-    return { id, shape: "box", ...extra } as Node;
+    return { id, shape: "box", agent: "noop", prompt: "noop", ...extra } as Node;
   }
   function makeGraph(nodes: Node[], edges: Edge[]): Graph {
     return {
@@ -501,8 +501,8 @@ describe("pipelineValidateCommand — edge-label diff", () => {
     // Rebuild current graph in-memory and pass via a write-then-read of a real dot.
     writeFileSync(dotPath, `digraph g {
       start [shape=Mdiamond]
-      a [shape=box]
-      b [shape=box]
+      a [shape=box, agent="noop", prompt="noop"]
+      b [shape=box, agent="noop", prompt="noop"]
       done [shape=Msquare]
       start -> a
       a -> b [label="approved"]
@@ -526,9 +526,9 @@ describe("pipelineValidateCommand — edge-label diff", () => {
   it("errors when the old label is still referenced elsewhere", async () => {
     writeFileSync(dotPath, `digraph g {
       start [shape=Mdiamond]
-      a [shape=box]
-      b [shape=box]
-      recovery [shape=box, agent="ok"]
+      a [shape=box, agent="noop", prompt="noop"]
+      b [shape=box, agent="noop", prompt="noop"]
+      recovery [shape=box, agent="ok", prompt="noop"]
       done [shape=Msquare]
       start -> a
       a -> b [label="approved"]
@@ -554,8 +554,8 @@ describe("pipelineValidateCommand — edge-label diff", () => {
   it("emits no rename diagnostic when topology changed", async () => {
     writeFileSync(dotPath, `digraph g {
       start [shape=Mdiamond]
-      a [shape=box]
-      c [shape=box]
+      a [shape=box, agent="noop", prompt="noop"]
+      c [shape=box, agent="noop", prompt="noop"]
       done [shape=Msquare]
       start -> a
       a -> c [label="approved"]
@@ -579,8 +579,8 @@ describe("pipelineValidateCommand — edge-label diff", () => {
   it("emits no diagnostic when label is identical", async () => {
     writeFileSync(dotPath, `digraph g {
       start [shape=Mdiamond]
-      a [shape=box]
-      b [shape=box]
+      a [shape=box, agent="noop", prompt="noop"]
+      b [shape=box, agent="noop", prompt="noop"]
       done [shape=Msquare]
       start -> a
       a -> b [label="ok"]
@@ -603,8 +603,8 @@ describe("pipelineValidateCommand — edge-label diff", () => {
   it("emits no diff diagnostic when previousGraph is omitted", async () => {
     writeFileSync(dotPath, `digraph g {
       start [shape=Mdiamond]
-      a [shape=box]
-      b [shape=box]
+      a [shape=box, agent="noop", prompt="noop"]
+      b [shape=box, agent="noop", prompt="noop"]
       done [shape=Msquare]
       start -> a
       a -> b [label="approved"]

@@ -7,7 +7,7 @@ import { pipelineRunCommand } from "../commands/pipeline.js";
 const DOT = `digraph fail_fixture {
   goal="exercise failure-reason surfacing"
   start [shape=Mdiamond]
-  runner [shape=parallelogram, tool_command="echo boom-stderr 1>&2; exit 1"]
+  runner [shape=parallelogram, type="tool", cwd="$project", tool_command="echo boom-stderr 1>&2; exit 1"]
   done  [shape=Msquare]
   start -> runner -> done
 }`;
