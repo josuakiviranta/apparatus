@@ -109,13 +109,9 @@ describe("ToolHandler", () => {
     expect(outcome.status).toBe("fail");
   });
 
-  it("returns fail when no toolCommand", async () => {
-    const h = new ToolHandler();
-    const node: Node = { id: "t", shape: "parallelogram" };
-    const outcome = await h.execute(node, baseCtx(), makeContext());
-    expect(outcome.status).toBe("fail");
-    expect(outcome.failureReason).toContain("tool_command");
-  });
+  // "no toolCommand" check is now performed at validate-time by zod
+  // (ToolNodeSchema refine: toolCommand || scriptFile required).
+  // The runtime guard was removed in Chunk 4 of the validator trust upgrade.
 });
 
 describe("ParallelHandler", () => {

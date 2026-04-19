@@ -185,18 +185,9 @@ describe("ToolHandler — script_file dispatch", () => {
     expect(outcome.failureReason).toContain("boom");
   });
 
-  it("both script_file and tool_command → fail with script_command_conflict", async () => {
-    const h = new ToolHandler();
-    const node: Node = {
-      id: "t",
-      shape: "parallelogram",
-      scriptFile: "scripts/echo.mjs",
-      toolCommand: "echo collision",
-    };
-    const outcome = await h.execute(node, baseCtx(), makeContext({ dotDir }));
-    expect(outcome.status).toBe("fail");
-    expect(outcome.failureReason).toMatch(/script_command_conflict/);
-  });
+  // script_command_conflict is now caught at validate-time by zod refine
+  // (see ToolNodeSchema in src/attractor/core/schemas.ts and graph.test.ts).
+  // The runtime guard was removed in Chunk 4 of the validator trust upgrade.
 });
 
 describe("ToolHandler — produces_from_stdout", () => {

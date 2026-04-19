@@ -24,12 +24,6 @@ function shellQuote(s: string): string {
   return `'${s.replace(/'/g, `'\\''`)}'`;
 }
 
-// Coerce a node attribute that may be either a real boolean (unquoted DOT value)
-// or the string "true"/"false" (quoted DOT value or hand-written).
-function isTruthyAttr(val: unknown): boolean {
-  return val === true || val === "true";
-}
-
 // Parse the last non-empty line of stdout as JSON. On success, returns the
 // parsed top-level object as a string-keyed record. On failure, emits a warning
 // via console.warn and returns undefined. Empty stdout returns undefined with
@@ -57,11 +51,16 @@ function parseLastLineJson(stdout: string, nodeId: string): Record<string, unkno
 
 export class ToolHandler implements NodeHandler {
   async execute(node: Node, ctx: PipelineContext, meta: HandlerExecutionContext): Promise<Outcome> {
-    const nodeRecord = node as unknown as Record<string, unknown>;
-    const scriptFile = typeof nodeRecord.scriptFile === "string" ? nodeRecord.scriptFile : undefined;
-    const scriptArgs = typeof nodeRecord.scriptArgs === "string" ? nodeRecord.scriptArgs : undefined;
-    const producesFromStdout = isTruthyAttr(nodeRecord.producesFromStdout);
-    const defaults = extractDefaults(nodeRecord);
+    const nodeRecord = node as unknown as {
+      scriptFile?: string;
+      scriptArgs?: string;
+      producesFromStdout?: boolean | "true";
+      cwd: string;
+    };
+    const { scriptFile, scriptArgs, cwd } = nodeRecord;
+    const producesFromStdout = nodeRecord.producesFromStdout === true
+      || nodeRecord.producesFromStdout === "true";
+    const defaults = extractDefaults(node as unknown as Record<string, unknown>);
 
     // Build stdout-derived context updates. tool.output is always present;
     // when produces_from_stdout=true we additionally flatten the last-line JSON
@@ -84,13 +83,6 @@ export class ToolHandler implements NodeHandler {
     };
 
     if (scriptFile) {
-      if (node.toolCommand) {
-        return {
-          status: "fail",
-          failureReason: "script_command_conflict: script_file= and tool_command= are mutually exclusive.",
-        };
-      }
-
       const ext = extname(scriptFile).toLowerCase();
       const interpreter = SCRIPT_INTERPRETERS[ext];
       if (!interpreter) {
@@ -106,7 +98,7 @@ export class ToolHandler implements NodeHandler {
         ? `${interpreter} ${shellQuote(resolvedPath)} ${expandedArgs}`
         : `${interpreter} ${shellQuote(resolvedPath)}`;
 
-      const result = spawnSync("sh", ["-c", command], { encoding: "utf8" });
+      const result = spawnSync("sh", ["-c", command], { encoding: "utf8", cwd });
       const stdout = result.stdout ?? "";
       const stderr = result.stderr ?? "";
       if (result.status !== 0) {
@@ -119,11 +111,8 @@ export class ToolHandler implements NodeHandler {
       return { status: "success", contextUpdates: buildUpdates(stdout) };
     }
 
-    if (!node.toolCommand) {
-      return { status: "fail", failureReason: "No tool_command specified on node" };
-    }
-    const command = expandVariables(node.toolCommand, ctx.values, defaults);
-    const result = spawnSync("sh", ["-c", command], { encoding: "utf8" });
+    const command = expandVariables(node.toolCommand!, ctx.values, defaults);
+    const result = spawnSync("sh", ["-c", command], { encoding: "utf8", cwd });
     const stdout = result.stdout ?? "";
     if (result.status !== 0) {
       return {
