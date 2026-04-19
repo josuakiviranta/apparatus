@@ -746,6 +746,56 @@ describe("validateGraph — variable_coverage", () => {
     const warnings = diags.filter(d => d.rule === "variable_coverage");
     expect(warnings).toHaveLength(0);
   });
+
+  it("treats wait.human gates as implicit producers of choice and <id>.choice", () => {
+    const graph = parseDot(`digraph g {
+      start [shape=Mdiamond];
+      g1   [shape=hexagon, label="First pick?"];
+      g2   [shape=hexagon, label="Second pick?"];
+      use  [shape=box, prompt="saw $g1.choice then $g2.choice aka $choice"];
+      done [shape=Msquare];
+      start -> g1; g1 -> g2; g2 -> use; use -> done;
+    }`);
+    const diags = validateGraph(graph);
+    const warnings = diags.filter(d => d.rule === "variable_coverage");
+    expect(warnings).toHaveLength(0);
+  });
+
+  it("still warns when a gate sits on only some paths to the consumer", () => {
+    const graph = parseDot(`digraph g {
+      start  [shape=Mdiamond];
+      router [shape=diamond];
+      gate   [shape=hexagon, label="Pick?"];
+      merge  [shape=box];
+      use    [shape=box, prompt="read $gate.choice"];
+      done   [shape=Msquare];
+      start -> router;
+      router -> gate [condition="x=a"];
+      router -> merge [condition="x=b"];
+      gate -> merge;
+      merge -> use;
+      use -> done;
+    }`);
+    const diags = validateGraph(graph);
+    const warnings = diags.filter(d => d.rule === "variable_coverage");
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0].message).toContain("may be undefined on path(s) that skip");
+    expect(warnings[0].message).toContain("gate");
+  });
+
+  it("still warns when a consumer references $choice with no gate upstream", () => {
+    const graph = parseDot(`digraph g {
+      start [shape=Mdiamond];
+      use   [shape=box, prompt="read $choice"];
+      done  [shape=Msquare];
+      start -> use; use -> done;
+    }`);
+    const diags = validateGraph(graph);
+    const warnings = diags.filter(d => d.rule === "variable_coverage");
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0].message).toContain("has no known producer");
+    expect(warnings[0].message).toContain("$choice");
+  });
 });
 
 describe("parseDot inputs= attribute", () => {

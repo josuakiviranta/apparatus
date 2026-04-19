@@ -360,7 +360,7 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
   const TYPE_PRODUCES: Record<string, string[]> = {
     "tool": ["tool.output"],
     "store": ["store.path"],
-    "wait.human": ["chat.output"],
+    "wait.human": ["chat.output", "choice"],
   };
 
   // Build adjacency list for forward BFS
@@ -378,6 +378,10 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
     // Implicit productions from handler type
     if (TYPE_PRODUCES[handlerType]) {
       for (const v of TYPE_PRODUCES[handlerType]) produced.add(v);
+    }
+    // Gates write a node-specific choice key in addition to the alias (8cb4eef).
+    if (handlerType === "wait.human") {
+      produced.add(`${id}.choice`);
     }
     // Interactive nodes produce chat.output
     if (node.interactive) produced.add("chat.output");
