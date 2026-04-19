@@ -1,0 +1,6 @@
+digraph regression {
+  start [shape=Mdiamond]
+  commit_push [type="tool", tool_command="cd $project && git push"]
+  done [shape=Msquare]
+  start -> commit_push -> done
+}

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from "fs";
 import { tmpdir } from "os";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
@@ -880,6 +880,18 @@ describe("validateGraph — inline_script_smell", () => {
     }`);
     const diags = validateGraph(g);
     expect(diags.some(d => d.rule === "inline_script_smell")).toBe(false);
+  });
+});
+
+describe("validateGraph — regression fixture: pre-migration tool node missing cwd", () => {
+  it("rejects pre-migration tool node missing cwd (regression fixture)", () => {
+    const src = readFileSync(
+      new URL("./fixtures/pre-migration-tool-node.dot", import.meta.url),
+      "utf8",
+    );
+    const graph = parseDot(src);
+    const diags = validateGraph(graph);
+    expect(diags.some(d => d.rule === "schema_error" && d.message.includes("cwd"))).toBe(true);
   });
 });
 
