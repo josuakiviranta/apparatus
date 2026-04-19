@@ -138,7 +138,7 @@ cleanup_run() {
 Harness gotchas that bite:
 - **Always `wait_stable` before `capture`** — otherwise you read half-rendered Ink frames.
 - **Always `wait_stable` before and after `send_input`** — two separate `tmux send-keys` calls internally, Ink needs time to absorb.
-- **Long/quoted payloads need `-l`**: `tmux send-keys -t "$SESSION:$WIN" -l "literal"` then a separate `Enter`.
+- **Long/quoted payloads need `-l`**: send the literal text via `tmux send-keys -t <session>:<window> -l "literal"` (use the `SESSION` and `WIN` shell variables you set above), then a separate `Enter`.
 - `current.txt` is ANSI-stripped (clean to read). `current.ansi` is raw (use only if colors/cursor matter).
 - `capture-pane` output is the visible pane, not history. If you need scrollback, use `tmux capture-pane -S -` with a larger range.
 
