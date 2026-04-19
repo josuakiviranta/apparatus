@@ -34,7 +34,7 @@ Source the following bash block in your shell **before** calling any helper. It 
 
 ```bash
 SESSION=$(tmux display-message -p '#S')
-WIN="test-$run_id"
+WIN=$(tmux list-windows -t "$SESSION" -F '#W' | grep '^test-' | head -1)
 RUN_ID="tmux-tester-$(date +%s)-$$"
 RUN_DIR="$HOME/.ralph/harness/$RUN_ID"
 CAPTURE_INDEX=0
