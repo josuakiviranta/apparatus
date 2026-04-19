@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { BaseNodeSchema, AgentNodeSchema } from "../core/schemas.js";
+import { BaseNodeSchema, AgentNodeSchema, ToolNodeSchema } from "../core/schemas.js";
 
 describe("BaseNodeSchema", () => {
   it("accepts a node with only id", () => {
@@ -82,6 +82,70 @@ describe("AgentNodeSchema", () => {
       agent: "claude-code",
       prompt: "p",
       defaultRefinments: "oops",
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("ToolNodeSchema", () => {
+  it("requires cwd", () => {
+    const result = ToolNodeSchema.safeParse({
+      id: "t1",
+      type: "tool",
+      toolCommand: "echo hi",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects empty-string cwd", () => {
+    const result = ToolNodeSchema.safeParse({
+      id: "t1",
+      type: "tool",
+      cwd: "",
+      toolCommand: "echo hi",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts toolCommand only", () => {
+    const result = ToolNodeSchema.safeParse({
+      id: "t1",
+      type: "tool",
+      cwd: ".",
+      toolCommand: "echo hi",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts scriptFile only", () => {
+    const result = ToolNodeSchema.safeParse({
+      id: "t1",
+      type: "tool",
+      cwd: ".",
+      scriptFile: "scripts/foo.sh",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects both toolCommand and scriptFile (script_command_conflict)", () => {
+    const result = ToolNodeSchema.safeParse({
+      id: "t1",
+      type: "tool",
+      cwd: ".",
+      toolCommand: "echo hi",
+      scriptFile: "scripts/foo.sh",
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some(i => i.message.includes("script_command_conflict"))).toBe(true);
+    }
+  });
+
+  it("rejects neither toolCommand nor scriptFile", () => {
+    const result = ToolNodeSchema.safeParse({
+      id: "t1",
+      type: "tool",
+      cwd: ".",
     });
     expect(result.success).toBe(false);
   });

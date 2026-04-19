@@ -30,3 +30,19 @@ export const AgentNodeSchema = BaseNodeSchema.extend({
   defaultTestResult: z.string().optional(),
   defaultTestSummary: z.string().optional(),
 }).strict();
+
+export const ToolNodeSchema = BaseNodeSchema.extend({
+  type: z.literal("tool"),
+  cwd: z.string().min(1),
+  toolCommand: z.string().optional(),
+  scriptFile: z.string().optional(),
+  scriptArgs: z.string().optional(),
+  producesFromStdout: z.union([z.boolean(), z.literal("true")]).optional(),
+  produces: z.string().optional(),
+}).strict()
+  .refine(n => !(n.toolCommand && n.scriptFile), {
+    message: "script_command_conflict: toolCommand and scriptFile are mutually exclusive",
+  })
+  .refine(n => n.toolCommand || n.scriptFile, {
+    message: "tool_node_needs_command_or_script",
+  });
