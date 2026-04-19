@@ -7,7 +7,7 @@ import type { PipelineTracer } from "../../attractor/tracer/pipeline-tracer.js";
 import { parseDot, validateGraph, validateOrRaise } from "../../attractor/core/graph.js";
 import type { Graph } from "../../attractor/types.js";
 import { runPipeline } from "../../attractor/core/engine.js";
-import { variableExpansionTransform, scanUndeclaredCallerVars } from "../../attractor/transforms/variable-expansion.js";
+import { variableExpansionTransform, scanUndeclaredCallerVars, findVarReferences } from "../../attractor/transforms/variable-expansion.js";
 import {
   formatMissingInputsError,
   formatLegacyMissingWarning,
@@ -138,6 +138,19 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
     await output.error((err as Error).message);
     printRefineTip(dotFile);
     process.exit(1);
+  }
+
+  // $project preflight: if any node references $project, --project must be set.
+  if (!opts.project) {
+    const refs = findVarReferences(graph, "project");
+    if (refs.length > 0) {
+      process.stderr.write(
+        `✗ [project_binding_missing] Pipeline references $project but --project flag not passed.\n` +
+        `  Pass --project <folder>, not --var project=...\n` +
+        `  Nodes referencing $project: ${refs.join(", ")}\n`
+      );
+      process.exit(1);
+    }
   }
 
   // Pre-flight: scan for missing caller-supplied variables before expansion

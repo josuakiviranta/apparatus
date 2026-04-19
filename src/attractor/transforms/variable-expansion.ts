@@ -85,7 +85,22 @@ export function variableExpansionTransform(graph: Graph, vars: { project?: strin
 const VAR_RE = /\$([a-zA-Z_][\w.]*)/g;
 const RESERVED = new Set(["goal", "project", "run_id"]);
 // String-valued node attributes the scanner must walk for $var references.
-const STRING_ATTRS = ["prompt", "toolCommand"];
+// Keep in sync with the fields list in graph.ts variable_coverage check.
+const STRING_ATTRS = ["prompt", "toolCommand", "label", "scriptArgs"];
+
+export { STRING_ATTRS };
+
+export function findVarReferences(graph: Graph, varName: string): string[] {
+  const re = new RegExp(`\\$${varName}\\b`);
+  const out: string[] = [];
+  for (const node of graph.nodes.values()) {
+    for (const attr of STRING_ATTRS) {
+      const v = (node as Record<string, unknown>)[attr];
+      if (typeof v === "string" && re.test(v)) { out.push(node.id); break; }
+    }
+  }
+  return out;
+}
 
 function collectVarRefs(node: Node, out: Set<string>): void {
   for (const key of STRING_ATTRS) {
