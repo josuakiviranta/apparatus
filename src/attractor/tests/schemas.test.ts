@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { BaseNodeSchema, AgentNodeSchema, ToolNodeSchema } from "../core/schemas.js";
+import {
+  BaseNodeSchema,
+  AgentNodeSchema,
+  ToolNodeSchema,
+  GateNodeSchema,
+  StartNodeSchema,
+  ExitNodeSchema,
+} from "../core/schemas.js";
 
 describe("BaseNodeSchema", () => {
   it("accepts a node with only id", () => {
@@ -148,5 +155,45 @@ describe("ToolNodeSchema", () => {
       cwd: ".",
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe("GateNodeSchema", () => {
+  it("requires a non-empty label", () => {
+    const result = GateNodeSchema.safeParse({
+      id: "g1",
+      shape: "hexagon",
+      label: "",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts hexagon + non-empty label", () => {
+    const result = GateNodeSchema.safeParse({
+      id: "g1",
+      shape: "hexagon",
+      label: "Should we proceed?",
+    });
+    expect(result.success).toBe(true);
+  });
+});
+
+describe("StartNodeSchema", () => {
+  it("accepts shape Mdiamond", () => {
+    const result = StartNodeSchema.safeParse({
+      id: "start",
+      shape: "Mdiamond",
+    });
+    expect(result.success).toBe(true);
+  });
+});
+
+describe("ExitNodeSchema", () => {
+  it("accepts shape Msquare", () => {
+    const result = ExitNodeSchema.safeParse({
+      id: "exit",
+      shape: "Msquare",
+    });
+    expect(result.success).toBe(true);
   });
 });

@@ -46,3 +46,17 @@ export const ToolNodeSchema = BaseNodeSchema.extend({
   .refine(n => n.toolCommand || n.scriptFile, {
     message: "tool_node_needs_command_or_script",
   });
+
+export const GateNodeSchema = BaseNodeSchema.extend({
+  shape: z.literal("hexagon"),
+  label: z.string().min(1),
+  defaultRefinements: z.string().optional(),
+}).strict();
+
+export const StartNodeSchema = BaseNodeSchema.extend({
+  shape: z.literal("Mdiamond"),
+}).strict();
+
+export const ExitNodeSchema = BaseNodeSchema.extend({
+  shape: z.literal("Msquare"),
+}).strict();
