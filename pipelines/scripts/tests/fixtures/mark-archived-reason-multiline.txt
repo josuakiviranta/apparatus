@@ -1,0 +1,3 @@
+pipelineFailed boolean already present;
+process.exitCode   assignment already committed.
+
