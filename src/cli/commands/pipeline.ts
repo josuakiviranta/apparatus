@@ -104,7 +104,31 @@ export async function pipelineValidateCommand(dotFile: string, opts: PipelineVal
     }
   }
 
-  if (errors.length === 0 && !diffHasError) {
+  // Scan agent .md bodies for unresolved $vars (fenced segments are skipped by the scanner).
+  // initialContext is empty here — validate has no caller-supplied vars or --project context;
+  // the scanner uses initialContext.project (if provided) to look up project-local agents.
+  // Use the validate cwd's project as a best-effort lookup root.
+  const preflight = scanUndeclaredCallerVars(graph, { project });
+  let unresolvedAgentBodyRefs = false;
+  const seen = new Set<string>();
+  for (const ref of preflight.missing) {
+    if (!ref.source) continue;
+    // Dedupe by file+line+name (one entry per agent-body occurrence).
+    const key = `${ref.source.file}:${ref.source.line}:${ref.name}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unresolvedAgentBodyRefs = true;
+    const rel = ref.source.file.startsWith(project + "/")
+      ? ref.source.file.slice(project.length + 1)
+      : ref.source.file;
+    await output.error(
+      `[unresolved_var_in_agent_prompt] $${ref.name}\n` +
+      `    ${rel}:${ref.source.line}\n` +
+      `    (referenced in agent="${ref.source.agentName}" used by node ${ref.source.nodeId})`
+    );
+  }
+
+  if (errors.length === 0 && !diffHasError && !unresolvedAgentBodyRefs) {
     await output.success(`Pipeline valid (${graph.nodes.size} nodes, ${graph.edges.length} edges)`);
     return 0;
   }
@@ -178,6 +202,31 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
   if (graph.inputs && preflight.undeclared.length > 0) {
     console.error(formatUndeclaredWarning(preflight.undeclared.map((r) => r.name)));
     // continue — author oversight, not a caller-facing failure
+  }
+
+  // Surface unresolved $vars referenced inside agent .md bodies (file:line).
+  // The scanner already deduped by name, but multiple sources per name are
+  // pushed as separate `missing` entries — dedupe again on file+line+name.
+  let unresolvedAgentBodyRefs = false;
+  const seenAgentRefs = new Set<string>();
+  for (const ref of preflight.missing) {
+    if (!ref.source) continue;
+    const key = `${ref.source.file}:${ref.source.line}:${ref.name}`;
+    if (seenAgentRefs.has(key)) continue;
+    seenAgentRefs.add(key);
+    unresolvedAgentBodyRefs = true;
+    const rel = ref.source.file.startsWith(project + "/")
+      ? ref.source.file.slice(project.length + 1)
+      : ref.source.file;
+    await output.error(
+      `[unresolved_var_in_agent_prompt] $${ref.name}\n` +
+      `    ${rel}:${ref.source.line}\n` +
+      `    (referenced in agent="${ref.source.agentName}" used by node ${ref.source.nodeId})`
+    );
+  }
+  if (unresolvedAgentBodyRefs) {
+    printRefineTip(dotFile);
+    process.exit(1);
   }
 
   graph = variableExpansionTransform(graph, {
