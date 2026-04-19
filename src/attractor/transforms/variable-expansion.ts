@@ -7,6 +7,34 @@ export class UndefinedVariableError extends Error {
   }
 }
 
+export function splitFences(s: string): Array<{ fenced: boolean; text: string }> {
+  const out: Array<{ fenced: boolean; text: string }> = [];
+  const lines = s.split(/(\n)/); // keep newlines as separate tokens so joins preserve them
+  let buf = "";
+  let inFence = false;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (line === "\n") { buf += line; continue; }
+    const opensOrCloses = /^```/.test(line);
+    if (!inFence && opensOrCloses) {
+      if (buf.length) out.push({ fenced: false, text: buf });
+      buf = line;
+      inFence = true;
+      continue;
+    }
+    if (inFence && /^```\s*$/.test(line)) {
+      buf += line;
+      out.push({ fenced: true, text: buf });
+      buf = "";
+      inFence = false;
+      continue;
+    }
+    buf += line;
+  }
+  if (buf.length) out.push({ fenced: inFence, text: buf });
+  return out;
+}
+
 /**
  * Expand $key references in a string against a key-value context.
  * Skips $goal and $project (handled by the graph-level transform).

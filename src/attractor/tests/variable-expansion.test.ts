@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { variableExpansionTransform, scanUndeclaredCallerVars } from "../transforms/variable-expansion.js";
+import { variableExpansionTransform, scanUndeclaredCallerVars, splitFences } from "../transforms/variable-expansion.js";
 import type { Graph, Node } from "../types.js";
 
 function makeGraph(nodeAttrs: Record<string, unknown>): Graph {
@@ -114,5 +114,36 @@ describe("scanUndeclaredCallerVars", () => {
     ]);
     const r = scanUndeclaredCallerVars(g, {});
     expect(r.missing).toEqual([]);
+  });
+});
+
+describe("splitFences", () => {
+  it("returns a single non-fenced segment when no fences", () => {
+    const out = splitFences("plain $foo text");
+    expect(out).toEqual([{ fenced: false, text: "plain $foo text" }]);
+  });
+
+  it("splits a single fenced bash block", () => {
+    const src = "before\n```bash\nRUN=$HOME\n```\nafter";
+    const out = splitFences(src);
+    expect(out).toHaveLength(3);
+    expect(out[0]).toEqual({ fenced: false, text: "before\n" });
+    expect(out[1].fenced).toBe(true);
+    expect(out[1].text).toContain("RUN=$HOME");
+    expect(out[2]).toEqual({ fenced: false, text: "\nafter" });
+  });
+
+  it("treats an unclosed opening fence as fenced to EOF", () => {
+    const src = "prose\n```bash\nRUN=$HOME\nmore shell\n";
+    const out = splitFences(src);
+    expect(out).toHaveLength(2);
+    expect(out[0]).toEqual({ fenced: false, text: "prose\n" });
+    expect(out[1].fenced).toBe(true);
+    expect(out[1].text).toContain("RUN=$HOME");
+  });
+
+  it("does NOT treat inline single-backtick spans as fenced", () => {
+    const out = splitFences("see `$foo` here");
+    expect(out).toEqual([{ fenced: false, text: "see `$foo` here" }]);
   });
 });
