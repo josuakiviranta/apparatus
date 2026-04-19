@@ -6,7 +6,10 @@ import {
   GateNodeSchema,
   StartNodeSchema,
   ExitNodeSchema,
+  classifyNode,
+  validateNode,
 } from "../core/schemas.js";
+import type { Node } from "../types.js";
 
 describe("BaseNodeSchema", () => {
   it("accepts a node with only id", () => {
@@ -195,5 +198,71 @@ describe("ExitNodeSchema", () => {
       shape: "Msquare",
     });
     expect(result.success).toBe(true);
+  });
+});
+
+describe("classifyNode", () => {
+  it("classifies tool nodes by type='tool'", () => {
+    const node: Node = { id: "t1", type: "tool", cwd: ".", toolCommand: "x" };
+    expect(classifyNode(node)).toBe("tool");
+  });
+
+  it("classifies start nodes by shape='Mdiamond'", () => {
+    const node: Node = { id: "start", shape: "Mdiamond" };
+    expect(classifyNode(node)).toBe("start");
+  });
+
+  it("classifies exit nodes by shape='Msquare'", () => {
+    const node: Node = { id: "exit", shape: "Msquare" };
+    expect(classifyNode(node)).toBe("exit");
+  });
+
+  it("classifies gate nodes by shape='hexagon'", () => {
+    const node: Node = { id: "g1", shape: "hexagon", label: "Q?" };
+    expect(classifyNode(node)).toBe("gate");
+  });
+
+  it("classifies agent nodes by presence of agent attr", () => {
+    const node: Node = { id: "a1", agent: "claude-code", prompt: "p" };
+    expect(classifyNode(node)).toBe("agent");
+  });
+});
+
+describe("validateNode", () => {
+  it("returns [] for a valid agent node", () => {
+    const node: Node = { id: "a1", agent: "claude-code", prompt: "p" };
+    expect(validateNode(node)).toEqual([]);
+  });
+
+  it("emits schema_error with node id for unknown attribute", () => {
+    const node: Node = {
+      id: "a1",
+      agent: "claude-code",
+      prompt: "p",
+      tool_commnd: "oops",
+    };
+    const diags = validateNode(node);
+    expect(diags.length).toBeGreaterThan(0);
+    expect(diags[0].rule).toBe("schema_error");
+    expect(diags[0].severity).toBe("error");
+    expect(diags[0].message).toContain("[a1]");
+  });
+
+  it("emits schema_error for tool node missing cwd", () => {
+    const node: Node = { id: "t1", type: "tool", toolCommand: "echo" };
+    const diags = validateNode(node);
+    expect(diags.length).toBeGreaterThan(0);
+    expect(diags[0].rule).toBe("schema_error");
+    expect(diags[0].message).toContain("[t1]");
+  });
+
+  it("returns [] for a valid tool node", () => {
+    const node: Node = { id: "t1", type: "tool", cwd: ".", toolCommand: "echo" };
+    expect(validateNode(node)).toEqual([]);
+  });
+
+  it("returns [] for a valid gate node", () => {
+    const node: Node = { id: "g1", shape: "hexagon", label: "Proceed?" };
+    expect(validateNode(node)).toEqual([]);
   });
 });

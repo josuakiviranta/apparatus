@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Node, Diagnostic } from "../types.js";
 
 export const BaseNodeSchema = z.object({
   id: z.string(),
@@ -60,3 +61,34 @@ export const StartNodeSchema = BaseNodeSchema.extend({
 export const ExitNodeSchema = BaseNodeSchema.extend({
   shape: z.literal("Msquare"),
 }).strict();
+
+export type NodeKind = "tool" | "agent" | "gate" | "start" | "exit";
+
+const SCHEMAS = {
+  tool: ToolNodeSchema,
+  agent: AgentNodeSchema,
+  gate: GateNodeSchema,
+  start: StartNodeSchema,
+  exit: ExitNodeSchema,
+} as const;
+
+export function classifyNode(node: Node): NodeKind {
+  if (node.type === "tool") return "tool";
+  if (node.shape === "Mdiamond") return "start";
+  if (node.shape === "Msquare") return "exit";
+  if (node.shape === "hexagon") return "gate";
+  if (typeof node.agent === "string") return "agent";
+  return "agent";
+}
+
+export function validateNode(node: Node): Diagnostic[] {
+  const kind = classifyNode(node);
+  const schema = SCHEMAS[kind];
+  const result = schema.safeParse(node);
+  if (result.success) return [];
+  return result.error.issues.map(issue => ({
+    rule: "schema_error",
+    severity: "error" as const,
+    message: `[${node.id}] ${issue.path.join(".") || "<node>"}: ${issue.message}`,
+  }));
+}
