@@ -182,6 +182,8 @@ Because `--resume` re-executes the node that was interrupted, scripts referenced
 
 **`--project` preflight:** if the pipeline references `$project` in any node attribute, `pipeline run` requires `--project <folder>` and exits 1 otherwise with rule `project_binding_missing` (printed to stderr as `[project_binding_missing]`). `--var project=...` does not satisfy this.
 
+**Gate-node choice in context:** every `wait-human` (hexagon) gate that resolves to a user pick writes two keys into pipeline context on success: `<gateNodeId>.choice` — authoritative and immutable for the remainder of the run, safe to reference from any downstream node, condition, or `$var` expansion — and `choice` — an alias that always holds the most-recent resolved gate's pick. Aborted or failed gates write neither key; any prior gate's `<nodeId>.choice` survives intact. Under parallel branches the bare `choice` alias is last-writer-wins and non-deterministic, so prefer `<gateNodeId>.choice` whenever two gates can race. Condition edges read these via the standard `condition="key=value"` syntax; variable expansion reads them as `$<gateNodeId>.choice` or `$choice`.
+
 ### `ralph pipeline list [folder]`
 
 Lists available pipeline DOT files in a folder.
