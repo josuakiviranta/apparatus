@@ -2,6 +2,7 @@ import { existsSync } from "fs";
 import { resolve as resolvePath, extname } from "path";
 import type { Graph, Node, Edge, Diagnostic } from "../types.js";
 import { expandVariables, extractDefaults, UndefinedVariableError } from "../transforms/variable-expansion.js";
+import { validateNode } from "./schemas.js";
 
 // Convert snake_case to camelCase
 function toCamel(s: string): string {
@@ -260,6 +261,9 @@ const INLINE_SCRIPT_PATTERNS: RegExp[] = [
 
 export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
   const diags: Diagnostic[] = [];
+  for (const node of graph.nodes.values()) {
+    diags.push(...validateNode(node));
+  }
   const { nodes, edges } = graph;
 
   const isStart = (n: Node) => n.shape === "Mdiamond" || n.id === "start" || n.id === "Start";
@@ -415,8 +419,16 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
   if (startNodes.length === 1) {
     const startId = startNodes[0].id;
     for (const [consumerId, consumer] of nodes) {
-      // Extract variable references from prompt and toolCommand
-      const fields = [consumer.prompt, consumer.toolCommand].filter(Boolean) as string[];
+      // Extract variable references from prompt, toolCommand, label, and scriptArgs.
+      // label is rendered by the wait-human handler (hexagon gates); scriptArgs
+      // is rendered by the tool handler when script_file= is set. Both expand
+      // $vars at runtime, so both must be scanned for path-wise availability.
+      const fields = [
+        consumer.prompt,
+        consumer.toolCommand,
+        consumer.label,
+        consumer.scriptArgs,
+      ].filter(Boolean) as string[];
       const vars = new Set<string>();
       for (const field of fields) {
         let m: RegExpExecArray | null;

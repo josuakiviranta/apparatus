@@ -1006,7 +1006,10 @@ describe("validateGraph — schema_error", () => {
       }
     `);
     const diags = validateGraph(graph);
-    expect(diags.some(d => d.rule === "schema_error" && d.message.includes("tool_commnd"))).toBe(true);
+    // Note: parseDot normalizes snake_case attribute keys to camelCase
+    // (tool_commnd -> toolCommnd) before zod sees them, so the schema
+    // diagnostic surfaces the camelCased key.
+    expect(diags.some(d => d.rule === "schema_error" && d.message.includes("toolCommnd"))).toBe(true);
   });
 
   it("validateGraph returns no schema_error for a valid tool node", () => {
