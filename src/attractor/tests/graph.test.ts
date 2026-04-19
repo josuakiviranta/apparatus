@@ -708,6 +708,44 @@ describe("validateGraph — variable_coverage", () => {
     const warnings = diags.filter(d => d.rule === "variable_coverage");
     expect(warnings).toHaveLength(0);
   });
+
+  it("scans $var refs inside gate-node labels (hexagon)", () => {
+    // Regression: approval_gate in illumination-to-implementation.dot referenced
+    // $refinements in its label, but chat_summarizer (the producer) is only on
+    // the chat-loop path. First entry to approval_gate skips the producer and
+    // crashes the wait-human handler at runtime. Validator must catch this.
+    const graph = parseDot(`digraph g {
+      start [shape=Mdiamond]
+      explainer [shape=box, agent="impl"]
+      approval_gate [shape=hexagon, label="Refinements: $refinements"]
+      chat [shape=box, agent="impl", interactive=true]
+      summarizer [shape=box, agent="impl", produces="refinements"]
+      writer [shape=box, agent="impl"]
+      done [shape=Msquare]
+      start -> explainer -> approval_gate
+      approval_gate -> writer [label="Approve"]
+      approval_gate -> chat   [label="Chat"]
+      chat -> summarizer -> approval_gate
+      writer -> done
+    }`);
+    const diags = validateGraph(graph);
+    const warnings = diags.filter(d => d.rule === "variable_coverage");
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0].message).toContain("refinements");
+    expect(warnings[0].message).toContain("approval_gate");
+  });
+
+  it("honors default_<var> on a gate-node label (suppresses warning)", () => {
+    const graph = parseDot(`digraph g {
+      start [shape=Mdiamond]
+      approval_gate [shape=hexagon, default_refinements="", label="Refinements: $refinements"]
+      done [shape=Msquare]
+      start -> approval_gate -> done
+    }`);
+    const diags = validateGraph(graph);
+    const warnings = diags.filter(d => d.rule === "variable_coverage");
+    expect(warnings).toHaveLength(0);
+  });
 });
 
 describe("parseDot inputs= attribute", () => {
@@ -941,5 +979,46 @@ describe("validateGraph — script_file rules", () => {
         `ext ${ext} should be accepted`,
       ).toBe(false);
     }
+  });
+});
+
+describe("validateGraph — schema_error", () => {
+  it("validateGraph emits schema_error for tool node missing cwd", () => {
+    const graph = parseDot(`
+      digraph g {
+        start [shape=Mdiamond]
+        bad [type="tool", toolCommand="echo hi"]
+        done [shape=Msquare]
+        start -> bad -> done
+      }
+    `);
+    const diags = validateGraph(graph);
+    expect(diags.some(d => d.rule === "schema_error" && d.message.includes("cwd"))).toBe(true);
+  });
+
+  it("validateGraph emits schema_error for unknown attribute", () => {
+    const graph = parseDot(`
+      digraph g {
+        start [shape=Mdiamond]
+        n [agent="implement", prompt="p", tool_commnd="typo"]
+        done [shape=Msquare]
+        start -> n -> done
+      }
+    `);
+    const diags = validateGraph(graph);
+    expect(diags.some(d => d.rule === "schema_error" && d.message.includes("tool_commnd"))).toBe(true);
+  });
+
+  it("validateGraph returns no schema_error for a valid tool node", () => {
+    const graph = parseDot(`
+      digraph g {
+        start [shape=Mdiamond]
+        ok [type="tool", cwd="$project", toolCommand="echo hi"]
+        done [shape=Msquare]
+        start -> ok -> done
+      }
+    `);
+    const diags = validateGraph(graph);
+    expect(diags.filter(d => d.rule === "schema_error")).toEqual([]);
   });
 });
