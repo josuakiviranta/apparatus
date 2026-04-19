@@ -56,3 +56,35 @@ describe("evaluateCondition handles unknown-typed context values", () => {
     expect(evaluateCondition("context.chat.success=false", success, ctx)).toBe(false);
   });
 });
+
+describe("evaluateCondition — gate choice namespacing", () => {
+  const success: Outcome = { status: "success", preferredLabel: "Approve" };
+
+  it("resolves <nodeId>.choice via flat-key fall-through", () => {
+    const ctx: Record<string, unknown> = { "approval_gate.choice": "Approve" };
+    expect(evaluateCondition("approval_gate.choice=Approve", success, ctx)).toBe(true);
+    expect(evaluateCondition("approval_gate.choice=Decline", success, ctx)).toBe(false);
+  });
+
+  it("resolves bare choice alias via flat-key fall-through", () => {
+    const ctx: Record<string, unknown> = { choice: "Approve" };
+    expect(evaluateCondition("choice=Approve", success, ctx)).toBe(true);
+    expect(evaluateCondition("choice=Decline", success, ctx)).toBe(false);
+  });
+
+  it("namespaced key is independent of alias (prior gate survives)", () => {
+    const ctx: Record<string, unknown> = {
+      "approval_gate.choice": "Approve",
+      "review_gate.choice": "Decline",
+      choice: "Decline",
+    };
+    expect(evaluateCondition("approval_gate.choice=Approve", success, ctx)).toBe(true);
+    expect(evaluateCondition("review_gate.choice=Decline", success, ctx)).toBe(true);
+    expect(evaluateCondition("choice=Decline", success, ctx)).toBe(true);
+  });
+
+  it("missing namespaced key resolves to empty string", () => {
+    expect(evaluateCondition("approval_gate.choice=Approve", success, {})).toBe(false);
+    expect(evaluateCondition("approval_gate.choice=", success, {})).toBe(true);
+  });
+});

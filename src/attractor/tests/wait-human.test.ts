@@ -74,3 +74,86 @@ describe("WaitHumanHandler — label variable expansion (Bug B.1)", () => {
     expect(captured[0].prompt).toBe("Refinements: (none yet)");
   });
 });
+
+describe("WaitHumanHandler — gate choice namespacing", () => {
+  const makeInterviewer = (value: string): Interviewer => ({
+    ask: async (): Promise<Answer> => ({ value }),
+  });
+
+  it("writes <nodeId>.choice and choice alias on success", async () => {
+    const handler = new WaitHumanHandler(makeInterviewer("Approve"));
+    const node: Node = { id: "approval_gate", label: "Proceed?" };
+    const ctx: PipelineContext = { values: {} };
+    const outcome = await handler.execute(node, ctx, { outgoingLabels: ["Approve", "Decline"] });
+
+    expect(outcome.status).toBe("success");
+    expect(outcome.preferredLabel).toBe("Approve");
+    expect(outcome.contextUpdates).toEqual({
+      "approval_gate.choice": "Approve",
+      choice: "Approve",
+    });
+  });
+
+  it("uses the exact node.id in the namespaced key", async () => {
+    const handler = new WaitHumanHandler(makeInterviewer("Yes"));
+    const node: Node = { id: "remove_gate", label: "Remove?" };
+    const outcome = await handler.execute(node, { values: {} }, { outgoingLabels: ["Yes", "No"] });
+
+    expect(outcome.contextUpdates?.["remove_gate.choice"]).toBe("Yes");
+    expect(outcome.contextUpdates?.choice).toBe("Yes");
+  });
+
+  it("does not emit contextUpdates when aborted before prompt", async () => {
+    const handler = new WaitHumanHandler(makeInterviewer("Approve"));
+    const node: Node = { id: "approval_gate", label: "Proceed?" };
+    const controller = new AbortController();
+    controller.abort();
+    const outcome = await handler.execute(node, { values: {} }, {
+      outgoingLabels: ["Approve"],
+      signal: controller.signal,
+    });
+
+    expect(outcome.status).toBe("fail");
+    expect(outcome.contextUpdates).toBeUndefined();
+  });
+
+  it("does not emit contextUpdates when aborted during prompt", async () => {
+    const controller = new AbortController();
+    const interviewer: Interviewer = {
+      ask: () => new Promise<Answer>(() => { /* never resolves */ }),
+    };
+    const handler = new WaitHumanHandler(interviewer);
+    const node: Node = { id: "approval_gate", label: "Proceed?" };
+    const p = handler.execute(node, { values: {} }, {
+      outgoingLabels: ["Approve"],
+      signal: controller.signal,
+    });
+    controller.abort();
+    const outcome = await p;
+
+    expect(outcome.status).toBe("fail");
+    expect(outcome.contextUpdates).toBeUndefined();
+  });
+
+  it("two gates in sequence: prior namespaced key survives, alias tracks most recent", async () => {
+    const first = new WaitHumanHandler(makeInterviewer("Approve"));
+    const firstNode: Node = { id: "approval_gate", label: "Proceed?" };
+    const firstOutcome = await first.execute(firstNode, { values: {} }, {
+      outgoingLabels: ["Approve", "Decline"],
+    });
+
+    let merged: Record<string, unknown> = {};
+    if (firstOutcome.contextUpdates) merged = { ...merged, ...firstOutcome.contextUpdates };
+
+    const second = new WaitHumanHandler(makeInterviewer("Decline"));
+    const secondNode: Node = { id: "review_gate", label: "Looks right?" };
+    const secondOutcome = await second.execute(secondNode, { values: merged }, {
+      outgoingLabels: ["Approve", "Decline"],
+    });
+    if (secondOutcome.contextUpdates) merged = { ...merged, ...secondOutcome.contextUpdates };
+
+    expect(merged["approval_gate.choice"]).toBe("Approve");
+    expect(merged["review_gate.choice"]).toBe("Decline");
+    expect(merged.choice).toBe("Decline");
+  });
+});

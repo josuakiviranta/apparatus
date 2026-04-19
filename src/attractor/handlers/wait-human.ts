@@ -24,7 +24,11 @@ export class WaitHumanHandler implements NodeHandler {
 
     if (!signal) {
       const answer = await askPromise;
-      return { status: "success", preferredLabel: answer.value };
+      return {
+        status: "success",
+        preferredLabel: answer.value,
+        contextUpdates: { [`${node.id}.choice`]: answer.value, choice: answer.value },
+      };
     }
 
     const answer = await Promise.race([
@@ -40,6 +44,10 @@ export class WaitHumanHandler implements NodeHandler {
     if (answer === null) {
       return { status: "fail", failureReason: "Aborted during human prompt" };
     }
-    return { status: "success", preferredLabel: answer.value };
+    return {
+      status: "success",
+      preferredLabel: answer.value,
+      contextUpdates: { [`${node.id}.choice`]: answer.value, choice: answer.value },
+    };
   }
 }

@@ -8,6 +8,15 @@
 
 ## Recently shipped
 
+### Gate Choice Namespacing (2026-04-19) — DONE
+
+WaitHumanHandler now writes each gate's pick to context under `<nodeId>.choice` (authoritative, survives further gates) and `choice` (alias, most-recent-wins). Aborted gates emit no contextUpdates. Tag v0.1.26. Memory: `2026-04-19-gate-choice-namespacing-shipped.md`.
+
+Lessons:
+
+- **Regex+fall-through already supported dotted flat keys.** Existing `expandVariables` regex `/\$([a-zA-Z_]\w*(?:\.\w+)*)/g` and `conditions.resolveKey` `ctx[key]` fall-through already accept dotted keys. The only code change was the handler contextUpdates shape; the two new tests in `conditions.test.ts` + `variable-expansion.test.ts` are regression locks that already passed at RED time.
+- **LSP flagged non-error on `HandlerExecutionContext` args in tests.** Existing pre-change tests use the same minimal shape `{ outgoingLabels }`. `npx tsc --noEmit` reports only the pre-existing `agent-handler.ts:36` error. Rule re-confirmed: LSP vs tsc → tsc wins.
+
 ### Fenced Code-Block Variable-Skip (2026-04-19) — DONE
 
 All four chunks landed; commit history `1f2b0df…f94d708`. Memory: `2026-04-19-fenced-var-skip-shipped.md`.
@@ -32,7 +41,6 @@ After Task 3.2's render hunk shifted line numbers, two pre-existing unreachable-
 
 ### Specs queued for design review
 
-- `specs/2026-04-19-mark-archived-reason-split-design.md`
-- `specs/2026-04-19-gate-choice-namespacing-design.md`
+- `specs/2026-04-19-mark-archived-reason-split-design.md` — bundles with T0000; not independently landable (must ship in the same diff as T0000's `remove_gate` retarget).
 
-Decide which to scaffold into a plan next.
+Decide whether to scaffold T0000 next (would unblock the mark-archived split).

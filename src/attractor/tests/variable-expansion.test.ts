@@ -188,6 +188,16 @@ describe("expandVariables fence behavior", () => {
   it("does NOT throw for unknown $foo inside fence", () => {
     expect(() => expandVariables("```\n$typo\n```", {})).not.toThrow();
   });
+
+  it("expands dotted $<nodeId>.choice references against flat keys", () => {
+    const out = expandVariables("picked $approval_gate.choice", { "approval_gate.choice": "Approve" });
+    expect(out).toBe("picked Approve");
+  });
+
+  it("expands bare $choice alias", () => {
+    const out = expandVariables("last pick: $choice", { choice: "Decline" });
+    expect(out).toBe("last pick: Decline");
+  });
 });
 
 describe("scanUndeclaredCallerVars with agent body", () => {
