@@ -142,26 +142,31 @@ export function validateNode(node: Node): Diagnostic[] {
   } = node as Node & { sourceLocation?: unknown; attrLocations?: unknown };
   const result = schema.safeParse(nodeForValidation);
   if (result.success) return [];
-  return result.error.issues.map(issue => {
-    let message: string;
+  const diags: Diagnostic[] = [];
+  for (const issue of result.error.issues) {
     if (issue.code === "unrecognized_keys") {
       const keys = (issue as { keys?: string[] }).keys ?? [];
-      const snakeList = keys.map(camelToSnake).map(k => `'${k}'`).join(", ");
-      const plural = keys.length > 1 ? "s" : "";
-      message = `[${node.id}]: unrecognized key${plural} ${snakeList}`;
-    } else {
-      const path = issue.path.join(".");
-      const loc = path ? camelToSnake(path) : "node";
-      message = `[${node.id}] ${loc}: ${issue.message}`;
+      for (const key of keys) {
+        const snake = camelToSnake(key);
+        diags.push({
+          rule: "schema_error",
+          severity: "error",
+          message: `[${node.id}]: unrecognized key '${snake}'`,
+          hint: formatAllowedAttrs(kind),
+          location: node.attrLocations?.[key] ?? node.sourceLocation,
+        });
+      }
+      continue;
     }
-    const diag: Diagnostic = {
+    const path = issue.path.join(".");
+    const loc = path ? camelToSnake(path) : "node";
+    const firstPath = typeof issue.path[0] === "string" ? issue.path[0] : undefined;
+    diags.push({
       rule: "schema_error",
-      severity: "error" as const,
-      message,
-    };
-    if (issue.code === "unrecognized_keys") {
-      diag.hint = formatAllowedAttrs(kind);
-    }
-    return diag;
-  });
+      severity: "error",
+      message: `[${node.id}] ${loc}: ${issue.message}`,
+      location: (firstPath && node.attrLocations?.[firstPath]) ?? node.sourceLocation,
+    });
+  }
+  return diags;
 }

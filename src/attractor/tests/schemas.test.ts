@@ -283,6 +283,25 @@ describe("validateNode", () => {
     expect(unrecognized!.hint!).toContain("agent");
     expect(unrecognized!.hint!).toContain("default_refinements");
   });
+
+  it("emits one diagnostic per unknown key with attr-level location", () => {
+    const node = {
+      id: "x", type: "tool", cwd: "$project", toolCommand: "echo",
+      badOne: 1, badTwo: 2,
+      sourceLocation: { line: 10, column: 1 },
+      attrLocations: {
+        badOne: { line: 12, column: 3 },
+        badTwo: { line: 13, column: 3 },
+      },
+    } as any;
+    const diags = validateNode(node);
+    expect(diags).toHaveLength(2);
+    const locs = diags.map(d => d.location?.line).sort();
+    expect(locs).toEqual([12, 13]);
+    for (const d of diags) {
+      expect(d.hint).toContain("Allowed keys for kind=tool");
+    }
+  });
 });
 
 describe("describeKind", () => {
