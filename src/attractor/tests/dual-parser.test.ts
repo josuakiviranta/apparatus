@@ -25,7 +25,8 @@ function collectPipelines(): string[] {
 }
 
 function stripSourceLine(n: Node): Node {
-  const { sourceLine, ...rest } = n;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { sourceLine: _sourceLine, sourceLocation: _sourceLocation, attrLocations: _attrLocations, ...rest } = n;
   return rest as Node;
 }
 
