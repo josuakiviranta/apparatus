@@ -24,6 +24,7 @@ import { runTwoPhaseClaudeSession } from "../lib/session.js";
 import * as output from "../lib/output.js";
 import { renderCodeFrame } from "../lib/code-frame.js";
 import type { Diagnostic } from "../../attractor/types.js";
+import { DotSyntaxError } from "../../attractor/core/dot-syntax.js";
 import { renderPipelineApp } from "../components/PipelineApp.js";
 import { classifyNode } from "../lib/classifyNode.js";
 import { parseClaudeEvent } from "../lib/parseClaudeEvent.js";
@@ -101,7 +102,21 @@ export async function pipelineValidateCommand(dotFile: string, opts: PipelineVal
     return `${loc}[${d.rule}] ${d.message}${hint}${frame}`;
   }
 
-  const graph = parseDot(src);
+  let graph: Graph;
+  try { graph = parseDot(src); }
+  catch (e) {
+    if (e instanceof DotSyntaxError) {
+      const diag: Diagnostic = {
+        rule: "syntax",
+        severity: "error",
+        message: e.message,
+        location: e.location,
+      };
+      await output.error(formatDiag(diag));
+      return 1;
+    }
+    throw e;
+  }
   const diags = validateGraph(graph, dirname(absPath));
   const errors   = diags.filter(d => d.severity === "error");
   const warnings = diags.filter(d => d.severity === "warning");

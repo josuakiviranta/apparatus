@@ -50,6 +50,19 @@ describe("pipeline validate — source frames", () => {
   }, 30000);
 });
 
+describe("pipeline validate — syntax errors", () => {
+  it("prints a [syntax] diagnostic with code frame for malformed DOT", () => {
+    const project = setupTempProjectWith({
+      "broken.dot": `digraph g {\n  start [shape="Mdiamond"\n  done\n}`,
+    });
+    const { exitCode, stdout, stderr } = runCli(["pipeline", "validate", "broken.dot"], { cwd: project });
+    const out = stderr + stdout;
+    expect(exitCode).not.toBe(0);
+    expect(out).toMatch(/broken\.dot:\d+:\d+/);
+    expect(out).toContain("[syntax]");
+  }, 30000);
+});
+
 describe("pipeline validate — agent body unresolved vars", () => {
   beforeAll(() => {
     // Tests require a built CLI binary. The smoke test uses the same convention.
