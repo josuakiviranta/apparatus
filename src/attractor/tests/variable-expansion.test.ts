@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { variableExpansionTransform, scanUndeclaredCallerVars, splitFences, expandVariables, UndefinedVariableError } from "../transforms/variable-expansion.js";
+import { variableExpansionTransform, scanUndeclaredCallerVars, splitFences, expandVariables, UndefinedVariableError, extractDefaults } from "../transforms/variable-expansion.js";
 import { parseDot } from "../core/graph.js";
 import type { Graph, Node } from "../types.js";
 
@@ -247,5 +247,28 @@ describe("scanUndeclaredCallerVars with agent body", () => {
     `);
     const res = scanUndeclaredCallerVars(graph, { project: projectDir });
     expect(res.missing.some((m) => typeof m === "object" && m.name === "typo_var")).toBe(false);
+  });
+});
+
+describe("extractDefaults", () => {
+  it("snake-cases scope changed", () => {
+    expect(extractDefaults({ defaultScopeChanged: "false" })).toEqual({ scope_changed: "false" });
+  });
+
+  it("snake-cases archive reason short", () => {
+    expect(extractDefaults({ defaultArchiveReasonShort: "Declined at approval gate" }))
+      .toEqual({ archive_reason_short: "Declined at approval gate" });
+  });
+
+  it("ignores bare 'default' (no varname)", () => {
+    expect(extractDefaults({ default: "x" })).toEqual({});
+  });
+
+  it("ignores 'defaulted' (no uppercase after prefix)", () => {
+    expect(extractDefaults({ defaulted: "x" })).toEqual({});
+  });
+
+  it("ignores non-default keys", () => {
+    expect(extractDefaults({ refinements: "x", prompt: "p" })).toEqual({});
   });
 });
