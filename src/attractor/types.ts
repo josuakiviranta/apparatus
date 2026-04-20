@@ -31,6 +31,8 @@ export interface Node {
   interactive?: boolean | string;
   jsonSchemaFile?: string;
   class?: string;
+  /** 1-based line in the source .dot file where this node was declared. */
+  sourceLine?: number;
   [key: string]: unknown;
 }
 
