@@ -7,14 +7,15 @@ digraph illumination_to_implementation {
 
   // ── Phase 1: Illumination triage (from illumination-to-plan) ──────────────
 
-  verifier [agent="verifier", json_schema_file="schemas/verifier.json", produces="preferred_label, illumination_path, summary, explanation", prompt="Verify one illumination from $illuminations_dir/illuminations/*.md against the current ralph-cli codebase.\n\nFollow your agent-level rubric (relevance + technical accuracy + project-fit / Feature-Creep) and procedure. Use $illuminations_dir as the input directory. Project root for README and specs lookup is the current working directory.\n\nReturn the structured verdict only — no prose preamble."]
+  verifier [agent="verifier", json_schema_file="schemas/verifier.json", produces="preferred_label, illumination_path, summary, explanation, archive_reason_short", prompt="Verify one illumination from $illuminations_dir/illuminations/*.md against the current ralph-cli codebase.\n\nFollow your agent-level rubric (relevance + technical accuracy + project-fit / Feature-Creep) and procedure. Use $illuminations_dir as the input directory. Project root for README and specs lookup is the current working directory.\n\nReturn the structured verdict only — no prose preamble."]
 
   remove_gate [shape=hexagon, label="Archive this illumination?\n$illumination_path\n\n$explanation"]
 
   mark_archived [type="tool",
                  cwd="$project",
                  script_file="scripts/mark-archived.mjs",
-                 script_args="$illumination_path $choice"]
+                 default_archive_reason_short="Declined at approval gate",
+                 script_args="$illumination_path $archive_reason_short"]
 
   mark_dispatched [type="tool",
                    cwd="$project",
