@@ -9,7 +9,7 @@ digraph illumination_to_implementation {
 
   verifier [agent="verifier", json_schema_file="schemas/verifier.json", produces="preferred_label, illumination_path, summary, explanation, archive_reason_short", prompt="Verify one illumination from $illuminations_dir/illuminations/*.md against the current ralph-cli codebase.\n\nFollow your agent-level rubric (relevance + technical accuracy + project-fit / Feature-Creep) and procedure. Use $illuminations_dir as the input directory. Project root for README and specs lookup is the current working directory.\n\nReturn the structured verdict only — no prose preamble."]
 
-  remove_gate [shape=hexagon, label="Archive this illumination?\n$illumination_path\n\n$explanation"]
+  remove_gate [shape=hexagon, label="Verifier recommends archiving.\n\n$illumination_path\n\nReason: $explanation\n\nChoose: Archive (agree), Keep (override), or Chat (discuss)."]
 
   mark_archived [type="tool",
                  cwd="$project",
@@ -35,7 +35,7 @@ digraph illumination_to_implementation {
 
   // ── Phase 2: Implementation ───────────────────────────────────────────────
 
-  implement [agent="implement", max_retries=1, prompt="Read the implementation plan at $plan_path.\n\nImplement the plan using red/green TDD:\n1. Read the plan carefully\n2. For each chunk: write failing tests first, then implement to make them pass\n3. Commit after each passing chunk\n\nDo NOT push — a separate pipeline node handles that.\nDo NOT modify files outside the scope of the plan."]
+  implement [agent="implement", max_retries=1, prompt="Read the implementation plan at $plan_path.\n\nImplement the plan using subagent-driven red/green TDD:\n1. Read the plan carefully\n2. For each chunk: dispatch parallel subagents to write failing tests first, then implement to make them pass (one subagent per concern)\n3. Commit after each passing chunk\n\nDo NOT push — a separate pipeline node handles that.\nDo NOT modify files outside the scope of the plan."]
 
   review_gate [shape=hexagon, label="Review implementation\n\nProject: $project\nPlan: $plan_path"]
 
@@ -54,8 +54,9 @@ digraph illumination_to_implementation {
   verifier -> done             [condition="preferred_label=empty"]
 
   // False path
-  remove_gate -> done           [label="Skip"]
   remove_gate -> mark_archived  [label="Archive"]
+  remove_gate -> done           [label="Keep"]
+  remove_gate -> chat_session   [label="Chat"]
 
   // True path
   explainer -> approval_gate
@@ -67,8 +68,7 @@ digraph illumination_to_implementation {
   // When the chat materially alters scope, loop back through verifier so $summary
   // and $explanation reflect the refined scope, not the original illumination pass.
   chat_session -> chat_summarizer
-  chat_summarizer -> verifier  [condition="scope_changed=true"]
-  chat_summarizer -> explainer [condition="scope_changed=false"]
+  chat_summarizer -> verifier
 
   // Decline branch terminator
   mark_archived -> done

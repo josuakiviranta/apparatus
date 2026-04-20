@@ -112,6 +112,10 @@ ralph-cli/
 
 Tool nodes (handled by `attractor/handlers/tool.ts`) may externalise their logic to a script on disk via the `script_file=` DOT attribute (resolved relative to the pipeline file, conventionally under `pipelines/scripts/`) — see [`docs/superpowers/specs/2026-04-17-pipeline-script-files-design.md`](../docs/superpowers/specs/2026-04-17-pipeline-script-files-design.md).
 
+`attractor/handlers/parallel.ts` exports two handlers: `ParallelHandler` executes a fan-out node, gathering per-branch outcomes from `meta.branchOutcomes` and serialising them into the `parallel.results` context key; `FanInHandler` (registered as `parallel.fan_in`) reads that key back, parses the per-branch outcomes, and rolls them up into a single `success` / `partial_success` / `fail` status depending on whether all, some, or none of the branches succeeded.
+
+Agent nodes resolve their agent name with a precedence rule: `attractor/handlers/agent-handler.ts` first looks in the project-local `<projectDir>/.ralph/agents/` directory, then falls back to the user-level `~/.ralph/agents/` registry, and finally to the agents bundled under `src/cli/agents/`. Projects can therefore override any bundled agent by dropping a same-named markdown file into `.ralph/agents/`.
+
 ## Build Entry Points
 
 tsup compiles 4 entries:
@@ -125,4 +129,10 @@ tsup compiles 4 entries:
 
 ## Asset Bundling
 
-`tsup.config.ts` copies bundled prompt files from `src/cli/prompts/` and agent definitions from `src/cli/agents/` into `dist/` via an `onSuccess` hook. At runtime, `assets.ts` resolves paths relative to the compiled entry point using a prod/dev detection constant (`__RALPH_PROD__`) injected by tsup's `define` config.
+`tsup.config.ts` copies bundled prompt files from `src/cli/prompts/`, agent definitions from `src/cli/agents/`, and pipeline `.dot` files from `src/cli/pipelines/` into `dist/` via an `onSuccess` hook. The `meditations/` directory at the repo root is not rewritten into `dist/` — it is published directly by npm via the `files` entry in `package.json`, so installed copies of the package carry `meditations/` next to `dist/`. At runtime, `assets.ts` resolves paths relative to the compiled entry point using a prod/dev detection constant (`__RALPH_PROD__`) injected by tsup's `define` config.
+
+## Checkpoint and Resume
+
+`src/attractor/checkpoint.ts` persists a `CheckpointState` JSON blob (`{ timestamp, currentNode, completedNodes, nodeRetries, context }`) to `<logsRoot>/checkpoint.json`, which defaults to `~/.ralph/runs/<slug>/checkpoint.json` where `<slug>` is derived from the graph name. `core/engine.ts` writes the checkpoint at each node advance — before a node executes, after a successful transition, after taking a fail edge, and on retry — so that a run interrupted by Ctrl-C or a failing node can be resumed from the last completed boundary.
+
+`ralph pipeline run <dot-file> --resume` calls `loadCheckpoint()` and replays from the recorded `currentNode`, preserving `completedNodes`, `nodeRetries`, and accumulated `context.values`. Without `--resume`, a fresh run deletes the prior run directory before starting, so scripts invoked from tool nodes should be idempotent.

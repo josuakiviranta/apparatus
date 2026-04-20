@@ -1,7 +1,9 @@
 ---
 date: 2026-04-20
-status: open
+status: archived
 description: pipelines/smoke/ already exists but is undocumented as a first-class convention; every non-trivial pipeline should ship with a smoke test running it end-to-end with mock agents, and that expectation needs to be encoded in authoring commands, scaffolding, and validation lint-lane warnings — otherwise runtime-only bugs (agent output schema drift, conditional branch dead ends) continue to escape static validation.
+archived_at: 2026-04-20
+reason: Declined at approval gate
 ---
 
 ## Core Idea

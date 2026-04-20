@@ -18,3 +18,4 @@ Reference specifications for ralph-cli — an agentic loop runner for AI-assiste
 | [heartbeat.md](heartbeat.md) | Heartbeat scheduling — recurring tasks via background daemon |
 | [daemon.md](daemon.md) | Daemon architecture — socket IPC, state, task runner |
 | [mcp-illumination.md](mcp-illumination.md) | MCP illumination server — path-restricted write access for meditations |
+| [pipeline.md](pipeline.md) | Pipeline subsystem — DOT graph engine, handlers, interviewer, checkpoint, tracer, diagnostics |
