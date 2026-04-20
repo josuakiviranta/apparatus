@@ -13,15 +13,24 @@ import {
 // for AST nodes and rely on the shape documented in the design spec.
 type AttrMap = Record<string, unknown>;
 
-function readAttrs(children: any[]): AttrMap {
-  const out: AttrMap = {};
+function readAttrs(children: any[]): { attrs: AttrMap; locations: Record<string, SourceLocation> } {
+  const attrs: AttrMap = {};
+  const locations: Record<string, SourceLocation> = {};
   for (const c of children) {
     if (c.type !== "Attribute") continue;
     const key = toCamel(c.key.value);
     const raw = c.value.quoted ? unescapeDotString(c.value.value) : c.value.value;
-    out[key] = c.value.quoted ? raw : coerceValue(raw);
+    attrs[key] = c.value.quoted ? raw : coerceValue(raw);
+    if (c.location) {
+      locations[key] = {
+        line: c.location.start.line,
+        column: c.location.start.column,
+        endLine: c.location.end?.line,
+        endColumn: c.location.end?.column,
+      };
+    }
   }
-  return out;
+  return { attrs, locations };
 }
 
 export function parseDotV2(src: string): Graph {
@@ -59,7 +68,7 @@ export function parseDotV2(src: string): Graph {
           break;
         }
         case "AttributeList": {
-          const attrs = readAttrs(child.children);
+          const { attrs } = readAttrs(child.children);
           if (child.kind === "Node") nodeDefaults = { ...nodeDefaults, ...attrs };
           else if (child.kind === "Edge") edgeDefaults = { ...edgeDefaults, ...attrs };
           else Object.assign(graphAttrs, attrs);
@@ -67,7 +76,8 @@ export function parseDotV2(src: string): Graph {
         }
         case "Node": {
           const id = child.id.value;
-          const attrs = { ...nodeDefaults, ...readAttrs(child.children) };
+          const { attrs: selfAttrs, locations: selfLocs } = readAttrs(child.children);
+          const merged = { ...nodeDefaults, ...selfAttrs };
           const loc = child.location;
           const sourceLocation: SourceLocation | undefined = loc
             ? {
@@ -79,17 +89,34 @@ export function parseDotV2(src: string): Graph {
             : undefined;
           nodes.set(id, {
             id,
-            ...attrs,
+            ...merged,
             sourceLine: loc?.start.line,
             sourceLocation,
+            attrLocations: selfLocs,
           } as Node);
           break;
         }
         case "Edge": {
-          const attrs = { ...edgeDefaults, ...readAttrs(child.children) };
+          const { attrs: selfAttrs, locations: edgeLocs } = readAttrs(child.children);
+          const edgeAttrs = { ...edgeDefaults, ...selfAttrs };
           const targets = child.targets.map((t: any) => t.id.value);
+          const edgeLoc = child.location;
+          const edgeSourceLocation: SourceLocation | undefined = edgeLoc
+            ? {
+                line: edgeLoc.start.line,
+                column: edgeLoc.start.column,
+                endLine: edgeLoc.end?.line,
+                endColumn: edgeLoc.end?.column,
+              }
+            : undefined;
           for (let i = 0; i < targets.length - 1; i++) {
-            edges.push({ from: targets[i], to: targets[i + 1], ...attrs } as Edge);
+            edges.push({
+              from: targets[i],
+              to: targets[i + 1],
+              ...edgeAttrs,
+              sourceLocation: edgeSourceLocation,
+              attrLocations: edgeLocs,
+            } as Edge);
           }
           break;
         }
