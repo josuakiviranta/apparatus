@@ -5,6 +5,12 @@ import { parseDot } from "../core/graph.js";
 import { parseDotV2 } from "../core/graph-ast.js";
 import type { Graph, Node } from "../types.js";
 
+// This test was originally a dual-run check (parseDot ≡ parseDotV2) during
+// the migration. Now that parseDot delegates to parseDotV2, it serves as a
+// fixture snapshot: every .dot in pipelines/ must continue to parse with the
+// same Graph shape. If this test fails after a parser change, a pipeline's
+// semantics changed silently — review the diff carefully.
+
 function collectPipelines(): string[] {
   const out: string[] = [];
   const roots = ["pipelines", "pipelines/smoke"];
@@ -50,7 +56,7 @@ function graphEquiv(a: Graph, b: Graph) {
   }
 }
 
-describe("parseDot ≡ parseDotV2 across fixtures", () => {
+describe("parseDot fixture regression (AST parser)", () => {
   const files = collectPipelines();
   it.each(files)("%s produces equivalent Graph", (file) => {
     const src = readFileSync(file, "utf8");
