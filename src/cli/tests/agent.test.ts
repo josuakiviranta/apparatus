@@ -123,6 +123,14 @@ describe("Agent.buildArgs", () => {
     const args = agent.buildArgs({ cwd: "/tmp" });
     expect(args).toContain("--output-format");
     expect(args).toContain("stream-json");
+    // claude CLI requires --verbose when -p pairs with stream-json
+    expect(args).toContain("--verbose");
+  });
+
+  it("omits --verbose when interactive", () => {
+    const agent = new Agent(baseConfig);
+    const args = agent.buildArgs({ cwd: "/tmp", interactive: true });
+    expect(args).not.toContain("--verbose");
   });
 
   it("uses stream-json even when jsonSchema is set (schema is in prompt)", () => {

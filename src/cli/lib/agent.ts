@@ -114,7 +114,7 @@ export class Agent {
     // When jsonSchema is set, schema is embedded in the prompt by agent-handler.ts;
     // we use stream-json so text deltas reach the TUI in real-time.
     if (!options.interactive) {
-      args.push("--output-format", "stream-json");
+      args.push("--output-format", "stream-json", "--verbose");
     }
 
     // Resume or prompt

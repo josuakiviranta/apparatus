@@ -27,6 +27,25 @@ export function initialState(): FormatterState {
   };
 }
 
+// json_schema agents emit their result as a single JSON blob like
+// `{"explainer_render":"…markdown…"}`. When the object has exactly one
+// string-valued property, unwrap to the inner markdown so renderMarkdown
+// in the UI can format it. Multi-field structured outputs fall through
+// unchanged (showing the JSON) — we don't pick a field.
+function unwrapStructuredText(text: string): string {
+  const trimmed = text.trim();
+  if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) return text;
+  try {
+    const parsed = JSON.parse(trimmed) as Record<string, unknown>;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return text;
+    const keys = Object.keys(parsed);
+    if (keys.length === 1 && typeof parsed[keys[0]] === "string") {
+      return parsed[keys[0]] as string;
+    }
+  } catch { /* not valid JSON — emit raw */ }
+  return text;
+}
+
 function formatToolUse(name: string, input: Record<string, unknown>): Extract<StreamEvent, { type: "tool" }> {
   switch (name) {
     case "Read":
@@ -174,7 +193,7 @@ export function processLine(
     for (const block of content) {
       const b = block as Record<string, unknown>;
       if (b.type === "text") {
-        buf.push({ type: "text", content: String(b.text), indented: true });
+        buf.push({ type: "text", content: unwrapStructuredText(String(b.text)), indented: true });
       } else if (b.type === "tool_use") {
         const name = String(b.name);
         const input = (b.input ?? {}) as Record<string, unknown>;
@@ -232,7 +251,7 @@ export function processLine(
   for (const block of content) {
     const b = block as Record<string, unknown>;
     if (b.type === "text") {
-      events.push({ type: "text", content: String(b.text) });
+      events.push({ type: "text", content: unwrapStructuredText(String(b.text)) });
     } else if (b.type === "tool_use") {
       const name = String(b.name);
       const input = (b.input ?? {}) as Record<string, unknown>;

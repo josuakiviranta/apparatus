@@ -705,3 +705,49 @@ describe("streamEvents", () => {
     expect(events).toEqual([]);
   });
 });
+
+describe("processLine — json_schema single-field unwrap", () => {
+  it("unwraps {render_field: markdown} so the TUI sees readable markdown", () => {
+    const markdown = "## Heading\n\n- bullet one\n- bullet two";
+    const line = JSON.stringify({
+      type: "assistant",
+      message: { content: [{ type: "text", text: JSON.stringify({ explainer_render: markdown }) }] },
+    });
+    const { events } = processLine(line, initialState());
+    const textEvent = events.find(e => e.type === "text") as Extract<StreamEvent, { type: "text" }>;
+    expect(textEvent).toBeDefined();
+    expect(textEvent.content).toBe(markdown);
+  });
+
+  it("leaves multi-field JSON untouched (no ambiguity about which field to show)", () => {
+    const blob = JSON.stringify({ preferred_label: "true", summary: "s", explanation: "e", illumination_path: "x.md" });
+    const line = JSON.stringify({
+      type: "assistant",
+      message: { content: [{ type: "text", text: blob }] },
+    });
+    const { events } = processLine(line, initialState());
+    const textEvent = events.find(e => e.type === "text") as Extract<StreamEvent, { type: "text" }>;
+    expect(textEvent.content).toBe(blob);
+  });
+
+  it("leaves plain prose text untouched", () => {
+    const line = JSON.stringify({
+      type: "assistant",
+      message: { content: [{ type: "text", text: "plain prose reply" }] },
+    });
+    const { events } = processLine(line, initialState());
+    const textEvent = events.find(e => e.type === "text") as Extract<StreamEvent, { type: "text" }>;
+    expect(textEvent.content).toBe("plain prose reply");
+  });
+
+  it("leaves single-field JSON with non-string value untouched", () => {
+    const blob = JSON.stringify({ count: 42 });
+    const line = JSON.stringify({
+      type: "assistant",
+      message: { content: [{ type: "text", text: blob }] },
+    });
+    const { events } = processLine(line, initialState());
+    const textEvent = events.find(e => e.type === "text") as Extract<StreamEvent, { type: "text" }>;
+    expect(textEvent.content).toBe(blob);
+  });
+});
