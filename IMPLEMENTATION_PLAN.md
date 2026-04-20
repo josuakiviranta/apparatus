@@ -1,666 +1,1192 @@
-# DOT Parser AST Migration Implementation Plan
+# Source-Location Diagnostics Implementation Plan
 
 ## Status
 
-**Shipped 2026-04-20. Hardened v0.1.30.** 999/999 tests passing. Chunks 1–4 complete. Task 4.2 review returned GO with three follow-up regression gaps; all three have been addressed in `graph-ast.ts`:
-
-1. `parseDotV2` now throws on missing `Graph` root (was silent empty graph).
-2. Multi-line quoted-value pre-collapse regex now tolerates escaped quotes (`\"`).
-3. Subgraph `nodeDefaults`/`edgeDefaults` are now per-subgraph (passed as args, forked on entry) — DOT-correct scoping instead of shared-closure leak.
-
-Regression tests added to `src/attractor/tests/graph-ast.test.ts`. See memory note: [`~/.claude/projects/-Users-josu-Documents-projects-ralph-cli/memory/2026-04-20-dot-parser-ast-migration.md`](/Users/josu/.claude/projects/-Users-josu-Documents-projects-ralph-cli/memory/2026-04-20-dot-parser-ast-migration.md).
+**Shipped 2026-04-20 as v0.1.31.** All 6 chunks complete. 1013 tests passing. Smoke verification recorded at `docs/superpowers/verifications/2026-04-20-source-location-smoke.md`. Spec marked shipped at `docs/superpowers/specs/2026-04-20-source-location-diagnostics-design.md`.
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the regex-driven `parseDot()` in `src/attractor/core/graph.ts` with an AST-based parser (`parseDotV2`) built on `@ts-graphviz/ast`, so that every `Node` carries `sourceLine` and future diagnostics can reference `file:line:col`.
+**Goal:** Upgrade `ralph pipeline validate` to surface `file:line:col` + source-frame carets on every diagnostic by cashing in the `@ts-graphviz/ast` location data that has been collected but unused since v0.1.28.
 
-**Architecture:** New module `graph-ast.ts` walks `@ts-graphviz/ast`'s AST → existing `Graph` shape. Shared helpers extracted to `dot-common.ts`. Dual-run test asserts `parseDot ≡ parseDotV2` across all 19 pipelines. Once green, `parseDot` becomes a thin re-export of `parseDotV2` and the regex helpers are deleted.
+**Architecture:** Add optional `SourceLocation` to `Node`, `Edge`, and `Diagnostic`. Capture per-attribute and per-edge locations in `parseDotV2`. Wrap `parseAST` errors in a typed `DotSyntaxError`. Validator emits `location` on every locatable diagnostic. CLI renders `relpath:line:col` header plus a pure `renderCodeFrame` function. Zero runtime impact on pipeline execution — validator-only.
 
-**Tech Stack:** TypeScript, zod, `@ts-graphviz/ast ^3.0.6` (already installed), vitest.
+**Tech Stack:** TypeScript, `@ts-graphviz/ast ^3.0.6` (already installed), zod (already installed), vitest.
 
-**Reference:** `docs/superpowers/specs/2026-04-20-dot-parser-ast-migration-design.md`
-
-**Pre-flight notes for the engineer:**
-- `@ts-graphviz/ast` probe results: 19/19 pipelines parse clean; every AST node exposes `{start,end}` location with `{offset, line, column}`; 468 KB install, zero transitive deps.
-- AST shape cheat-sheet (confirmed by probe):
-  - Root `Dot.children = [Graph, …]`
-  - `Graph.children` is a union of `Attribute | AttributeList | Node | Edge | Subgraph`
-  - `Attribute.key.value`, `Attribute.value.value`, `Attribute.value.quoted`
-  - `AttributeList.kind` is `"Node"` / `"Edge"` / `"Graph"` for default blocks
-  - `Edge.targets: NodeRef[]` (chained edges → multiple targets). `Edge.children: Attribute[]`
-  - Escape sequences come through RAW (`\n` stays literal). Keep using `unescapeDotString`.
-- Read `src/attractor/core/graph.ts:116-223` to understand what shape the legacy parser produces; your AST walker must produce the same `Graph` object modulo new `sourceLine` field.
-- **@superpowers:test-driven-development** is non-negotiable for every task below: write the failing test, run it (confirm it fails for the right reason), then implement, then commit.
+**Spec:** `docs/superpowers/specs/2026-04-20-source-location-diagnostics-design.md`
 
 ---
 
-## Chunk 1: Extract shared helpers
+## File map
 
-Goal: factor the pure helpers out of `graph.ts` into `dot-common.ts` so both parsers can share them with zero duplication. No behavior change expected — all 968 tests must stay green after this chunk.
+### Create
+- `src/attractor/core/dot-syntax.ts` — `DotSyntaxError` class
+- `src/cli/lib/code-frame.ts` — pure `renderCodeFrame` function
+- `src/attractor/tests/dot-syntax.test.ts` — PEG-error wrapping
+- `src/cli/tests/code-frame.test.ts` — pure renderer unit tests
 
-### Task 1.1: Create `dot-common.ts` with extracted helpers
+### Modify
+- `src/attractor/types.ts` — add `SourceLocation`, extend `Node`, `Edge`, `Diagnostic`
+- `src/attractor/core/graph-ast.ts` — capture per-attr + per-edge + per-node locations; wrap `parseAST`
+- `src/attractor/core/schemas.ts` — strip new parser metadata; one diag per unknown key w/ `location`
+- `src/attractor/core/graph.ts` — edge & node rules set `location`
+- `src/cli/commands/pipeline.ts` — syntax-error catch; header prefix; code-frame call
+- `src/attractor/tests/graph-ast.test.ts` — assert locations
+- `src/attractor/tests/dual-parser.test.ts` — strip new metadata for equality
+- `src/attractor/tests/graph.test.ts` — edge/node diags carry `location`
+- `src/attractor/tests/schemas.test.ts` — per-key diag + location
+- `src/cli/tests/pipeline.test.ts` (or add new) — end-to-end snapshot
+
+---
+
+## Chunk 1: Data model + parser location capture
+
+Goal: every `Node` and `Edge` returned by `parseDotV2` carries `sourceLocation` and `attrLocations`. Legacy `sourceLine` preserved. Strict schemas strip the new fields. No CLI-visible change yet.
+
+### Task 1.1: Add `SourceLocation` type and extend public interfaces
 
 **Files:**
-- Create: `src/attractor/core/dot-common.ts`
-- Modify: `src/attractor/core/graph.ts:7-55` (delete helpers, import instead)
-- Modify: `src/attractor/core/graph.ts:57-100` (delete `parseStylesheet` + `applyStylesheet`, import)
-- Modify: `src/attractor/core/graph.ts:102-114` (delete `parseInputsAttr`, import)
+- Modify: `src/attractor/types.ts`
 
-- [x] **Step 1: Write a smoke test for the new module**
+- [ ] **Step 1: Write the failing test**
 
-Create `src/attractor/tests/dot-common.test.ts`:
+Add to `src/attractor/tests/graph-ast.test.ts`:
 
 ```ts
-import { describe, it, expect } from "vitest";
-import {
-  toCamel,
-  coerceValue,
-  unescapeDotString,
-  parseStylesheet,
-  applyStylesheet,
-  parseInputsAttr,
-} from "../core/dot-common.js";
-
-describe("dot-common helpers", () => {
-  it("toCamel converts snake_case", () => {
-    expect(toCamel("tool_command")).toBe("toolCommand");
-    expect(toCamel("max_retries")).toBe("maxRetries");
-    expect(toCamel("id")).toBe("id");
-  });
-
-  it("coerceValue infers types", () => {
-    expect(coerceValue("true")).toBe(true);
-    expect(coerceValue("false")).toBe(false);
-    expect(coerceValue("42")).toBe(42);
-    expect(coerceValue("hello")).toBe("hello");
-  });
-
-  it("unescapeDotString handles DOT escapes", () => {
-    expect(unescapeDotString("a\\nb")).toBe("a\nb");
-    expect(unescapeDotString('say \\"hi\\"')).toBe('say "hi"');
-  });
-
-  it("parseInputsAttr splits + dedupes", () => {
-    expect(parseInputsAttr("a, b,  a , c")).toEqual(["a", "b", "c"]);
-    expect(parseInputsAttr("")).toBeUndefined();
-    expect(parseInputsAttr(123)).toBeUndefined();
-  });
-
-  it("parseStylesheet + applyStylesheet work round-trip", () => {
-    const rules = parseStylesheet(".archived { color: gray; } * { font: mono; }");
-    const node = { id: "n", class: "archived" } as any;
-    const styled = applyStylesheet(node, rules);
-    expect(styled.color).toBe("gray");
-    expect(styled.font).toBe("mono");
+it("records sourceLocation with line + column on each node", () => {
+  const dot = `digraph g {\n  start [shape="Mdiamond"];\n  done  [shape="Msquare"];\n}`;
+  const g = parseDotV2(dot);
+  const start = g.nodes.get("start");
+  expect(start?.sourceLocation).toEqual({
+    line: 2,
+    column: 3,
+    endLine: 2,
+    endColumn: expect.any(Number),
   });
 });
 ```
 
-- [x] **Step 2: Run test to verify it fails**
+- [ ] **Step 2: Run test to verify it fails**
 
-Run: `npx vitest run src/attractor/tests/dot-common.test.ts`
-Expected: FAIL with "Cannot find module '../core/dot-common.js'"
+Run: `npx vitest run src/attractor/tests/graph-ast.test.ts -t "sourceLocation"`
+Expected: FAIL — field does not exist.
 
-- [x] **Step 3: Create `dot-common.ts` by copying helpers verbatim from `graph.ts`**
+- [ ] **Step 3: Add `SourceLocation` + extend interfaces**
 
-Copy into `src/attractor/core/dot-common.ts`:
-- `toCamel` (lines 7-9)
-- `coerceValue` (lines 12-19)
-- `unescapeDotString` (lines 28-40)
-- `parseStylesheet` (lines 57-80)
-- `applyStylesheet` (lines 82-100)
-- `parseInputsAttr` (lines 102-114)
-
-Add `export` to each. Do NOT copy `stripComments`, `parseAttrs`, `parseDot` — those stay in `graph.ts` for now.
-
-Add top-level import for any internal cross-reference (none — these are all leaves).
-
-- [x] **Step 4: Run dot-common test to verify it passes**
-
-Run: `npx vitest run src/attractor/tests/dot-common.test.ts`
-Expected: PASS (5/5)
-
-- [x] **Step 5: Replace helpers in `graph.ts` with imports**
-
-At top of `graph.ts`:
-```ts
-import {
-  toCamel,
-  coerceValue,
-  unescapeDotString,
-  parseStylesheet,
-  applyStylesheet,
-  parseInputsAttr,
-} from "./dot-common.js";
-```
-
-Delete the in-file definitions (lines 7-19, 28-40, 57-80, 82-100, 102-114).
-
-Keep `stripComments` (lines 22-26) and `parseAttrs` (lines 43-55) in `graph.ts` — regex-specific.
-
-- [x] **Step 6: Run full test suite**
-
-Run: `npx vitest run`
-Expected: PASS, 968/968
-
-- [x] **Step 7: Commit**
-
-```bash
-git add src/attractor/core/dot-common.ts src/attractor/core/graph.ts src/attractor/tests/dot-common.test.ts
-git commit -m "refactor(graph): extract pure helpers to dot-common.ts"
-```
-
----
-
-## Chunk 2: Write `parseDotV2` and dual-run safety net
-
-Goal: AST-based parser that produces identical `Graph` to legacy `parseDot` for every pipeline we have, plus the one new field `sourceLine` on every `Node`.
-
-### Task 2.1: Add `sourceLine` to `Node` type
-
-**Files:**
-- Modify: `src/attractor/types.ts:12-35`
-
-- [x] **Step 1: Extend `Node` interface**
+Edit `src/attractor/types.ts`:
 
 ```ts
-export interface Node {
-  id: string;
-  shape?: string;
-  // … existing fields unchanged …
-  /** 1-based line in the source .dot file where this node was declared. */
-  sourceLine?: number;
-  [key: string]: unknown;
+export interface SourceLocation {
+  line: number;
+  column: number;
+  endLine?: number;
+  endColumn?: number;
 }
 ```
 
-- [x] **Step 2: Run tests to verify nothing broke**
-
-Run: `npx vitest run`
-Expected: PASS 968/968 (field is optional, no change in behavior).
-
-- [x] **Step 3: Commit**
-
-```bash
-git add src/attractor/types.ts
-git commit -m "types(node): add optional sourceLine field for AST-parser"
-```
-
-### Task 2.2: Scaffold `parseDotV2` + write a minimal test
-
-**Files:**
-- Create: `src/attractor/core/graph-ast.ts`
-- Create: `src/attractor/tests/graph-ast.test.ts`
-
-- [x] **Step 1: Write the failing test (minimal graph)**
-
-Create `src/attractor/tests/graph-ast.test.ts`:
+Add to `Node`:
 
 ```ts
-import { describe, it, expect } from "vitest";
-import { parseDotV2 } from "../core/graph-ast.js";
+  sourceLocation?: SourceLocation;
+  attrLocations?: Record<string, SourceLocation>;
+```
 
-describe("parseDotV2 — minimal", () => {
-  it("parses a single-node graph", () => {
-    const g = parseDotV2(`digraph foo { start [shape=Mdiamond] }`);
-    expect(g.name).toBe("foo");
-    expect(g.nodes.size).toBe(1);
-    expect(g.nodes.get("start")?.shape).toBe("Mdiamond");
-  });
+Add to `Edge`:
 
-  it("records sourceLine on each node", () => {
-    const g = parseDotV2(`digraph foo {
-  start [shape=Mdiamond]
-  done [shape=Msquare]
-}`);
-    expect(g.nodes.get("start")?.sourceLine).toBe(2);
-    expect(g.nodes.get("done")?.sourceLine).toBe(3);
-  });
+```ts
+  sourceLocation?: SourceLocation;
+  attrLocations?: Record<string, SourceLocation>;
+```
+
+Add to `Diagnostic`:
+
+```ts
+  location?: SourceLocation;
+```
+
+Keep `sourceLine?: number` in `Node` with a JSDoc `@deprecated Use sourceLocation.line`.
+
+- [ ] **Step 4: Run test — expect FAIL still (parser hasn't been updated)**
+
+Run: `npx vitest run src/attractor/tests/graph-ast.test.ts -t "sourceLocation"`
+Expected: FAIL — `sourceLocation` is undefined.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/attractor/types.ts src/attractor/tests/graph-ast.test.ts
+git commit -m "feat(types): add SourceLocation + per-attribute/per-edge location fields"
+```
+
+### Task 1.2: Capture per-node `sourceLocation` in `parseDotV2`
+
+**Files:**
+- Modify: `src/attractor/core/graph-ast.ts:68-76`
+
+- [ ] **Step 1: Make the Task 1.1 test pass**
+
+In the `Node` case of `walk()`, replace the current `sourceLine` assignment with:
+
+```ts
+const loc = child.location;
+const sourceLocation: SourceLocation | undefined = loc
+  ? {
+      line: loc.start.line,
+      column: loc.start.column,
+      endLine: loc.end?.line,
+      endColumn: loc.end?.column,
+    }
+  : undefined;
+nodes.set(id, {
+  id,
+  ...attrs,
+  sourceLine: loc?.start.line,
+  sourceLocation,
+} as Node);
+```
+
+Import `SourceLocation` from `../types.js`.
+
+- [ ] **Step 2: Run test — expect PASS**
+
+Run: `npx vitest run src/attractor/tests/graph-ast.test.ts -t "sourceLocation"`
+Expected: PASS.
+
+- [ ] **Step 3: Run whole graph-ast suite + dual-parser to catch regressions**
+
+Run: `npx vitest run src/attractor/tests/graph-ast.test.ts src/attractor/tests/dual-parser.test.ts`
+Expected: dual-parser FAILS because new field isn't stripped. That's the next task.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add src/attractor/core/graph-ast.ts
+git commit -m "feat(parser): populate Node.sourceLocation from AST"
+```
+
+### Task 1.3: Strip new parser metadata in dual-parser equality check
+
+**Files:**
+- Modify: `src/attractor/tests/dual-parser.test.ts:28`
+
+- [ ] **Step 1: Extend the strip**
+
+Current line:
+
+```ts
+const { sourceLine, ...rest } = n;
+```
+
+Change to:
+
+```ts
+const { sourceLine, sourceLocation, attrLocations, ...rest } = n;
+```
+
+(Same `_unused` pattern — destructure to discard.)
+
+- [ ] **Step 2: Run test**
+
+Run: `npx vitest run src/attractor/tests/dual-parser.test.ts`
+Expected: PASS.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add src/attractor/tests/dual-parser.test.ts
+git commit -m "test(dual-parser): strip sourceLocation/attrLocations in equality check"
+```
+
+### Task 1.4: Capture per-attribute `attrLocations`
+
+**Files:**
+- Modify: `src/attractor/core/graph-ast.ts:16-25` (`readAttrs`)
+- Modify: `src/attractor/core/graph-ast.ts` node + edge cases
+
+- [ ] **Step 1: Write the failing test**
+
+Add to `src/attractor/tests/graph-ast.test.ts`:
+
+```ts
+it("records attrLocations keyed by camelCase attr name", () => {
+  const dot = `digraph g {\n  start [shape="Mdiamond"];\n  worker [\n    type="tool",\n    cwd="$project",\n    tool_command="echo hi"\n  ];\n  done [shape="Msquare"];\n  start -> worker -> done;\n}`;
+  const g = parseDotV2(dot);
+  const worker = g.nodes.get("worker");
+  expect(worker?.attrLocations?.type?.line).toBe(4);
+  expect(worker?.attrLocations?.cwd?.line).toBe(5);
+  expect(worker?.attrLocations?.toolCommand?.line).toBe(6);
 });
 ```
 
-- [x] **Step 2: Run test to verify it fails**
+- [ ] **Step 2: Run test — expect FAIL**
 
-Run: `npx vitest run src/attractor/tests/graph-ast.test.ts`
-Expected: FAIL "Cannot find module '../core/graph-ast.js'"
+Run: `npx vitest run src/attractor/tests/graph-ast.test.ts -t "attrLocations"`
+Expected: FAIL.
 
-- [x] **Step 3: Implement minimal `parseDotV2`**
+- [ ] **Step 3: Rewrite `readAttrs` to emit locations**
 
-Create `src/attractor/core/graph-ast.ts`:
+Change return type to `{ attrs: AttrMap; locations: Record<string, SourceLocation> }`. For each `Attribute` child, record `locations[toCamel(c.key.value)] = { line, column, endLine, endColumn }` from `c.location`.
 
-```ts
-import { parse as parseAST } from "@ts-graphviz/ast";
-import type { Graph, Node, Edge } from "../types.js";
-import {
-  toCamel,
-  coerceValue,
-  unescapeDotString,
-  parseStylesheet,
-  applyStylesheet,
-  parseInputsAttr,
-} from "./dot-common.js";
+Update callers:
 
-// The @ts-graphviz/ast types aren't re-exported conveniently; we use `any`
-// for AST nodes and rely on the shape documented in the design spec.
-type AttrMap = Record<string, unknown>;
+- `AttributeList`: ignore locations (defaults apply to future nodes, not positional).
+- `Node` case: `const { attrs: selfAttrs, locations: selfLocs } = readAttrs(child.children); const merged = { ...nodeDefaults, ...selfAttrs }; nodes.set(id, { id, ...merged, sourceLine: loc?.start.line, sourceLocation, attrLocations: selfLocs });` — note only the node's own attrs get locations (defaults do not).
+- `Edge` case: same pattern — `attrLocations` reflects only the edge-local attrs.
 
-function readAttrs(children: any[]): AttrMap {
-  const out: AttrMap = {};
-  for (const c of children) {
-    if (c.type !== "Attribute") continue;
-    const key = toCamel(c.key.value);
-    const raw = c.value.quoted ? unescapeDotString(c.value.value) : c.value.value;
-    out[key] = c.value.quoted ? raw : coerceValue(raw);
-  }
-  return out;
-}
+- [ ] **Step 4: Run test — expect PASS**
 
-export function parseDotV2(src: string): Graph {
-  const ast = parseAST(src);
-  const root = ast.children.find((c: any) => c.type === "Graph");
-  if (!root) {
-    return { name: "unnamed", nodes: new Map(), edges: [] };
-  }
-  const name = root.id?.value ?? "unnamed";
+Run: `npx vitest run src/attractor/tests/graph-ast.test.ts -t "attrLocations"`
+Expected: PASS.
 
-  const nodes = new Map<string, Node>();
-  const edges: Edge[] = [];
-  const graphAttrs: AttrMap = {};
-  let nodeDefaults: AttrMap = {};
-  let edgeDefaults: AttrMap = {};
+- [ ] **Step 5: Run full attractor suite**
 
-  function walk(container: any) {
-    for (const child of container.children ?? []) {
-      switch (child.type) {
-        case "Attribute": {
-          const key = toCamel(child.key.value);
-          const raw = child.value.quoted
-            ? unescapeDotString(child.value.value)
-            : child.value.value;
-          graphAttrs[key] = child.value.quoted ? raw : coerceValue(raw);
-          break;
-        }
-        case "AttributeList": {
-          const attrs = readAttrs(child.children);
-          if (child.kind === "Node") nodeDefaults = { ...nodeDefaults, ...attrs };
-          else if (child.kind === "Edge") edgeDefaults = { ...edgeDefaults, ...attrs };
-          else Object.assign(graphAttrs, attrs);
-          break;
-        }
-        case "Node": {
-          const id = child.id.value;
-          const attrs = { ...nodeDefaults, ...readAttrs(child.children) };
-          nodes.set(id, {
-            id,
-            ...attrs,
-            sourceLine: child.location?.start.line,
-          } as Node);
-          break;
-        }
-        case "Edge": {
-          const attrs = { ...edgeDefaults, ...readAttrs(child.children) };
-          const targets = child.targets.map((t: any) => t.id.value);
-          for (let i = 0; i < targets.length - 1; i++) {
-            edges.push({ from: targets[i], to: targets[i + 1], ...attrs } as Edge);
-          }
-          break;
-        }
-        case "Subgraph":
-          walk(child); // flatten: subgraph body contributes to outer scope
-          break;
-      }
-    }
-  }
-  walk(root);
+Run: `npx vitest run src/attractor`
+Expected: all green.
 
-  const stylesheet = (graphAttrs["modelStylesheet"] as string) ?? "";
-  const rules = stylesheet ? parseStylesheet(stylesheet) : [];
-  if (rules.length > 0) {
-    for (const [id, node] of nodes) {
-      nodes.set(id, applyStylesheet(node, rules));
-    }
-  }
-
-  return {
-    name,
-    goal: graphAttrs["goal"] as string | undefined,
-    label: graphAttrs["label"] as string | undefined,
-    modelStylesheet: stylesheet || undefined,
-    defaultMaxRetries: graphAttrs["defaultMaxRetries"] as number | undefined,
-    defaultFidelity: graphAttrs["defaultFidelity"] as string | undefined,
-    maxParallel: graphAttrs["maxParallel"] as number | undefined,
-    retryTarget: graphAttrs["retryTarget"] as string | undefined,
-    fallbackRetryTarget: graphAttrs["fallbackRetryTarget"] as string | undefined,
-    headlessSafe: graphAttrs["headlessSafe"] as boolean | undefined,
-    inputs: parseInputsAttr(graphAttrs["inputs"]),
-    nodes,
-    edges,
-  };
-}
-```
-
-**Note:** `applyStylesheet` in `dot-common.ts` uses `{ ...resolved, ...node }` — this means explicit node attrs win over stylesheet. Preserve that; legacy parser does the same.
-
-- [x] **Step 4: Run minimal test to verify PASS**
-
-Run: `npx vitest run src/attractor/tests/graph-ast.test.ts`
-Expected: PASS 2/2.
-
-- [x] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add src/attractor/core/graph-ast.ts src/attractor/tests/graph-ast.test.ts
-git commit -m "feat(graph): add AST-based parseDotV2 with sourceLine"
+git commit -m "feat(parser): capture per-attribute sourceLocations"
 ```
 
-### Task 2.3: Dual-run test across all 19 pipelines
+### Task 1.5: Capture edge locations
 
 **Files:**
-- Create: `src/attractor/tests/dual-parser.test.ts`
+- Modify: `src/attractor/core/graph-ast.ts` `Edge` case
 
-- [x] **Step 1: Write the dual-run test**
+- [ ] **Step 1: Write the failing test**
+
+Add to `src/attractor/tests/graph-ast.test.ts`:
+
+```ts
+it("records sourceLocation on each edge", () => {
+  const dot = `digraph g {\n  start [shape="Mdiamond"];\n  done [shape="Msquare"];\n  start -> done [label="go"];\n}`;
+  const g = parseDotV2(dot);
+  expect(g.edges[0].sourceLocation?.line).toBe(4);
+  expect(g.edges[0].attrLocations?.label?.line).toBe(4);
+});
+```
+
+- [ ] **Step 2: Run test — expect FAIL**
+
+Run: `npx vitest run src/attractor/tests/graph-ast.test.ts -t "sourceLocation on each edge"`
+Expected: FAIL.
+
+- [ ] **Step 3: Populate edge locations**
+
+In the `Edge` case, for each emitted edge (the chain `targets[i] -> targets[i+1]`), attach:
+
+```ts
+const edgeLoc = child.location;
+edges.push({
+  from: targets[i],
+  to: targets[i + 1],
+  ...edgeAttrs,
+  sourceLocation: edgeLoc ? {
+    line: edgeLoc.start.line, column: edgeLoc.start.column,
+    endLine: edgeLoc.end?.line, endColumn: edgeLoc.end?.column,
+  } : undefined,
+  attrLocations: edgeLocs,
+} as Edge);
+```
+
+- [ ] **Step 4: Run full attractor suite**
+
+Run: `npx vitest run src/attractor`
+Expected: all green.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/attractor/core/graph-ast.ts src/attractor/tests/graph-ast.test.ts
+git commit -m "feat(parser): capture Edge.sourceLocation + attrLocations"
+```
+
+### Task 1.6: Strip new metadata in `validateNode`
+
+**Files:**
+- Modify: `src/attractor/core/schemas.ts:137`
+
+- [ ] **Step 1: Extend strip**
+
+```ts
+const {
+  sourceLine: _sl,
+  sourceLocation: _slo,
+  attrLocations: _al,
+  ...nodeForValidation
+} = node as Node & { sourceLocation?: unknown; attrLocations?: unknown };
+```
+
+- [ ] **Step 2: Run all validator tests**
+
+Run: `npx vitest run src/attractor`
+Expected: green. If a strict-schema test flags an "unrecognized key" for `sourceLocation` or `attrLocations`, the strip is wrong — fix before moving on.
+
+- [ ] **Step 3: Confirm `applyStylesheet` preserves locations**
+
+Add to `src/attractor/tests/dot-common.test.ts` (create if missing):
+
+```ts
+it("applyStylesheet preserves sourceLocation and attrLocations", () => {
+  const node = { id: "x", sourceLocation: { line: 5, column: 1 }, attrLocations: { shape: { line: 5, column: 3 } } } as any;
+  const result = applyStylesheet(node, [{ selector: { class: null, id: "x" }, attrs: { extra: "hi" } }]);
+  expect(result.sourceLocation).toEqual(node.sourceLocation);
+  expect(result.attrLocations).toEqual(node.attrLocations);
+});
+```
+
+Run: `npx vitest run src/attractor/tests/dot-common.test.ts`
+Expected: PASS (spread preserves them naturally; test pins the invariant).
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add src/attractor/core/schemas.ts src/attractor/tests/dot-common.test.ts
+git commit -m "fix(schemas): strip sourceLocation/attrLocations before strict parse"
+```
+
+---
+
+## Chunk 2: Syntax-error wrapping
+
+Goal: malformed DOT raises a typed `DotSyntaxError` with `location`. No CLI wiring yet.
+
+### Task 2.1: Create `DotSyntaxError`
+
+**Files:**
+- Create: `src/attractor/core/dot-syntax.ts`
+
+- [ ] **Step 1: Write class**
+
+```ts
+import type { SourceLocation } from "../types.js";
+
+export class DotSyntaxError extends Error {
+  readonly location: SourceLocation;
+  constructor(message: string, location: SourceLocation) {
+    super(message);
+    this.name = "DotSyntaxError";
+    this.location = location;
+  }
+}
+```
+
+- [ ] **Step 2: Commit**
+
+```bash
+git add src/attractor/core/dot-syntax.ts
+git commit -m "feat(parser): add DotSyntaxError for wrapped PEG errors"
+```
+
+### Task 2.2: Wrap `parseAST` call in `parseDotV2`
+
+**Files:**
+- Modify: `src/attractor/core/graph-ast.ts` (the `parseAST(normalized)` line)
+- Create: `src/attractor/tests/dot-syntax.test.ts`
+
+- [ ] **Step 1: Write the failing test**
 
 ```ts
 import { describe, it, expect } from "vitest";
-import { readFileSync, readdirSync, statSync } from "fs";
-import { join } from "path";
-import { parseDot } from "../core/graph.js";
 import { parseDotV2 } from "../core/graph-ast.js";
-import type { Graph, Node } from "../types.js";
+import { DotSyntaxError } from "../core/dot-syntax.js";
 
-function collectPipelines(): string[] {
-  const out: string[] = [];
-  const roots = ["pipelines", "pipelines/smoke"];
-  for (const r of roots) {
-    for (const name of readdirSync(r)) {
-      const p = join(r, name);
-      if (name.endsWith(".dot") && statSync(p).isFile()) out.push(p);
-    }
-  }
-  return out;
-}
-
-function stripSourceLine(n: Node): Node {
-  const { sourceLine, ...rest } = n;
-  return rest as Node;
-}
-
-function graphEquiv(a: Graph, b: Graph) {
-  expect(b.name).toBe(a.name);
-  expect(b.goal).toEqual(a.goal);
-  expect(b.label).toEqual(a.label);
-  expect(b.modelStylesheet).toEqual(a.modelStylesheet);
-  expect(b.inputs).toEqual(a.inputs);
-  expect(b.defaultMaxRetries).toEqual(a.defaultMaxRetries);
-  expect(b.defaultFidelity).toEqual(a.defaultFidelity);
-  expect(b.maxParallel).toEqual(a.maxParallel);
-  expect(b.retryTarget).toEqual(a.retryTarget);
-  expect(b.fallbackRetryTarget).toEqual(a.fallbackRetryTarget);
-  expect(b.headlessSafe).toEqual(a.headlessSafe);
-
-  const aKeys = [...a.nodes.keys()].sort();
-  const bKeys = [...b.nodes.keys()].sort();
-  expect(bKeys).toEqual(aKeys);
-  for (const k of aKeys) {
-    expect(stripSourceLine(b.nodes.get(k)!))
-      .toEqual(stripSourceLine(a.nodes.get(k)!));
-  }
-
-  expect(b.edges.length).toBe(a.edges.length);
-  for (let i = 0; i < a.edges.length; i++) {
-    expect(b.edges[i]).toEqual(a.edges[i]);
-  }
-}
-
-describe("parseDot ≡ parseDotV2 across fixtures", () => {
-  const files = collectPipelines();
-  it.each(files)("%s produces equivalent Graph", (file) => {
-    const src = readFileSync(file, "utf8");
-    const g1 = parseDot(src);
-    const g2 = parseDotV2(src);
-    graphEquiv(g1, g2);
-  });
-
-  it("parseDotV2 records sourceLine on every node", () => {
-    for (const file of files) {
-      const src = readFileSync(file, "utf8");
-      const g = parseDotV2(src);
-      for (const [id, n] of g.nodes) {
-        expect(n.sourceLine, `${file}: node ${id} missing sourceLine`)
-          .toBeGreaterThan(0);
-      }
-    }
+describe("parseDotV2 syntax errors", () => {
+  it("wraps PEG syntax errors with location", () => {
+    const bad = `digraph g {\n  start [shape="Mdiamond"\n  done\n}`;
+    let err: unknown;
+    try { parseDotV2(bad); } catch (e) { err = e; }
+    expect(err).toBeInstanceOf(DotSyntaxError);
+    const dse = err as DotSyntaxError;
+    expect(dse.location.line).toBeGreaterThanOrEqual(2);
+    expect(dse.location.column).toBeGreaterThan(0);
   });
 });
 ```
 
-- [x] **Step 2: Run it — expect either pass or targeted failures**
+- [ ] **Step 2: Run — expect FAIL** (raw PEG error bubbles up)
 
-Run: `npx vitest run src/attractor/tests/dual-parser.test.ts`
+Run: `npx vitest run src/attractor/tests/dot-syntax.test.ts`
+Expected: FAIL.
 
-Three possible outcomes:
-1. **All green** → proceed to Task 2.4.
-2. **Some pipelines diverge** → investigate each divergence. Usually one of:
-   - Missing graph-attr handling in `parseDotV2`'s `walk()` (add to switch).
-   - Edge attribute expansion order differs — check `Edge.targets` iteration.
-   - Stylesheet application order differs — should not, we reuse `applyStylesheet`.
-3. **`parseDotV2` crashes** → read stack, likely a null-safe access needed on `child.id?.value`.
-
-Fix divergences one by one, re-running until green. Do **not** change `parseDot` to match `parseDotV2` — the legacy parser is the oracle. Adjust `parseDotV2` to match it.
-
-- [x] **Step 3: Commit when green**
-
-```bash
-git add src/attractor/tests/dual-parser.test.ts
-git commit -m "test(graph): dual-run parseDot ≡ parseDotV2 across 19 pipelines"
-```
-
-### Task 2.4: Full test suite green-check
-
-- [x] **Step 1: Run the whole suite**
-
-Run: `npx vitest run`
-Expected: PASS 968 + new dual-run tests + new dot-common tests + new graph-ast tests. No regressions.
-
-- [x] **Step 2: Build check**
-
-Run: `npm run build`
-Expected: success. Note size of `dist/cli/index.js`; compare against pre-migration size (commit `55aff7c` has baseline). Assert <100 KB growth.
-
-- [x] **Step 3: Commit if anything fixed en route** (otherwise skip)
-
----
-
-## Chunk 3: Flip the switch
-
-Goal: make `parseDot` internally delegate to `parseDotV2`. Keep the `parseDot` export stable so no downstream code changes. After one clean cycle we'll delete the regex body.
-
-### Task 3.1: Redirect `parseDot` to `parseDotV2`
-
-**Files:**
-- Modify: `src/attractor/core/graph.ts:116-223`
-
-- [x] **Step 1: Before touching, capture baseline**
-
-Run: `npx vitest run 2>&1 | tail -3`
-Expected: all tests green. Record count (e.g. `Tests 968 passed`).
-
-- [x] **Step 2: Replace `parseDot` body**
-
-In `graph.ts`, replace the entire function body (lines 116-223) with a delegation:
+- [ ] **Step 3: Add try/catch around `parseAST`**
 
 ```ts
-import { parseDotV2 } from "./graph-ast.js";
-
-export function parseDot(src: string): Graph {
-  return parseDotV2(src);
+let ast;
+try { ast = parseAST(normalized); }
+catch (e: any) {
+  if (e && e.location && typeof e.location?.start?.line === "number") {
+    throw new DotSyntaxError(e.message ?? "DOT syntax error", {
+      line: e.location.start.line,
+      column: e.location.start.column,
+      endLine: e.location.end?.line,
+      endColumn: e.location.end?.column,
+    });
+  }
+  throw e;
 }
 ```
 
-Delete the now-orphaned helpers in `graph.ts`:
-- `stripComments` (lines 22-26)
-- `parseAttrs` (lines 43-55)
+Import `DotSyntaxError` at top of file.
 
-Leave the rest of the file (`validateGraph`, `validateOrRaise`, etc.) untouched.
+- [ ] **Step 4: Run test — expect PASS**
 
-- [x] **Step 3: Run full suite**
+Run: `npx vitest run src/attractor/tests/dot-syntax.test.ts`
+Expected: PASS.
 
-Run: `npx vitest run`
-Expected: PASS (same count as baseline, possibly +1 for dual-run now passing with identity).
+- [ ] **Step 5: Run full attractor suite**
 
-**If any test fails**, it means `parseDotV2` still has a divergence not caught by dual-run fixtures. Fix the divergence and re-run; do NOT revert the delegation.
+Run: `npx vitest run src/attractor`
+Expected: green.
 
-- [x] **Step 4: Live-run validate on an existing pipeline**
-
-Run:
-```bash
-npm run build && ralph pipeline validate pipelines/smoke/gate.dot
-```
-Expected: `✔ Pipeline valid (5 nodes, 5 edges)` (or equivalent success message).
-
-- [x] **Step 5: Live-run the actual failing pipeline**
-
-Run: `ralph pipeline validate pipelines/illumination-to-implementation.dot`
-Expected: same `schema_error` output as before the migration (content unchanged — this plan doesn't touch the diagnostic formatter).
-
-- [x] **Step 6: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add src/attractor/core/graph.ts
-git commit -m "feat(graph): parseDot now delegates to parseDotV2 (AST-based)"
+git add src/attractor/core/graph-ast.ts src/attractor/tests/dot-syntax.test.ts
+git commit -m "feat(parser): throw DotSyntaxError with location on PEG failure"
 ```
 
-### Task 3.2: Simplify dual-run test to identity assertion
+---
+
+## Chunk 3: Attach `location` to validator diagnostics
+
+Goal: every zod + edge + node-level diagnostic carries `location` when one is available. Unrecognized-keys splits into one diagnostic per key.
+
+### Task 3.1: Split unrecognized-keys per key + attach attr-location
 
 **Files:**
-- Modify: `src/attractor/tests/dual-parser.test.ts`
+- Modify: `src/attractor/core/schemas.ts:140-161` (`validateNode`)
+- Modify: `src/attractor/tests/schemas.test.ts`
 
-After Chunk 3 Task 3.1, the dual-run test is now comparing `parseDotV2` against itself (since `parseDot === parseDotV2`). Keep the test but relabel it as a regression guard.
+- [ ] **Step 1: Write the failing test**
 
-- [x] **Step 1: Update test description**
+Add to `src/attractor/tests/schemas.test.ts`:
 
-Change the `describe()` block to:
 ```ts
-describe("parseDot fixture regression (AST parser)", () => {
+it("emits one diagnostic per unknown key with attr-level location", () => {
+  const node = {
+    id: "x", type: "tool", cwd: "$project", toolCommand: "echo",
+    badOne: 1, badTwo: 2,
+    sourceLocation: { line: 10, column: 1 },
+    attrLocations: {
+      badOne: { line: 12, column: 3 },
+      badTwo: { line: 13, column: 3 },
+    },
+  } as any;
+  const diags = validateNode(node);
+  expect(diags).toHaveLength(2);
+  const locs = diags.map(d => d.location?.line).sort();
+  expect(locs).toEqual([12, 13]);
+  for (const d of diags) {
+    expect(d.hint).toContain("Allowed keys for kind=tool");
+  }
+});
 ```
 
-Comment at the top:
+- [ ] **Step 2: Run — expect FAIL** (today emits one combined diagnostic)
+
+Run: `npx vitest run src/attractor/tests/schemas.test.ts -t "per unknown key"`
+Expected: FAIL.
+
+- [ ] **Step 3: Update `validateNode`**
+
+In the `result.error.issues.map` branch, handle `unrecognized_keys` specially: emit one diagnostic per key. For other codes, attach `location` using `issue.path[0]` lookup or node-level fallback.
+
 ```ts
-// This test was originally a dual-run check (parseDot ≡ parseDotV2) during
-// the migration. Now that parseDot delegates to parseDotV2, it serves as a
-// fixture snapshot: every .dot in pipelines/ must continue to parse with the
-// same Graph shape. If this test fails after a parser change, a pipeline's
-// semantics changed silently — review the diff carefully.
+if (result.success) return [];
+const diags: Diagnostic[] = [];
+for (const issue of result.error.issues) {
+  if (issue.code === "unrecognized_keys") {
+    const keys = (issue as { keys?: string[] }).keys ?? [];
+    for (const key of keys) {
+      const snake = camelToSnake(key);
+      diags.push({
+        rule: "schema_error",
+        severity: "error",
+        message: `[${node.id}]: unrecognized key '${snake}'`,
+        hint: formatAllowedAttrs(kind),
+        location: node.attrLocations?.[key] ?? node.sourceLocation,
+      });
+    }
+    continue;
+  }
+  const path = issue.path.join(".");
+  const loc = path ? camelToSnake(path) : "node";
+  const firstPath = typeof issue.path[0] === "string" ? issue.path[0] : undefined;
+  diags.push({
+    rule: "schema_error",
+    severity: "error",
+    message: `[${node.id}] ${loc}: ${issue.message}`,
+    location: (firstPath && node.attrLocations?.[firstPath]) ?? node.sourceLocation,
+  });
+}
+return diags;
 ```
 
-- [x] **Step 2: Commit**
+- [ ] **Step 4: Run — expect PASS**
+
+Run: `npx vitest run src/attractor/tests/schemas.test.ts`
+Expected: all green. Update any prior test that expected a single combined diagnostic — now one per key.
+
+- [ ] **Step 5: Commit**
 
 ```bash
-git add src/attractor/tests/dual-parser.test.ts
-git commit -m "test(graph): relabel dual-run test as fixture regression guard"
+git add src/attractor/core/schemas.ts src/attractor/tests/schemas.test.ts
+git commit -m "feat(validator): emit one diagnostic per unknown key with attr-level location"
 ```
 
-### Task 3.3: Smoke-test the full pipeline runtime
-
-- [x] **Step 1: Run one smoke pipeline end-to-end**
-
-From the repo root:
-```bash
-npm run build
-ralph pipeline run pipelines/smoke/gate.dot --var project=/tmp/ralph-smoke-$(date +%s) 2>&1 | head -60
-```
-Expected: pipeline starts executing. Validates, graph loads, first node fires. Kill after confirming startup (Ctrl-C).
-
-If startup fails with an error not seen before migration, investigate — the engine might rely on some Node attr our AST parser didn't emit.
-
-- [x] **Step 2: Run scenario tests**
-
-Run: `ls scenario-tests/ 2>/dev/null` — if present, run one that exercises pipelines:
-```bash
-bash scenario-tests/pipeline-validate.sh  # or whichever exists
-```
-
-- [x] **Step 3: No commit** (verification step only).
-
----
-
-## Chunk 4: Ship + clean up
-
-### Task 4.1: Bump version + update CHANGELOG or memory entry
+### Task 3.2: Attach `location` to edge-rule diagnostics
 
 **Files:**
-- Modify: `package.json` (bump patch)
-- Optional: write memory file documenting the migration
+- Modify: `src/attractor/core/graph.ts` (`edge_target_exists`, `edge_source_exists`, `condition_syntax`)
+- Modify: `src/attractor/tests/graph.test.ts`
 
-- [x] **Step 1: Bump version**
+- [ ] **Step 1: Write the failing test**
 
-Edit `package.json`, increment `version` by patch (e.g. `0.1.2` → `0.1.3`).
-
-- [x] **Step 2: Write memory file**
-
-Create `/Users/josu/.claude/projects/-Users-josu-Documents-projects-ralph-cli/memory/2026-04-20-dot-parser-ast-migration.md`:
-
-```markdown
----
-name: DOT parser migrated to @ts-graphviz/ast
-description: parseDot internally uses AST parser; every Node now carries sourceLine. Enables file:line in future diagnostics.
-type: project
----
-
-Migrated `src/attractor/core/graph.ts` `parseDot` from regex chain to AST-based `parseDotV2` (`src/attractor/core/graph-ast.ts`).
-
-**Why:** regex parser detached source positions during string mutation, blocking file:line in schema_error diagnostics. AST parser preserves `location: {start, end}` on every AST node including `Attribute`.
-
-**How to apply:** next time someone edits parser code, the oracle is `parseDotV2`. Legacy regex helpers deleted. If adding new DOT syntax support, extend the `walk()` switch in `graph-ast.ts` and add a fixture pipeline to catch regressions via `dual-parser.test.ts`.
-
-Shared pure helpers live in `src/attractor/core/dot-common.ts`.
+```ts
+it("edge_target_exists carries edge sourceLocation", () => {
+  const dot = `digraph g {\n  start [shape="Mdiamond"];\n  done [shape="Msquare"];\n  start -> missing;\n}`;
+  const g = parseDot(dot);
+  const diags = validateGraph(g);
+  const d = diags.find(x => x.rule === "edge_target_exists");
+  expect(d?.location?.line).toBe(4);
+});
 ```
 
-Add an index line to `MEMORY.md`:
+- [ ] **Step 2: Run — expect FAIL**
 
-```markdown
-| 2026-04-20 | DOT Parser AST Migration (parseDot delegates to @ts-graphviz/ast) | [→ File](2026-04-20-dot-parser-ast-migration.md) |
-```
+Run: `npx vitest run src/attractor/tests/graph.test.ts -t "edge_target_exists"`
+Expected: FAIL.
 
-- [x] **Step 3: Commit**
+- [ ] **Step 3: Attach `location` in edge-rule branches**
+
+In `validateGraph` for each relevant `diags.push({...})` inside edge loops, add `location: e.sourceLocation`.
+
+- [ ] **Step 4: Run full graph tests — expect green**
+
+Run: `npx vitest run src/attractor/tests/graph.test.ts`
+
+- [ ] **Step 5: Commit**
 
 ```bash
-git add package.json /Users/josu/.claude/projects/-Users-josu-Documents-projects-ralph-cli/memory/
-git commit -m "chore: bump version for AST parser migration + memory note"
+git add src/attractor/core/graph.ts src/attractor/tests/graph.test.ts
+git commit -m "feat(validator): attach sourceLocation to edge-rule diagnostics"
 ```
 
-### Task 4.2: Request code review
+### Task 3.3: Attach `location` to node-level diagnostics
 
-- [x] **Step 1: Invoke @superpowers:requesting-code-review**
+**Files:**
+- Modify: `src/attractor/core/graph.ts` (reachability, reaches_exit, start_no_incoming, exit_no_outgoing, variable_coverage, portability_heuristic, script_command_conflict, unsupported_script_extension, script_file_exists, inline_script_smell, type_known, type_unsupported)
+- Modify: `src/attractor/tests/graph.test.ts`
 
-Review returned GO verdict. Two Important issues + one Nit flagged as pre-work for the follow-up diagnostic plan:
-- Silent empty graph on missing `Graph` root
-- Subgraph default leak across sibling scopes
-- Escaped-quote pre-collapse regex limitation
+- [ ] **Step 1: Write one representative failing test**
 
-- [x] **Step 2: Address feedback**
+```ts
+it("reachability diagnostic carries node sourceLocation", () => {
+  const dot = `digraph g {\n  start [shape="Mdiamond"];\n  done [shape="Msquare"];\n  orphan [shape="box"];\n  start -> done;\n}`;
+  const g = parseDot(dot);
+  const diags = validateGraph(g);
+  const d = diags.find(x => x.rule === "reachability");
+  expect(d?.location?.line).toBe(4);
+});
+```
 
-All three addressed in `src/attractor/core/graph-ast.ts` with matching regression tests in `src/attractor/tests/graph-ast.test.ts`. Suite now 999/999.
+- [ ] **Step 2: Run — expect FAIL**
 
-### Task 4.3: Finish the branch
+- [ ] **Step 3: Wire `location: node.sourceLocation` at each node-rule `diags.push` call site**
 
-- [x] **Step 1: Final verification per @superpowers:verification-before-completion**
+Leave cardinality rules (`start_node`, `terminal_node`) without `location` — they do not bind to one node.
 
-Evidence captured 2026-04-20:
-- `npx vitest run` → 999/999 passing (85 files, 22.52s)
-- `npx tsc --noEmit` → clean
-- `npm run build` → success, `dist/cli/index.js` = 169.57 KB
-- `pipeline validate pipelines/smoke/gate.dot` → `Pipeline valid (5 nodes, 5 edges)`
-- `pipeline validate pipelines/illumination-to-implementation.dot` → `schema_error` as expected (unrelated — to be addressed in validator follow-up)
+- [ ] **Step 4: Run full attractor suite**
 
-- [x] **Step 2: Use @superpowers:finishing-a-development-branch**
+Run: `npx vitest run src/attractor`
+Expected: green.
 
-Branch `main`. No PR flow required — migration landed directly + hardening patch in same branch. Tagged `v0.1.30`.
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/attractor/core/graph.ts src/attractor/tests/graph.test.ts
+git commit -m "feat(validator): attach sourceLocation to node-level diagnostics"
+```
 
 ---
 
-## Out of scope (follow-up plans)
+## Chunk 4: CLI renderer — header + code frame
 
-- Diagnostic output improvements: `file:line:col` prefix, fuzzy "did you mean", `--verbose` allowed-keys table, grouped-by-node formatting. New plan: `2026-04-20-validate-diagnostic-ergonomics.md`.
-- AST-based `ralph pipeline refine` that edits the AST instead of rewriting the `.dot` file. Substantial follow-up.
-- `ralph pipeline schema [kind]` command (prints allowed keys with descriptions).
+Goal: `pipelineValidateCommand` prints `relpath:line:col` prefix and a source-frame caret for every diagnostic that has `location`. Syntax errors route through the same renderer.
+
+### Task 4.1: `renderCodeFrame` pure function
+
+**Files:**
+- Create: `src/cli/lib/code-frame.ts`
+- Create: `src/cli/tests/code-frame.test.ts`
+
+- [ ] **Step 1: Write the failing tests**
+
+```ts
+import { describe, it, expect } from "vitest";
+import { renderCodeFrame } from "../lib/code-frame.js";
+
+describe("renderCodeFrame", () => {
+  const src = ["line1", "line2 bad", "line3", "line4"].join("\n");
+
+  it("renders N lines before and after, gutter with numbers", () => {
+    const out = renderCodeFrame(src, { line: 2, column: 7 }, { context: 1, color: false });
+    expect(out).toContain("1 |");
+    expect(out).toContain("2 |");
+    expect(out).toContain("3 |");
+    expect(out).not.toContain("4 |");
+  });
+
+  it("emits caret under the offending column", () => {
+    const out = renderCodeFrame(src, { line: 2, column: 7 }, { context: 0, color: false });
+    const lines = out.split("\n");
+    const caretLine = lines.find(l => l.includes("^"));
+    expect(caretLine).toBeDefined();
+    const caretIdx = caretLine!.indexOf("^");
+    const prevLine = lines[lines.indexOf(caretLine!) - 1];
+    expect(prevLine.charAt(caretIdx)).toBe("b");
+  });
+
+  it("spans caret across endColumn when provided", () => {
+    const out = renderCodeFrame(src, { line: 2, column: 7, endLine: 2, endColumn: 10 }, { context: 0, color: false });
+    expect(out).toMatch(/\^{3}/);
+  });
+
+  it("clamps lines past EOF", () => {
+    const out = renderCodeFrame(src, { line: 99, column: 1 }, { context: 0, color: false });
+    expect(out).not.toContain("undefined");
+  });
+});
+```
+
+- [ ] **Step 2: Run — expect FAIL (module missing)**
+
+Run: `npx vitest run src/cli/tests/code-frame.test.ts`
+Expected: FAIL with module not found.
+
+- [ ] **Step 3: Implement renderer**
+
+```ts
+import type { SourceLocation } from "../../attractor/types.js";
+
+interface Opts { context?: number; color?: boolean }
+
+export function renderCodeFrame(source: string, loc: SourceLocation, opts: Opts = {}): string {
+  const lines = source.split("\n");
+  const context = opts.context ?? 2;
+  const target = Math.min(loc.line, lines.length);
+  const first = Math.max(1, target - context);
+  const last  = Math.min(lines.length, target + context);
+  const width = String(last).length;
+  const out: string[] = [];
+  for (let n = first; n <= last; n++) {
+    const prefix = n === target ? "›" : " ";
+    out.push(`${prefix} ${String(n).padStart(width)} | ${lines[n - 1] ?? ""}`);
+    if (n === target) {
+      const col = Math.max(1, loc.column);
+      const end = loc.endLine === loc.line && loc.endColumn ? loc.endColumn : col + 1;
+      const span = Math.max(1, end - col);
+      const gutter = `  ${" ".repeat(width)} | `;
+      out.push(gutter + " ".repeat(col - 1) + "^".repeat(span));
+    }
+  }
+  return out.join("\n");
+}
+```
+
+(Ignore `opts.color` for now — no colors. Add later if needed.)
+
+- [ ] **Step 4: Run tests — expect PASS**
+
+Run: `FORCE_COLOR=0 npx vitest run src/cli/tests/code-frame.test.ts`
+Expected: green.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/cli/lib/code-frame.ts src/cli/tests/code-frame.test.ts
+git commit -m "feat(cli): add renderCodeFrame pure renderer"
+```
+
+### Task 4.2: Wire header + code-frame into `pipelineValidateCommand`
+
+**Files:**
+- Modify: `src/cli/commands/pipeline.ts`
+
+- [ ] **Step 1: Write the failing end-to-end test**
+
+Add to `src/cli/tests/pipeline-validate.test.ts` (create if missing):
+
+```ts
+import { describe, it, expect, vi } from "vitest";
+import { writeFileSync, mkdtempSync } from "fs";
+import { join } from "path";
+import { tmpdir } from "os";
+import { pipelineValidateCommand } from "../commands/pipeline.js";
+
+describe("pipelineValidateCommand source frames", () => {
+  it("prints relpath:line:col and a code frame for schema errors", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "ralph-val-"));
+    const file = join(dir, "bad.dot");
+    writeFileSync(file,
+      `digraph g {\n  start [shape="Mdiamond"];\n  done [shape="Msquare"];\n  worker [type="tool",\n          cwd="$project",\n          bad_key="oops",\n          tool_command="echo"];\n  start -> worker -> done;\n}`,
+    );
+    const errors: string[] = [];
+    vi.spyOn(console, "error").mockImplementation((m: string) => { errors.push(m); });
+    await pipelineValidateCommand(file);
+    const all = errors.join("\n");
+    expect(all).toMatch(/bad\.dot:6:\d+/);
+    expect(all).toContain("bad_key");
+    expect(all).toContain("^");
+  });
+});
+```
+
+NOTE: adapt the stdout-capture strategy to whatever pattern existing `pipeline.test.ts` uses.
+
+- [ ] **Step 2: Run — expect FAIL**
+
+Run: `FORCE_COLOR=0 npx vitest run src/cli/tests/pipeline-validate.test.ts`
+Expected: FAIL.
+
+- [ ] **Step 3: Update `pipelineValidateCommand`**
+
+Before the diagnostic-emit loops, compute:
+
+```ts
+import { relative } from "path";
+import { renderCodeFrame } from "../lib/code-frame.js";
+// …
+const relPath = relative(process.cwd(), absPath) || absPath;
+```
+
+Replace the `for (const w of warnings) { … }` and `for (const e of errors) { … }` blocks with a unified helper:
+
+```ts
+function formatDiag(d: Diagnostic): string {
+  const loc = d.location ? `${relPath}:${d.location.line}:${d.location.column} ` : "";
+  const hint = d.hint ? `\n${indentHint(d.hint)}` : "";
+  const frame = d.location ? `\n${indentHint(renderCodeFrame(src, d.location, { context: 2, color: false }))}` : "";
+  return `${loc}[${d.rule}] ${d.message}${hint}${frame}`;
+}
+for (const w of warnings) await output.warn(formatDiag(w));
+for (const e of errors)   await output.error(formatDiag(e));
+```
+
+- [ ] **Step 4: Run the e2e test — expect PASS**
+
+Run: `FORCE_COLOR=0 npx vitest run src/cli/tests/pipeline-validate.test.ts`
+Expected: PASS.
+
+- [ ] **Step 5: Smoke-check against a real pipeline**
+
+Run: `npm run build && node dist/cli/index.js pipeline validate pipelines/illumination-to-implementation.dot`
+
+Expected: exits 0 today (clean pipeline). Then temporarily add `bad_key="x"` to a node → expect `pipelines/illumination-to-implementation.dot:<line>:<col>` + caret. Revert the edit before committing.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add src/cli/commands/pipeline.ts src/cli/tests/pipeline-validate.test.ts
+git commit -m "feat(cli): render relpath:line:col + code frame for validate diagnostics"
+```
+
+### Task 4.3: Route syntax errors through the renderer
+
+**Files:**
+- Modify: `src/cli/commands/pipeline.ts`
+
+- [ ] **Step 1: Write the failing test**
+
+```ts
+it("prints a [syntax] diagnostic with code frame for malformed DOT", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "ralph-val-"));
+  const file = join(dir, "broken.dot");
+  writeFileSync(file, `digraph g {\n  start [shape="Mdiamond"\n  done\n}`);
+  const errors: string[] = [];
+  vi.spyOn(console, "error").mockImplementation((m: string) => { errors.push(m); });
+  const code = await pipelineValidateCommand(file);
+  expect(code).toBe(1);
+  const all = errors.join("\n");
+  expect(all).toMatch(/broken\.dot:\d+:\d+/);
+  expect(all).toContain("[syntax]");
+});
+```
+
+- [ ] **Step 2: Run — expect FAIL** (raw PEG error leaks)
+
+- [ ] **Step 3: Catch `DotSyntaxError` around `parseDot`**
+
+```ts
+import { DotSyntaxError } from "../../attractor/core/dot-syntax.js";
+// …
+let graph: Graph;
+try { graph = parseDot(src); }
+catch (e) {
+  if (e instanceof DotSyntaxError) {
+    const diag: Diagnostic = {
+      rule: "syntax",
+      severity: "error",
+      message: e.message,
+      location: e.location,
+    };
+    await output.error(formatDiag(diag));
+    return 1;
+  }
+  throw e;
+}
+```
+
+Hoist `formatDiag` above the try/catch so both paths use it.
+
+- [ ] **Step 4: Run test — expect PASS**
+
+- [ ] **Step 5: Run full CLI suite**
+
+Run: `FORCE_COLOR=0 npx vitest run src/cli`
+Expected: green.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add src/cli/commands/pipeline.ts src/cli/tests/pipeline-validate.test.ts
+git commit -m "feat(cli): emit [syntax] diagnostic with code frame on malformed DOT"
+```
+
+---
+
+## Chunk 5: Docs + version bump
+
+### Task 5.1: Update design-spec status + cross-link
+
+**Files:**
+- Modify: `docs/superpowers/specs/2026-04-20-source-location-diagnostics-design.md` (flip status: design → shipped, add "shipped in v0.1.30")
+- Modify: `docs/superpowers/specs/2026-04-20-dot-parser-ast-migration-design.md` (cross-link "cashes in" to this spec)
+
+- [ ] **Step 1: Flip status** in the header: `status: shipped` + add shipping commit SHA.
+
+- [ ] **Step 2: Add one-line back-reference** in the parser-migration spec under its success-criteria or trailing section.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add docs/superpowers/specs/2026-04-20-source-location-diagnostics-design.md docs/superpowers/specs/2026-04-20-dot-parser-ast-migration-design.md
+git commit -m "docs: mark source-location spec shipped; cross-link from parser spec"
+```
+
+### Task 5.2: Verify full suite + version bump
+
+- [ ] **Step 1: Run full test suite**
+
+Run: `npm test`
+Expected: all green. If failing, fix before continuing.
+
+- [ ] **Step 2: Typecheck + build**
+
+Run: `npx tsc --noEmit && npm run build`
+Expected: clean.
+
+- [ ] **Step 3: Bump version**
+
+Edit `package.json`: `"version": "0.1.29"` → `"0.1.30"`.
+
+- [ ] **Step 4: Commit and tag**
+
+```bash
+git add package.json package-lock.json
+git commit -m "chore: bump version to 0.1.30"
+git tag v0.1.30
+```
+
+### Task 5.3: Write memory note
+
+- [ ] **Step 1: Write** `/Users/josu/.claude/projects/-Users-josu-Documents-projects-ralph-cli/memory/2026-04-20-source-location-diagnostics-shipped.md` (project type memory, "Why" + "How to apply" lines).
+
+- [ ] **Step 2: Append index entry** to `MEMORY.md`.
+
+---
+
+## Chunk 6: End-to-end verification across `pipelines/smoke/*.dot`
+
+Goal: confirm the changes do not regress any existing smoke pipeline — validate-clean on all 14 dots, validate-with-error on a fixture, validate-syntax-error on a fixture, and runtime smoke via the tmux-drive harness on 2–3 representative dots to prove parser changes still produce a runnable graph.
+
+**Prerequisites:**
+- `npm run build` must have been run since the last code edit (Chunk 5 bumped version; the built `dist/` binary is what `ralph` resolves via `npm link`).
+- Read `docs/harness/tmux-drive.md` *first* and source the bash block inside. All `start_run`, `wait_stable`, `capture`, `cleanup_run` helpers come from there. Do not invent tmux incantations — the document already accounts for nanosecond timing, atomic JSON updates, orphan recovery, focus.
+- Work inside a fresh project sandbox (e.g. `~/tmp/ralph-smoke-<ts>/`) — the smoke dots use `$project` and should not touch the ralph-cli repo itself.
+
+### Task 6.1: Validate-clean matrix across all smoke dots
+
+**Files:**
+- Read only: `pipelines/smoke/*.dot`
+
+- [ ] **Step 1: Prepare sandbox**
+
+```bash
+SANDBOX=$(mktemp -d -t ralph-smoke-XXXXXX)
+cd "$SANDBOX" && git init -q -b main
+echo "# smoke sandbox" > README.md && git add . && git commit -q -m "init"
+cd /Users/josu/Documents/projects/ralph-cli
+```
+
+- [ ] **Step 2: Run the matrix**
+
+```bash
+for f in pipelines/smoke/*.dot; do
+  echo "=== $f ==="
+  node dist/cli/index.js pipeline validate "$f" --project "$SANDBOX" && echo "  OK" || echo "  FAIL"
+done
+```
+
+Expected: every pipeline prints `Pipeline valid (N nodes, M edges)` → `OK`. Zero `FAIL`.
+
+(Note: `missing-caller-var.dot` is intentionally a negative-case fixture. If a pre-change run of this matrix showed it failing, preserve that — the goal is that post-change outcomes match pre-change outcomes, not that every dot passes.)
+
+- [ ] **Step 3: Back-compat check — legacy `sourceLine` still populates**
+
+```bash
+node -e '
+  const { parseDot } = require("./dist/attractor/core/graph.js");
+  const fs = require("fs");
+  const g = parseDot(fs.readFileSync("pipelines/smoke/tool.dot", "utf8"));
+  const first = [...g.nodes.values()][0];
+  if (typeof first.sourceLine !== "number") { console.error("FAIL sourceLine gone"); process.exit(1); }
+  if (!first.sourceLocation || first.sourceLocation.line !== first.sourceLine) { console.error("FAIL mismatch"); process.exit(1); }
+  console.log("OK sourceLine=" + first.sourceLine + " matches sourceLocation.line");
+'
+```
+
+Expected: `OK sourceLine=N matches sourceLocation.line`. Guards the `@deprecated` back-compat field promise.
+
+- [ ] **Step 4: Interpret failures**
+
+If a pipeline that passed pre-change now fails, the change introduced a regression. Most likely cause: per-key-split of unrecognized-keys exposing a pre-existing issue that was previously collapsed into a single diagnostic. Verify by checking pre-change output (`git stash && rebuild && rerun`) before treating as a real regression.
+
+- [ ] **Step 5: Record matrix output** to `~/.ralph/harness/validate-matrix-<ts>.txt` for the reviewer.
+
+- [ ] **Step 6: Commit nothing** — this is a verification gate, not a code change.
+
+### Task 6.2: Validate-with-schema-error fixture (includes multi-line-attr regression)
+
+**Files:**
+- Temporary fixture — do NOT commit edits to `pipelines/smoke/*.dot`.
+
+- [ ] **Step 1: Prepare fixture with cleanup trap**
+
+```bash
+FIXTURE=$(mktemp -t ralph-smoke-bad.XXXXXX).dot
+OUT=$(mktemp -t ralph-smoke-bad.XXXXXX).out
+trap 'rm -f "$FIXTURE" "$OUT"' EXIT
+cp pipelines/smoke/tool.dot "$FIXTURE"
+```
+
+- [ ] **Step 2: Inject a multi-line attr BEFORE the bad key, then the bad key**
+
+This exercises spec §10 risk: multi-line quoted values must not shift subsequent line numbers. Edit `$FIXTURE`: on the first `type="tool"` node's attribute block, add these two lines *in order*:
+
+```
+          label="first\nsecond\nthird",
+          bad_key="oops",
+```
+
+Note the 1-based source line where `bad_key="oops"` lives (call it `L`). Because `parseDotV2` pre-collapses newlines **inside** the quoted `label=` value, the reported line for `bad_key` must equal the *source* line, not a post-collapse offset.
+
+- [ ] **Step 3: Run validate against the sandbox project**
+
+```bash
+node dist/cli/index.js pipeline validate "$FIXTURE" --project "$SANDBOX" 2>&1 | tee "$OUT"
+```
+
+- [ ] **Step 4: Assert on output**
+
+Required substrings in `$OUT`:
+
+- `$FIXTURE:<L>:` — the **source** line of `bad_key="oops"`, colon, column. Hard-coded `:<L>:` check, not a wildcard.
+- `[schema_error]` — rule name.
+- `unrecognized key 'bad_key'` — snake_case key name (per `feedback-validator-vocabulary.md`).
+- `Allowed keys for kind=tool:` — hint block.
+- A line containing `^` under the `bad_key` token.
+
+Do not assert on the `label` line — it is valid on agent nodes only (`label` on tool may produce its own diagnostic; that's fine and orthogonal).
+
+Fail the task if the `:<L>:` substring is missing — that means multi-line collapse leaked into positions.
+
+- [ ] **Step 5: Cleanup**
+
+Trap handles it automatically on shell exit; no manual rm required.
+
+### Task 6.3: Validate-with-syntax-error fixture
+
+- [ ] **Step 1: Prepare fixture with cleanup trap**
+
+```bash
+FIXTURE=$(mktemp -t ralph-smoke-syntax.XXXXXX).dot
+OUT=$(mktemp -t ralph-smoke-syntax.XXXXXX).out
+trap 'rm -f "$FIXTURE" "$OUT"' EXIT
+cp pipelines/smoke/tool.dot "$FIXTURE"
+```
+
+- [ ] **Step 2: Break the dot**
+
+Edit `$FIXTURE`: pick any node's attribute block and delete the closing `]`. Record the line number of the deleted bracket (call it `L`).
+
+- [ ] **Step 3: Run validate**
+
+```bash
+node dist/cli/index.js pipeline validate "$FIXTURE" --project "$SANDBOX"; echo "exit=$?" > "$OUT"
+node dist/cli/index.js pipeline validate "$FIXTURE" --project "$SANDBOX" 2>&1 >> "$OUT"
+```
+
+- [ ] **Step 4: Assert on output**
+
+- Exit code recorded in `$OUT` is `1`.
+- Output contains `[syntax]`.
+- Output contains `$FIXTURE:<line>:<col>` where line is at or near `L`.
+- Output does **not** contain `node_modules/@ts-graphviz` (no stack trace leak).
+- Output contains at least one `^` caret.
+
+- [ ] **Step 5: Cleanup** — trap handles it.
+
+### Task 6.4: Runtime smoke via tmux-drive harness (agent-free dots only)
+
+Goal: confirm that parser changes (new fields on `Node`/`Edge`, `applyStylesheet` preservation) did not break the runtime. **Only agent-free smoke dots are acceptable here** — agent nodes require a live Claude API session, introduce non-determinism, and are the wrong tool for a parser-regression smoke. `Grep "agent="` across `pipelines/smoke/*.dot` confirms 9 of 14 dots spawn agents. Usable candidates:
+
+- `pipelines/smoke/tool.dot` — pure tool handler, minimum path.
+- `pipelines/smoke/tool-runtime-vars.dot` — multi-node tool chain that exercises `$tool.output` propagation and multiple attribute-heavy nodes.
+- `pipelines/smoke/store.dot` — `store` handler node, exercises a different handler type than `tool` to widen coverage.
+
+**Conditional-edge coverage is left to the unit test at Task 3.2** (graph.test.ts `edge_target_exists` carries edge sourceLocation). There is no agent-free conditional smoke dot; adding runtime coverage for edge-condition routing is out of scope for this change.
+
+**Success detection:** `pipeline run` does not emit a "pipeline complete" banner. It exits silently on success and prints `✗ pipeline failed at node …` to stderr on failure (`src/cli/commands/pipeline.ts:488`). The smoke assertion is therefore **negative**: after `wait_stable`, the capture must not contain `✗ pipeline failed`, and the run's JSONL trace must record that the exit (`Msquare`) node completed.
+
+**Setup (do once before the three sub-tasks below):**
+
+- [ ] **Step 0: Read harness doc + source the helper block**
+
+```bash
+$EDITOR /Users/josu/Documents/projects/ralph-cli/docs/harness/tmux-drive.md   # or: cat
+# then source the full fenced bash block in your current shell so start_run, wait_stable, capture, cleanup_run are defined
+```
+
+Verify:
+```bash
+type start_run wait_stable capture cleanup_run
+```
+Expected: all four print `is a function`.
+
+- [ ] **Step 0b: Reuse the `$SANDBOX` from Task 6.1**
+
+If Chunk 6 is running end-to-end in one shell, `$SANDBOX` is already initialised. Otherwise:
+
+```bash
+SANDBOX=$(mktemp -d -t ralph-smoke-XXXXXX)
+cd "$SANDBOX" && git init -q -b main
+echo "# smoke sandbox" > README.md && git add . && git commit -q -m "init"
+cd /Users/josu/Documents/projects/ralph-cli
+```
+
+Referenced as `$SANDBOX` in each sub-task below. Final step of Chunk 6 removes it (`rm -rf "$SANDBOX"`).
+
+**Shared assertion helper** (paste once per shell):
+
+```bash
+assert_smoke_success() {
+  local capture_file=$1
+  if grep -F "✗ pipeline failed" "$capture_file"; then
+    echo "FAIL: failure marker found in $capture_file"; return 1
+  fi
+  # Find the most-recent run's jsonl and confirm pipeline-end success.
+  # Tracer schema (src/attractor/tracer/jsonl-pipeline-tracer.ts:51-58):
+  #   onPipelineEnd writes {"kind":"pipeline-end","runId":"...","outcome":"success"}
+  local jsonl
+  jsonl=$(ls -1t "$HOME/.ralph/runs"/*/pipeline.jsonl 2>/dev/null | head -1)
+  if [ -z "$jsonl" ]; then echo "FAIL: no pipeline.jsonl found"; return 1; fi
+  if ! grep -Fq '"kind":"pipeline-end"' "$jsonl"; then
+    echo "FAIL: pipeline-end event missing in $jsonl"; return 1
+  fi
+  if ! grep -Fq '"outcome":"success"' "$jsonl"; then
+    echo "FAIL: pipeline-end outcome was not success in $jsonl"; return 1
+  fi
+  echo "OK: pipeline-end success recorded in $jsonl"
+}
+```
+
+#### Task 6.4.a: `tool.dot`
+
+- [ ] **Step 1: Start the run**
+
+```bash
+start_run "node /Users/josu/Documents/projects/ralph-cli/dist/cli/index.js pipeline run /Users/josu/Documents/projects/ralph-cli/pipelines/smoke/tool.dot --project '$SANDBOX'" "smoke-tool"
+```
+
+- [ ] **Step 2: Wait for stability**
+
+```bash
+wait_stable 60000
+```
+Expected: returns 0 within 60s. (30s was too tight for cold-start subprocesses per reviewer.)
+
+- [ ] **Step 3: Capture and assert**
+
+```bash
+capture "final"
+assert_smoke_success "$RUN_DIR/captures/final.txt"
+```
+Expected: `OK: no failure marker, exit-node reached ...`.
+
+- [ ] **Step 4: Cleanup**
+
+```bash
+cleanup_run
+```
+
+#### Task 6.4.b: `tool-runtime-vars.dot`
+
+Multi-node tool chain; exercises attribute-heavy nodes after the parser change.
+
+- [ ] Repeat the 4 steps from 6.4.a with:
+  - `start_run "node /Users/josu/Documents/projects/ralph-cli/dist/cli/index.js pipeline run /Users/josu/Documents/projects/ralph-cli/pipelines/smoke/tool-runtime-vars.dot --project '$SANDBOX'" "smoke-tool-runtime-vars"`
+
+#### Task 6.4.c: `store.dot`
+
+Different handler kind (`store`); broadens coverage beyond `tool`.
+
+- [ ] Repeat the 4 steps from 6.4.a with:
+  - `start_run "node /Users/josu/Documents/projects/ralph-cli/dist/cli/index.js pipeline run /Users/josu/Documents/projects/ralph-cli/pipelines/smoke/store.dot --project '$SANDBOX'" "smoke-store"`
+
+### Task 6.5: Record verification summary
+
+- [ ] **Step 1: Write a short verification report**
+
+Create `docs/superpowers/verifications/2026-04-20-source-location-smoke.md` with:
+- Validate-clean matrix result per smoke dot (14 rows, all `OK`).
+- Validate-schema-error fixture: `PASS` / `FAIL` + captured stdout snippet.
+- Validate-syntax-error fixture: `PASS` / `FAIL` + captured stdout snippet.
+- Runtime smoke: 3 rows (`tool`, `tool-runtime-vars`, `store`), each `PASS` / `FAIL` with capture reference.
+
+- [ ] **Step 2: Commit the verification report**
+
+```bash
+git add docs/superpowers/verifications/2026-04-20-source-location-smoke.md
+git commit -m "docs(verify): source-location diagnostics smoke report"
+```
+
+- [ ] **Step 3: Tear down sandbox**
+
+```bash
+rm -rf "$SANDBOX"
+unset SANDBOX
+```
+
+**If any task in Chunk 6 fails:** do not claim the feature is shipped. Fix root cause, re-run the failing task, then rerun the tasks below it.
+
+---
+
+## Risks / follow-ups
+
+- **Multi-line quoted values.** `parseDotV2` pre-collapses newlines inside quoted strings before PEG parsing. Line numbers reported for *subsequent* nodes must match the original source. Verify with a test that has a multi-line `model_stylesheet=` attr before a flagged node, and pin.
+- **Snapshot fragility.** The e2e test asserts on substrings, not the full frame. If someone wants a golden file, use `expect(all).toMatchSnapshot()` — but prefer substring checks for resilience to cosmetic changes.
+- **Columns on default attributes.** Attrs inherited from graph-wide `node [...]` defaults have no per-node position. `attrLocations` will be missing that key → validator falls back to `node.sourceLocation`. Document in inline comment where fallback happens.
+- **Performance.** Splitting the source on every diagnostic render is O(N diagnostics × N lines). For the typical pipeline (≤50 lines, ≤10 diagnostics), noise. If validate ever becomes a bottleneck, memoize `source.split("\n")` once per command invocation.
