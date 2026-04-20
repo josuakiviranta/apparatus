@@ -1,6 +1,6 @@
 import { existsSync } from "fs";
 import { resolve as resolvePath, extname } from "path";
-import type { Graph, Node, Edge, Diagnostic } from "../types.js";
+import type { Graph, Node, Diagnostic } from "../types.js";
 import { expandVariables, extractDefaults, UndefinedVariableError } from "../transforms/variable-expansion.js";
 import { validateNode } from "./schemas.js";
 import { parseDotV2 } from "./graph-ast.js";
