@@ -14,6 +14,8 @@ import { getBundledAgentsDir } from "./assets.js";
 export interface RegistryOptions {
   userDir?: string;
   bundledDir?: string;
+  /** Optional project-local agents dir, searched before userDir/bundledDir. */
+  projectDir?: string;
 }
 
 export interface AgentInfo {
@@ -41,6 +43,13 @@ export function resolveAgent(
 ): AgentConfig {
   const userDir = getUserAgentsDir(opts);
   const bundledDir = getBundledDir(opts);
+
+  if (opts?.projectDir) {
+    const projectPath = join(opts.projectDir, `${name}.md`);
+    if (existsSync(projectPath)) {
+      return parseAgentFile(readFileSync(projectPath, "utf-8"));
+    }
+  }
 
   const userPath = join(userDir, `${name}.md`);
   if (existsSync(userPath)) {

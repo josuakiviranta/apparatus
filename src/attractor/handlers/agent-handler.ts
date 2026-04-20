@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync, readFileSync } from "fs";
 import { join, resolve } from "path";
 import { randomUUID } from "crypto";
-import type { NodeHandler, HandlerExecutionContext, OnInteractiveRequest } from "./registry.js";
+import type { NodeHandler, HandlerExecutionContext } from "./registry.js";
 import type { Node, Outcome, PipelineContext, CheckpointState } from "../types.js";
 import { Agent, type AgentConfig, type RunResult, type ChildHandle } from "../../cli/lib/agent.js";
 import { resolveAgent as defaultResolveAgent } from "../../cli/lib/agent-registry.js";
@@ -16,7 +16,7 @@ export interface AgentHandlerDeps {
 }
 
 export class AgentHandler implements NodeHandler {
-  private resolve: (name: string) => AgentConfig;
+  private resolve: (name: string, opts?: import("../../cli/lib/agent-registry.js").RegistryOptions) => AgentConfig;
   private create: (config: AgentConfig) => Agent;
 
   constructor(deps?: AgentHandlerDeps) {
