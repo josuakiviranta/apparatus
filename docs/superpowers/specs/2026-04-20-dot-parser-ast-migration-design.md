@@ -146,6 +146,8 @@ Only one consumer changes behavior:
 - [ ] `parseDot` delegates to `parseDotV2` (or is replaced).
 - [ ] Old regex helpers (`stripComments`, `flattenSubgraphs`, `parseAttrs` duplicate) removed.
 
+**Follow-up shipped:** The "every attribute can be located to line:column" uplift (goal 2) was cashed in by the [source-location diagnostics](./2026-04-20-source-location-diagnostics-design.md) spec (v0.1.31).
+
 ## Follow-ups (out of scope)
 
 - Add `file:line:col` prefix to `schema_error` diagnostics (separate plan).
