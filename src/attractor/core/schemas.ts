@@ -153,7 +153,7 @@ export function validateNode(node: Node): Diagnostic[] {
           severity: "error",
           message: `[${node.id}]: unrecognized key '${snake}'`,
           hint: formatAllowedAttrs(kind),
-          location: node.attrLocations?.[key] ?? node.sourceLocation,
+          location: (node.attrLocations?.[key] as import("../types.js").SourceLocation | undefined) ?? node.sourceLocation,
         });
       }
       continue;
@@ -161,11 +161,12 @@ export function validateNode(node: Node): Diagnostic[] {
     const path = issue.path.join(".");
     const loc = path ? camelToSnake(path) : "node";
     const firstPath = typeof issue.path[0] === "string" ? issue.path[0] : undefined;
+    const attrLoc = firstPath ? node.attrLocations?.[firstPath] : undefined;
     diags.push({
       rule: "schema_error",
       severity: "error",
       message: `[${node.id}] ${loc}: ${issue.message}`,
-      location: (firstPath && node.attrLocations?.[firstPath]) ?? node.sourceLocation,
+      location: (attrLoc as import("../types.js").SourceLocation | undefined) ?? node.sourceLocation,
     });
   }
   return diags;

@@ -1044,6 +1044,16 @@ describe("validateGraph — script_file rules", () => {
   });
 });
 
+describe("validateGraph — node sourceLocation", () => {
+  it("reachability diagnostic carries node sourceLocation", () => {
+    const dot = `digraph g {\n  start [shape="Mdiamond"];\n  done [shape="Msquare"];\n  orphan [shape="box"];\n  start -> done;\n}`;
+    const g = parseDot(dot);
+    const diags = validateGraph(g);
+    const d = diags.find(x => x.rule === "reachability");
+    expect(d?.location?.line).toBe(4);
+  });
+});
+
 describe("validateGraph — edge sourceLocation", () => {
   it("edge_target_exists carries edge sourceLocation", () => {
     const dot = `digraph g {\n  start [shape="Mdiamond"];\n  done [shape="Msquare"];\n  start -> missing;\n}`;

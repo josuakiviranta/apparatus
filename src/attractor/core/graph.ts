@@ -76,18 +76,18 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
       for (const e of edges.filter(e => e.from === cur)) queue.push(e.to);
     }
     for (const id of nodes.keys()) {
-      if (!reachable.has(id)) diags.push({ rule: "reachability", severity: "error", message: `Node "${id}" is unreachable from start` });
+      if (!reachable.has(id)) diags.push({ rule: "reachability", severity: "error", message: `Node "${id}" is unreachable from start`, location: nodes.get(id)?.sourceLocation });
     }
 
     // start has no incoming
     if (edges.some(e => e.to === startNodes[0].id)) {
-      diags.push({ rule: "start_no_incoming", severity: "error", message: "Start node must not have incoming edges" });
+      diags.push({ rule: "start_no_incoming", severity: "error", message: "Start node must not have incoming edges", location: startNodes[0].sourceLocation });
     }
   }
 
   // exit has no outgoing
   if (exitNodes.length === 1 && edges.some(e => e.from === exitNodes[0].id)) {
-    diags.push({ rule: "exit_no_outgoing", severity: "error", message: "Exit node must not have outgoing edges" });
+    diags.push({ rule: "exit_no_outgoing", severity: "error", message: "Exit node must not have outgoing edges", location: exitNodes[0].sourceLocation });
   }
 
   // Reverse-BFS from exit: every non-exit node must be able to reach the exit.
@@ -115,6 +115,7 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
           rule: "reaches_exit",
           severity: "error",
           message: `Node "${id}" has no path to the exit node`,
+          location: node.sourceLocation,
         });
       }
     }
@@ -137,8 +138,8 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
   // type_known warning + unimplemented type errors
   for (const node of nodes.values()) {
     const t = resolveHandlerType(node);
-    if (!KNOWN_TYPES.has(t)) diags.push({ rule: "type_known", severity: "warning", message: `Unknown handler type "${t}" on node "${node.id}"` });
-    if (UNIMPLEMENTED_TYPES.has(t)) diags.push({ rule: "type_unsupported", severity: "error", message: `Node type "${t}" is declared but not yet implemented (node "${node.id}")` });
+    if (!KNOWN_TYPES.has(t)) diags.push({ rule: "type_known", severity: "warning", message: `Unknown handler type "${t}" on node "${node.id}"`, location: node.sourceLocation });
+    if (UNIMPLEMENTED_TYPES.has(t)) diags.push({ rule: "type_unsupported", severity: "error", message: `Node type "${t}" is declared but not yet implemented (node "${node.id}")`, location: node.sourceLocation });
   }
 
   // variable_coverage — warn when a $variable may not be defined on all paths
@@ -249,6 +250,7 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
             rule: "variable_coverage",
             severity: "warning",
             message: `Variable "$${varName}" referenced by node "${consumerId}" has no known producer`,
+            location: consumer.sourceLocation,
           });
           continue;
         }
@@ -261,6 +263,7 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
             rule: "variable_coverage",
             severity: "warning",
             message: `Variable "$${varName}" referenced by node "${consumerId}" may be undefined on path(s) that skip node "${producerList}"`,
+            location: consumer.sourceLocation,
           });
         }
       }
@@ -278,6 +281,7 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
             rule: "portability_heuristic",
             severity: "warning",
             message: `Node "${node.id}" hardcodes project path "${pat}" — use $variable and declare in inputs=`,
+            location: node.sourceLocation,
           });
           break; // one warning per node per field is enough
         }
@@ -298,6 +302,7 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
         rule: "script_command_conflict",
         severity: "error",
         message: `script_file= and tool_command= are mutually exclusive.`,
+        location: node.sourceLocation,
       });
     }
 
@@ -311,6 +316,7 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
           message:
             `Unsupported script extension: ${ext}. ` +
             `Supported: ${SUPPORTED_SCRIPT_EXTS.join(", ")}.`,
+          location: node.sourceLocation,
         });
       }
 
@@ -322,6 +328,7 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
             rule: "script_file_exists",
             severity: "error",
             message: `script_file= references a path that doesn't exist: ${resolved}`,
+            location: node.sourceLocation,
           });
         }
       }
@@ -354,6 +361,7 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
           message:
             `Inline script in tool_command= is fragile under DOT quoting. ` +
             `Move to pipelines/scripts/<name>.<ext> and use script_file=.`,
+          location: node.sourceLocation,
         });
       }
     }
