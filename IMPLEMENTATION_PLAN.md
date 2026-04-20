@@ -2,7 +2,13 @@
 
 ## Status
 
-**Shipped 2026-04-20, v0.1.28.** 995/995 tests passing. `parseDot` now delegates to `parseDotV2`, helpers extracted to `dot-common.ts`, and every `Node` carries `sourceLine`. Chunks 1, 2, 3, and 4.1 complete. Chunks 4.2 (code review) and 4.3 (final verification + branch-finishing) remain pending. See memory note: [`~/.claude/projects/-Users-josu-Documents-projects-ralph-cli/memory/2026-04-20-dot-parser-ast-migration.md`](/Users/josu/.claude/projects/-Users-josu-Documents-projects-ralph-cli/memory/2026-04-20-dot-parser-ast-migration.md).
+**Shipped 2026-04-20. Hardened v0.1.30.** 999/999 tests passing. Chunks 1–4 complete. Task 4.2 review returned GO with three follow-up regression gaps; all three have been addressed in `graph-ast.ts`:
+
+1. `parseDotV2` now throws on missing `Graph` root (was silent empty graph).
+2. Multi-line quoted-value pre-collapse regex now tolerates escaped quotes (`\"`).
+3. Subgraph `nodeDefaults`/`edgeDefaults` are now per-subgraph (passed as args, forked on entry) — DOT-correct scoping instead of shared-closure leak.
+
+Regression tests added to `src/attractor/tests/graph-ast.test.ts`. See memory note: [`~/.claude/projects/-Users-josu-Documents-projects-ralph-cli/memory/2026-04-20-dot-parser-ast-migration.md`](/Users/josu/.claude/projects/-Users-josu-Documents-projects-ralph-cli/memory/2026-04-20-dot-parser-ast-migration.md).
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -625,34 +631,31 @@ git commit -m "chore: bump version for AST parser migration + memory note"
 
 ### Task 4.2: Request code review
 
-- [ ] **Step 1: Invoke @superpowers:requesting-code-review**
+- [x] **Step 1: Invoke @superpowers:requesting-code-review**
 
-Dispatch the review against the full diff on this branch vs `main`. Flag for the reviewer:
-- Parser migration is the load-bearing change
-- Dual-run regression test is the safety net
-- No diagnostic-output changes in this plan (follow-up)
+Review returned GO verdict. Two Important issues + one Nit flagged as pre-work for the follow-up diagnostic plan:
+- Silent empty graph on missing `Graph` root
+- Subgraph default leak across sibling scopes
+- Escaped-quote pre-collapse regex limitation
 
-- [ ] **Step 2: Address feedback**
+- [x] **Step 2: Address feedback**
 
-Per @superpowers:receiving-code-review, evaluate each comment on technical merit; don't perform-agree. Re-run full test suite after any code change.
+All three addressed in `src/attractor/core/graph-ast.ts` with matching regression tests in `src/attractor/tests/graph-ast.test.ts`. Suite now 999/999.
 
 ### Task 4.3: Finish the branch
 
-- [ ] **Step 1: Final verification per @superpowers:verification-before-completion**
+- [x] **Step 1: Final verification per @superpowers:verification-before-completion**
 
-Run these before declaring done:
-```bash
-npx vitest run                                                  # 968+ green
-npm run build                                                   # success
-ralph pipeline validate pipelines/illumination-to-implementation.dot  # schema_error as expected
-ralph pipeline validate pipelines/smoke/gate.dot                # valid
-```
+Evidence captured 2026-04-20:
+- `npx vitest run` → 999/999 passing (85 files, 22.52s)
+- `npx tsc --noEmit` → clean
+- `npm run build` → success, `dist/cli/index.js` = 169.57 KB
+- `pipeline validate pipelines/smoke/gate.dot` → `Pipeline valid (5 nodes, 5 edges)`
+- `pipeline validate pipelines/illumination-to-implementation.dot` → `schema_error` as expected (unrelated — to be addressed in validator follow-up)
 
-Paste the actual output of each command into the completion message. Assertions without evidence are not enough.
+- [x] **Step 2: Use @superpowers:finishing-a-development-branch**
 
-- [ ] **Step 2: Use @superpowers:finishing-a-development-branch**
-
-Invoke the skill to present the merge/PR/cleanup choice.
+Branch `main`. No PR flow required — migration landed directly + hardening patch in same branch. Tagged `v0.1.30`.
 
 ---
 

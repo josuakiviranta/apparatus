@@ -26,25 +26,28 @@ function readAttrs(children: any[]): AttrMap {
 
 export function parseDotV2(src: string): Graph {
   // @ts-graphviz/ast's PEG parser rejects literal newlines inside quoted strings.
-  // Pre-collapse multi-line quoted values the same way the old regex parser did.
-  const normalized = src.replace(/(\w+)\s*=\s*"([^"]*)"/gs, (match: string, key: string, val: string) => {
+  // Pre-collapse multi-line quoted values. Regex tolerates escaped quotes (\").
+  const normalized = src.replace(/(\w+)\s*=\s*"((?:\\.|[^"\\])*)"/gs, (match: string, key: string, val: string) => {
     if (!val.includes("\n")) return match;
     return key + '="' + val.replace(/\s*\n\s*/g, " ").trim() + '"';
   });
   const ast = parseAST(normalized);
   const root: any = ast.children.find((c: any) => c.type === "Graph");
   if (!root) {
-    return { name: "unnamed", nodes: new Map(), edges: [] };
+    throw new Error("parseDotV2: input contains no digraph/graph root");
   }
   const name = root.id?.value ?? "unnamed";
 
   const nodes = new Map<string, Node>();
   const edges: Edge[] = [];
   const graphAttrs: AttrMap = {};
-  let nodeDefaults: AttrMap = {};
-  let edgeDefaults: AttrMap = {};
 
-  function walk(container: any) {
+  // Node/edge defaults are subgraph-scoped per DOT semantics: a subgraph's
+  // `node [...]` / `edge [...]` lines apply only inside that subgraph. Pass
+  // defaults as arguments and fork on subgraph entry so sibling scopes stay
+  // independent. Graph-level attributes (e.g. `label=…`) still propagate to
+  // the outer graphAttrs map.
+  function walk(container: any, nodeDefaults: AttrMap, edgeDefaults: AttrMap) {
     for (const child of container.children ?? []) {
       switch (child.type) {
         case "Attribute": {
@@ -81,12 +84,12 @@ export function parseDotV2(src: string): Graph {
           break;
         }
         case "Subgraph":
-          walk(child); // flatten: subgraph body contributes to outer scope
+          walk(child, { ...nodeDefaults }, { ...edgeDefaults });
           break;
       }
     }
   }
-  walk(root);
+  walk(root, {}, {});
 
   const stylesheet = (graphAttrs["modelStylesheet"] as string) ?? "";
   const rules = stylesheet ? parseStylesheet(stylesheet) : [];
