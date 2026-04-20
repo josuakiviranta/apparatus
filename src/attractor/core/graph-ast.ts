@@ -26,7 +26,7 @@ function readAttrs(children: any[]): AttrMap {
 
 export function parseDotV2(src: string): Graph {
   const ast = parseAST(src);
-  const root = ast.children.find((c: any) => c.type === "Graph");
+  const root: any = ast.children.find((c: any) => c.type === "Graph");
   if (!root) {
     return { name: "unnamed", nodes: new Map(), edges: [] };
   }
