@@ -1,8 +1,10 @@
 # Mark-Archived Reason-Arg Split Design
 
 **Date:** 2026-04-19
-**Status:** Approved (scoped, bundles with T0000)
+**Status:** Superseded by [`specs/2026-04-19-mark-archived-spec-drift-design.md`](2026-04-19-mark-archived-spec-drift-design.md)
 **Source illumination:** `meditations/illuminations/2026-04-19T0800-mark-archived-script-will-write-the-wrong-reason.md`
+
+> **Superseded.** During refactor the `mark_archived` pipeline collapsed from a two-node split (`mark_archived_invalid` + `mark_archived_decline`) plus an `explain_removal` sidecar to a single `mark_archived` node. The successor spec adds a shell-safe `archive_reason_short` verifier field that ferries the rationale inline through `sh -c` — obviating both the sidecar file and the node split. Body retained for historical context (audit-trail motivation and shell-tokenization analysis are still load-bearing); do not use the prescribed architecture.
 
 ## Overview
 

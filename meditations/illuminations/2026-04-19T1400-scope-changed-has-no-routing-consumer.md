@@ -1,7 +1,9 @@
 ---
 date: 2026-04-19
-status: open
+status: archived
 description: `chat_summarizer` emits `scope_changed=true` when a chat round materially changes scope, but no edge condition routes on it — the verifier is never re-run, leaving `$summary` and `$explanation` stale for the rest of the pipeline.
+archived_at: 2026-04-20
+reason: Archive
 ---
 
 ## Core Idea

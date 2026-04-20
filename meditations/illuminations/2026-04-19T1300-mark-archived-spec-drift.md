@@ -1,7 +1,9 @@
 ---
 date: 2026-04-19
-status: open
+status: dispatched
 description: Approved design spec specs/2026-04-19-mark-archived-reason-split-design.md prescribes a two-node mark_archived split (decline vs invalid) + an explain_removal sidecar writer, but the current illumination-to-implementation.dot collapsed explain_removal into the verifier's $explanation and uses one mark_archived node with $choice as the reason — spec and pipeline now disagree.
+dispatched_at: 2026-04-20
+plan_path: docs/superpowers/plans/2026-04-20-mark-archived-spec-drift.md
 ---
 
 ## Core Idea
