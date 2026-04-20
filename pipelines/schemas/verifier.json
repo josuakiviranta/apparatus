@@ -17,6 +17,10 @@
     "explanation": {
       "type": "string",
       "description": "Verification findings: why the illumination is or isn't valid"
+    },
+    "archive_reason_short": {
+      "type": "string",
+      "description": "Shell-safe one-line reason suitable for archived frontmatter. Emit when preferred_label is 'false'. One sentence, ≤100 chars, no newlines, no shell metacharacters (no $, `, \", ', \\, ;, |, &, <, >, (, ), {, }). Written verbatim into the illumination's frontmatter reason: field if the user archives at remove_gate."
     }
   },
   "required": ["preferred_label", "illumination_path", "summary", "explanation"],

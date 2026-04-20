@@ -52,6 +52,7 @@ Structured JSON only. No prose preamble. Fields:
 - `illumination_path`: chosen file path, or empty string when label is `empty`
 - `summary`: one paragraph stating what the illumination proposes (verbatim intent, no editorializing)
 - `explanation`: verification findings. On `false`, lead with which criterion failed and quote the contradicting evidence (file:line or spec excerpt). On `true`, summarize what each criterion check confirmed.
+- `archive_reason_short`: required when `preferred_label` is `"false"`. One sentence, ≤100 chars, no newlines, no shell metacharacters. The illumination's archive frontmatter reads this verbatim. Example: `Feature already implemented at src/bar.ts:42` — not `This illumination is stale because…`. Omit (or set to empty) when `preferred_label` is `"true"` or `"empty"`.
 
 # Hard rules
 
@@ -59,3 +60,4 @@ Structured JSON only. No prose preamble. Fields:
 - Do not paraphrase code claims — quote with file:line citations.
 - Do not assume; if a claim cannot be verified from source, mark the illumination `false` and say so in `explanation`.
 - Do not run the project (no `npm test`, no pipeline execution). Verification is static.
+- On `preferred_label: "false"`, you MUST emit `archive_reason_short`. The mark_archived script uses it verbatim as the illumination's archived frontmatter `reason:` value. Treat the shape constraints (one sentence, ≤100 chars, shell-safe) as strict.
