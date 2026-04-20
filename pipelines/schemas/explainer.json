@@ -3,7 +3,7 @@
   "properties": {
     "explainer_render": {
       "type": "string",
-      "description": "Markdown string with four sections (Currently implemented, What will change, Why it matters, Affected files). Used verbatim in the approval gate label."
+      "description": "Markdown render shown verbatim in the approval gate label per agent rubric (src/cli/agents/change-explainer.md)."
     }
   },
   "required": ["explainer_render"],

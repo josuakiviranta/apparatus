@@ -8,7 +8,7 @@
     },
     "test_summary": {
       "type": "string",
-      "description": "Brief summary of what ran and the final outcome (1-3 sentences)"
+      "description": "Brief summary of what ran and the final outcome."
     },
     "issues_found": {
       "type": "array",
@@ -17,7 +17,7 @@
     },
     "test_render": {
       "type": "string",
-      "description": "Markdown-formatted block for display at the approval gate. Cover: pass/fail banner, short summary, cycles run, fixes applied (with commit hashes), remaining issues as bullets. This is read verbatim by the user at tmux_confirm_gate to decide Commit vs Retry."
+      "description": "Markdown render shown verbatim at tmux_confirm_gate per agent rubric (src/cli/agents/tmux-tester.md)."
     }
   },
   "required": ["test_result", "test_summary", "issues_found", "test_render"],

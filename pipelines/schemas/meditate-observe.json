@@ -11,11 +11,11 @@
     },
     "kid_summary": {
       "type": "string",
-      "description": "Summary of the illumination written for a 5-year-old (3-5 short sentences, no jargon)"
+      "description": "Plain-language summary of the illumination per agent rubric (src/cli/agents/meditate-observer.md)."
     },
     "observation_notes": {
       "type": "string",
-      "description": "1-2 sentences describing what the agent saw in the meditate TUI while it ran"
+      "description": "Description of what the agent saw in the meditate TUI while it ran."
     }
   },
   "required": ["topic", "illumination_path", "kid_summary", "observation_notes"],
