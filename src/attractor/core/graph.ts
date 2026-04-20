@@ -122,15 +122,15 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
 
   // Edge targets exist
   for (const e of edges) {
-    if (!nodes.has(e.to)) diags.push({ rule: "edge_target_exists", severity: "error", message: `Edge target "${e.to}" not declared` });
-    if (!nodes.has(e.from)) diags.push({ rule: "edge_source_exists", severity: "error", message: `Edge source "${e.from}" not declared` });
+    if (!nodes.has(e.to)) diags.push({ rule: "edge_target_exists", severity: "error", message: `Edge target "${e.to}" not declared`, location: e.sourceLocation });
+    if (!nodes.has(e.from)) diags.push({ rule: "edge_source_exists", severity: "error", message: `Edge source "${e.from}" not declared`, location: e.sourceLocation });
   }
 
   // Condition syntax (basic: only allow key=value and key!=value with &&)
   for (const e of edges) {
     if (e.condition) {
       const valid = /^[\w.'= !&\s]+$/.test(e.condition) && !/==|=>|<=/.test(e.condition);
-      if (!valid) diags.push({ rule: "condition_syntax", severity: "error", message: `Invalid condition syntax: "${e.condition}"` });
+      if (!valid) diags.push({ rule: "condition_syntax", severity: "error", message: `Invalid condition syntax: "${e.condition}"`, location: e.sourceLocation });
     }
   }
 

@@ -1044,6 +1044,16 @@ describe("validateGraph — script_file rules", () => {
   });
 });
 
+describe("validateGraph — edge sourceLocation", () => {
+  it("edge_target_exists carries edge sourceLocation", () => {
+    const dot = `digraph g {\n  start [shape="Mdiamond"];\n  done [shape="Msquare"];\n  start -> missing;\n}`;
+    const g = parseDot(dot);
+    const diags = validateGraph(g);
+    const d = diags.find(x => x.rule === "edge_target_exists");
+    expect(d?.location?.line).toBe(4);
+  });
+});
+
 describe("validateGraph — schema_error", () => {
   it("validateGraph emits schema_error for tool node missing cwd", () => {
     const graph = parseDot(`
