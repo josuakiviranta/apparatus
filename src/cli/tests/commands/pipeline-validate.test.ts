@@ -26,6 +26,30 @@ function runCli(args: string[], opts: { cwd: string }): { exitCode: number; stdo
   return { exitCode: r.status ?? -1, stdout: r.stdout ?? "", stderr: r.stderr ?? "" };
 }
 
+describe("pipeline validate — source frames", () => {
+  it("prints relpath:line:col and a code frame for schema errors", () => {
+    const project = setupTempProjectWith({
+      "bad.dot": [
+        `digraph g {`,
+        `  start [shape="Mdiamond"];`,
+        `  done [shape="Msquare"];`,
+        `  worker [type="tool",`,
+        `          cwd="$project",`,
+        `          bad_key="oops",`,
+        `          tool_command="echo"];`,
+        `  start -> worker -> done;`,
+        `}`,
+      ].join("\n"),
+    });
+    const { exitCode, stdout, stderr } = runCli(["pipeline", "validate", "bad.dot"], { cwd: project });
+    const out = stderr + stdout;
+    expect(exitCode).not.toBe(0);
+    expect(out).toMatch(/bad\.dot:\d+:\d+/);
+    expect(out).toContain("bad_key");
+    expect(out).toContain("^");
+  }, 30000);
+});
+
 describe("pipeline validate — agent body unresolved vars", () => {
   beforeAll(() => {
     // Tests require a built CLI binary. The smoke test uses the same convention.

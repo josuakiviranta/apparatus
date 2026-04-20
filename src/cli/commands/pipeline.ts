@@ -1,5 +1,5 @@
 import { readFileSync, existsSync, readdirSync, mkdirSync, rmSync, statSync } from "fs";
-import { resolve, join, basename, dirname } from "path";
+import { resolve, join, basename, dirname, relative } from "path";
 import { homedir } from "os";
 import { randomUUID } from "crypto";
 import { JsonlPipelineTracer } from "../../attractor/tracer/jsonl-pipeline-tracer.js";
@@ -22,6 +22,8 @@ import { parseStreamJsonEvents, streamEvents } from "../lib/stream-formatter.js"
 import { composeCreatePrompt } from "../lib/pipeline-create-prompt.js";
 import { runTwoPhaseClaudeSession } from "../lib/session.js";
 import * as output from "../lib/output.js";
+import { renderCodeFrame } from "../lib/code-frame.js";
+import type { Diagnostic } from "../../attractor/types.js";
 import { renderPipelineApp } from "../components/PipelineApp.js";
 import { classifyNode } from "../lib/classifyNode.js";
 import { parseClaudeEvent } from "../lib/parseClaudeEvent.js";
@@ -91,19 +93,21 @@ export async function pipelineValidateCommand(dotFile: string, opts: PipelineVal
   try { src = readFileSync(absPath, "utf8"); }
   catch { await output.error(`Cannot read file: ${absPath}`); return 1; }
 
+  const relPath = relative(process.cwd(), absPath) || absPath;
+  function formatDiag(d: Diagnostic): string {
+    const loc = d.location ? `${relPath}:${d.location.line}:${d.location.column} ` : "";
+    const hint = d.hint ? `\n${indentHint(d.hint)}` : "";
+    const frame = d.location ? `\n${indentHint(renderCodeFrame(src, d.location, { context: 2, color: false }))}` : "";
+    return `${loc}[${d.rule}] ${d.message}${hint}${frame}`;
+  }
+
   const graph = parseDot(src);
   const diags = validateGraph(graph, dirname(absPath));
   const errors   = diags.filter(d => d.severity === "error");
   const warnings = diags.filter(d => d.severity === "warning");
 
-  for (const w of warnings) {
-    const hint = w.hint ? `\n${indentHint(w.hint)}` : "";
-    await output.warn(`[${w.rule}] ${w.message}${hint}`);
-  }
-  for (const e of errors) {
-    const hint = e.hint ? `\n${indentHint(e.hint)}` : "";
-    await output.error(`[${e.rule}] ${e.message}${hint}`);
-  }
+  for (const w of warnings) await output.warn(formatDiag(w));
+  for (const e of errors)   await output.error(formatDiag(e));
 
   let diffHasError = false;
   if (opts.previousGraph) {
