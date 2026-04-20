@@ -132,9 +132,14 @@ export function validateNode(node: Node): Diagnostic[] {
   const kind = classifyNode(node);
   if (kind === null) return [];
   const schema = SCHEMAS[kind];
-  // Strip internal parser metadata (sourceLine) before schema validation so
-  // strict schemas don't flag it as an unrecognized key.
-  const { sourceLine: _sl, ...nodeForValidation } = node as Node & { sourceLine?: unknown };
+  // Strip internal parser metadata before schema validation so strict schemas
+  // don't flag these fields as unrecognized keys.
+  const {
+    sourceLine: _sl,
+    sourceLocation: _slo,
+    attrLocations: _al,
+    ...nodeForValidation
+  } = node as Node & { sourceLocation?: unknown; attrLocations?: unknown };
   const result = schema.safeParse(nodeForValidation);
   if (result.success) return [];
   return result.error.issues.map(issue => {

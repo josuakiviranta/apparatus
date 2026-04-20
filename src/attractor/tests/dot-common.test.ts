@@ -41,3 +41,12 @@ describe("dot-common helpers", () => {
     expect(styled.font).toBe("mono");
   });
 });
+
+describe("applyStylesheet preserves metadata", () => {
+  it("applyStylesheet preserves sourceLocation and attrLocations", () => {
+    const node = { id: "x", sourceLocation: { line: 5, column: 1 }, attrLocations: { shape: { line: 5, column: 3 } } } as any;
+    const result = applyStylesheet(node, [{ selector: "x", selectorType: "id", props: { extra: "hi" } }]);
+    expect(result.sourceLocation).toEqual(node.sourceLocation);
+    expect(result.attrLocations).toEqual(node.attrLocations);
+  });
+});
