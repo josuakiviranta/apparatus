@@ -95,6 +95,10 @@ Declared inside the `digraph` block, before any node or edge declarations:
 | `auto_status` | bool | engine | If true, engine auto-generates `success` outcome when handler writes no status — **recognized but no-op in v1**; ralph handlers always return explicit outcomes |
 | `allow_partial` | bool | all | When true, `RETRY` outcome on exhaustion becomes `partial_success` instead of `fail` — **recognized but no-op in v1** (see Section 4.4); deferred to v2 |
 
+#### Per-node default seeds
+
+Any attribute on an `agent`, `gate`, or `tool` node whose snake_case name begins with `default_` is treated as a context seed. When the run reaches the node, if no upstream producer has written `$<name>` into context, the default value is inserted. The attribute is otherwise uninterpreted by the engine. Example: `default_archive_reason_short="Declined"` on an agent node seeds `$archive_reason_short` if nothing upstream produced it. The validator accepts any key matching `/^default_[a-z][a-z0-9_]*$/` on these three node kinds.
+
 ### 2.3 Edge Attributes
 
 | Attribute | Type | Description |
