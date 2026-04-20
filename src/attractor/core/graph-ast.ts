@@ -25,7 +25,13 @@ function readAttrs(children: any[]): AttrMap {
 }
 
 export function parseDotV2(src: string): Graph {
-  const ast = parseAST(src);
+  // @ts-graphviz/ast's PEG parser rejects literal newlines inside quoted strings.
+  // Pre-collapse multi-line quoted values the same way the old regex parser did.
+  const normalized = src.replace(/(\w+)\s*=\s*"([^"]*)"/gs, (match: string, key: string, val: string) => {
+    if (!val.includes("\n")) return match;
+    return key + '="' + val.replace(/\s*\n\s*/g, " ").trim() + '"';
+  });
+  const ast = parseAST(normalized);
   const root: any = ast.children.find((c: any) => c.type === "Graph");
   if (!root) {
     return { name: "unnamed", nodes: new Map(), edges: [] };

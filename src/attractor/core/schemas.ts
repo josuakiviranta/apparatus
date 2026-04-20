@@ -2,44 +2,44 @@ import { z } from "zod";
 import type { Node, Diagnostic } from "../types.js";
 
 export const BaseNodeSchema = z.object({
-  id: z.string(),
-  shape: z.string().optional(),
-  label: z.string().optional(),
-  condition: z.string().optional(),
-  class: z.string().optional(),
+  id: z.string().describe("Node identifier (unique within the graph)."),
+  shape: z.string().optional().describe("Graphviz shape; drives node-kind classification."),
+  label: z.string().optional().describe("Human-readable node label shown in the TUI."),
+  condition: z.string().optional().describe("Condition expression controlling edge selection."),
+  class: z.string().optional().describe("Graphviz class attribute; applied by model_stylesheet."),
 }).strict();
 
 export const AgentNodeSchema = BaseNodeSchema.extend({
-  agent: z.string(),
-  prompt: z.string().optional(),
-  jsonSchemaFile: z.string().optional(),
-  produces: z.string().optional(),
-  maxRetries: z.coerce.number().int().nonnegative().optional(),
-  retryTarget: z.string().optional(),
-  fallbackRetryTarget: z.string().optional(),
-  interactive: z.union([z.boolean(), z.literal("true"), z.literal("false")]).optional(),
-  goalGate: z.boolean().optional(),
-  loopRestart: z.boolean().optional(),
-  fidelity: z.string().optional(),
-  threadId: z.string().optional(),
-  llmModel: z.string().optional(),
-  llmProvider: z.string().optional(),
-  reasoningEffort: z.string().optional(),
-  maxIterations: z.union([z.number(), z.string()]).optional(),
-  defaultRefinements: z.string().optional(),
-  defaultChatNotesPath: z.string().optional(),
-  defaultTestResult: z.string().optional(),
-  defaultTestSummary: z.string().optional(),
+  agent: z.string().describe("Agent identifier (e.g. claude-code) or $variable."),
+  prompt: z.string().optional().describe("Prompt text sent to the agent."),
+  jsonSchemaFile: z.string().optional().describe("Path to JSON schema file validating the agent's structured output."),
+  produces: z.string().optional().describe("Context key under which the agent result is stored."),
+  maxRetries: z.coerce.number().int().nonnegative().optional().describe("Retry count on agent failure before giving up."),
+  retryTarget: z.string().optional().describe("Node id to jump to on retry."),
+  fallbackRetryTarget: z.string().optional().describe("Node id to jump to when maxRetries exhausted."),
+  interactive: z.union([z.boolean(), z.literal("true"), z.literal("false")]).optional().describe("Run the agent as an interactive TUI session."),
+  goalGate: z.boolean().optional().describe("Block graph progression until agent confirms goal met."),
+  loopRestart: z.boolean().optional().describe("Restart the containing loop when this node returns."),
+  fidelity: z.string().optional().describe("Fidelity tier hint for model selection."),
+  threadId: z.string().optional().describe("Conversation thread id to resume."),
+  llmModel: z.string().optional().describe("Override LLM model for this node."),
+  llmProvider: z.string().optional().describe("Override LLM provider for this node."),
+  reasoningEffort: z.string().optional().describe("Reasoning-effort budget hint (low/medium/high)."),
+  maxIterations: z.union([z.number(), z.string()]).optional().describe("Cap on agent loop iterations."),
+  defaultRefinements: z.string().optional().describe("Default refinements value when none is supplied."),
+  defaultChatNotesPath: z.string().optional().describe("Default chat-notes file path for the session."),
+  defaultTestResult: z.string().optional().describe("Default test-result payload when none is produced."),
+  defaultTestSummary: z.string().optional().describe("Default test-summary text when none is produced."),
 }).strict();
 
 export const ToolNodeSchema = BaseNodeSchema.extend({
-  type: z.literal("tool"),
-  cwd: z.string().min(1),
-  toolCommand: z.string().optional(),
-  scriptFile: z.string().optional(),
-  scriptArgs: z.string().optional(),
-  producesFromStdout: z.union([z.boolean(), z.literal("true")]).optional(),
-  produces: z.string().optional(),
+  type: z.literal("tool").describe("Must be the literal \"tool\" for tool nodes."),
+  cwd: z.string().min(1).describe("Required working directory (literal or $project / $run_id)."),
+  toolCommand: z.string().optional().describe("Inline shell command (mutually exclusive with scriptFile)."),
+  scriptFile: z.string().optional().describe("Path to script file resolved relative to the .dot file's dir."),
+  scriptArgs: z.string().optional().describe("Whitespace-split args passed after the script path."),
+  producesFromStdout: z.union([z.boolean(), z.literal("true")]).optional().describe("Parse last stdout line as JSON and merge into context."),
+  produces: z.string().optional().describe("Context key under which the tool stdout is stored."),
 }).strict()
   .refine(n => !(n.toolCommand && n.scriptFile), {
     message: "script_command_conflict: toolCommand and scriptFile are mutually exclusive",
@@ -49,17 +49,17 @@ export const ToolNodeSchema = BaseNodeSchema.extend({
   });
 
 export const GateNodeSchema = BaseNodeSchema.extend({
-  shape: z.literal("hexagon"),
-  label: z.string().min(1),
-  defaultRefinements: z.string().optional(),
+  shape: z.literal("hexagon").describe("Must be the literal \"hexagon\" for gate nodes."),
+  label: z.string().min(1).describe("Required question or choice label shown to the user."),
+  defaultRefinements: z.string().optional().describe("Default refinements value when none is supplied."),
 }).strict();
 
 export const StartNodeSchema = BaseNodeSchema.extend({
-  shape: z.literal("Mdiamond"),
+  shape: z.literal("Mdiamond").describe("Must be the literal \"Mdiamond\" for the start node."),
 }).strict();
 
 export const ExitNodeSchema = BaseNodeSchema.extend({
-  shape: z.literal("Msquare"),
+  shape: z.literal("Msquare").describe("Must be the literal \"Msquare\" for the exit node."),
 }).strict();
 
 export type NodeKind = "tool" | "agent" | "gate" | "start" | "exit";
@@ -83,15 +83,80 @@ export function classifyNode(node: Node): NodeKind | null {
   return null;
 }
 
+export interface AttrDescriptor {
+  camelKey: string;
+  snakeKey: string;
+  description: string;
+  required: boolean;
+}
+
+export function camelToSnake(key: string): string {
+  return key.replace(/[A-Z]/g, c => `_${c.toLowerCase()}`);
+}
+
+function rootShape(schema: z.ZodTypeAny): z.ZodRawShape | null {
+  // Unwrap ZodEffects (from .refine()) until we hit the underlying ZodObject.
+  let s: any = schema;
+  while (s && s._def && s._def.typeName === "ZodEffects") s = s._def.schema;
+  if (s && typeof s.shape === "object") return s.shape;
+  return null;
+}
+
+export function describeKind(kind: NodeKind): AttrDescriptor[] {
+  const schema = SCHEMAS[kind];
+  const shape = rootShape(schema);
+  if (!shape) return [];
+  return Object.entries(shape).map(([camelKey, field]) => {
+    const f = field as z.ZodTypeAny;
+    return {
+      camelKey,
+      snakeKey: camelToSnake(camelKey),
+      description: f._def.description ?? "",
+      required: !f.isOptional(),
+    };
+  });
+}
+
+export function formatAllowedAttrs(kind: NodeKind): string {
+  const entries = describeKind(kind);
+  const width = Math.max(...entries.map(e => e.snakeKey.length), 0);
+  const lines = entries.map(e => {
+    const req = e.required ? " (required)" : "";
+    const pad = e.snakeKey.padEnd(width);
+    return `  ${pad}  ${e.description}${req}`;
+  });
+  return `Allowed keys for kind=${kind}:\n${lines.join("\n")}`;
+}
+
 export function validateNode(node: Node): Diagnostic[] {
   const kind = classifyNode(node);
   if (kind === null) return [];
   const schema = SCHEMAS[kind];
-  const result = schema.safeParse(node);
+  // Strip internal parser metadata (sourceLine) before schema validation so
+  // strict schemas don't flag it as an unrecognized key.
+  const { sourceLine: _sl, ...nodeForValidation } = node as Node & { sourceLine?: unknown };
+  const result = schema.safeParse(nodeForValidation);
   if (result.success) return [];
-  return result.error.issues.map(issue => ({
-    rule: "schema_error",
-    severity: "error" as const,
-    message: `[${node.id}] ${issue.path.join(".") || "<node>"}: ${issue.message}`,
-  }));
+  return result.error.issues.map(issue => {
+    let message: string;
+    if (issue.code === "unrecognized_keys") {
+      const keys = (issue as { keys?: string[] }).keys ?? [];
+      const snakeList = keys.map(camelToSnake).map(k => `'${k}'`).join(", ");
+      const plural = keys.length > 1 ? "s" : "";
+      message = `[${node.id}]: unrecognized key${plural} ${snakeList}`;
+    } else {
+      const path = issue.path.join(".");
+      const loc = path ? camelToSnake(path) : "node";
+      message = `[${node.id}] ${loc}: ${issue.message}`;
+    }
+    const diag: Diagnostic = {
+      rule: "schema_error",
+      severity: "error" as const,
+      message,
+    };
+    if (issue.code === "unrecognized_keys") {
+      diag.hint = formatAllowedAttrs(kind);
+    }
+    return diag;
+  });
 }
