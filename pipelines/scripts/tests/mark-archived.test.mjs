@@ -48,6 +48,43 @@ describe("mark-archived.mjs", () => {
     expect(after).toContain("Fixture content.");
   });
 
+  it("joins multiple argv entries (simulates sh -c tokenization of a multi-word reason)", () => {
+    const target = join(tmp, "open.md");
+    copyFileSync(join(FIXTURES, "mark-archived-open.md"), target);
+
+    // Simulates engine raw-expansion of `$archive_reason_short` into sh -c,
+    // which tokenizes the sentence into separate argv entries.
+    const result = runScript([
+      target,
+      "pipelineFailed",
+      "boolean",
+      "already",
+      "present",
+      "at",
+      "src/attractor/engine.ts:221",
+    ]);
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).toBe("");
+
+    const after = readFileSync(target, "utf8");
+    expect(after).toContain(
+      "reason: pipelineFailed boolean already present at src/attractor/engine.ts:221\n",
+    );
+  });
+
+  it("joins multiple argv entries for the decline-path default reason", () => {
+    const target = join(tmp, "open.md");
+    copyFileSync(join(FIXTURES, "mark-archived-open.md"), target);
+
+    // Decline path: node default `Declined at approval gate` tokenizes to 4 argv entries.
+    const result = runScript([target, "Declined", "at", "approval", "gate"]);
+
+    expect(result.status).toBe(0);
+    const after = readFileSync(target, "utf8");
+    expect(after).toContain("reason: Declined at approval gate\n");
+  });
+
   it("reads reason from file when arg2 is a path to an existing file (prose carrier)", () => {
     const target = join(tmp, "open.md");
     copyFileSync(join(FIXTURES, "mark-archived-open.md"), target);

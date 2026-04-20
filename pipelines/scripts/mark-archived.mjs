@@ -1,10 +1,11 @@
 import fs from "node:fs";
 
-const [, , illuminationPath, reasonArg] = process.argv;
-if (!illuminationPath || !reasonArg) {
+const [illuminationPath, ...reasonArgs] = process.argv.slice(2);
+if (!illuminationPath || reasonArgs.length === 0) {
   console.error("usage: mark-archived.mjs <illumination> <reason-or-reason-file>");
   process.exit(2);
 }
+const reasonArg = reasonArgs.join(" ");
 
 // Arg2 is either a path to a reason file (used on the invalid path when the
 // reason is multi-word prose) or a literal reason string (decline path).
