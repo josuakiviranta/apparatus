@@ -1,5 +1,12 @@
 export type OutcomeStatus = "success" | "retry" | "fail" | "partial_success";
 
+export interface SourceLocation {
+  line: number;
+  column: number;
+  endLine?: number;
+  endColumn?: number;
+}
+
 export interface Outcome {
   status: OutcomeStatus;
   notes?: string;
@@ -31,8 +38,11 @@ export interface Node {
   interactive?: boolean | string;
   jsonSchemaFile?: string;
   class?: string;
-  /** 1-based line in the source .dot file where this node was declared. */
+  /** 1-based line in the source .dot file where this node was declared.
+   * @deprecated Use sourceLocation.line */
   sourceLine?: number;
+  sourceLocation?: SourceLocation;
+  attrLocations?: Record<string, SourceLocation>;
   [key: string]: unknown;
 }
 
@@ -45,6 +55,8 @@ export interface Edge {
   loopRestart?: boolean;
   fidelity?: string;
   threadId?: string;
+  sourceLocation?: SourceLocation;
+  attrLocations?: Record<string, SourceLocation>;
   [key: string]: unknown;
 }
 
@@ -85,4 +97,5 @@ export interface Diagnostic {
   message: string;
   /** Optional multi-line hint (allowed attrs, suggestions) rendered after the message. */
   hint?: string;
+  location?: SourceLocation;
 }

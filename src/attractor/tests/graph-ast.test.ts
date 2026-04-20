@@ -43,6 +43,36 @@ across lines"]
   });
 });
 
+describe("parseDotV2 — sourceLocation", () => {
+  it("records sourceLocation with line + column on each node", () => {
+    const dot = `digraph g {\n  start [shape="Mdiamond"];\n  done  [shape="Msquare"];\n}`;
+    const g = parseDotV2(dot);
+    const start = g.nodes.get("start");
+    expect(start?.sourceLocation).toEqual({
+      line: 2,
+      column: 3,
+      endLine: 2,
+      endColumn: expect.any(Number),
+    });
+  });
+
+  it("records attrLocations keyed by camelCase attr name", () => {
+    const dot = `digraph g {\n  start [shape="Mdiamond"];\n  worker [\n    type="tool",\n    cwd="$project",\n    tool_command="echo hi"\n  ];\n  done [shape="Msquare"];\n  start -> worker -> done;\n}`;
+    const g = parseDotV2(dot);
+    const worker = g.nodes.get("worker");
+    expect(worker?.attrLocations?.type?.line).toBe(4);
+    expect(worker?.attrLocations?.cwd?.line).toBe(5);
+    expect(worker?.attrLocations?.toolCommand?.line).toBe(6);
+  });
+
+  it("records sourceLocation on each edge", () => {
+    const dot = `digraph g {\n  start [shape="Mdiamond"];\n  done [shape="Msquare"];\n  start -> done [label="go"];\n}`;
+    const g = parseDotV2(dot);
+    expect(g.edges[0].sourceLocation?.line).toBe(4);
+    expect(g.edges[0].attrLocations?.label?.line).toBe(4);
+  });
+});
+
 describe("parseDotV2 — subgraph default scoping", () => {
   it("applies outer defaults to outer nodes, inner defaults to inner nodes", () => {
     const src = `digraph s {
