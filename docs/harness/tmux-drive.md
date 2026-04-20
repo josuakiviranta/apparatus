@@ -12,6 +12,19 @@ Not for:
 - **User-facing demos.** This is a dev-time debugging tool.
 - **Driving commands that do not spawn a TUI.** For non-TUI commands, just run them in your current shell.
 
+## Who runs the commands
+
+The agent (Claude) runs these helpers directly via Bash — they are not
+delegated to a subagent or executed silently. The run happens in a **new,
+named tmux window in the user's current session** so the human can switch
+to it (`Ctrl-b w`) and watch the Ink TUI live while the agent drives it.
+
+**Always pass a descriptive `label` to `start_run`.** The label becomes
+part of the window name (`ralph-<label>-<shortid>`), which is what the
+human sees in the window list. Unlabeled windows fall back to an opaque
+`ralph-drive-<ts>-<pid>` format that is hard to eyeball when multiple
+runs coexist.
+
 ## Prerequisites
 
 - **tmux** (any 3.x version).
@@ -294,7 +307,7 @@ recover_orphans() {
 
 `start_run "<cmd>" [label]` creates a new tmux window in your current session (without stealing focus), waits for the shell to print its prompt, records run metadata, and launches the command.
 
-**Always pass a `label`** when you want the observer (you or the user) to find the window quickly in `Ctrl-b w`. The label becomes part of the window name: `ralph-<label>-<shortid>` (e.g. `ralph-pipe-tmux-tester-8f3c`). Omitting the label falls back to the legacy `ralph-drive-<ts>-<pid>` format, which is harder to eyeball when multiple runs coexist.
+**Always pass a `label`.** The human watching the session needs to find the window in `Ctrl-b w`; the label is what makes that possible. The window name becomes `ralph-<label>-<shortid>` (e.g. `ralph-pipe-tmux-tester-8f3c`). The unlabeled `ralph-drive-<ts>-<pid>` fallback exists only for legacy callers — do not use it in new work.
 
 Label guidance:
 - Use kebab-case, describe what's running (`pipe-illumination-to-plan`, `meditate-session`, `implement-loop`).
