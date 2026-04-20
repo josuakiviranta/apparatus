@@ -1,5 +1,5 @@
 import { parse as parseAST } from "@ts-graphviz/ast";
-import type { Graph, Node, Edge } from "../types.js";
+import type { Graph, Node, Edge, SourceLocation } from "../types.js";
 import {
   toCamel,
   coerceValue,
@@ -68,10 +68,20 @@ export function parseDotV2(src: string): Graph {
         case "Node": {
           const id = child.id.value;
           const attrs = { ...nodeDefaults, ...readAttrs(child.children) };
+          const loc = child.location;
+          const sourceLocation: SourceLocation | undefined = loc
+            ? {
+                line: loc.start.line,
+                column: loc.start.column,
+                endLine: loc.end?.line,
+                endColumn: loc.end?.column,
+              }
+            : undefined;
           nodes.set(id, {
             id,
             ...attrs,
-            sourceLine: child.location?.start.line,
+            sourceLine: loc?.start.line,
+            sourceLocation,
           } as Node);
           break;
         }
