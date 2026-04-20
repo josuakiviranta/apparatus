@@ -4,18 +4,22 @@
     "test_result": {
       "type": "string",
       "enum": ["pass", "fail"],
-      "description": "Whether the automated tests passed and the smoke exercise produced no crashes"
+      "description": "Whether the final cycle's tests passed with no unfixed issues"
     },
     "test_summary": {
       "type": "string",
-      "description": "Brief summary of what ran and the outcome (1-3 sentences)"
+      "description": "Brief summary of what ran and the final outcome (1-3 sentences)"
     },
     "issues_found": {
       "type": "array",
       "items": { "type": "string" },
-      "description": "Observed bugs, regressions, UX gaps, or surprises. Empty array means nothing surprising was found."
+      "description": "Unfixed issues remaining after all cycles. Empty array means everything found was either fixed or not a real issue."
+    },
+    "test_render": {
+      "type": "string",
+      "description": "Markdown-formatted block for display at the approval gate. Cover: pass/fail banner, short summary, cycles run, fixes applied (with commit hashes), remaining issues as bullets. This is read verbatim by the user at tmux_confirm_gate to decide Commit vs Retry."
     }
   },
-  "required": ["test_result", "test_summary", "issues_found"],
+  "required": ["test_result", "test_summary", "issues_found", "test_render"],
   "additionalProperties": false
 }

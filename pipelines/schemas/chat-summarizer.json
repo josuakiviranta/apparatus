@@ -3,17 +3,13 @@
   "properties": {
     "refinements": {
       "type": "string",
-      "description": "Summary of what was refined or changed during the interactive chat session"
+      "description": "Cumulative refinement log. Markdown bullets with attribution per entry: each bullet states the refinement, the chat round it came from, the user's surfaced topic, and the rationale. Subsequent rounds APPEND; never drop prior entries."
     },
     "scope_changed": {
       "type": "boolean",
-      "description": "Whether the scope of the proposed change was materially altered"
-    },
-    "chat_notes_path": {
-      "type": "string",
-      "description": "Absolute or project-relative path to the chat-notes.md file read by this summarizer, for downstream nodes that need full session context"
+      "description": "True if the latest chat round materially altered the scope established by the verifier (re-verification may be warranted)."
     }
   },
-  "required": ["refinements", "scope_changed", "chat_notes_path"],
+  "required": ["refinements", "scope_changed"],
   "additionalProperties": false
 }
