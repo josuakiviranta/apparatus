@@ -49,46 +49,6 @@ describe("AgentNodeSchema", () => {
     }
   });
 
-  it("accepts defaultRefinements", () => {
-    const result = AgentNodeSchema.safeParse({
-      id: "a1",
-      agent: "claude-code",
-      prompt: "p",
-      defaultRefinements: "none",
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it("accepts defaultChatNotesPath", () => {
-    const result = AgentNodeSchema.safeParse({
-      id: "a1",
-      agent: "claude-code",
-      prompt: "p",
-      defaultChatNotesPath: "/tmp/notes.md",
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it("accepts defaultTestResult", () => {
-    const result = AgentNodeSchema.safeParse({
-      id: "a1",
-      agent: "claude-code",
-      prompt: "p",
-      defaultTestResult: "{}",
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it("accepts defaultTestSummary", () => {
-    const result = AgentNodeSchema.safeParse({
-      id: "a1",
-      agent: "claude-code",
-      prompt: "p",
-      defaultTestSummary: "ok",
-    });
-    expect(result.success).toBe(true);
-  });
-
   it("rejects unknown attributes (typo'd default_*)", () => {
     const result = AgentNodeSchema.safeParse({
       id: "a1",
@@ -269,21 +229,57 @@ describe("validateNode", () => {
     expect(validateNode(node)).toEqual([]);
   });
 
-  it("attaches a hint listing allowed attrs when attr is unrecognized", () => {
+  it("accepts arbitrary default_<varname> on agent nodes", () => {
     const node: Node = {
       id: "mark_archived",
       agent: "claude-code",
       prompt: "p",
-      defaultArchiveReasonShort: "oops",
+      defaultArchiveReasonShort: "Declined at approval gate",
     };
+    expect(validateNode(node)).toEqual([]);
+  });
+
+  it("accepts arbitrary default_<varname> on gate nodes", () => {
+    const node: Node = {
+      id: "g1",
+      shape: "hexagon",
+      label: "Proceed?",
+      defaultCustomNote: "hello",
+    };
+    expect(validateNode(node)).toEqual([]);
+  });
+
+  it("accepts arbitrary default_<varname> on tool nodes", () => {
+    const node: Node = {
+      id: "t1",
+      type: "tool",
+      cwd: ".",
+      toolCommand: "echo",
+      defaultFoo: "bar",
+    };
+    expect(validateNode(node)).toEqual([]);
+  });
+
+  it("still rejects non-default unknown keys on agent nodes", () => {
+    const node: Node = {
+      id: "a1",
+      agent: "claude-code",
+      prompt: "p",
+      bogusKey: "x",
+    } as Node & { bogusKey: string };
     const diags = validateNode(node);
-    const unrecognized = diags.find(d => d.message.includes("unrecognized key"));
-    expect(unrecognized).toBeDefined();
-    expect(unrecognized!.message).toContain("'default_archive_reason_short'");
-    expect(unrecognized!.hint).toBeDefined();
-    expect(unrecognized!.hint!).toMatch(/Allowed keys for kind=agent/);
-    expect(unrecognized!.hint!).toContain("agent");
-    expect(unrecognized!.hint!).toContain("default_refinements");
+    expect(diags.some(d => d.message.includes("unrecognized key 'bogus_key'"))).toBe(true);
+  });
+
+  it("rejects 'defaulted' (no uppercase after 'default')", () => {
+    const node = {
+      id: "a1",
+      agent: "claude-code",
+      prompt: "p",
+      defaulted: "x",
+    } as Node & { defaulted: string };
+    const diags = validateNode(node);
+    expect(diags.some(d => d.message.includes("unrecognized key 'defaulted'"))).toBe(true);
   });
 
   it("emits one diagnostic per unknown key with attr-level location", () => {
@@ -312,7 +308,6 @@ describe("describeKind", () => {
     const keys = entries.map(e => e.camelKey);
     expect(keys).toContain("agent");
     expect(keys).toContain("prompt");
-    expect(keys).toContain("defaultRefinements");
 
     const required = entries.filter(e => e.required).map(e => e.camelKey);
     expect(required).toContain("agent");
@@ -320,10 +315,6 @@ describe("describeKind", () => {
     const prompt = entries.find(e => e.camelKey === "prompt")!;
     expect(prompt.snakeKey).toBe("prompt");
     expect(prompt.description.length).toBeGreaterThan(0);
-
-    const defaults = entries.find(e => e.camelKey === "defaultRefinements")!;
-    expect(defaults.snakeKey).toBe("default_refinements");
-    expect(defaults.description.length).toBeGreaterThan(0);
   });
 
   it("returns allowed attrs for kind=tool with cwd marked required", () => {

@@ -31,10 +31,6 @@ export const AgentNodeSchema = BaseNodeSchema.extend({
   llmProvider: z.string().optional().describe("Override LLM provider for this node."),
   reasoningEffort: z.string().optional().describe("Reasoning-effort budget hint (low/medium/high)."),
   maxIterations: z.union([z.number(), z.string()]).optional().describe("Cap on agent loop iterations."),
-  defaultRefinements: z.string().optional().describe("Default refinements value when none is supplied."),
-  defaultChatNotesPath: z.string().optional().describe("Default chat-notes file path for the session."),
-  defaultTestResult: z.string().optional().describe("Default test-result payload when none is produced."),
-  defaultTestSummary: z.string().optional().describe("Default test-summary text when none is produced."),
 }).strict();
 
 export const ToolNodeSchema = BaseNodeSchema.extend({
@@ -56,7 +52,6 @@ export const ToolNodeSchema = BaseNodeSchema.extend({
 export const GateNodeSchema = BaseNodeSchema.extend({
   shape: z.literal("hexagon").describe("Must be the literal \"hexagon\" for gate nodes."),
   label: z.string().min(1).describe("Required question or choice label shown to the user."),
-  defaultRefinements: z.string().optional().describe("Default refinements value when none is supplied."),
 }).strict();
 
 export const StartNodeSchema = BaseNodeSchema.extend({
@@ -151,7 +146,10 @@ export function validateNode(node: Node): Diagnostic[] {
   for (const issue of result.error.issues) {
     if (issue.code === "unrecognized_keys") {
       const keys = (issue as { keys?: string[] }).keys ?? [];
-      for (const key of keys) {
+      const filtered = (kind === "agent" || kind === "gate" || kind === "tool")
+        ? keys.filter(k => !isDefaultSeedKey(k))
+        : keys;
+      for (const key of filtered) {
         const snake = camelToSnake(key);
         diags.push({
           rule: "schema_error",
