@@ -9,6 +9,8 @@ import {
   classifyNode,
   validateNode,
   describeKind,
+  formatAllowedAttrs,
+  isDefaultSeedKey,
 } from "../core/schemas.js";
 import type { Node } from "../types.js";
 
@@ -329,5 +331,19 @@ describe("describeKind", () => {
     const cwd = entries.find(e => e.camelKey === "cwd")!;
     expect(cwd).toBeDefined();
     expect(cwd.required).toBe(true);
+  });
+});
+
+describe("isDefaultSeedKey", () => {
+  it.each([
+    ["defaultRefinements", true],
+    ["defaultScopeChanged", true],
+    ["defaultX", true],
+    ["defaulted", false],
+    ["default", false],
+    ["defualtTypo", false],
+    ["refinements", false],
+  ])("isDefaultSeedKey(%s) === %s", (key, expected) => {
+    expect(isDefaultSeedKey(key as string)).toBe(expected);
   });
 });

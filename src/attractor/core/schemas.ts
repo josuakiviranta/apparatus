@@ -1,6 +1,11 @@
 import { z } from "zod";
 import type { Node, Diagnostic } from "../types.js";
 
+export const DEFAULT_SEED_KEY_RE = /^default[A-Z]/;
+export function isDefaultSeedKey(camelKey: string): boolean {
+  return DEFAULT_SEED_KEY_RE.test(camelKey);
+}
+
 export const BaseNodeSchema = z.object({
   id: z.string().describe("Node identifier (unique within the graph)."),
   shape: z.string().optional().describe("Graphviz shape; drives node-kind classification."),
