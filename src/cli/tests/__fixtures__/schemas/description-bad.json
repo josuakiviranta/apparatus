@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "properties": {
+    "render": {
+      "type": "string",
+      "description": "Markdown render with three bullets per section, ≤ 250 words."
+    }
+  },
+  "required": ["render"],
+  "additionalProperties": false
+}
