@@ -125,7 +125,10 @@ export function formatAllowedAttrs(kind: NodeKind): string {
     const pad = e.snakeKey.padEnd(width);
     return `  ${pad}  ${e.description}${req}`;
   });
-  return `Allowed keys for kind=${kind}:\n${lines.join("\n")}`;
+  const seedRule = (kind === "agent" || kind === "gate" || kind === "tool")
+    ? `\n  default_<varname>  seeds $varname when no upstream node has produced it.`
+    : "";
+  return `Allowed keys for kind=${kind}:\n${lines.join("\n")}${seedRule}`;
 }
 
 export function validateNode(node: Node): Diagnostic[] {

@@ -363,3 +363,15 @@ describe("isDefaultSeedKey", () => {
     expect(isDefaultSeedKey(key as string)).toBe(expected);
   });
 });
+
+describe("formatAllowedAttrs seed-rule suffix", () => {
+  it.each(["agent", "gate", "tool"] as const)("mentions default_<varname> for kind=%s", (kind) => {
+    const out = formatAllowedAttrs(kind);
+    expect(out).toMatch(/default_<varname>/);
+    expect(out).toMatch(/seeds \$varname/);
+  });
+
+  it("does not mention default_<varname> for kind=start", () => {
+    expect(formatAllowedAttrs("start")).not.toMatch(/default_<varname>/);
+  });
+});
