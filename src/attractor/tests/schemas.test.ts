@@ -8,6 +8,7 @@ import {
   ExitNodeSchema,
   classifyNode,
   validateNode,
+  describeKind,
 } from "../core/schemas.js";
 import type { Node } from "../types.js";
 
@@ -264,5 +265,50 @@ describe("validateNode", () => {
   it("returns [] for a valid gate node", () => {
     const node: Node = { id: "g1", shape: "hexagon", label: "Proceed?" };
     expect(validateNode(node)).toEqual([]);
+  });
+
+  it("attaches a hint listing allowed attrs when attr is unrecognized", () => {
+    const node: Node = {
+      id: "mark_archived",
+      agent: "claude-code",
+      prompt: "p",
+      defaultArchiveReasonShort: "oops",
+    };
+    const diags = validateNode(node);
+    const unrecognized = diags.find(d => d.message.includes("unrecognized key"));
+    expect(unrecognized).toBeDefined();
+    expect(unrecognized!.message).toContain("'default_archive_reason_short'");
+    expect(unrecognized!.hint).toBeDefined();
+    expect(unrecognized!.hint!).toMatch(/Allowed keys for kind=agent/);
+    expect(unrecognized!.hint!).toContain("agent");
+    expect(unrecognized!.hint!).toContain("default_refinements");
+  });
+});
+
+describe("describeKind", () => {
+  it("returns allowed attrs for kind=agent with descriptions + snake_case", () => {
+    const entries = describeKind("agent");
+    const keys = entries.map(e => e.camelKey);
+    expect(keys).toContain("agent");
+    expect(keys).toContain("prompt");
+    expect(keys).toContain("defaultRefinements");
+
+    const required = entries.filter(e => e.required).map(e => e.camelKey);
+    expect(required).toContain("agent");
+
+    const prompt = entries.find(e => e.camelKey === "prompt")!;
+    expect(prompt.snakeKey).toBe("prompt");
+    expect(prompt.description.length).toBeGreaterThan(0);
+
+    const defaults = entries.find(e => e.camelKey === "defaultRefinements")!;
+    expect(defaults.snakeKey).toBe("default_refinements");
+    expect(defaults.description.length).toBeGreaterThan(0);
+  });
+
+  it("returns allowed attrs for kind=tool with cwd marked required", () => {
+    const entries = describeKind("tool");
+    const cwd = entries.find(e => e.camelKey === "cwd")!;
+    expect(cwd).toBeDefined();
+    expect(cwd.required).toBe(true);
   });
 });

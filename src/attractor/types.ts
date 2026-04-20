@@ -83,4 +83,6 @@ export interface Diagnostic {
   rule: string;
   severity: "error" | "warning";
   message: string;
+  /** Optional multi-line hint (allowed attrs, suggestions) rendered after the message. */
+  hint?: string;
 }

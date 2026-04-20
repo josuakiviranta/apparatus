@@ -65,6 +65,10 @@ export function diffEdgeLabels(prev: Graph, curr: Graph): EdgeDiagnostic[] {
   return out;
 }
 
+function indentHint(hint: string): string {
+  return hint.split("\n").map(line => `  ${line}`).join("\n");
+}
+
 function labelIsReferenced(g: Graph, label: string): boolean {
   if (!label) return false;
   const needle = `"${label}"`;
@@ -92,8 +96,14 @@ export async function pipelineValidateCommand(dotFile: string, opts: PipelineVal
   const errors   = diags.filter(d => d.severity === "error");
   const warnings = diags.filter(d => d.severity === "warning");
 
-  for (const w of warnings) await output.warn(`[${w.rule}] ${w.message}`);
-  for (const e of errors)   await output.error(`[${e.rule}] ${e.message}`);
+  for (const w of warnings) {
+    const hint = w.hint ? `\n${indentHint(w.hint)}` : "";
+    await output.warn(`[${w.rule}] ${w.message}${hint}`);
+  }
+  for (const e of errors) {
+    const hint = e.hint ? `\n${indentHint(e.hint)}` : "";
+    await output.error(`[${e.rule}] ${e.message}${hint}`);
+  }
 
   let diffHasError = false;
   if (opts.previousGraph) {
