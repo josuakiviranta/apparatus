@@ -282,6 +282,31 @@ describe("validateNode", () => {
     expect(diags.some(d => d.message.includes("unrecognized key 'defaulted'"))).toBe(true);
   });
 
+  it.each([
+    "defaultRefinements",
+    "defaultChatNotesPath",
+    "defaultTestResult",
+    "defaultTestSummary",
+  ])("still accepts previously-whitelisted agent field: %s", (key) => {
+    const node = {
+      id: "a1",
+      agent: "claude-code",
+      prompt: "p",
+      [key]: "v",
+    } as Node & Record<string, string>;
+    expect(validateNode(node)).toEqual([]);
+  });
+
+  it("still accepts defaultRefinements on gate node", () => {
+    const node: Node = {
+      id: "g1",
+      shape: "hexagon",
+      label: "Proceed?",
+      defaultRefinements: "none",
+    } as Node & { defaultRefinements: string };
+    expect(validateNode(node)).toEqual([]);
+  });
+
   it("emits one diagnostic per unknown key with attr-level location", () => {
     const node = {
       id: "x", type: "tool", cwd: "$project", toolCommand: "echo",
