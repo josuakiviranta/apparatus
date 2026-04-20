@@ -1,5 +1,6 @@
 import { parse as parseAST } from "@ts-graphviz/ast";
 import type { Graph, Node, Edge, SourceLocation } from "../types.js";
+import { DotSyntaxError } from "./dot-syntax.js";
 import {
   toCamel,
   coerceValue,
@@ -40,7 +41,21 @@ export function parseDotV2(src: string): Graph {
     if (!val.includes("\n")) return match;
     return key + '="' + val.replace(/\s*\n\s*/g, " ").trim() + '"';
   });
-  const ast = parseAST(normalized);
+  let ast;
+  try { ast = parseAST(normalized); }
+  catch (e: any) {
+    // @ts-graphviz/ast wraps PEG errors: the location is on e.cause, not e.
+    const loc = e?.location ?? e?.cause?.location;
+    if (loc && typeof loc?.start?.line === "number") {
+      throw new DotSyntaxError(e.message ?? "DOT syntax error", {
+        line: loc.start.line,
+        column: loc.start.column,
+        endLine: loc.end?.line,
+        endColumn: loc.end?.column,
+      });
+    }
+    throw e;
+  }
   const root: any = ast.children.find((c: any) => c.type === "Graph");
   if (!root) {
     throw new Error("parseDotV2: input contains no digraph/graph root");
