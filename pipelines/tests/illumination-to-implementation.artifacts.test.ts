@@ -24,20 +24,19 @@ describe("illumination-to-implementation.dot — archive_reason_short wiring", (
     expect(match![1]).not.toContain("$choice");
   });
 
-  it("mark_archived node declares default_archive_reason_short for the decline path", () => {
-    const match = dot.match(/mark_archived\s*\[[^\]]*default_archive_reason_short="([^"]+)"/s);
-    expect(match).not.toBeNull();
-    expect(match![1]).toBe("Declined at approval gate");
+  it("mark_archived node does not declare default_archive_reason_short (verifier always emits)", () => {
+    const match = dot.match(/mark_archived\s*\[[^\]]*default_archive_reason_short=/s);
+    expect(match).toBeNull();
   });
 });
 
 describe("verifier.json schema — archive_reason_short property", () => {
   const schema = JSON.parse(readFileSync(SCHEMA, "utf8"));
 
-  it("declares archive_reason_short as an optional string property", () => {
+  it("declares archive_reason_short as a required string property (verifier always emits)", () => {
     expect(schema.properties.archive_reason_short).toBeDefined();
     expect(schema.properties.archive_reason_short.type).toBe("string");
-    expect(schema.required).not.toContain("archive_reason_short");
+    expect(schema.required).toContain("archive_reason_short");
   });
 
   it("preserves additionalProperties: false", () => {

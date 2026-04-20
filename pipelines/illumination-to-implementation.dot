@@ -14,7 +14,6 @@ digraph illumination_to_implementation {
   mark_archived [type="tool",
                  cwd="$project",
                  script_file="scripts/mark-archived.mjs",
-                 default_archive_reason_short="Declined at approval gate",
                  script_args="$illumination_path $archive_reason_short"]
 
   mark_dispatched [type="tool",

@@ -20,9 +20,9 @@
     },
     "archive_reason_short": {
       "type": "string",
-      "description": "Shell-safe one-line reason suitable for archived frontmatter. Emit when preferred_label is 'false'. One sentence, ≤100 chars, no newlines, no shell metacharacters (no $, `, \", ', \\, ;, |, &, <, >, (, ), {, }). Written verbatim into the illumination's frontmatter reason: field if the user archives at remove_gate."
+      "description": "Shell-safe one-line reason suitable for archived frontmatter. ALWAYS emit. On preferred_label='false' (remove_gate → Archive path): verification reason. On preferred_label='true' (approval_gate → Decline path): placeholder 'Declined at approval gate' — consumed only if user later declines. On preferred_label='empty': empty string. One sentence, ≤100 chars, no newlines, no shell metacharacters (no $, `, \", ', \\, ;, |, &, <, >, (, ), {, })."
     }
   },
-  "required": ["preferred_label", "illumination_path", "summary", "explanation"],
+  "required": ["preferred_label", "illumination_path", "summary", "explanation", "archive_reason_short"],
   "additionalProperties": false
 }

@@ -52,7 +52,10 @@ Structured JSON only. No prose preamble. Fields:
 - `illumination_path`: chosen file path, or empty string when label is `empty`
 - `summary`: one paragraph stating what the illumination proposes (verbatim intent, no editorializing)
 - `explanation`: verification findings. On `false`, lead with which criterion failed and quote the contradicting evidence (file:line or spec excerpt). On `true`, summarize what each criterion check confirmed.
-- `archive_reason_short`: required when `preferred_label` is `"false"`. One sentence, ≤100 chars, no newlines, no shell metacharacters. The illumination's archive frontmatter reads this verbatim. Example: `Feature already implemented at src/bar.ts:42` — not `This illumination is stale because…`. Omit (or set to empty) when `preferred_label` is `"true"` or `"empty"`.
+- `archive_reason_short`: ALWAYS emit. One sentence, ≤100 chars, no newlines, no shell metacharacters. The illumination's archive frontmatter reads this verbatim.
+  - On `preferred_label: "false"`: the verification reason. Example: `Feature already implemented at src/bar.ts:42` — not `This illumination is stale because…`.
+  - On `preferred_label: "true"`: emit the literal placeholder `Declined at approval gate`. The value is only consumed downstream if the user declines the illumination at the later approval gate; until then it is inert.
+  - On `preferred_label: "empty"`: emit empty string `""`.
 
 # Hard rules
 
@@ -60,4 +63,4 @@ Structured JSON only. No prose preamble. Fields:
 - Do not paraphrase code claims — quote with file:line citations.
 - Do not assume; if a claim cannot be verified from source, mark the illumination `false` and say so in `explanation`.
 - Do not run the project (no `npm test`, no pipeline execution). Verification is static.
-- On `preferred_label: "false"`, you MUST emit `archive_reason_short`. The mark_archived script uses it verbatim as the illumination's archived frontmatter `reason:` value. Treat the shape constraints (one sentence, ≤100 chars, shell-safe) as strict.
+- You MUST emit `archive_reason_short` on every verdict (`true`, `false`, `empty`). The mark_archived script consumes it verbatim as the illumination's archived frontmatter `reason:` value on whichever path triggers archiving (remove_gate on `false`, approval_gate decline on `true`). Treat the shape constraints (one sentence, ≤100 chars, shell-safe) as strict. Use `Declined at approval gate` on `true` and empty string on `empty`.
