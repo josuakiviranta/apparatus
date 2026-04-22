@@ -19,8 +19,10 @@ See memory entry `memory/2026-04-22-rubric-prepend-shipped.md` for detailed run 
 
 ## Open follow-ups
 
-- **Verification-matrix block in plans** (from `meditations/illuminations/2026-04-20T2900-verification-matrix-in-plan.md`). The rubric-prepend plan informally included verification targets in Chunk 4; formalising a `## Verification targets` sub-block per chunk in `plan-writer.md` is a separate future change.
+- **Verification-matrix downstream wiring** (from `meditations/illuminations/2026-04-20T2900-verification-matrix-in-plan.md` parts (b) + (c)). Rubric now mandates the sub-block; still to do: (b) add structured `verification_targets` to `pipelines/schemas/plan-writer.json` and wire it into `tmux_tester`'s context + Phase 2, and (c) add `ralph pipeline trace --coverage`. Defer until a real run produces a matrix to dog-food against.
+- **Plan-chunk verification-targets lint** (from T2900 part (a)(3)). A vitest that walks `docs/superpowers/plans/*.md` and asserts every `## Chunk` is followed by a `## Verification targets` block before the next chunk. Deferred because historical plans (2026-04-03…2026-04-21) predate the rubric and would all red-phase; needs a date-cutoff or backfill strategy first.
 
 ## Recently shipped
 
+- **Plan-writer rubric: `## Verification targets` per chunk (2026-04-22, v0.1.35).** `src/cli/agents/plan-writer.md` step 4 now requires each chunk to close with a 5-row sub-block (Smokes / Scenario tests / Manual exercises / Lint / Surfaces touched), quoting the exact row structure and reminding the writer that `tmux_tester` consumes it verbatim. Implements part (a)(1) of illumination `2026-04-20T2900-verification-matrix-in-plan.md`. Schema and lint changes (parts (a)(2)/(a)(3)) are held back as open follow-ups above — their scope belongs with the downstream consumer work, not with the rubric formalisation. Verification: `npx vitest run` 1062/1062 green, `npx tsc --noEmit` clean.
 - **Plan reviewer reference disambiguated (2026-04-22).** `plan-writer.md` and `pipelines/illumination-to-implementation.dot` no longer refer to a non-existent `plan-document-reviewer` subagent; both now explicitly dispatch the Task tool with `subagent_type: "general-purpose"` using the `plan-document-reviewer-prompt.md` template from the `superpowers:writing-plans` skill. Matches the skill's own guidance.

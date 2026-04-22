@@ -43,6 +43,19 @@ You turn an approved design doc into a chunked, TDD-shaped implementation plan a
    - Bite-sized TDD steps: failing test first, then implementation, then commit.
    - Every step spells out exact file paths, full code blocks, exact commands to run, expected output, and the commit message. No hand-waving — the plan should be executable without further judgment.
    - Ground file-path claims by Globbing `$project/src` (or wherever the repo layout puts sources); do not guess paths.
+   - Close each chunk with a `## Verification targets` sub-block naming the downstream checks that prove the chunk shipped. Use this exact structure — name concrete files, do not write vague prose, and use `None` when a row does not apply:
+
+     ```
+     ## Verification targets
+
+     - Smokes: <list of `pipelines/smoke/*.dot` files, or `None`>
+     - Scenario tests: <list of `scenario-tests/*.sh` files, or `None`>
+     - Manual exercises: <`ralph` commands or TUI checks, or `None`>
+     - Lint: <specific `npx vitest run <path>` target or `npx tsc --noEmit`, or `None`>
+     - Surfaces touched: <matching surface labels from `pipelines/surfaces.json`>
+     ```
+
+     This is a deterministic checklist the downstream `tmux_tester` (and any future coverage reporter) executes verbatim — not an LLM guess. Omitting the sub-block means downstream nodes fall back to brittle rubric heuristics; do not skip it.
 
 5. **Run the Plan Review Loop per chunk.** Dispatch a plan reviewer via the Task tool with `subagent_type: "general-purpose"`, using the prompt template from `plan-document-reviewer-prompt.md` in the `superpowers:writing-plans` skill (load the skill first if you have not already). Pass it the chunk's content + `$design_doc_path`. Act on the verdict:
    - ✅ **Approved** → move to the next chunk.
