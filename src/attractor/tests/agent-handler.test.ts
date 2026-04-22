@@ -695,4 +695,30 @@ describe("AgentHandler", () => {
     }
   });
 
+  it("spider-case rubric still expands $vars when node has no task", async () => {
+    mockResolve.mockReturnValue({ ...baseConfig, prompt: "Spider instruction uses $spider_var." });
+    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null });
+
+    const handler = new AgentHandler({
+      resolveAgent: mockResolve,
+      createAgent: (config) => ({ run: mockAgentRun, kill: mockAgentKill, config } as any),
+    });
+
+    const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-test-"));
+    try {
+      const ctx: PipelineContext = { values: { spider_var: "SPIDER_VALUE" } };
+      await handler.execute(
+        makeNode({ id: "n1", shape: "box", agent: "spider-rubric", prompt: undefined, label: undefined }),
+        ctx,
+        makeContext({ logsRoot: logsDir }),
+      );
+
+      const writtenPrompt = readFileSync(join(logsDir, "n1", "prompt.md"), "utf8");
+      expect(writtenPrompt).toContain("SPIDER_VALUE");
+      expect(writtenPrompt).not.toContain("$spider_var");
+    } finally {
+      rmSync(logsDir, { recursive: true, force: true });
+    }
+  });
+
 });
