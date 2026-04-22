@@ -721,4 +721,31 @@ describe("AgentHandler", () => {
     }
   });
 
+  it("empty-rubric agent does not emit stray separator", async () => {
+    mockResolve.mockReturnValue({ ...baseConfig, prompt: "" });
+    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null });
+
+    const handler = new AgentHandler({
+      resolveAgent: mockResolve,
+      createAgent: (config) => ({ run: mockAgentRun, kill: mockAgentKill, config } as any),
+    });
+
+    const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-test-"));
+    try {
+      const ctx: PipelineContext = { values: {} };
+      await handler.execute(
+        makeNode({ id: "n1", shape: "box", agent: "empty-rubric", prompt: "Output exactly: 'hello'." }),
+        ctx,
+        makeContext({ logsRoot: logsDir }),
+      );
+
+      const writtenPrompt = readFileSync(join(logsDir, "n1", "prompt.md"), "utf8");
+      expect(writtenPrompt).toContain("Output exactly: 'hello'.");
+      expect(writtenPrompt).not.toContain("---\n\n---\n\n");
+      expect(writtenPrompt).not.toMatch(/^\s*---\s*\n\nOutput/);
+    } finally {
+      rmSync(logsDir, { recursive: true, force: true });
+    }
+  });
+
 });
