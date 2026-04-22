@@ -4,6 +4,10 @@ status: open
 description: agent-handler.ts discards the rubric body whenever node.prompt= is set — the fix is a one-line prepend that injects the rubric as a preceding section, making "Follow your agent-level procedure" a live reference instead of a broken pointer.
 ---
 
+## Addendum (2026-04-21 — spider/web lens)
+
+The user's spider/web mental model (`memory/user-spider-web-mental-model.md`) confirms this illumination's universal-prepend approach. Follow-up illuminations T0800, T0900, and T1100 proposed blocking or conditioning the universal fix on an apparent loop-vs-procedure archetype split — under spider/web, that split dissolves. `implement.md`'s body is how the spider eats; prepending it is correct for every agent. The pipeline-side suppression clauses ("Do NOT push") in `illumination-to-implementation.dot` are misdesign to fix in the graph, not reasons to withhold the rubric from the agent. Step 5 below remains valuable as the post-fix audit — "Follow your agent-level procedure" becomes a live reference across all 7 affected nodes simultaneously once the prepend lands AND the pipeline stops puppeting the spider. See T1000 for the paired pipeline redesign.
+
 ## Core Idea
 
 `agent-handler.ts` resolves the agent config (rubric body lands in `config.prompt`), then immediately overwrites it: `const rawPrompt = node.prompt ?? node.label ?? config.prompt`. Every pipeline node that sets `prompt=` silently discards the rubric body. "Follow your agent-level procedure" is a dead reference — those instructions never reach Claude. The fix is one change to the prompt assembly block: when `node.prompt` was the source, prepend `rubricBody + "\n\n---\n\n"` before the preamble + task. No CLI changes, no new attributes, no agent reauthoring.
@@ -24,18 +28,26 @@ Every node in `illumination-to-implementation.dot` that delegates via "Follow yo
 
 ## Revised Implementation Steps
 
-1. **In `src/attractor/handlers/agent-handler.ts`**, capture the rubric body before the rawPrompt line:
+1. **In `src/attractor/handlers/agent-handler.ts`**, capture the rubric body before the rawPrompt line and assemble with a labeled provenance section (replaces the earlier bare-`---` separator — the label tells the agent where the second block came from so "Follow your agent-level procedure" becomes a live pointer to the rubric above):
+
    ```typescript
-   const rubricBody = config.prompt;  // save before potential override
+   const rubricBody = config.prompt;                         // save before potential override
    const rawPrompt = node.prompt ?? node.label ?? config.prompt;
-   ```
-   Then in the prompt assembly (currently `const prompt = preamble + jsonWrappedPrompt`), inject the rubric body when the node overrode it:
-   ```typescript
-   const nodeOverrodePrompt = !!(node.prompt || node.label);
+   const nodeOverrodePrompt = !!(node.prompt ?? node.label);
+   const runId = ctx.values["run_id"] as string | undefined;
+
+   const taskHeader = nodeOverrodePrompt
+     ? `\n\n---\n\n## Task context\n\nSource: pipeline \`${dotFile}\`, node \`${node.id}\`, run \`${runId ?? "unknown"}\`.\n\n${preamble}\n\n## Task\n\n`
+     : "";
+
    const prompt = nodeOverrodePrompt
-     ? rubricBody + "\n\n---\n\n" + preamble + jsonWrappedPrompt
-     : preamble + jsonWrappedPrompt;
+     ? rubricBody + taskHeader + jsonWrappedPrompt
+     : preamble + jsonWrappedPrompt;   // rawPrompt IS config.prompt; preamble precedes as today
    ```
+
+   Three of the four provenance values are already in scope: `node.id` is on the `node` param, `runId` reads from `ctx.values["run_id"]` (injected by the engine at `src/attractor/core/engine.ts:140`), and `preamble` is the local variable already computed by `buildPreamble(...)` at `agent-handler.ts:65–68`.
+
+   The fourth value, `dotFile`, needs one small addition — the handler has `meta.dotDir` (directory) but not the `.dot` basename. Extend `HandlerExecutionContext` in `src/attractor/handlers/registry.ts` to add `dotFile: string` next to `dotDir`, then populate it from the engine where the DOT source path is already resolved. Destructure `dotFile` alongside `dotDir` in the handler. One field, two call sites, no new types.
 
 2. **Write a failing unit test first** in `src/attractor/tests/agent-handler.test.ts`:
    - Create a node with `prompt="Run the task"` and an agent whose rubric body is `"Procedure: step A. Hard rule: never push."`

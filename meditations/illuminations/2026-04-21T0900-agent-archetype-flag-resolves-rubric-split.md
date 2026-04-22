@@ -1,10 +1,16 @@
 ---
 date: 2026-04-21
-status: open
+status: superseded
+superseded_by: memory/user-spider-web-mental-model.md
+superseded_at: 2026-04-21
 description: T0600–T0800 exposed a genuine agent archetype split — procedure agents need their rubric prepended in pipeline context, loop agents need it dropped — and the resolution is a single `pipeline_rubric: include|exclude` frontmatter field, not a universal behavioral change.
 ---
 
-## Core Idea
+## Superseded by spider/web mental model (2026-04-21)
+
+The archetype split this illumination proposed does not exist. The user's spider/web model (`memory/user-spider-web-mental-model.md`) names `implement.md` as the spider (autopilot is essential, body is how it eats) and every other agent rubric as a web strand (method delivered when the strand is used). Both classes want the body delivered. The conflict that motivated the `include|exclude` flag is downstream of a misdesigned pipeline that puppets the spider via suppression clauses. Fix the pipeline; apply T0700 universally; do not add the flag. Accepting the flag would encode the misdesign as a supported feature and ossify the pipeline-side contradictions. See T1000 for the revised implementation steps.
+
+## Core Idea (original, retained for history)
 
 Three consecutive illuminations (T0600–T0800) circled the same structural fault without naming the fix. T0600 observed that `node.prompt=` silently drops the agent rubric body. T0700 prescribed a one-line prepend as the universal fix. T0800 correctly blocked T0700 because `implement.md`'s rubric encodes loop-protocol behaviors (study 500 specs, git push, update AGENTS.md) that pipeline node prompts currently rely on suppressing. The conflict is real — but the resolution is not a universal default. It is an explicit, per-agent declaration: add `pipeline_rubric: include | exclude` to agent frontmatter, defaulting to `exclude` (preserving current behavior). Procedure agents opt in; loop agents stay out.
 

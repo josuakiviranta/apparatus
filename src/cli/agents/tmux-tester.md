@@ -186,8 +186,13 @@ If Phase 1 fails, you MAY skip Phases 2–3 for this cycle and go straight to th
 
 If Phase 1 passed:
 
-1. `ls $project/pipelines/smoke/*.dot` in your shell (not the tmux window) to enumerate.
-2. Pick the smoke pipelines most relevant to what the implementation node changed. If unsure, prefer **all smoke pipelines** with budget: max 3 pipeline runs, 180s each.
+1. `ls $project/pipelines/smoke/*.dot` (or the project's equivalent smoke directory) in your shell — not the tmux window — to enumerate the available smokes.
+2. Determine what the implementation node changed and match smokes to it:
+   - Inspect the diff: `git diff --name-only HEAD~3 HEAD` and `git log --stat -3`. Also read any `$verification_targets` / `changed_files` / `touched_surfaces` value already in your received context — upstream nodes may have supplied it, in which case prefer that over re-deriving from git.
+   - Read each smoke's `.dot` header (goal comment, first few nodes) to understand what runtime path it exercises. Match by intent, not by filename keyword.
+   - Select the **union** of smokes that exercise any touched surface. No hard cap — per-run budget stays 180s, so the total cost is bounded by wall-clock, not by a count.
+   - When the diff touches something general (engine internals, prompt assembly, graph load, variable expansion — anything every handler depends on), run **every** smoke. The safe failure mode is over-verification, not under.
+   - If you intentionally skip a smoke, log it in `issues_found` as `"skipped smoke/<name>.dot because <reason>"`. Silent narrowing is the failure mode this phase exists to prevent.
 3. For each selected pipeline, send into the window:
    ```
    ralph pipeline run pipelines/smoke/<name>.dot --var <whatever-the-pipeline-requires>

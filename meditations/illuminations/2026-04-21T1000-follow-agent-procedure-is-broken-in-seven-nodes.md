@@ -30,16 +30,22 @@ The `implement` and `chat_summarizer` nodes have full standalone instructions in
 
 `tmux-tester` is the most critical gap: the harness bash block, phase procedure (0–4), and hard rules ("no git push", "no cleanup_run") live exclusively in the rubric. The node prompt says "follow your harness helpers" but provides none. The agent is flying without its instruments.
 
-## Revised Implementation Steps
+## Revised Implementation Steps (2026-04-21 — spider/web lens)
 
-1. **Add `pipeline_rubric: include` frontmatter** to the 7 affected agent `.md` files: `verifier.md`, `change-explainer.md`, `chat-refiner.md`, `design-writer.md`, `plan-writer.md`, `tmux-tester.md`, `memory-writer.md`. Add `pipeline_rubric: exclude` to `implement.md` (loop agent — rubric encodes standalone git-push behavior that pipeline suppresses via node prompt).
+The original archetype-flag approach is rejected by the spider/web model (`memory/user-spider-web-mental-model.md`). Universal prepend applies to every agent, including `implement`. The apparent conflict with implement's standalone push/study-specs/update-plan behavior is a pipeline-misdesign problem, not a handler problem — `illumination-to-implementation.dot` is puppeting the spider via suppression clauses. Fix the pipeline and the handler together; do not introduce a classification flag.
 
-2. **Extend `AgentConfig`** to carry the parsed `pipelineRubric` flag. In `agent-registry.ts` / wherever the `.md` frontmatter is parsed, read the field and include it in the returned config.
+1. **Universal prepend in `agent-handler.ts`** (around line 62–76): capture `rubricBody = config.prompt` before the `rawPrompt` line. When `node.prompt` or `node.label` is set (rubric was displaced), assemble as `rubricBody + "\n\n---\n\n" + preamble + jsonWrappedPrompt`. Otherwise the current path (`preamble + jsonWrappedPrompt`, where `rawPrompt === config.prompt` already) is unchanged. No frontmatter flag, no `AgentConfig` field, no per-agent opt-in. The fix applies to all 9 agents uniformly.
 
-3. **Update `agent-handler.ts`** (around line 62–70): when `config.pipelineRubric === "include"`, prepend the rubric body before the preamble. Final prompt order: `rubric_body + "\n\n" + preamble + jsonWrappedPrompt`. When `exclude` or unset (default), current behavior unchanged.
+2. **Redesign `illumination-to-implementation.dot` to stop puppeting the spider.** This is the paired fix; universal prepend without it would restore the rubric and then contradict it with the current `implement` node's "Do NOT push" override.
+   - Delete the `commit_push` tool node and its incoming/outgoing edges. Commit+push is spider autopilot; running it as a sibling of `implement` is the misdesign.
+   - Strip suppression clauses from the `implement` node's `prompt=` ("Do NOT push", "Do NOT modify files outside the scope of the plan"). Replace with a fly-handoff: "Execute the plan at `$plan_path`."
+   - Audit `memory_writer`: if it records the spider's code changes, fold into implement's autopilot. If it records pipeline-run state (which illumination dispatched, which gate outcomes, which smoke passed), keep as a web strand — legitimate web work at a different layer from the spider's own memory updates.
+   - Leave `capture_pre_sha` / `compute_changed_surfaces` (T0300) intact — they are web-strand verification inputs for `tmux_tester`, not spider puppeteering.
 
-4. **Write one unit test** in `src/attractor/tests/agent-handler.test.ts` asserting that an include-flagged agent's assembled prompt begins with the rubric body when `node.prompt=` is set. One test for exclude/default confirming rubric body is absent.
+3. **Write one unit test** in `src/attractor/tests/agent-handler.test.ts`: for ANY agent, when `node.prompt=` is set, the assembled prompt begins with the rubric body followed by `---`. One test, no flag variants.
 
-5. **Verify `tmux-tester.md`'s recent Phase 2 edit now executes** by running the `tmux-tester` smoke (`pipelines/smoke/tmux-tester.dot`) and confirming the graceful `$verification_targets` fallback path is reachable in the rubric's Phase 2 section.
+4. **Verify `tmux-tester.md`'s Phase 2 edit now executes** by running `pipelines/smoke/tmux-tester.dot` and confirming the graceful `$verification_targets` fallback path is reachable.
 
-6. **Do not touch node `prompt=` strings** in `illumination-to-implementation.dot` — the "Follow your agent-level procedure" phrases become correct and self-documenting once the rubric is present. No rewrites needed.
+5. **Update `specs/pipeline.md`** to document the prepend contract: agent rubrics are always delivered in pipeline context. Pipelines must not encode instructions that contradict the rubric. If they need to, fix the rubric or pick a different agent — do not puppet via suppression.
+
+6. **(Future lint.)** Add a `ralph pipeline validate` rule that flags node `prompt=` strings containing negations ("Do NOT X") that contradict the agent rubric's affirmative directives. Catches spider-puppeteering drift at authoring time.

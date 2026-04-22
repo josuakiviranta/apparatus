@@ -1,10 +1,16 @@
 ---
 date: 2026-04-21
-status: open
+status: superseded
+superseded_by: memory/user-spider-web-mental-model.md
+superseded_at: 2026-04-21
 description: The pipeline has two implicit node-authoring conventions — inline-procedure (prompt= contains the full task) and reference-procedure (prompt= defers to the rubric with "Follow your agent-level procedure") — but the engine treats both identically, dropping the rubric in both cases and making all 7 reference-procedure nodes structurally broken.
 ---
 
-## Core Idea
+## Superseded by spider/web mental model (2026-04-21)
+
+The "two conventions" framing is an artifact of a misdesigned pipeline, not a real authoring pattern. The user's spider/web model (`memory/user-spider-web-mental-model.md`) names every agent's rubric as the method; the handler should always deliver it. `implement`'s apparent "inline-procedure" convention exists because `illumination-to-implementation.dot` encodes suppression clauses ("Do NOT push", "Do NOT modify files outside the scope of the plan") that contradict the spider's autopilot, and the rubric-drop bug (T0600) made the contradiction invisible. Fix the pipeline, apply T0700 universally, and the two-convention illusion resolves. No archetype classification, no lint rule for "which convention does this node use" — just universal delivery and a pipeline that stops puppeting the spider. See T1000 for the revised implementation steps.
+
+## Core Idea (original, retained for history)
 
 Two authoring conventions coexist silently in `illumination-to-implementation.dot`. Inline-procedure nodes (`implement`, `chat_summarizer`) embed the full task in `prompt=` and are self-contained. Reference-procedure nodes (the other 7) end with "Follow your agent-level procedure and harness helpers" — their `prompt=` is intentionally minimal, treating the rubric as the load-bearing spec. The engine drops the rubric whenever `node.prompt=` is set, making no distinction. All 7 reference-procedure nodes are structurally broken: the agent receives a 3-line task stub where it expects its complete operating manual.
 

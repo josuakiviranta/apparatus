@@ -1,10 +1,16 @@
 ---
 date: 2026-04-21
-status: open
+status: superseded
+superseded_by: memory/user-spider-web-mental-model.md
+superseded_at: 2026-04-21
 description: T0700's rubric-prepend fix is correct for procedure-style agents (tmux-tester, verifier) but harmful for loop-style agents (implement) whose rubrics encode standalone behaviors — git push, study 500 specs — that pipeline node prompts currently rely on the rubric being dropped to suppress.
 ---
 
-## Core Idea
+## Superseded by spider/web mental model (2026-04-21)
+
+The user's spider/web model (`memory/user-spider-web-mental-model.md`) invalidates this illumination's conclusion. There is no loop-vs-procedure archetype split. `implement.md`'s body — push, study specs, update plan, tag — is how the spider eats, not a liability that pipelines should suppress. The observed contradiction with the `implement` node's "Do NOT push" override signals that **the pipeline itself is misdesigned**, not that the rubric is harmful. Correct path: apply T0700's universal prepend AND redesign `illumination-to-implementation.dot` to hand a prepared fly to the spider and trust autopilot. See T1000 for the revised implementation steps.
+
+## Core Idea (original, retained for history)
 
 `implement.md`'s rubric body is a standalone agentic loop: it instructs the agent to push after every commit, study `specs/*` with up to 500 parallel subagents, and continuously update `IMPLEMENTATION_PLAN.md`. The `implement` pipeline node in `illumination-to-implementation.dot` overrides all three: "Do NOT push," "Read the implementation plan at `$plan_path`," "Do NOT modify files outside the scope of the plan." Today those overrides work because the rubric is silently dropped (T0600/T0700). T0700's proposed one-line prepend would restore the rubric, causing the agent to see "git push" *and* "Do NOT push" simultaneously — an unresolved conflict whose outcome depends on instruction ordering and temperature.
 

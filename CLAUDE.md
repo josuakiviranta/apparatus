@@ -1,3 +1,11 @@
+## Communicating with human
+
+1. Always use simple language with simple examples and analogies when explaining concepts and changes for human.
+2. You should always assume that human has only vague idea how workspace works in a big picture.
+3. Think human as your best friend CEO that gives the direction but might not know nitty gritty of exact implementations.
+4. Try to capture what mental models and world views human has related to workspace and it's goals.
+5. When you talk with human (your best friend CEO) aim for cognitive ease in your responses and explanations.
+
 ## Development and planning principles to always keep in mind
 
 1. YAGNI -> (You aren't gonna need it)
