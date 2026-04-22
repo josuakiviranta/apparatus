@@ -10,8 +10,7 @@ The rubric-prepend plan shipped on 2026-04-22 as **v0.1.32** (tag `0.1.32`, comm
 
 **Verification:**
 - `npm test` → 1062/1062 green.
-- 4 of 5 non-tmux smokes green (`agent-implement`, `conditional`, `json-schema-stream`, `static-multi-node`).
-- Pre-existing failure: `pipelines/smoke/agent-json-vars.dot` — schema/prompt mismatch that predates this plan. Producer ran green through the migrated `task` agent; consumer tripped on the enum-restricted schema. Tracked below.
+- All non-tmux smokes green after `agent-json-vars` schema fix (2026-04-22): `agent-implement`, `agent-json-vars`, `conditional`, `json-schema-stream`, `static-multi-node`.
 - Composition spot-checks for `tmux-tester` (non-empty rubric, correct ordering) and `mark_archived` (task agent, no stray separator).
 
 See memory entry `memory/2026-04-22-rubric-prepend-shipped.md` for detailed run notes.
@@ -20,6 +19,5 @@ See memory entry `memory/2026-04-22-rubric-prepend-shipped.md` for detailed run 
 
 ## Open follow-ups
 
-- **Fix `pipelines/smoke/agent-json-vars.dot`.** Schema `pipelines/smoke/schemas/conditional-result.json` only allows `{ result: pass|fail }` with `additionalProperties:false`, but the smoke prompt asks the producer for `{ result: "hello", label: "world" }`. Consumer then needs `$result` and `$label`, but the schema strips/rejects `label`. Options: (a) give this smoke its own schema with both `result` and `label` fields, (b) rewrite the smoke to match the `conditional-result` contract. Unrelated to rubric-prepend; predates `b2467bf`.
 - **Create `plan-document-reviewer` agent or drop the reference.** The rubric-prepend plan cited this agent name for its Review checkpoint; no such agent exists. The `code-reviewer` superpowers agent served that role on 2026-04-22. Future plans should either add the agent file or refer to the available reviewer.
 - **Verification-matrix block in plans** (from `meditations/illuminations/2026-04-20T2900-verification-matrix-in-plan.md`). The rubric-prepend plan informally included verification targets in Chunk 4; formalising a `## Verification targets` sub-block per chunk in `plan-writer.md` is a separate future change.
