@@ -199,6 +199,50 @@ describe("AgentHandler", () => {
     }
   });
 
+  it("prepends agent rubric body before node task in prompt.md", async () => {
+    const rubric = "# Procedure\n1. First do X.\n2. Then do Y.";
+    mockResolve.mockReturnValue({ ...baseConfig, prompt: rubric });
+    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null });
+
+    const handler = new AgentHandler({
+      resolveAgent: mockResolve,
+      createAgent: (config) => ({ run: mockAgentRun, kill: mockAgentKill, config } as any),
+    });
+
+    const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-test-"));
+    try {
+      const ctx: PipelineContext = { values: {} };
+      await handler.execute(
+        makeNode({ id: "n1", shape: "box", agent: "with-rubric", prompt: "Run the procedure on this input." }),
+        ctx,
+        makeContext({ logsRoot: logsDir }),
+      );
+
+      const writtenPrompt = readFileSync(join(logsDir, "n1", "prompt.md"), "utf8");
+
+      // Rubric content present
+      expect(writtenPrompt).toContain("# Procedure");
+      expect(writtenPrompt).toContain("1. First do X.");
+      expect(writtenPrompt).toContain("2. Then do Y.");
+      // Task content present
+      expect(writtenPrompt).toContain("Run the procedure on this input.");
+      // Ordering: preamble → rubric → separator → task
+      const preambleIdx = writtenPrompt.indexOf("Pipeline Context");
+      const rubricIdx = writtenPrompt.indexOf("# Procedure");
+      const separatorIdx = writtenPrompt.indexOf("\n\n---\n\n", rubricIdx);
+      const taskIdx = writtenPrompt.indexOf("Run the procedure on this input.");
+      expect(preambleIdx).toBeGreaterThanOrEqual(0);
+      expect(rubricIdx).toBeGreaterThanOrEqual(0);
+      expect(separatorIdx).toBeGreaterThanOrEqual(0);
+      expect(taskIdx).toBeGreaterThanOrEqual(0);
+      expect(preambleIdx).toBeLessThan(rubricIdx);
+      expect(rubricIdx).toBeLessThan(separatorIdx);
+      expect(separatorIdx).toBeLessThan(taskIdx);
+    } finally {
+      rmSync(logsDir, { recursive: true, force: true });
+    }
+  });
+
   it("includes completedNodes from meta in preamble", async () => {
     mockResolve.mockReturnValue({ ...baseConfig });
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null });
