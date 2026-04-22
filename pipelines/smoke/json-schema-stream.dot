@@ -4,7 +4,7 @@ digraph json_schema_stream {
   start [shape=Mdiamond]
 
   list_files [
-    agent="implement",
+    agent="task",
     json_schema_file="schemas/file-list.json",
     prompt="List the files in src/cli/lib/ using the Glob tool. For each file found, write one sentence describing what it does based on its name. Then return your structured JSON output."
   ]

@@ -4,7 +4,7 @@ digraph agent_implement {
   start [shape=Mdiamond]
 
   work [
-    agent="implement",
+    agent="task",
     prompt="Output exactly one line: 'agent-implement: ok'. Do NOT use any tools."
   ]
 

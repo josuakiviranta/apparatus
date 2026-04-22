@@ -6,12 +6,12 @@ digraph gate_smoke {
   gate [shape=hexagon, label="Pick a path:\n\nA: Proceed  B: Abort"]
 
   proceed [
-    agent="implement",
+    agent="task",
     prompt="The user chose to proceed. Output exactly one line: 'gate: proceed chosen'. Do NOT use any tools."
   ]
 
   abort [
-    agent="implement",
+    agent="task",
     prompt="The user chose to abort. Output exactly one line: 'gate: abort chosen'. Do NOT use any tools."
   ]
 

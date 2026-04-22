@@ -5,14 +5,14 @@ digraph agent_json_vars_smoke {
 
   // Agent produces JSON with two fields
   producer [
-    agent="implement",
+    agent="task",
     json_schema_file="schemas/conditional-result.json",
     prompt="Return JSON with exactly: { \"result\": \"hello\", \"label\": \"world\" }. Do NOT use any tools."
   ]
 
   // Downstream agent consumes $result and $label from producer output
   consumer [
-    agent="implement",
+    agent="task",
     prompt="The result is '$result' and the label is '$label'. Output exactly one line: 'agent-json-vars: ok'. Do NOT use any tools."
   ]
 

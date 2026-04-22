@@ -5,7 +5,7 @@ digraph conditional_smoke {
 
   // Agent node produces structured output with a "result" field
   classify [
-    agent="implement",
+    agent="task",
     json_schema_file="schemas/conditional-result.json",
     prompt="You are a classifier. Return JSON with exactly: { \"result\": \"pass\" }. Do NOT use any tools."
   ]
@@ -14,12 +14,12 @@ digraph conditional_smoke {
   router [shape=diamond]
 
   pass_path [
-    agent="implement",
+    agent="task",
     prompt="Routing was: pass. Output exactly one line: 'conditional: pass'. Do NOT use any tools."
   ]
 
   fail_path [
-    agent="implement",
+    agent="task",
     prompt="Routing was: fail. Output exactly one line: 'conditional: fail'. Do NOT use any tools."
   ]
 
