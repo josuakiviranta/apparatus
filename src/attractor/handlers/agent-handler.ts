@@ -59,8 +59,17 @@ export class AgentHandler implements NodeHandler {
     // Build prompt with pipeline context preamble
     const nodeDir = join(logsRoot, node.id);
     mkdirSync(nodeDir, { recursive: true });
-    const rawPrompt = node.prompt ?? node.label ?? config.prompt;
-    const expandedRawPrompt = expandVariables(rawPrompt, ctx.values, extractDefaults(node as unknown as Record<string, unknown>));
+    const nodeTask = node.prompt ?? node.label;
+    const agentRubric = (config.prompt ?? "").trim();
+    const defaults = extractDefaults(node as unknown as Record<string, unknown>);
+    // Expand ONLY the node task. Rubric bodies are authored manuals —
+    // their literal `$var` tokens (e.g. `$run_id` in tmux-tester.md as documentation)
+    // must not reach expandVariables or undefined ones throw.
+    // Spider case (no node task) keeps the old behavior: rubric IS the template, so expand it.
+    const expandedTask = nodeTask ? expandVariables(nodeTask, ctx.values, defaults) : undefined;
+    const expandedRawPrompt = expandedTask
+      ? (agentRubric ? `${agentRubric}\n\n---\n\n${expandedTask}` : expandedTask)
+      : expandVariables(agentRubric, ctx.values, defaults);
     const fidelity = (node.fidelity as string | undefined) ?? "compact";
     const preamble = buildPreamble(
       { timestamp: "", currentNode: node.id, completedNodes, nodeRetries, context: ctx.values } as CheckpointState,
