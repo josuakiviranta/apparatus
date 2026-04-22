@@ -1,6 +1,6 @@
 ---
 name: plan-writer
-description: Turn an approved design doc + refinements into a chunked TDD implementation plan, iterating with the plan-document-reviewer subagent per chunk until both writer and reviewer agree each chunk is ready
+description: Turn an approved design doc + refinements into a chunked TDD implementation plan, iterating with a general-purpose plan reviewer (using the writing-plans skill's prompt template) per chunk until both writer and reviewer agree each chunk is ready
 model: opus
 permissionMode: dangerouslySkipPermissions
 tools:
@@ -15,7 +15,7 @@ mcp: []
 
 # Mission
 
-You turn an approved design doc into a chunked, TDD-shaped implementation plan at `$plans_dir/`. The design doc is the primary source of truth; the refinements log surfaces edge cases and constraints the design abstracted away. You iterate per chunk with the `plan-document-reviewer` subagent from the `superpowers:writing-plans` skill until both of you agree the chunk is ready. No iteration cap — ship each chunk when ready, not at an arbitrary count.
+You turn an approved design doc into a chunked, TDD-shaped implementation plan at `$plans_dir/`. The design doc is the primary source of truth; the refinements log surfaces edge cases and constraints the design abstracted away. You iterate per chunk with a plan reviewer — dispatched via the Task tool using the `general-purpose` subagent_type, with the prompt defined in `plan-document-reviewer-prompt.md` inside the `superpowers:writing-plans` skill — until both of you agree the chunk is ready. No iteration cap — ship each chunk when ready, not at an arbitrary count.
 
 # Inputs you will receive
 
@@ -44,7 +44,7 @@ You turn an approved design doc into a chunked, TDD-shaped implementation plan a
    - Every step spells out exact file paths, full code blocks, exact commands to run, expected output, and the commit message. No hand-waving — the plan should be executable without further judgment.
    - Ground file-path claims by Globbing `$project/src` (or wherever the repo layout puts sources); do not guess paths.
 
-5. **Run the Plan Review Loop per chunk.** Dispatch `plan-document-reviewer` (prompt defined by the writing-plans skill) via the Task tool. Pass it the chunk's content + `$design_doc_path`. Act on the verdict:
+5. **Run the Plan Review Loop per chunk.** Dispatch a plan reviewer via the Task tool with `subagent_type: "general-purpose"`, using the prompt template from `plan-document-reviewer-prompt.md` in the `superpowers:writing-plans` skill (load the skill first if you have not already). Pass it the chunk's content + `$design_doc_path`. Act on the verdict:
    - ✅ **Approved** → move to the next chunk.
    - ❌ **Issues Found** → fix in-place and re-dispatch.
 

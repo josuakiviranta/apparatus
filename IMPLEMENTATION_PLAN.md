@@ -19,5 +19,8 @@ See memory entry `memory/2026-04-22-rubric-prepend-shipped.md` for detailed run 
 
 ## Open follow-ups
 
-- **Create `plan-document-reviewer` agent or drop the reference.** The rubric-prepend plan cited this agent name for its Review checkpoint; no such agent exists. The `code-reviewer` superpowers agent served that role on 2026-04-22. Future plans should either add the agent file or refer to the available reviewer.
 - **Verification-matrix block in plans** (from `meditations/illuminations/2026-04-20T2900-verification-matrix-in-plan.md`). The rubric-prepend plan informally included verification targets in Chunk 4; formalising a `## Verification targets` sub-block per chunk in `plan-writer.md` is a separate future change.
+
+## Recently shipped
+
+- **Plan reviewer reference disambiguated (2026-04-22).** `plan-writer.md` and `pipelines/illumination-to-implementation.dot` no longer refer to a non-existent `plan-document-reviewer` subagent; both now explicitly dispatch the Task tool with `subagent_type: "general-purpose"` using the `plan-document-reviewer-prompt.md` template from the `superpowers:writing-plans` skill. Matches the skill's own guidance.
