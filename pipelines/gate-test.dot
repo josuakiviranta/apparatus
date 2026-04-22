@@ -5,8 +5,8 @@ digraph gate_test {
 
   approval_gate [shape=hexagon, label="Do you approve?\n\nAction: Test gate rendering in TUI."]
 
-  approved [agent="implement", prompt="The user approved. Output exactly one line: 'Gate approved.' Do NOT use any tools."]
-  declined [agent="implement", prompt="The user declined. Output exactly one line: 'Gate declined.' Do NOT use any tools."]
+  approved [agent="task", prompt="The user approved. Output exactly one line: 'Gate approved.' Do NOT use any tools."]
+  declined [agent="task", prompt="The user declined. Output exactly one line: 'Gate declined.' Do NOT use any tools."]
 
   done [shape=Msquare]
 
