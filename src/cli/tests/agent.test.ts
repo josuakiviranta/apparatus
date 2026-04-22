@@ -46,8 +46,14 @@ describe("validateAgentConfig", () => {
     expect(() => validateAgentConfig(config)).toThrow("description is required");
   });
 
-  it("rejects missing prompt", () => {
+  it("accepts empty prompt for procedure-less agents (e.g. task)", () => {
     const config = { ...validConfig, prompt: "" };
+    expect(() => validateAgentConfig(config)).not.toThrow();
+    expect(validateAgentConfig(config).prompt).toBe("");
+  });
+
+  it("rejects prompt that is not a string", () => {
+    const config = { ...validConfig, prompt: undefined as unknown as string };
     expect(() => validateAgentConfig(config)).toThrow("prompt body is required");
   });
 

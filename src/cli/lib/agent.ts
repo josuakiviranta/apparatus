@@ -422,7 +422,8 @@ export function validateAgentConfig(
 ): AgentConfig {
   if (!config.name) throw new Error("name is required");
   if (!config.description) throw new Error("description is required");
-  if (!config.prompt) throw new Error("prompt body is required");
+  // Empty string is valid (procedure-less agents like `task`); only missing field is invalid.
+  if (typeof config.prompt !== "string") throw new Error("prompt body is required");
 
   return {
     name: config.name,
