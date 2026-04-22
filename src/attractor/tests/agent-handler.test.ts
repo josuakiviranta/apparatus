@@ -663,4 +663,36 @@ describe("AgentHandler", () => {
     expect(starts).toEqual([1, 2]);
     expect(ends).toEqual([0, 1]);
   });
+
+  it("rubric $var stays literal while task $var expands", async () => {
+    const rubric = "Run id context: `$run_id` is injected at runtime.";
+    mockResolve.mockReturnValue({ ...baseConfig, prompt: rubric });
+    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null });
+
+    const handler = new AgentHandler({
+      resolveAgent: mockResolve,
+      createAgent: (config) => ({ run: mockAgentRun, kill: mockAgentKill, config } as any),
+    });
+
+    const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-test-"));
+    try {
+      const ctx: PipelineContext = { values: { task_var: "EXPANDED_VALUE" } };
+      await handler.execute(
+        makeNode({ id: "n1", shape: "box", agent: "var-rubric", prompt: "Node task references $task_var for expansion." }),
+        ctx,
+        makeContext({ logsRoot: logsDir }),
+      );
+
+      const writtenPrompt = readFileSync(join(logsDir, "n1", "prompt.md"), "utf8");
+      // Rubric $run_id must remain literal (not expanded, not throw)
+      expect(writtenPrompt).toContain("$run_id");
+      // Task $task_var must be expanded
+      expect(writtenPrompt).toContain("EXPANDED_VALUE");
+      // Task variable placeholder must not remain
+      expect(writtenPrompt).not.toContain("$task_var");
+    } finally {
+      rmSync(logsDir, { recursive: true, force: true });
+    }
+  });
+
 });
