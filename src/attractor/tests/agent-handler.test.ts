@@ -160,9 +160,95 @@ describe("AgentHandler", () => {
     expect(mockAgentRun).toHaveBeenCalledWith(
       expect.objectContaining({
         cwd: "/tmp/project",
-        variables: { "$goal": "Ship it", "custom.key": "value" },
+        variables: expect.objectContaining({
+          "$goal": "Ship it",
+          "custom.key": "value",
+        }),
       }),
     );
+  });
+
+  it("auto-injects standard MCP infra variables (illumination server, project root, meta-meditations dir)", async () => {
+    mockResolve.mockReturnValue({ ...baseConfig });
+    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null });
+
+    const handler = makeHandler();
+    await handler.execute(
+      makeNode(),
+      baseCtx(),
+      makeContext({ projectDir: "/tmp/specific-project" }),
+    );
+
+    const call = mockAgentRun.mock.calls[0][0];
+    expect(call.variables.ILLUMINATION_SERVER_PATH).toMatch(/illumination-server\.(ts|js)$/);
+    expect(call.variables.PROJECT_ROOT).toBe("/tmp/specific-project");
+    expect(call.variables.META_MEDITATIONS_DIR).toMatch(/meditations$/);
+  });
+
+  it("falls back PROJECT_ROOT to cwd when projectDir is not set", async () => {
+    mockResolve.mockReturnValue({ ...baseConfig });
+    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null });
+
+    const handler = makeHandler();
+    await handler.execute(
+      makeNode(),
+      baseCtx(),
+      makeContext({ cwd: "/tmp/cwd-project" }),
+    );
+
+    expect(mockAgentRun.mock.calls[0][0].variables.PROJECT_ROOT).toBe("/tmp/cwd-project");
+  });
+
+  it("lets caller-provided ctx values override auto-injected MCP infra vars", async () => {
+    mockResolve.mockReturnValue({ ...baseConfig });
+    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null });
+
+    const handler = makeHandler();
+    const ctx: PipelineContext = {
+      values: {
+        ILLUMINATION_SERVER_PATH: "/custom/server.js",
+        PROJECT_ROOT: "/custom/project",
+      },
+    };
+    await handler.execute(
+      makeNode(),
+      ctx,
+      makeContext(),
+    );
+
+    const vars = mockAgentRun.mock.calls[0][0].variables;
+    expect(vars.ILLUMINATION_SERVER_PATH).toBe("/custom/server.js");
+    expect(vars.PROJECT_ROOT).toBe("/custom/project");
+  });
+
+  it("dev-mode swaps node→tsx for MCP commands so .ts servers run via tsx", async () => {
+    let capturedConfig: any = null;
+    mockResolve.mockReturnValue({
+      ...baseConfig,
+      mcp: [
+        { name: "illumination", command: "node", args: ["{{ILLUMINATION_SERVER_PATH}}"] },
+        { name: "other", command: "python", args: ["other.py"] },
+      ],
+    });
+    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null });
+
+    const handler = new AgentHandler({
+      resolveAgent: mockResolve,
+      createAgent: (config) => {
+        capturedConfig = config;
+        return { run: mockAgentRun, kill: mockAgentKill, config } as any;
+      },
+    });
+
+    await handler.execute(
+      makeNode(),
+      baseCtx(),
+      makeContext(),
+    );
+
+    // Vitest runs without tsup's __RALPH_PROD__ define, so dev-mode is active.
+    expect(capturedConfig.mcp[0].command).toBe("tsx");
+    expect(capturedConfig.mcp[1].command).toBe("python"); // non-node commands untouched
   });
 
   it("prepends pipeline context preamble to prompt.md and delivers to agent", async () => {

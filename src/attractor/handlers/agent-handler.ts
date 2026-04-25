@@ -5,6 +5,7 @@ import type { NodeHandler, HandlerExecutionContext } from "./registry.js";
 import type { Node, Outcome, PipelineContext, CheckpointState } from "../types.js";
 import { Agent, type AgentConfig, type RunResult, type ChildHandle } from "../../cli/lib/agent.js";
 import { resolveAgent as defaultResolveAgent } from "../../cli/lib/agent-registry.js";
+import { getIlluminationServerPath, getMetaMeditationsDir } from "../../cli/lib/assets.js";
 import { buildPreamble } from "../transforms/preamble.js";
 import { expandVariables, extractDefaults } from "../transforms/variable-expansion.js";
 import { parseStructuredOutput } from "../../cli/lib/parse-structured-output.js";
@@ -42,6 +43,26 @@ export class AgentHandler implements NodeHandler {
     if (node.llmModel) config = { ...config, model: node.llmModel as string };
 
     const { logsRoot, cwd, dotDir, signal, onStdout, completedNodes, nodeRetries, onInteractiveRequest } = meta;
+
+    // Dev-mode: tsx is needed to run .ts MCP servers (the bundled paths from
+    // getIlluminationServerPath() etc point at .ts in dev, .js in prod).
+    if (typeof __RALPH_PROD__ === "undefined") {
+      config = {
+        ...config,
+        mcp: config.mcp.map((m) => (m.command === "node" ? { ...m, command: "tsx" } : m)),
+      };
+    }
+
+    // Auto-inject standard MCP infra variables so agents using the illumination
+    // server (e.g. meditate, janitor) get their {{ILLUMINATION_SERVER_PATH}} /
+    // {{PROJECT_ROOT}} / {{META_MEDITATIONS_DIR}} placeholders resolved without
+    // every pipeline command re-declaring them. Caller-provided values win.
+    const agentVariables: Record<string, unknown> = {
+      ILLUMINATION_SERVER_PATH: getIlluminationServerPath(),
+      PROJECT_ROOT: meta.projectDir ?? cwd,
+      META_MEDITATIONS_DIR: getMetaMeditationsDir(),
+      ...ctx.values,
+    };
 
     // Read JSON schema from file if specified
     const jsonSchemaFile = node.jsonSchemaFile as string | undefined;
@@ -101,7 +122,7 @@ export class AgentHandler implements NodeHandler {
         session,
         systemPrompt,
         cwd,
-        variables: ctx.values,
+        variables: agentVariables,
       });
 
       if (!onInteractiveRequest) {
@@ -171,7 +192,7 @@ export class AgentHandler implements NodeHandler {
       const result = await agent.run({
         cwd,
         signal,
-        variables: ctx.values,
+        variables: agentVariables,
         onStdout,
       });
 
