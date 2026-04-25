@@ -1,9 +1,10 @@
 ---
 date: 2026-04-18
-status: dispatched
+status: implemented
 description: T0000 and T2300 both specify $summary as the reason arg for mark-archived.mjs, but $summary is the verifier's topic description — the false path needs $explanation (invalidity rationale) and the approval-decline path needs a reason no variable currently captures.
 dispatched_at: 2026-04-19
 plan_path: docs/superpowers/plans/2026-04-19-mark-archived-reason-split.md
+implemented_at: 2026-04-25
 ---
 
 ## Core Idea
