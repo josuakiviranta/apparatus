@@ -378,6 +378,63 @@ export function listPlans(projectRoot: string, status?: string): string {
   }
 }
 
+export function markPlanImplemented(
+  projectRoot: string,
+  planFilename: string,
+):
+  | { success: true; plan_filename: string; previous_status: string; new_status: string }
+  | { success: false; error: string } {
+  const fnErr = validateFilename(planFilename);
+  if (fnErr) return { success: false, error: fnErr };
+
+  const planDir = join(projectRoot, "docs", "superpowers", "plans");
+  const filePath = join(planDir, planFilename);
+
+  if (!existsSync(filePath)) {
+    return { success: false, error: `Plan file not found: ${planFilename}` };
+  }
+
+  const raw = readFileSync(filePath, "utf-8");
+  const fmMatch = raw.match(/^---\n([\s\S]*?)\n---\n/);
+  if (!fmMatch) {
+    return { success: false, error: "No frontmatter found in plan file" };
+  }
+
+  const fmBlock = fmMatch[1];
+  const body = raw.slice(fmMatch[0].length);
+
+  const statusMatch = fmBlock.match(/^status:\s*(.+)$/m);
+  const currentStatus = statusMatch ? statusMatch[1].trim() : null;
+
+  if (currentStatus !== "pending") {
+    return {
+      success: false,
+      error: `Cannot mark as implemented: current status is ${currentStatus ?? "(missing)"}`,
+    };
+  }
+
+  const updatedFm = fmBlock.replace(/^status:\s*.+$/m, "status: implemented");
+  const updatedContent = `---\n${updatedFm}\n---\n${body}`;
+  writeFileSync(filePath, updatedContent);
+
+  try {
+    execSync(`git -C "${projectRoot}" add "${filePath}"`, { stdio: "ignore" });
+    execSync(
+      `git -C "${projectRoot}" commit -m "meditate: mark plan ${planFilename} implemented"`,
+      { stdio: "ignore" },
+    );
+  } catch {
+    // git not available, not a git repo, or nothing to commit (idempotent re-run).
+  }
+
+  return {
+    success: true,
+    plan_filename: planFilename,
+    previous_status: currentStatus,
+    new_status: "implemented",
+  };
+}
+
 export function readMetaMeditation(meditationsDir: string, filename: string): string {
   const err = validateFilename(filename);
   if (err) return `Error: ${err}`;

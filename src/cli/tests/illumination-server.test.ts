@@ -1078,3 +1078,65 @@ describe("listPlans", () => {
     expect(result).toBe("d-no-h1.md — (no description)");
   });
 });
+
+describe("markPlanImplemented", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = realpathSync(mkdtempSync(join(tmpdir(), "ralph-plan-impl-")));
+    mkdirSync(join(tmpDir, "docs", "superpowers", "plans"), { recursive: true });
+    mockExecSync.mockReset();
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  function writePlanFile(filename: string, frontmatter: string | null, body: string) {
+    const fm = frontmatter === null ? "" : `---\n${frontmatter}\n---\n`;
+    writeFileSync(join(tmpDir, "docs", "superpowers", "plans", filename), fm + body);
+  }
+
+  it("transitions pending to implemented and rewrites frontmatter", () => {
+    writePlanFile(
+      "2026-04-12-meditate-backpressure-guard.md",
+      "status: pending\nillumination_source: 2026-04-12T0900-foo.md",
+      "# Backpressure plan\n\nBody.\n",
+    );
+    const result = markPlanImplemented(tmpDir, "2026-04-12-meditate-backpressure-guard.md");
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.previous_status).toBe("pending");
+      expect(result.new_status).toBe("implemented");
+      expect(result.plan_filename).toBe("2026-04-12-meditate-backpressure-guard.md");
+    }
+    const written = readFileSync(
+      join(tmpDir, "docs", "superpowers", "plans", "2026-04-12-meditate-backpressure-guard.md"),
+      "utf-8",
+    );
+    expect(written).toMatch(/status: implemented/);
+    expect(written).not.toMatch(/status: pending/);
+    expect(written).toMatch(/illumination_source: 2026-04-12T0900-foo\.md/);
+    expect(written).toContain("# Backpressure plan");
+    expect(written).toContain("Body.");
+  });
+
+  it("auto-commits with git add + commit (mirroring markDispatched)", () => {
+    writePlanFile(
+      "T-commit.md",
+      "status: pending",
+      "# Commit test\n",
+    );
+    const result = markPlanImplemented(tmpDir, "T-commit.md");
+    expect(result.success).toBe(true);
+    expect(mockExecSync).toHaveBeenCalledTimes(2);
+    const addCall = mockExecSync.mock.calls[0][0] as string;
+    const commitCall = mockExecSync.mock.calls[1][0] as string;
+    expect(addCall).toContain("git -C");
+    expect(addCall).toContain(tmpDir);
+    expect(addCall).toContain("add");
+    expect(addCall).toContain("T-commit.md");
+    expect(commitCall).toContain("commit");
+    expect(commitCall).toContain("meditate: mark plan T-commit.md implemented");
+  });
+});
