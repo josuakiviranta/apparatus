@@ -4,6 +4,9 @@
 # `status: pending` or `status: implemented` frontmatter are skipped.
 # Files with `status: proposed` (legacy) have ONLY their status line
 # rewritten to `implemented`; other frontmatter fields are preserved.
+#
+# Requires bash 4+ (associative arrays). macOS default /bin/bash is 3.2;
+# install GNU bash via `brew install bash` and run with /usr/local/bin/bash.
 
 set -euo pipefail
 
@@ -71,7 +74,7 @@ for filename in "${!STATUS[@]}"; do
   first_line="$(head -n1 "$path")"
   if [[ "$first_line" == "---" ]]; then
     # Existing frontmatter: rewrite the status line in place.
-    if grep -qE '^status: (pending|implemented)$' "$path"; then
+    if grep -qE '^status: (pending|implemented|proposed|open)$' "$path"; then
       # Already correctly stamped — but verify it matches the assigned status.
       current="$(grep -E '^status: (pending|implemented|proposed|open)$' "$path" | head -n1 | awk '{print $2}')"
       if [[ "$current" != "$status" ]]; then
