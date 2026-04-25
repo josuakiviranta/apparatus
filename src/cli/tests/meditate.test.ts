@@ -270,3 +270,21 @@ describe("meditateCommand --steer passthrough", () => {
   });
 });
 
+describe("meditate agent prompt body — exploration scope", () => {
+  it("exploration step weights specs/ and src/ folders", () => {
+    const agentMd = readFileSync(
+      join(__dirname, "..", "agents", "meditate.md"),
+      "utf-8",
+    );
+    const frontmatterMatch = agentMd.match(/^---\n[\s\S]+?\n---\n/);
+    expect(frontmatterMatch).not.toBeNull();
+    const body = agentMd.slice(frontmatterMatch![0].length);
+
+    // The exploration step (numbered "3." in the body) must call out the
+    // weighted focus on specs/*.md and src/. Both anchors must be present.
+    expect(body).toMatch(/specs\/\*?\*?\/?\*?\.?md|specs\//);
+    expect(body).toContain("src/");
+    expect(body.toLowerCase()).toContain("weighted focus");
+  });
+});
+
