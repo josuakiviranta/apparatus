@@ -52,3 +52,39 @@ describe("janitor.md — frontmatter contract", () => {
     expect(server.args).toContain("{{PROJECT_ROOT}}");
   });
 });
+
+describe("janitor.md — procedure body contract", () => {
+  // Whole-file read (not just the body); rubric strings only appear post-frontmatter,
+  // so regex matches do not collide with frontmatter keys.
+  const fileText = readFileSync(AGENT_PATH, "utf-8");
+
+  it("requires the read-only stance up front", () => {
+    expect(fileText).toMatch(/read[- ]only/i);
+    expect(fileText).toMatch(/never edit|do not edit|cannot edit/i);
+  });
+
+  it("encodes the lifecycle trigger condition (plan status=implemented)", () => {
+    expect(fileText).toMatch(/status:\s*implemented/);
+    expect(fileText).toMatch(/mark_implemented/);
+  });
+
+  it("encodes the one-illumination-per-run cap", () => {
+    expect(fileText).toMatch(/at most one illumination|one illumination per run/i);
+  });
+
+  it("encodes the three-prior-illuminations reading rule with fresh-project fallback", () => {
+    expect(fileText).toMatch(/three prior illuminations/i);
+    expect(fileText).toMatch(/fewer than three|all of them/i);
+  });
+
+  it("encodes the body rubric headings", () => {
+    expect(fileText).toMatch(/^## Findings/m);
+    expect(fileText).toMatch(/^## Lifecycle changes this run/m);
+    expect(fileText).toMatch(/^## Reading thread/m);
+  });
+
+  it("encodes the filename convention with kebab area slug", () => {
+    expect(fileText).toMatch(/YYYY-MM-DDTHHMM-janitor-/);
+    expect(fileText).toMatch(/kebab-case/i);
+  });
+});
