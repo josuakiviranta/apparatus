@@ -9,11 +9,6 @@ tools:
   - mcp__illumination__glob_files
   - mcp__illumination__project_tree
   - mcp__illumination__write_illumination
-  - mcp__illumination__mark_implemented
-  - mcp__illumination__mark_dispatched
-  - mcp__illumination__mark_archived
-  - mcp__illumination__list_plans
-  - mcp__illumination__mark_plan_implemented
   - mcp__illumination__list_meta_meditations
   - mcp__illumination__read_meta_meditation
 mcp:
