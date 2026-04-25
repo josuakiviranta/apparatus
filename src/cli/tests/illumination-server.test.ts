@@ -587,6 +587,33 @@ describe("markImplemented", () => {
     expect(content).toContain(`implemented_at: ${today}`);
     expect(content).toMatch(/implemented_at: \d{4}-\d{2}-\d{2}/);
   });
+
+  it("auto-commits the file after writing (git add then git commit)", () => {
+    mockExecSync.mockClear();
+    writeIlluminationFile("commit-impl.md", "status: dispatched", "# Body");
+    const result = markImplemented(tmpDir, "commit-impl.md");
+    expect(result.success).toBe(true);
+    expect(mockExecSync).toHaveBeenCalledTimes(2);
+    const addCall = mockExecSync.mock.calls[0][0] as string;
+    const commitCall = mockExecSync.mock.calls[1][0] as string;
+    expect(addCall).toContain("git -C");
+    expect(addCall).toContain(tmpDir);
+    expect(addCall).toContain("add");
+    expect(addCall).toContain("commit-impl.md");
+    expect(commitCall).toContain("git -C");
+    expect(commitCall).toContain("commit");
+    expect(commitCall).toContain("meditate: mark commit-impl.md implemented");
+  });
+
+  it("returns success even when git commands fail (fail-open)", () => {
+    mockExecSync.mockClear();
+    mockExecSync.mockImplementation(() => {
+      throw new Error("git not found");
+    });
+    writeIlluminationFile("fail-open-impl.md", "status: open", "# Body");
+    const result = markImplemented(tmpDir, "fail-open-impl.md");
+    expect(result.success).toBe(true);
+  });
 });
 
 describe("markDispatched", () => {

@@ -92,6 +92,16 @@ export function markImplemented(
   const updatedContent = `---\n${updatedFm}\n---\n${body}`;
   writeFileSync(filePath, updatedContent);
 
+  try {
+    execSync(`git -C "${projectRoot}" add "${filePath}"`, { stdio: "ignore" });
+    execSync(
+      `git -C "${projectRoot}" commit -m "meditate: mark ${filename} implemented"`,
+      { stdio: "ignore" },
+    );
+  } catch {
+    // git not available, not a git repo, or nothing to commit (idempotent re-run).
+  }
+
   return {
     success: true,
     filename,
