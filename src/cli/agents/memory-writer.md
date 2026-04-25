@@ -9,7 +9,13 @@ tools:
   - Grep
   - Glob
   - Bash
-mcp: []
+  - mcp__illumination__mark_plan_implemented
+mcp:
+  - name: illumination
+    command: node
+    args:
+      - "{{ILLUMINATION_SERVER_PATH}}"
+      - "{{PROJECT_ROOT}}"
 ---
 
 # Mission
