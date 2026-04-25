@@ -11,7 +11,7 @@ vi.mock("node:child_process", () => ({
   execSync: mockExecSync,
 }));
 
-import { validateFilename, writeIllumination, assertWithinRoot, readFile, validateGlobPattern, globFiles, projectTree, listMetaMeditations, readMetaMeditation, listIlluminations, markImplemented, markDispatched, markArchived } from "../mcp/illumination-server";
+import { validateFilename, writeIllumination, assertWithinRoot, readFile, validateGlobPattern, globFiles, projectTree, listMetaMeditations, readMetaMeditation, listIlluminations, markImplemented, markDispatched, markArchived, listPlans, markPlanImplemented } from "../mcp/illumination-server";
 
 let tmpDir: string;
 
@@ -1016,5 +1016,27 @@ describe("markArchived", () => {
     expect(result.success).toBe(true);
     // File still moved to archive even when git fails
     expect(existsSync(join(tmpDir, "meditations", "illuminations", "archive", "T2700-archive-fail-open.md"))).toBe(true);
+  });
+});
+
+describe("listPlans", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = realpathSync(mkdtempSync(join(tmpdir(), "ralph-plan-test-")));
+    mkdirSync(join(tmpDir, "docs", "superpowers", "plans"), { recursive: true });
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  function writePlanFile(filename: string, frontmatter: string | null, body: string) {
+    const fm = frontmatter === null ? "" : `---\n${frontmatter}\n---\n`;
+    writeFileSync(join(tmpDir, "docs", "superpowers", "plans", filename), fm + body);
+  }
+
+  it("returns sentinel when directory is empty", () => {
+    expect(listPlans(tmpDir)).toBe("No plans found.");
   });
 });

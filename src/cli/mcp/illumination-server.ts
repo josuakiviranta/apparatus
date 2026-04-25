@@ -335,6 +335,49 @@ export function listIlluminations(projectRoot: string, status?: string): string 
   }
 }
 
+const NO_PLANS_MESSAGE = "No plans found.";
+
+export function parsePlanDescription(filePath: string): string {
+  try {
+    const content = readFileSync(filePath, "utf8");
+    let body = content;
+    if (content.startsWith("---\n")) {
+      const end = content.indexOf("\n---\n", 4);
+      if (end === -1) return "(no description)";
+      body = content.slice(end + 5);
+    }
+    const match = body.match(/^#\s+(.+)$/m);
+    return match ? match[1].trim() : "(no description)";
+  } catch {
+    return "(no description)";
+  }
+}
+
+export function listPlans(projectRoot: string, status?: string): string {
+  const dir = join(projectRoot, "docs", "superpowers", "plans");
+  try {
+    let files = readdirSync(dir)
+      .filter((f) => f.endsWith(".md"))
+      .sort();
+    if (status) {
+      files = files.filter((f) => {
+        const content = readFileSync(join(dir, f), "utf-8");
+        const fmMatch = content.match(/^---\n([\s\S]*?)\n---\n/);
+        if (!fmMatch) return false;
+        const statusMatch = fmMatch[1].match(/^status:\s*(.+)$/m);
+        const fileStatus = statusMatch ? statusMatch[1].trim() : null;
+        return fileStatus === status;
+      });
+    }
+    if (files.length === 0) return NO_PLANS_MESSAGE;
+    return files
+      .map((f) => `${f} — ${parsePlanDescription(join(dir, f))}`)
+      .join("\n");
+  } catch {
+    return NO_PLANS_MESSAGE;
+  }
+}
+
 export function readMetaMeditation(meditationsDir: string, filename: string): string {
   const err = validateFilename(filename);
   if (err) return `Error: ${err}`;
