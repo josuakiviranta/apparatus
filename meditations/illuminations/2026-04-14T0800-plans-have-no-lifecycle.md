@@ -1,7 +1,9 @@
 ---
 date: 2026-04-12
-status: open
+status: dispatched
 description: The illumination state machine tracks open/dispatched/implemented/archived but the 20-file plans directory has no lifecycle frontmatter — at least one plan (meditate-backpressure-guard) is confirmed unimplemented with no signal in the repository that distinguishes it from complete plans.
+dispatched_at: 2026-04-25
+plan_path: docs/superpowers/plans/2026-04-25-plans-have-no-lifecycle.md
 ---
 
 ## Core Idea

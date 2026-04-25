@@ -1,7 +1,9 @@
 ---
 date: 2026-04-12
-status: open
+status: archived
 description: The illumination state machine is unit-tested in isolation but has no smoke pipeline — two of T0600's three bugs are undetectable by CI, and the idempotency property that the state machine was built to enforce is unverified end-to-end.
+archived_at: 2026-04-25
+reason: T0600 bugs already fixed in commits 8af5f69 5875b69 8f5b5af dd622df 938cddb with unit tests
 ---
 
 ## Core Idea

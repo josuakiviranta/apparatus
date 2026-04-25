@@ -182,29 +182,19 @@ If `$SESSION` is empty (i.e. the pipeline is not running inside a tmux session),
 
 If Phase 1 fails, you MAY skip Phases 2–3 for this cycle and go straight to the **Fix step** — a broken build or red suite means smoke runs are unreliable.
 
-## Phase 2 — Smoke pipelines
+## Phase 2 — Additional verification (per node prompt)
 
-If Phase 1 passed:
+If Phase 1 passed, run any additional verification the node prompt instructs (e.g. smoke pipelines, deeper integration runs). If Phase 1 failed, skip this phase and go straight to the **Fix step** — extra verification against a broken build or red suite is noise; loop on Phase 1 until tests are green, then re-enter this phase.
 
-1. `ls $project/pipelines/smoke/*.dot` (or the project's equivalent smoke directory) in your shell — not the tmux window — to enumerate the available smokes.
-2. Determine what the implementation node changed and match smokes to it:
-   - Inspect the diff: `git diff --name-only HEAD~3 HEAD` and `git log --stat -3`. Also read any `$verification_targets` / `changed_files` / `touched_surfaces` value already in your received context — upstream nodes may have supplied it, in which case prefer that over re-deriving from git.
-   - Read each smoke's `.dot` header (goal comment, first few nodes) to understand what runtime path it exercises. Match by intent, not by filename keyword.
-   - Select the **union** of smokes that exercise any touched surface. No hard cap — per-run budget stays 180s, so the total cost is bounded by wall-clock, not by a count.
-   - When the diff touches something general (engine internals, prompt assembly, graph load, variable expansion — anything every handler depends on), run **every** smoke. The safe failure mode is over-verification, not under.
-   - If you intentionally skip a smoke, log it in `issues_found` as `"skipped smoke/<name>.dot because <reason>"`. Silent narrowing is the failure mode this phase exists to prevent.
-3. For each selected pipeline, send into the window:
-   ```
-   ralph pipeline run pipelines/smoke/<name>.dot --var <whatever-the-pipeline-requires>
-   ```
-   Read the `.dot` file first to extract required caller variables. Use test-safe defaults.
-4. `wait_stable 180000` between runs, `capture` after each, note any:
-   - crashes / stack traces
-   - `TypeError`, `ReferenceError`, unhandled rejections
-   - exit code ≠ 0 (check `$?` in a follow-up `send_input`)
-   - nodes that hang past their budget
-   - TUI glitches (flicker, overlapping text, broken boxes, stale prompts)
-   - copy/UX regressions (error messages referring to removed features, stale file paths in help)
+For any command you drive in the window, apply these observation criteria:
+- crashes / stack traces
+- `TypeError`, `ReferenceError`, unhandled rejections
+- exit code ≠ 0 (check `$?` in a follow-up `send_input`)
+- commands/nodes that hang past their budget
+- TUI glitches (flicker, overlapping text, broken boxes, stale prompts)
+- copy/UX regressions (error messages referring to removed features, stale file paths in help)
+
+Use `wait_stable` and `capture` between runs.
 
 ## Phase 3 — Targeted manual exercise
 
