@@ -1,5 +1,5 @@
 ---
-status: pending
+status: implemented
 illumination_source: 2026-04-14T0800-plans-have-no-lifecycle.md
 ---
 
