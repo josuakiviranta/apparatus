@@ -213,6 +213,27 @@ describe("meditate agent tool whitelist", () => {
       expect(tools).not.toContain(tool);
     }
   });
+
+  it("body does not reference any removed lifecycle tool name", () => {
+    const agentMd = readFileSync(
+      join(__dirname, "..", "agents", "meditate.md"),
+      "utf-8",
+    );
+    const frontmatterMatch = agentMd.match(/^---\n[\s\S]+?\n---\n/);
+    expect(frontmatterMatch).not.toBeNull();
+    const body = agentMd.slice(frontmatterMatch![0].length);
+
+    const removedNames = [
+      "mark_implemented",
+      "mark_dispatched",
+      "mark_archived",
+      "list_plans",
+      "mark_plan_implemented",
+    ];
+    for (const name of removedNames) {
+      expect(body).not.toContain(name);
+    }
+  });
 });
 
 describe("runMeditationSession steer", () => {
