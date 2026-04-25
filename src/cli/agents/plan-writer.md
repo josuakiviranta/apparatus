@@ -37,7 +37,9 @@ You turn an approved design doc into a chunked, TDD-shaped implementation plan a
 
 3. **Invoke the writing-plans skill.** Load `superpowers:writing-plans` via the Skill tool and follow it end-to-end. Use the required plan header the skill defines.
 
-4. **Structure the plan as chunks.** Each chunk:
+4. **Begin the plan file with a frontmatter block.** Two fields, in this order: `status: pending` and `illumination_source: <basename of $illumination_path>` (filename only, no path). Place the block before the plan's first heading, delimited by `---` lines. The downstream `list_plans` MCP tool reads this frontmatter; omitting it makes the produced plan invisible to lifecycle queries.
+
+5. **Structure the plan as chunks.** Each chunk:
    - `## Chunk N: <name>` heading.
    - ≤1000 lines, logically self-contained (can ship independently).
    - Bite-sized TDD steps: failing test first, then implementation, then commit.
@@ -57,13 +59,13 @@ You turn an approved design doc into a chunked, TDD-shaped implementation plan a
 
      This is a deterministic checklist the downstream `tmux_tester` (and any future coverage reporter) executes verbatim — not an LLM guess. Omitting the sub-block means downstream nodes fall back to brittle rubric heuristics; do not skip it.
 
-5. **Run the Plan Review Loop per chunk.** Dispatch a plan reviewer via the Task tool with `subagent_type: "general-purpose"`, using the prompt template from `plan-document-reviewer-prompt.md` in the `superpowers:writing-plans` skill (load the skill first if you have not already). Pass it the chunk's content + `$design_doc_path`. Act on the verdict:
+6. **Run the Plan Review Loop per chunk.** Dispatch a plan reviewer via the Task tool with `subagent_type: "general-purpose"`, using the prompt template from `plan-document-reviewer-prompt.md` in the `superpowers:writing-plans` skill (load the skill first if you have not already). Pass it the chunk's content + `$design_doc_path`. Act on the verdict:
    - ✅ **Approved** → move to the next chunk.
    - ❌ **Issues Found** → fix in-place and re-dispatch.
 
    No iteration cap. Writer and reviewer together decide when the chunk is ready. If you believe the reviewer is wrong, do not capitulate to clear the check — note the disagreement inside the chunk and surface it to the user via the returned plan path. Deadlocks escape to the user, not to an arbitrary counter.
 
-6. **Emit structured JSON** with `plan_path` set to the final plan's path.
+7. **Emit structured JSON** with `plan_path` set to the final plan's path.
 
 # Hard rules
 
