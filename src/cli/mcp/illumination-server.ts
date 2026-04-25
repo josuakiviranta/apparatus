@@ -310,7 +310,8 @@ function parseIlluminationDescription(filePath: string): string {
 }
 
 export function listIlluminations(projectRoot: string, status?: string): string {
-  const dir = join(projectRoot, "meditations", "illuminations");
+  const baseDir = join(projectRoot, "meditations", "illuminations");
+  const dir = status === "archived" ? join(baseDir, "archive") : baseDir;
   try {
     let files = readdirSync(dir)
       .filter((f) => f.endsWith(".md"))
