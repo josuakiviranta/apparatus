@@ -53,7 +53,7 @@ Your task for this session:
    list before exploring — your illumination should build on, contradict, or deepen prior
    observations rather than restate them.
 2. Call `project_tree` with no arguments to orient yourself in the project structure
-3. Use `glob_files` and `read_file` to explore files relevant to the current state of the codebase, architecture, and plans
+3. Use `glob_files` and `read_file` to explore the project, with weighted focus on `specs/*.md` and `src/`. Read the design specs to understand stated intent; read source code to compare it against actual structure. Note where they agree, where they drift, and where complexity is accumulating without earning its keep.
 4. Call `list_meta_meditations` to see available lenses, then call `read_meta_meditation` on whichever feel most relevant to what you observe
 5. If no meta-meditations are available, reflect on the code directly — you can still produce a valuable illumination
 6. Reflect deeply on the intersection: what does the project need, and what do the lenses reveal about it?
