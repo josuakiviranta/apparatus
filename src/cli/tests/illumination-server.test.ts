@@ -589,7 +589,7 @@ describe("markImplemented", () => {
   });
 
   it("auto-commits the file after writing (git add then git commit)", () => {
-    mockExecSync.mockClear();
+    mockExecSync.mockReset();
     writeIlluminationFile("commit-impl.md", "status: dispatched", "# Body");
     const result = markImplemented(tmpDir, "commit-impl.md");
     expect(result.success).toBe(true);
@@ -746,7 +746,7 @@ describe("markDispatched", () => {
   });
 
   it("auto-commits the file after writing (git add then git commit)", () => {
-    mockExecSync.mockClear();
+    mockExecSync.mockReset();
     writeIlluminationFile(
       "T1900-commit-dispatch.md",
       "date: 2026-04-12\nstatus: open\ndescription: Commit test",
@@ -911,5 +911,44 @@ describe("markArchived", () => {
       "utf-8"
     );
     expect(written).toContain(body);
+  });
+
+  it("auto-commits the rename as one commit (add deleted path, add new path, commit)", () => {
+    mockExecSync.mockReset();
+    writeIlluminationFile(
+      "T2600-commit-archive.md",
+      "date: 2026-04-12\nstatus: open\ndescription: Archive commit test",
+      "Body."
+    );
+    const result = markArchived(tmpDir, "T2600-commit-archive.md", "Stale");
+    expect(result.success).toBe(true);
+    // Three execSync calls: add original (now deleted), add archive path, commit.
+    expect(mockExecSync).toHaveBeenCalledTimes(3);
+    const calls = mockExecSync.mock.calls.map((c) => c[0] as string);
+    expect(calls[0]).toContain("git -C");
+    expect(calls[0]).toContain("add");
+    expect(calls[0]).toContain("T2600-commit-archive.md");
+    expect(calls[0]).not.toContain("archive/T2600-commit-archive.md");
+    expect(calls[1]).toContain("git -C");
+    expect(calls[1]).toContain("add");
+    expect(calls[1]).toContain("archive/T2600-commit-archive.md");
+    expect(calls[2]).toContain("commit");
+    expect(calls[2]).toContain("meditate: archive T2600-commit-archive.md");
+  });
+
+  it("returns success even when git commands fail (fail-open)", () => {
+    mockExecSync.mockClear();
+    mockExecSync.mockImplementation(() => {
+      throw new Error("git not found");
+    });
+    writeIlluminationFile(
+      "T2700-archive-fail-open.md",
+      "date: 2026-04-12\nstatus: open\ndescription: Fail-open archive",
+      "Body."
+    );
+    const result = markArchived(tmpDir, "T2700-archive-fail-open.md", "Reason");
+    expect(result.success).toBe(true);
+    // File still moved to archive even when git fails
+    expect(existsSync(join(tmpDir, "meditations", "illuminations", "archive", "T2700-archive-fail-open.md"))).toBe(true);
   });
 });

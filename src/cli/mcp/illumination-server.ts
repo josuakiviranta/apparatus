@@ -224,6 +224,17 @@ export function markArchived(
 
   rmSync(filePath);
 
+  try {
+    execSync(`git -C "${projectRoot}" add "${filePath}"`, { stdio: "ignore" });
+    execSync(`git -C "${projectRoot}" add "${archivePath}"`, { stdio: "ignore" });
+    execSync(
+      `git -C "${projectRoot}" commit -m "meditate: archive ${filename}"`,
+      { stdio: "ignore" },
+    );
+  } catch {
+    // git not available, not a git repo, or nothing to commit (idempotent re-run).
+  }
+
   return {
     success: true,
     filename,
