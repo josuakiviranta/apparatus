@@ -163,7 +163,7 @@ describe("meditate agent tool whitelist", () => {
     expect(tools).toContain("mcp__illumination__list_illuminations");
   });
 
-  it("whitelists all 12 illumination server tools", () => {
+  it("whitelists exactly the 7 reflective-only tools", () => {
     const agentMd = readFileSync(
       join(__dirname, "..", "agents", "meditate.md"),
       "utf-8",
@@ -174,7 +174,7 @@ describe("meditate agent tool whitelist", () => {
       .split("\n")
       .map((l) => l.replace(/^\s+-\s+/, "").trim())
       .filter(Boolean);
-    expect(tools).toHaveLength(12);
+    expect(tools).toHaveLength(7);
 
     const expected = [
       "mcp__illumination__list_illuminations",
@@ -182,16 +182,35 @@ describe("meditate agent tool whitelist", () => {
       "mcp__illumination__glob_files",
       "mcp__illumination__project_tree",
       "mcp__illumination__write_illumination",
-      "mcp__illumination__mark_implemented",
-      "mcp__illumination__mark_dispatched",
-      "mcp__illumination__mark_archived",
-      "mcp__illumination__list_plans",
-      "mcp__illumination__mark_plan_implemented",
       "mcp__illumination__list_meta_meditations",
       "mcp__illumination__read_meta_meditation",
     ];
     for (const tool of expected) {
       expect(tools).toContain(tool);
+    }
+  });
+
+  it("does not whitelist any lifecycle (state-mutating) tools", () => {
+    const agentMd = readFileSync(
+      join(__dirname, "..", "agents", "meditate.md"),
+      "utf-8",
+    );
+    const toolsMatch = agentMd.match(/^tools:\n((?:\s+-\s+.+\n)+)/m);
+    expect(toolsMatch).not.toBeNull();
+    const tools = toolsMatch![1]
+      .split("\n")
+      .map((l) => l.replace(/^\s+-\s+/, "").trim())
+      .filter(Boolean);
+
+    const forbidden = [
+      "mcp__illumination__mark_implemented",
+      "mcp__illumination__mark_dispatched",
+      "mcp__illumination__mark_archived",
+      "mcp__illumination__list_plans",
+      "mcp__illumination__mark_plan_implemented",
+    ];
+    for (const tool of forbidden) {
+      expect(tools).not.toContain(tool);
     }
   });
 });
