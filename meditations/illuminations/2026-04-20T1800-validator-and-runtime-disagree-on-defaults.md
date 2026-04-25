@@ -1,9 +1,10 @@
 ---
 date: 2026-04-20
-status: dispatched
+status: implemented
 description: The runtime already handles arbitrary default_* node attributes generically, but the Zod schemas use .strict() with a four-item whitelist — so `pipeline validate` rejects any new default_<varname> that the engine would happily accept at runtime, creating a false error floor that punishes correct pipeline authoring.
 dispatched_at: 2026-04-20
 plan_path: docs/superpowers/plans/2026-04-20-validator-and-runtime-disagree-on-defaults.md
+implemented_at: 2026-04-25
 ---
 
 ## Core Idea
