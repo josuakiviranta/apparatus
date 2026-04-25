@@ -1,0 +1,11 @@
+digraph janitor {
+  goal="Reconcile illumination/plan lifecycle and surface doc drift / dead code"
+  headless_safe=true
+  inputs="project"
+
+  start [shape=Mdiamond]
+  janitor [agent="janitor", prompt="Run the janitor procedure for $project."]
+  done [shape=Msquare]
+
+  start -> janitor -> done
+}
