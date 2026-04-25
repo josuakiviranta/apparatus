@@ -1,9 +1,10 @@
 ---
 date: 2026-04-20
-status: dispatched
+status: implemented
 description: Agent JSON-schema `description` fields are injected inline above the rubric in the agent prompt (`src/attractor/handlers/agent-handler.ts:69-70`) and emphasized by `IMPORTANT:`/`REMINDER:` wrapper text — they silently override agent-rubric instructions when the two disagree, so every edit to an agent's output format in its `.md` rubric must be matched in `pipelines/schemas/<agent>.json` or the rubric change is dead on arrival.
 dispatched_at: 2026-04-20
 plan_path: docs/superpowers/plans/2026-04-20-schema-description-overrides-agent-rubric.md
+implemented_at: 2026-04-25
 ---
 
 ## Core Idea
