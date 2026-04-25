@@ -45,6 +45,14 @@ ralph meditate <project-folder> [--steer <text>]
 ```
 Runs a meditate session against the project's meditations. `--steer` injects an initial steering message at session start.
 
+For unattended lifecycle reconciliation and doc-drift surfacing, schedule the bundled janitor pipeline:
+
+```bash
+ralph heartbeat pipeline pipelines/janitor.dot --project . --every 720
+```
+
+The janitor is read-only on code; it only writes new illuminations and flips lifecycle frontmatter. See `docs/superpowers/specs/2026-04-25-janitor-agent-design.md` for the full design.
+
 ```bash
 ralph run-scenarios <project-folder> [--all]
 ```
