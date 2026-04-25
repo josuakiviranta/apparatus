@@ -288,3 +288,20 @@ describe("meditate agent prompt body — exploration scope", () => {
   });
 });
 
+describe("meditate agent prompt body — reflection brief", () => {
+  it("reflection step asks for architect-mode lenses", () => {
+    const agentMd = readFileSync(
+      join(__dirname, "..", "agents", "meditate.md"),
+      "utf-8",
+    );
+    const frontmatterMatch = agentMd.match(/^---\n[\s\S]+?\n---\n/);
+    expect(frontmatterMatch).not.toBeNull();
+    const body = agentMd.slice(frontmatterMatch![0].length).toLowerCase();
+
+    expect(body).toContain("architect");
+    expect(body).toMatch(/scalab/);
+    expect(body).toMatch(/feature creep|bloat/);
+    expect(body).toContain("abstraction");
+  });
+});
+
