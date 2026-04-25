@@ -1,7 +1,9 @@
 ---
 date: 2026-04-13
-status: open
+status: archived
 description: The state machine's lifecycle transition tools (mark_dispatched, mark_archived, mark_implemented) were configured into the meditate agent — which says "I cannot implement anything" — while the implement agent that runs every pipeline node was left with mcp: [].
+archived_at: 2026-04-25
+reason: Inversion already fixed by commit 089e954 stripping lifecycle tools from meditate.md
 ---
 
 ## Core Idea

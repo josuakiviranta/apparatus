@@ -1,7 +1,9 @@
 ---
 date: 2026-04-13
-status: open
+status: archived
 description: Pipelines are reuse-ready in format but trapped in the project that authored them — ralph bundles prompts and agents as first-class assets, but pipelines have no equivalent bundled library or fallback resolution path.
+archived_at: 2026-04-25
+reason: Distribution layer already shipped: bundled pipelines dir, tsup copy, 3-tier resolver fallback exist
 ---
 
 ## Core Idea

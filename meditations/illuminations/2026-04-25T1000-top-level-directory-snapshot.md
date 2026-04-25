@@ -1,7 +1,9 @@
 ---
 date: 2026-04-25
-status: open
+status: archived
 description: Top-level source directory inventory as of 2026-04-25, cataloguing the eight primary folders and their roles.
+archived_at: 2026-04-25
+reason: Reference snapshot proposes no actionable change so triage cannot produce a plan
 ---
 
 ## Core Idea

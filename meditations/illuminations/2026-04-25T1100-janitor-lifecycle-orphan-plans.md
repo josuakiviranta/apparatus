@@ -1,7 +1,9 @@
 ---
 date: 2026-04-25
-status: open
+status: dispatched
 description: Three dispatched illuminations cannot auto-reconcile because their plan_path fields point to files with missing or wrong lifecycle frontmatter — blocking the janitor loop permanently without manual correction.
+dispatched_at: 2026-04-25
+plan_path: docs/superpowers/plans/2026-04-25-janitor-lifecycle-orphan-plans.md
 ---
 
 ## Findings

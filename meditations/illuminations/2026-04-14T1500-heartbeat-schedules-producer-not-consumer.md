@@ -1,7 +1,9 @@
 ---
 date: 2026-04-13
-status: open
+status: archived
 description: The heartbeat daemon schedules `ralph meditate` (producer) but never schedules `ralph pipeline run illumination-to-plan.dot` (consumer) — so the observe-illuminate-plan cycle is a one-way pump, not a loop, and 14 illuminations have accumulated with zero dispatched.
+archived_at: 2026-04-25
+reason: 14 illuminations now dispatched, consumer pipeline has run many times since claim was written
 ---
 
 ## Core Idea

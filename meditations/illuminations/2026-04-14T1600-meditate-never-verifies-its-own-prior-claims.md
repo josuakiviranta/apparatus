@@ -1,7 +1,9 @@
 ---
 date: 2026-04-13
-status: open
+status: archived
 description: PROMPT_meditation.md uses list_illuminations only as an anti-duplication filter, never as a trigger to verify whether prior illuminations' described conditions still exist in the codebase — so mark_implemented is structurally unreachable without explicit user prompting.
+archived_at: 2026-04-25
+reason: Conflicts with dispatched T1200 plan stripping lifecycle tools, targets unused PROMPT_meditation.md
 ---
 
 ## Core Idea

@@ -1,7 +1,9 @@
 ---
 date: 2026-04-13
-status: open
+status: archived
 description: The illumination-to-plan.dot verifier globs all files in meditations/illuminations/ including dispatched ones, creating two failure modes on the second pipeline run: hard crash when mark_dispatched rejects a non-open status, or silent data loss when mark_archived destroys a dispatched record.
+archived_at: 2026-04-25
+reason: Verifier prompt already filters status:open at pipelines/illumination-to-plan.dot:8
 ---
 
 ## Core Idea

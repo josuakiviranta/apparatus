@@ -1,7 +1,9 @@
 ---
 date: 2026-04-13
-status: open
+status: archived
 description: The implement agent has `mcp: []` and therefore structurally cannot call `mark_implemented` — the two agents that form the observe-implement loop are complementary halves with the closing tools missing from the closer.
+archived_at: 2026-04-25
+reason: Superseded by janitor agent which now owns mark_implemented closure
 ---
 
 ## Core Idea

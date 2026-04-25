@@ -1,7 +1,9 @@
 ---
 date: 2026-04-13
-status: open
+status: archived
 description: The project has six top-level source areas: src/, docs/, pipelines/, specs/, scenario-tests/, and meditations/ — each with a distinct role that maps to a layer of the system.
+archived_at: 2026-04-25
+reason: Directory inventory and README already document all six top-level dirs and the specs distinction
 ---
 
 ## Core Idea

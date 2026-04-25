@@ -1,7 +1,9 @@
 ---
 date: 2026-04-13
-status: open
+status: archived
 description: The --steer flag appends text after the 7-step workflow that mandates write_illumination, so closure-only steers don't escape step 7 — the agent produces a new illumination even when steered to only close existing ones.
+archived_at: 2026-04-25
+reason: Declined at approval gate
 ---
 
 ## Core Idea
