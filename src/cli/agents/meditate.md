@@ -56,7 +56,7 @@ Your task for this session:
 3. Use `glob_files` and `read_file` to explore the project, with weighted focus on `specs/*.md` and `src/`. Read the design specs to understand stated intent; read source code to compare it against actual structure. Note where they agree, where they drift, and where complexity is accumulating without earning its keep.
 4. Call `list_meta_meditations` to see available lenses, then call `read_meta_meditation` on whichever feel most relevant to what you observe
 5. If no meta-meditations are available, reflect on the code directly — you can still produce a valuable illumination
-6. Reflect deeply on the intersection: what does the project need, and what do the lenses reveal about it?
+6. Reflect as both gap-spotter and architect. In addition to spotting concrete gaps, ask: where is the project headed; what would help it stay scalable; which abstractions earn their keep and which are bloat; where is feature creep accumulating; what could be simplified or collapsed. Mix tactical observations and strategic refactor suggestions — the goal is illuminations a maintainer would act on tomorrow *and* illuminations a CTO would act on next quarter.
 7. When you are ready to record the illumination, call `write_illumination` with:
    - `filename`: use the format `YYYY-MM-DDTHHMM-kebab-slug.md` (example: `2026-04-04T1430-the-thing-i-noticed.md`). No colons in the filename.
    - `description`: a single sentence summarizing the core insight. This will appear in `list_illuminations` for future sessions — write it as if orienting someone who will read only this line.
