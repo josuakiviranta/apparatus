@@ -744,6 +744,40 @@ describe("markDispatched", () => {
     );
     expect(written).toContain(body);
   });
+
+  it("auto-commits the file after writing (git add then git commit)", () => {
+    mockExecSync.mockClear();
+    writeIlluminationFile(
+      "T1900-commit-dispatch.md",
+      "date: 2026-04-12\nstatus: open\ndescription: Commit test",
+      "Body."
+    );
+    const result = markDispatched(tmpDir, "T1900-commit-dispatch.md", "docs/superpowers/plans/foo.md");
+    expect(result.success).toBe(true);
+    expect(mockExecSync).toHaveBeenCalledTimes(2);
+    const addCall = mockExecSync.mock.calls[0][0] as string;
+    const commitCall = mockExecSync.mock.calls[1][0] as string;
+    expect(addCall).toContain("git -C");
+    expect(addCall).toContain(tmpDir);
+    expect(addCall).toContain("add");
+    expect(addCall).toContain("T1900-commit-dispatch.md");
+    expect(commitCall).toContain("commit");
+    expect(commitCall).toContain("meditate: mark T1900-commit-dispatch.md dispatched");
+  });
+
+  it("returns success even when git commands fail (fail-open)", () => {
+    mockExecSync.mockClear();
+    mockExecSync.mockImplementation(() => {
+      throw new Error("git not found");
+    });
+    writeIlluminationFile(
+      "T1950-fail-open.md",
+      "date: 2026-04-12\nstatus: open\ndescription: Fail-open test",
+      "Body."
+    );
+    const result = markDispatched(tmpDir, "T1950-fail-open.md", "some/plan.md");
+    expect(result.success).toBe(true);
+  });
 });
 
 describe("markArchived", () => {
