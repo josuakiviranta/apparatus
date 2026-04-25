@@ -1,7 +1,9 @@
 ---
 date: 2026-04-12
-status: open
+status: dispatched
 description: The lifecycle state machine was implemented and wired into the pipeline, but the verifier's entry glob bypasses status filtering entirely — dispatched illuminations will be re-processed and duplicate plans generated on every subsequent pipeline run.
+dispatched_at: 2026-04-25
+plan_path: docs/superpowers/plans/2026-04-25-state-machine-exists-verifier-ignores-it.md
 ---
 
 ## Core Idea

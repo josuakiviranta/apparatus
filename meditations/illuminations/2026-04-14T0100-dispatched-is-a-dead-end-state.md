@@ -1,7 +1,9 @@
 ---
 date: 2026-04-11
-status: open
+status: archived
 description: T2300's state machine proposes `open → dispatched → implemented → archived` but specifies no actor for the dispatched→implemented transition — developers who ship a fix have no tool, no command, and no natural workflow path to close the loop, so illuminations will accumulate in `dispatched` indefinitely.
+archived_at: 2026-04-24
+reason: mark_implemented MCP tool already shipped in illumination-server.ts and whitelisted in meditate.md
 ---
 
 ## Core Idea

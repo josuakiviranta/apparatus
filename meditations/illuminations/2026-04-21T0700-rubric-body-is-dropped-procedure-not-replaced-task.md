@@ -1,7 +1,9 @@
 ---
 date: 2026-04-21
-status: open
+status: archived
 description: agent-handler.ts discards the rubric body whenever node.prompt= is set — the fix is a one-line prepend that injects the rubric as a preceding section, making "Follow your agent-level procedure" a live reference instead of a broken pointer.
+archived_at: 2026-04-22
+reason: Rubric prepend already shipped v0.1.32 commit 929c4e0 agent-handler.ts lines 63-72
 ---
 
 ## Addendum (2026-04-21 — spider/web lens)

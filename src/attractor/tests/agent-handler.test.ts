@@ -584,6 +584,43 @@ describe("AgentHandler", () => {
     }
   });
 
+  it("parses JSON when prose prefix contains literal ${...} brace markers", async () => {
+    const schema = JSON.stringify({ type: "object", properties: { preferred_label: { type: "string" }, summary: { type: "string" } } });
+    const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-test-"));
+    const schemaDir = join(logsDir, "schemas");
+    mkdirSync(schemaDir, { recursive: true });
+    writeFileSync(join(schemaDir, "test.json"), schema);
+
+    mockResolve.mockReturnValue({ ...baseConfig });
+    // Agent quotes source code containing ${var} template syntax in its prose preamble.
+    // Greedy /\{[\s\S]*\}/ would grab from `{agentRubric}` through the real JSON's
+    // closing brace, producing invalid JSON. The extractor must anchor to `{"`.
+    const proseResult = 'Already fixed via `${agentRubric}\\n---\\n${expandedTask}` concat.\n\n{"preferred_label":"false","summary":"stale"}';
+    const output = JSON.stringify([
+      { type: "result", result: proseResult },
+    ]);
+    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output });
+
+    const handler = new AgentHandler({
+      resolveAgent: mockResolve,
+      createAgent: () => ({ run: mockAgentRun, kill: mockAgentKill, config: {} } as any),
+    });
+
+    try {
+      const outcome = await handler.execute(
+        makeNode({ jsonSchemaFile: "schemas/test.json" } as any),
+        baseCtx(),
+        makeContext({ logsRoot: logsDir, cwd: logsDir, dotDir: logsDir }),
+      );
+
+      expect(outcome.status).toBe("success");
+      expect(outcome.preferredLabel).toBe("false");
+      expect(outcome.contextUpdates?.["summary"]).toBe("stale");
+    } finally {
+      rmSync(logsDir, { recursive: true, force: true });
+    }
+  });
+
   it("stops iteration when signal is aborted", async () => {
     mockResolve.mockReturnValue({ ...baseConfig });
     const ac = new AbortController();

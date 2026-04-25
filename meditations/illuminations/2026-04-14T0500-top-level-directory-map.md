@@ -1,7 +1,9 @@
 ---
 date: 2026-04-12
-status: open
+status: archived
 description: A map of the top-level source directories in ralph-cli, showing where code, docs, tests, pipelines, and specs live.
+archived_at: 2026-04-25
+reason: Directory map duplicates specs/architecture.md File Structure tree
 ---
 
 ## Core Idea

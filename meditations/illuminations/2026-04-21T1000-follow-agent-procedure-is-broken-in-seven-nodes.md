@@ -1,7 +1,9 @@
 ---
 date: 2026-04-21
-status: open
+status: archived
 description: 7 of 9 agent nodes in illumination-to-implementation.dot contain "Follow your agent-level procedure" — every one is a silent broken cross-reference because agent-handler drops the rubric body whenever node.prompt= is set, making the procedure layer of the pipeline structurally inert.
+archived_at: 2026-04-22
+reason: Already shipped in v0.1.32 - agent-handler layers rubric with node task per commit fa72c44
 ---
 
 ## Core Idea

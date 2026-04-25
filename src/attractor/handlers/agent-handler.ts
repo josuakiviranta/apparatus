@@ -250,8 +250,9 @@ export class AgentHandler implements NodeHandler {
         }
 
         // Claude sometimes outputs prose before the JSON object (e.g. in stream-json mode).
-        // Extract the first {...} block to tolerate that prefix.
-        const jsonMatch = resultPayload.match(/\{[\s\S]*\}/);
+        // Anchor to `{"` so prose that quotes source-code template syntax like
+        // `${agentRubric}` doesn't hijack the extraction; fall back to any `{...}`.
+        const jsonMatch = resultPayload.match(/\{"[\s\S]*\}/) ?? resultPayload.match(/\{[\s\S]*\}/);
         const jsonStr = jsonMatch ? jsonMatch[0] : resultPayload;
         const parsed = JSON.parse(jsonStr);
         for (const [key, value] of Object.entries(parsed)) {

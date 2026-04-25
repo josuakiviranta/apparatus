@@ -7,7 +7,7 @@ import type { PipelineTracer } from "../../attractor/tracer/pipeline-tracer.js";
 import { parseDot, validateGraph, validateOrRaise } from "../../attractor/core/graph.js";
 import type { Graph } from "../../attractor/types.js";
 import { runPipeline } from "../../attractor/core/engine.js";
-import { variableExpansionTransform, scanUndeclaredCallerVars, findVarReferences } from "../../attractor/transforms/variable-expansion.js";
+import { variableExpansionTransform, scanUndeclaredCallerVars, findVarReferences, expandVariables, extractDefaults } from "../../attractor/transforms/variable-expansion.js";
 import {
   formatMissingInputsError,
   formatLegacyMissingWarning,
@@ -415,10 +415,17 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
         const blockKind = classifyNode(node);
         if (blockKind === "marker") return;
         currentBlockNodeId = node.id;
+        const rawLabel = node.label ?? blockKind;
+        let displayLabel = rawLabel;
+        try {
+          displayLabel = expandVariables(rawLabel, latestContext, extractDefaults(node as unknown as Record<string, unknown>));
+        } catch {
+          // Fall back to raw label if any $var is undefined — handler will surface the real error.
+        }
         emit({
           kind: "start",
           nodeId: node.id,
-          label: node.label ?? blockKind,
+          label: displayLabel,
           blockKind,
           nodeReceiveId,
           hasContext: Object.keys(latestContext).length > 0,

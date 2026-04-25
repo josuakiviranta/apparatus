@@ -1,7 +1,9 @@
 ---
 date: 2026-04-21
-status: open
+status: archived
 description: When a pipeline node sets `prompt=`, the agent `.md` rubric body is silently dropped — replaced by the assembled node prompt — making every "Follow your agent-level procedure" reference in pipeline nodes a broken pointer to instructions Claude never received.
+archived_at: 2026-04-22
+reason: Fixed by rubric prepend in agent-handler.ts:62-72 v0.1.32
 ---
 
 ## Core Idea
