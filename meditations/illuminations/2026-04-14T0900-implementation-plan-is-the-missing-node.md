@@ -1,7 +1,9 @@
 ---
 date: 2026-04-13
-status: open
+status: archived
 description: IMPLEMENTATION_PLAN.md is the only file that has reliably converted plans into shipped features, but it has been empty since the state machine completed — nothing in the project's workflow promotes a plan from docs/superpowers/plans/ into it, leaving the development graph broken between "plan written" and "implementation started".
+archived_at: 2026-04-25
+reason: Stale: illumination-to-implementation.dot now provides the plan-to-implement edge
 ---
 
 ## Core Idea

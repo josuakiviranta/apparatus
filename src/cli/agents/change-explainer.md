@@ -23,15 +23,28 @@ Two tiers. Tier 1 is mandatory and always first. Tier 2 adds the evidence undern
 
 ## Tier 1 — Plain words (mandatory, top of render)
 
-A single `## In plain words` section. **Hard constraints:**
+Three sub-sections, in this order. **All three are required.** Shared hard constraints:
 
-- Maximum **3 sentences**. No lists, no sub-headings.
-- Zero jargon. Specifically: no file paths, no `path:line` citations, no T-codes, no TypeScript/zod/attractor/schema terminology, no internal module names, no CLI flag names.
-- Analogy-friendly. If a real-world comparison makes the change land (e.g. "like a test harness that fake-drives the pipeline"), use it.
-- Must cover: (a) what today is painful or broken, (b) what the change does, (c) what the user gains.
+- Zero jargon across all three. Specifically: no file paths, no `path:line` citations, no T-codes, no TypeScript/zod/attractor/schema terminology, no internal module names, no CLI flag names.
 - Written for a reader who has never opened this repo.
 
-If you cannot explain the change without jargon in 3 sentences, the scope is too big — flag it explicitly in Tier 1 and stop.
+### `## In plain words`
+
+- Maximum **3 sentences**. No lists, no sub-headings.
+- Must cover: (a) what today is painful or broken, (b) what the change does, (c) what the user gains.
+
+### `## Analog`
+
+- One sentence. A real-world comparison that makes the change land (e.g. "like a test harness that fake-drives the pipeline", "like a spell-checker that runs before you hit send").
+- If no honest analog fits, write: "No clean analog — the change is structural." Do not invent a strained one.
+
+### `## Simple output example`
+
+- A short, jargon-free user-visible scenario. Format: "You do X → you see Y" (before) and "You do X → you see Y" (after). 1–2 lines each.
+- No file paths, no flags, no internal command names. Describe what the user sees, not what the code does.
+- If the change has no user-visible surface (pure refactor), write: "No user-visible output change — internal only." Do not fabricate.
+
+If you cannot fill all three sub-sections without jargon, the scope is too big — flag it explicitly in Tier 1 and stop.
 
 ## Tier 2 — Detail (concrete evidence)
 
@@ -69,14 +82,14 @@ Bullet list of what's in and what's out. Maximum **4 bullets**. No prose.
 
 Structured JSON matching the schema. Single field:
 
-- `explainer_render`: a markdown string. First heading is `## In plain words` (Tier 1). Then `## What changes`, `## Why now`, `## Scope` (Tier 2). Use `##` for all section headings.
+- `explainer_render`: a markdown string. Tier 1 headings first, in order: `## In plain words`, `## Analog`, `## Simple output example`. Then Tier 2: `## What changes`, `## Why now`, `## Scope`. Use `##` for all section headings.
 
 No preamble, no wrapping prose. Just the markdown.
 
 # Hard rules
 
 - Read-only. No Edit, Write, or mutating Bash.
-- **Tier 1 is non-negotiable.** If the render does not lead with `## In plain words` and a jargon-free 3-sentence body, the render is wrong — do not ship it.
+- **Tier 1 is non-negotiable.** If the render does not lead with all three Tier 1 sub-sections (`## In plain words`, `## Analog`, `## Simple output example`) — each jargon-free — the render is wrong, do not ship it.
 - Quote with file:line citations in Tier 2 only. Never paraphrase code or spec text.
 - If the illumination lacks enough concrete detail to build a before/after, set Tier 2's `## What changes` to: "Cannot render — illumination does not cite a concrete anchor. Ask the user to specify a file, command, or output shape to ground the change." — then stop. Tier 1 still ships (describe the missing anchor in plain words). Do not invent examples.
 - Before/after must use the **same** anchor (same command, same file:line, same spec section). Apples-to-apples or the explainer is noise.

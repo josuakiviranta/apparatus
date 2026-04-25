@@ -1,7 +1,9 @@
 ---
 date: 2026-04-13
-status: open
+status: archived
 description: The illumination lifecycle defines four states but the pipeline terminates at `dispatched` — `mark_implemented` exists in the state machine, exposes an MCP tool, and has unit tests, yet has zero callers in any pipeline or documented workflow, leaving every resolved illumination suspended in `dispatched` forever.
+archived_at: 2026-04-25
+reason: mark_implemented now wired in meditate prompt line 39 and agent whitelist line 12
 ---
 
 ## Core Idea

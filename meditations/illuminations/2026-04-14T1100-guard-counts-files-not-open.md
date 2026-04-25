@@ -1,7 +1,9 @@
 ---
 date: 2026-04-13
-status: open
+status: archived
 description: The backpressure guard spec proposes counting all .md files in the illuminations directory, but the threshold semantics are "unprocessed" — dispatched illuminations remain on disk and will trigger false positives once the illumination-to-plan pipeline runs successfully.
+archived_at: 2026-04-25
+reason: Guard premise rejected as speculative backpressure feature declined
 ---
 
 ## Core Idea
