@@ -1039,4 +1039,42 @@ describe("listPlans", () => {
   it("returns sentinel when directory is empty", () => {
     expect(listPlans(tmpDir)).toBe("No plans found.");
   });
+
+  it("filter=pending returns only pending files", () => {
+    writePlanFile("a-pending.md", "status: pending", "# Plan A\n");
+    writePlanFile("b-implemented.md", "status: implemented", "# Plan B\n");
+    writePlanFile("c-no-fm.md", null, "# Plan C\n");
+    const result = listPlans(tmpDir, "pending");
+    expect(result).toBe("a-pending.md — Plan A");
+  });
+
+  it("filter=implemented returns only implemented files", () => {
+    writePlanFile("a-pending.md", "status: pending", "# Plan A\n");
+    writePlanFile("b-implemented.md", "status: implemented", "# Plan B\n");
+    writePlanFile("c-no-fm.md", null, "# Plan C\n");
+    const result = listPlans(tmpDir, "implemented");
+    expect(result).toBe("b-implemented.md — Plan B");
+  });
+
+  it("filter excludes no-frontmatter files from any status", () => {
+    writePlanFile("c-no-fm.md", null, "# Plan C\n");
+    expect(listPlans(tmpDir, "pending")).toBe("No plans found.");
+    expect(listPlans(tmpDir, "implemented")).toBe("No plans found.");
+  });
+
+  it("no filter returns all files including no-frontmatter", () => {
+    writePlanFile("a-pending.md", "status: pending", "# Plan A\n");
+    writePlanFile("b-implemented.md", "status: implemented", "# Plan B\n");
+    writePlanFile("c-no-fm.md", null, "# Plan C\n");
+    const result = listPlans(tmpDir);
+    expect(result).toBe(
+      "a-pending.md — Plan A\nb-implemented.md — Plan B\nc-no-fm.md — Plan C",
+    );
+  });
+
+  it("falls back to (no description) when body has no H1", () => {
+    writePlanFile("d-no-h1.md", "status: pending", "Body without heading\n");
+    const result = listPlans(tmpDir);
+    expect(result).toBe("d-no-h1.md — (no description)");
+  });
 });
