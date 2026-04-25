@@ -17,6 +17,7 @@ let tmpDir: string;
 
 beforeEach(() => {
   tmpDir = realpathSync(mkdtempSync(join(tmpdir(), "ralph-test-")));
+  mockExecSync.mockReset();
 });
 
 afterEach(() => {
