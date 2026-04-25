@@ -163,7 +163,7 @@ describe("meditate agent tool whitelist", () => {
     expect(tools).toContain("mcp__illumination__list_illuminations");
   });
 
-  it("whitelists all 8 illumination server tools", () => {
+  it("whitelists all 12 illumination server tools", () => {
     const agentMd = readFileSync(
       join(__dirname, "..", "agents", "meditate.md"),
       "utf-8",
@@ -174,7 +174,7 @@ describe("meditate agent tool whitelist", () => {
       .split("\n")
       .map((l) => l.replace(/^\s+-\s+/, "").trim())
       .filter(Boolean);
-    expect(tools).toHaveLength(10);
+    expect(tools).toHaveLength(12);
 
     const expected = [
       "mcp__illumination__list_illuminations",
@@ -185,6 +185,8 @@ describe("meditate agent tool whitelist", () => {
       "mcp__illumination__mark_implemented",
       "mcp__illumination__mark_dispatched",
       "mcp__illumination__mark_archived",
+      "mcp__illumination__list_plans",
+      "mcp__illumination__mark_plan_implemented",
       "mcp__illumination__list_meta_meditations",
       "mcp__illumination__read_meta_meditation",
     ];
