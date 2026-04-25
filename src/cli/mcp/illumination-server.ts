@@ -674,6 +674,35 @@ if (!isTestEnv) {
       },
     );
 
+    server.tool(
+      "list_plans",
+      "List implementation plans in docs/superpowers/plans/, with their H1 titles. " +
+        "Optionally filter by lifecycle status (pending or implemented). " +
+        "Call this to see what plans remain unimplemented.",
+      {
+        status: z.enum(["pending", "implemented"]).optional(),
+      },
+      async ({ status }: { status?: string }) => {
+        const result = listPlans(projectRoot, status);
+        return { content: [{ type: "text" as const, text: result }] };
+      },
+    );
+
+    server.tool(
+      "mark_plan_implemented",
+      "Mark a plan as implemented. Valid only from status pending. " +
+        "Auto-commits the frontmatter change. Call this when the plan's feature has shipped.",
+      {
+        plan_filename: z.string(),
+      },
+      async ({ plan_filename }: { plan_filename: string }) => {
+        const result = markPlanImplemented(projectRoot, plan_filename);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      },
+    );
+
     process.on("SIGINT", async () => {
       await server.close();
       process.exit(0);
