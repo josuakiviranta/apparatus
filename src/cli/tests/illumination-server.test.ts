@@ -1139,4 +1139,56 @@ describe("markPlanImplemented", () => {
     expect(commitCall).toContain("commit");
     expect(commitCall).toContain("meditate: mark plan T-commit.md implemented");
   });
+
+  it("rejects already-implemented plan", () => {
+    writePlanFile("T-already-impl.md", "status: implemented", "# Done\n");
+    const result = markPlanImplemented(tmpDir, "T-already-impl.md");
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toContain("implemented");
+    }
+  });
+
+  it("rejects plan with no frontmatter", () => {
+    writePlanFile("T-no-fm.md", null, "# Bare\n");
+    const result = markPlanImplemented(tmpDir, "T-no-fm.md");
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toBe("No frontmatter found in plan file");
+    }
+  });
+
+  it("rejects missing file", () => {
+    const result = markPlanImplemented(tmpDir, "T-nonexistent.md");
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toBe("Plan file not found: T-nonexistent.md");
+    }
+  });
+
+  it("rejects plan with frontmatter but no status field", () => {
+    writePlanFile("T-no-status.md", "illumination_source: foo.md", "# No status field\n");
+    const result = markPlanImplemented(tmpDir, "T-no-status.md");
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toContain("(missing)");
+    }
+  });
+
+  it("returns success even when git commands fail (fail-open)", () => {
+    mockExecSync.mockImplementation(() => {
+      throw new Error("git not found");
+    });
+    writePlanFile("T-fail-open.md", "status: pending", "# Fail open\n");
+    const result = markPlanImplemented(tmpDir, "T-fail-open.md");
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects invalid filename via validateFilename", () => {
+    const result = markPlanImplemented(tmpDir, "../escape.md");
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toContain("Invalid filename");
+    }
+  });
 });
