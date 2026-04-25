@@ -1,5 +1,6 @@
 ---
 status: pending
+illumination_source: meditations/illuminations/2026-04-14T0300-meditate-has-no-backpressure.md
 ---
 
 # Meditate Backpressure Guard — Implementation Plan
