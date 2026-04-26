@@ -1,9 +1,10 @@
 ---
 date: 2026-04-13
-status: dispatched
+status: implemented
 description: The meditate agent's session prompt has no step for closing resolved illuminations — mark_implemented, mark_dispatched, and mark_archived are in the tool whitelist but the prompt never invokes them proactively, so every session adds one illumination and closes zero, making the corpus grow monotonically by design.
 dispatched_at: 2026-04-25
 plan_path: docs/superpowers/plans/2026-04-25-meditate-prompt-is-write-only.md
+implemented_at: 2026-04-26
 ---
 
 ## Core Idea
