@@ -1,4 +1,4 @@
-import { readFileSync, existsSync, readdirSync, mkdirSync, rmSync, statSync } from "fs";
+import { readFileSync, existsSync, readdirSync, mkdirSync, rmSync, statSync, lstatSync } from "fs";
 import { resolve, join, basename, dirname, relative } from "path";
 import { homedir } from "os";
 import { randomUUID, createHash } from "crypto";
@@ -58,6 +58,28 @@ export function deriveProjectKey(projectPath: string): string {
   const base = basename(abs);
   const hash6 = createHash("sha256").update(abs).digest("hex").slice(0, 6);
   return `${base}-${hash6}`;
+}
+
+/**
+ * Garbage-collect a project's runs directory: keep the `keep` newest entries
+ * by mtime, recursively remove the rest. Silently ignores non-existent roots
+ * and non-directory children. Pure I/O — exported for tests.
+ */
+export function gcOldRuns(runsRoot: string, keep: number): void {
+  if (!existsSync(runsRoot)) return;
+  const entries: { path: string; mtime: number }[] = [];
+  for (const name of readdirSync(runsRoot)) {
+    const path = join(runsRoot, name);
+    try {
+      const st = lstatSync(path);
+      if (!st.isDirectory()) continue;
+      entries.push({ path, mtime: st.mtimeMs });
+    } catch { continue; }
+  }
+  entries.sort((a, b) => b.mtime - a.mtime);
+  for (const e of entries.slice(keep)) {
+    rmSync(e.path, { recursive: true, force: true });
+  }
 }
 
 export function diffEdgeLabels(prev: Graph, curr: Graph): EdgeDiagnostic[] {
@@ -291,6 +313,10 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
   const ralphRoot = process.env.RALPH_RUNS_ROOT ?? join(homedir(), ".ralph");
   const projectKey = deriveProjectKey(opts.project ?? process.cwd());
   const runsRoot = join(ralphRoot, projectKey, "runs");
+  if (!opts.resume) {
+    const keep = Number(process.env.RALPH_RUNS_KEEP ?? "50");
+    gcOldRuns(runsRoot, Number.isFinite(keep) && keep > 0 ? keep : 50);
+  }
   const logsRoot = opts.logsRoot ?? join(runsRoot, runId);
   const tracePath = join(logsRoot, "pipeline.jsonl");
   const jsonlTracer = new JsonlPipelineTracer(tracePath);
