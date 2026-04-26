@@ -97,7 +97,7 @@ export function resolveResumeLogsRoot(
     .map(e => `  ${e.name}  (${new Date(e.mtime).toISOString()})`)
     .join("\n");
   process.stderr.write(
-    `[ralph] multiple runs exist for this project; pass --resume <runId> to disambiguate:\n${list}\n`,
+    "[ralph] multiple runs exist for this project; pass --resume <runId> to disambiguate:\n" + list + "\n",
   );
   process.exit(1);
   return null;
@@ -654,30 +654,66 @@ export interface PipelineCreateOptions {
 export const REFINE_TRACE_COUNT = 3;
 
 /**
+ * Walk all project run-roots and return the set of directories. Used as the
+ * default scan target when a project is not pinned. Each root has the shape
+ * `~/.ralph/<projectKey>/runs/`.
+ */
+function listAllProjectRunsRoots(): string[] {
+  const ralphRoot = process.env.RALPH_RUNS_ROOT ?? join(homedir(), ".ralph");
+  if (!existsSync(ralphRoot)) return [];
+  const out: string[] = [];
+  for (const name of readdirSync(ralphRoot)) {
+    const candidate = join(ralphRoot, name, "runs");
+    if (existsSync(candidate)) out.push(candidate);
+  }
+  return out;
+}
+
+/**
+ * Resolve a runId to its trace path by scanning all project run-roots.
+ * Returns null if no project owns the runId. Throws if more than one does.
+ */
+export function findRunAcrossProjects(runId: string): string | null {
+  const roots = listAllProjectRunsRoots();
+  const matches: string[] = [];
+  for (const root of roots) {
+    const candidate = join(root, runId, "pipeline.jsonl");
+    if (existsSync(candidate)) matches.push(candidate);
+  }
+  if (matches.length === 0) return null;
+  if (matches.length > 1) {
+    throw new Error(`[ralph] multiple projects own runId ${runId}: ${matches.join(", ")}`);
+  }
+  return matches[0];
+}
+
+/**
  * Return absolute paths to up to `limit` most recent trace files for pipeline `name`,
- * newest first. Scans `tracesRoot` (default `~/.ralph/runs`) for `<runId>/pipeline.jsonl`
- * entries whose first event is `pipeline-start` with matching `pipelineName`.
+ * newest first. When `tracesRoot` is supplied, scans only that directory; otherwise
+ * walks all project run-roots under each project's runs directory.
  */
 export function listRecentTraces(
   name: string,
   limit: number,
   opts: { tracesRoot?: string } = {},
 ): string[] {
-  const root = opts.tracesRoot ?? join(homedir(), ".ralph", "runs");
-  if (!existsSync(root)) return [];
+  const roots = opts.tracesRoot ? [opts.tracesRoot] : listAllProjectRunsRoots();
   const entries: { path: string; mtime: number }[] = [];
-  for (const entry of readdirSync(root)) {
-    const tracePath = join(root, entry, "pipeline.jsonl");
-    if (!existsSync(tracePath)) continue;
-    try {
-      const firstLine = readFileSync(tracePath, "utf8").split("\n", 1)[0];
-      if (!firstLine) continue;
-      const start = JSON.parse(firstLine) as Record<string, unknown>;
-      if (start.kind !== "pipeline-start") continue;
-      if (start.pipelineName !== name) continue;
-      entries.push({ path: tracePath, mtime: statSync(tracePath).mtimeMs });
-    } catch {
-      continue;
+  for (const root of roots) {
+    if (!existsSync(root)) continue;
+    for (const entry of readdirSync(root)) {
+      const tracePath = join(root, entry, "pipeline.jsonl");
+      if (!existsSync(tracePath)) continue;
+      try {
+        const firstLine = readFileSync(tracePath, "utf8").split("\n", 1)[0];
+        if (!firstLine) continue;
+        const start = JSON.parse(firstLine) as Record<string, unknown>;
+        if (start.kind !== "pipeline-start") continue;
+        if (start.pipelineName !== name) continue;
+        entries.push({ path: tracePath, mtime: statSync(tracePath).mtimeMs });
+      } catch {
+        continue;
+      }
     }
   }
   return entries.sort((a, b) => b.mtime - a.mtime).slice(0, limit).map(e => e.path);
@@ -709,9 +745,35 @@ export function digestTraceFile(tracePath: string): string {
 
 export async function pipelineTraceCommand(
   runId: string,
-  opts: { nodeReceive?: string; full?: boolean } = {}
+  opts: { nodeReceive?: string; full?: boolean; project?: string } = {}
 ): Promise<void> {
-  const tracePath = join(homedir(), ".ralph", "runs", runId, "pipeline.jsonl");
+  let tracePath: string;
+  if (opts.project) {
+    const ralphRoot = process.env.RALPH_RUNS_ROOT ?? join(homedir(), ".ralph");
+    const projectKey = deriveProjectKey(opts.project);
+    tracePath = join(ralphRoot, projectKey, "runs", runId, "pipeline.jsonl");
+    if (!existsSync(tracePath)) {
+      await output.error(`No trace found for run: ${runId}`);
+      await output.error(`Expected: ${tracePath}`);
+      process.exit(1);
+      return;
+    }
+  } else {
+    let resolved: string | null;
+    try {
+      resolved = findRunAcrossProjects(runId);
+    } catch (e) {
+      await output.error((e as Error).message);
+      process.exit(1);
+      return;
+    }
+    if (!resolved) {
+      await output.error(`No trace found for run: ${runId}`);
+      process.exit(1);
+      return;
+    }
+    tracePath = resolved;
+  }
 
   let raw: string;
   try {
@@ -720,7 +782,7 @@ export async function pipelineTraceCommand(
     await output.error(`No trace found for run: ${runId}`);
     await output.error(`Expected: ${tracePath}`);
     process.exit(1);
-    return; // unreachable, satisfies TS
+    return;
   }
 
   const lines = raw.trim().split("\n").map(l => JSON.parse(l) as Record<string, unknown>);

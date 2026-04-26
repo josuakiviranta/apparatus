@@ -257,7 +257,8 @@ Scans <project>/pipelines/*.dot and prints each workflow's name and goal.
     .description("inspect a pipeline run trace")
     .option("--node-receive <nodeReceiveId>", "show context snapshot for a specific node invocation")
     .option("--full", "show full context values without truncation")
-    .action(async (runId: string, opts: { nodeReceive?: string; full?: boolean }) => {
+    .option("--project <folder>", "Pin trace lookup to one project (skips the cross-project scan)")
+    .action(async (runId: string, opts: { nodeReceive?: string; full?: boolean; project?: string }) => {
       await pipelineTraceCommand(runId, opts);
     });
 
