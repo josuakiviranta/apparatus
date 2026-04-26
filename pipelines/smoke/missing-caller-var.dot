@@ -9,7 +9,7 @@ digraph missing_caller_var {
   // when --var required_input=... is not supplied.
   use_var [
     type="tool",
-    cwd="$project",
+    cwd=".",
     shape=parallelogram,
     tool_command="echo $required_input"
   ]
