@@ -10,6 +10,7 @@ tools:
   - Glob
   - Bash
   - mcp__illumination__mark_plan_implemented
+  - mcp__illumination__mark_implemented
 mcp:
   - name: illumination
     command: node
@@ -114,7 +115,13 @@ Memory files are reference documents for future sessions. Keep them dense, scann
 
    Even if step 5 staged nothing, prior commits from `implement` and `tmux-tester` may not have been pushed yet. Push is idempotent — already-pushed refs are a no-op at the remote.
 
-7. **Mark the plan implemented (best-effort).** If `$plan_path` is set and non-empty, call `mark_plan_implemented` with the basename of `$plan_path` (i.e. strip the directory portion — the tool resolves the file under `docs/superpowers/plans/`). On `success: true`, do nothing more — the tool auto-commits its own frontmatter rewrite. On `success: false` (e.g., orphan plan with no frontmatter, plan already `implemented`, plan file missing), append a single bullet to the memory file's `Learnings from the run` section quoting the `error` field verbatim, then continue. Do **not** abort the node. If `$plan_path` is empty or unset, skip this step entirely and append a one-line note to the memory file (`- Lifecycle flip skipped: $plan_path was empty`).
+7. **Mark the lifecycle artifacts implemented (best-effort, both halves).** This step closes BOTH halves of the open/close pair that `mark_dispatched` opened upstream — the plan frontmatter AND the illumination frontmatter. Run them in this order:
+
+   **7a. Plan side.** If `$plan_path` is set and non-empty, call `mark_plan_implemented` with the basename of `$plan_path` (strip the directory portion — the tool resolves the file under `docs/superpowers/plans/`). On `success: true`, do nothing more — the tool auto-commits its own frontmatter rewrite. On `success: false` (orphan plan with no frontmatter, plan already `implemented`, plan file missing), append a single bullet to the memory file's `Learnings from the run` section quoting the `error` field verbatim, then continue. If `$plan_path` is empty or unset, skip 7a and append `- Plan lifecycle flip skipped: $plan_path was empty` to the memory file.
+
+   **7b. Illumination side.** If `$illumination_path` is set and non-empty, call `mark_implemented` with the basename of `$illumination_path` (strip the directory portion — the tool resolves the file under `meditations/illuminations/`). On `success: true`, do nothing more — the tool auto-commits its own frontmatter rewrite. On `success: false` (already `implemented` / `archived`, no frontmatter, file missing), append a single bullet to the memory file's `Learnings from the run` section quoting the `error` field verbatim, then continue. If `$illumination_path` is empty or unset, skip 7b and append `- Illumination lifecycle flip skipped: $illumination_path was empty` to the memory file.
+
+   Do **not** abort the node on either branch's failure. Push (step 6) and the structured-JSON emit (step 8) are non-negotiable; the lifecycle flips are opportunistic.
 
 8. **Emit structured JSON** with `memory_path` set to the final memory file's absolute path.
 
@@ -125,4 +132,4 @@ Memory files are reference documents for future sessions. Keep them dense, scann
 - Commit exactly **once** at the end of the node (or skip the commit if nothing is staged). Do not split into multiple commits. `implement` and `tmux-tester` already made per-chunk / per-fix commits earlier.
 - **Push is unconditional.** Prior session commits must reach `origin` even if this node staged nothing new.
 - No writes outside `$project/memory/` and git operations. Do not touch source code, specs, or pipelines from this node.
-- `mark_plan_implemented` is **best-effort** — never abort the node on `success: false`. Push (step 6) and the structured-JSON emit (step 8) are non-negotiable; the lifecycle flip (step 7) is opportunistic. A frontmatter-less or already-`implemented` plan must not block finalization.
+- Both lifecycle calls — `mark_plan_implemented` (step 7a) and `mark_implemented` (step 7b) — are **best-effort**. Never abort the node on `success: false` from either. Push (step 6) and the structured-JSON emit (step 8) are non-negotiable; both lifecycle flips in step 7 are opportunistic. A frontmatter-less, already-`implemented`, or missing plan/illumination must not block finalization.
