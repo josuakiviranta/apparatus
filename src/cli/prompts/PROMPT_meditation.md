@@ -38,7 +38,7 @@ Your task for this session:
 7. If the user reports that a fix has been shipped or an illumination has been resolved,
    call `mark_implemented` with the illumination filename before ending the session.
 8. When you are ready to record the illumination, call `write_illumination` with:
-   - `filename`: use the format `YYYY-MM-DDTHHMM-kebab-slug.md` (example: `2026-04-04T1430-the-thing-i-noticed.md`). No colons in the filename.
+   - `slug`: a kebab-case theme slug only (lowercase alphanumeric + hyphens, e.g. `the-thing-i-noticed`). The server prepends the current `YYYY-MM-DDTHHMM-` timestamp and appends `.md` — do NOT include either yourself, do NOT include colons.
    - `description`: a single sentence summarizing the core insight. This will appear in `list_illuminations` for future sessions — write it as if orienting someone who will read only this line.
    - `content`: the full markdown content of the illumination (body only — no frontmatter, that is added automatically).
      Do not use the `Write` tool directly — it is not available in this session.

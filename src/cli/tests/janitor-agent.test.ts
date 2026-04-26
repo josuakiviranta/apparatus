@@ -83,8 +83,8 @@ describe("janitor.md — procedure body contract", () => {
     expect(fileText).toMatch(/^## Reading thread/m);
   });
 
-  it("encodes the filename convention with kebab area slug", () => {
-    expect(fileText).toMatch(/YYYY-MM-DDTHHMM-janitor-/);
+  it("encodes the slug convention with the janitor- prefix", () => {
+    expect(fileText).toMatch(/slug = "janitor-<area>"/);
     expect(fileText).toMatch(/kebab-case/i);
   });
 });

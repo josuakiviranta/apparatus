@@ -11,7 +11,7 @@ vi.mock("node:child_process", () => ({
   execSync: mockExecSync,
 }));
 
-import { validateFilename, writeIllumination, assertWithinRoot, readFile, validateGlobPattern, globFiles, projectTree, listMetaMeditations, readMetaMeditation, listIlluminations, markImplemented, markDispatched, markArchived, listPlans, markPlanImplemented } from "../mcp/illumination-server";
+import { validateFilename, validateSlug, composeIlluminationFilename, writeIllumination, assertWithinRoot, readFile, validateGlobPattern, globFiles, projectTree, listMetaMeditations, readMetaMeditation, listIlluminations, markImplemented, markDispatched, markArchived, listPlans, markPlanImplemented } from "../mcp/illumination-server";
 
 let tmpDir: string;
 
@@ -22,6 +22,56 @@ beforeEach(() => {
 
 afterEach(() => {
   rmSync(tmpDir, { recursive: true, force: true });
+});
+
+describe("validateSlug", () => {
+  it("accepts kebab-case slug", () => {
+    expect(validateSlug("janitor-doc-drift")).toBeNull();
+    expect(validateSlug("my-insight")).toBeNull();
+    expect(validateSlug("a")).toBeNull();
+    expect(validateSlug("v2-thing")).toBeNull();
+  });
+
+  it("rejects empty slug", () => {
+    expect(validateSlug("")).not.toBeNull();
+  });
+
+  it("rejects uppercase letters", () => {
+    expect(validateSlug("Janitor-Doc")).not.toBeNull();
+  });
+
+  it("rejects underscores or other separators", () => {
+    expect(validateSlug("my_insight")).not.toBeNull();
+    expect(validateSlug("my insight")).not.toBeNull();
+  });
+
+  it("rejects leading hyphen or non-alphanumeric start", () => {
+    expect(validateSlug("-foo")).not.toBeNull();
+  });
+
+  it("rejects path components or extensions", () => {
+    expect(validateSlug("my/insight")).not.toBeNull();
+    expect(validateSlug("foo.md")).not.toBeNull();
+  });
+});
+
+describe("composeIlluminationFilename", () => {
+  it("prepends YYYY-MM-DDTHHMM- prefix and appends .md", () => {
+    const fixed = new Date(2026, 3, 26, 12, 57); // April 26 12:57 local
+    expect(composeIlluminationFilename("janitor-doc-drift", fixed)).toBe(
+      "2026-04-26T1257-janitor-doc-drift.md",
+    );
+  });
+
+  it("zero-pads month, day, hour, minute", () => {
+    const fixed = new Date(2026, 0, 5, 3, 9); // Jan 5 03:09
+    expect(composeIlluminationFilename("foo", fixed)).toBe("2026-01-05T0309-foo.md");
+  });
+
+  it("throws on invalid slug", () => {
+    expect(() => composeIlluminationFilename("Bad Slug")).toThrow();
+    expect(() => composeIlluminationFilename("")).toThrow();
+  });
 });
 
 describe("validateFilename", () => {

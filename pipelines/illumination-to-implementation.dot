@@ -35,7 +35,7 @@ digraph illumination_to_implementation {
 
   // ── Phase 2: Implementation ───────────────────────────────────────────────
 
-  implement [agent="implement", max_retries=1, prompt="Read the implementation plan at $plan_path.\n\nImplement the plan using subagent-driven red/green TDD:\n1. Read the plan carefully\n2. For each chunk: dispatch parallel subagents to write failing tests first, then implement to make them pass (one subagent per concern)\n3. Commit after each passing chunk\n\nDo NOT push — a separate pipeline node handles that.\nDo NOT modify files outside the scope of the plan."]
+  implement [agent="implement", max_retries=1, prompt="Read the implementation plan at $plan_path.\n\nBefore writing any code, invoke the superpowers:subagent-driven-development skill to establish the dispatch framework. Invoke superpowers:test-driven-development per chunk for the red/green discipline.\n\nImplement the plan using subagent-driven red/green TDD:\n1. Read the plan carefully\n2. For each chunk: dispatch parallel subagents to write failing tests first, then implement to make them pass (one subagent per concern). Solo implementation by the main agent is forbidden — every code change must come from a dispatched subagent. Your role is orchestration: dispatch, review, integrate.\n3. Commit after each passing chunk\n\nDo NOT push — a separate pipeline node handles that.\nDo NOT modify files outside the scope of the plan."]
 
   review_gate [shape=hexagon, label="Review implementation\n\nProject: $project\nPlan: $plan_path"]
 

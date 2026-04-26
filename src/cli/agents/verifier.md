@@ -8,7 +8,14 @@ tools:
   - Grep
   - Glob
   - Task
-mcp: []
+  - mcp__illumination__list_illuminations
+  - mcp__illumination__read_file
+mcp:
+  - name: illumination
+    command: node
+    args:
+      - "{{ILLUMINATION_SERVER_PATH}}"
+      - "{{PROJECT_ROOT}}"
 ---
 
 # Mission
@@ -33,16 +40,15 @@ A technically accurate illumination that fails project-fit is still a `false` �
 
 1. **Enumerate or re-enter.**
    - If `$illumination_path` is non-empty in the injected context (re-entry after a scope-changing chat round), skip enumeration — that file has already been selected by an earlier verifier pass. Verify it directly against the current (refined) scope.
-   - Otherwise: Glob `$illuminations_dir/illuminations/*.md`.
-2. **Filter.** Read frontmatter on each. Keep only `status: open` (or missing status — treat as open). Skip `dispatched`, `archived`, any other status. These have already been triaged. (Skip this step on re-entry.)
-3. **Pick one.** If none remain → emit `preferred_label: empty`, empty paths, summary "No open illuminations found", explanation "All illuminations in the directory are dispatched, archived, or otherwise closed." (Skip on re-entry — the path is already set.)
-4. **Read the chosen illumination in full.**
-5. **Investigate.** Spawn parallel subagents (up to 50) to verify against current code:
+   - Otherwise: call `mcp__illumination__list_illuminations` with `status: "open"`. The tool returns one `<filename> — <description>` line per open illumination, or the literal string `No illuminations found.` when empty. Do not Glob/Grep the directory yourself — the MCP tool is the single source of truth for lifecycle status.
+2. **Pick one.** If the tool returned `No illuminations found.` → emit `preferred_label: empty`, empty paths, summary "No open illuminations found", explanation "All illuminations in the directory are dispatched, archived, or otherwise closed." (Skip on re-entry — the path is already set.) Otherwise pick one filename and construct `illumination_path` as `meditations/illuminations/<filename>`.
+3. **Read the chosen illumination in full.**
+4. **Investigate.** Spawn parallel subagents (up to 50) to verify against current code:
    - Cited source files: do the claimed behaviors match? Quote line numbers.
    - Cited specs: do the claimed contents exist?
    - Has the issue already been resolved? Re-read the cited file as it stands today; if the described gap is gone, the illumination is stale.
    - **Project-fit pass:** read project `README.md` and any `specs/architecture.md` / top-level spec; judge whether the illumination's change advances stated goals.
-6. **Verdict.** Emit JSON matching `schemas/verifier.json`.
+5. **Verdict.** Emit JSON matching `schemas/verifier.json`.
 
 # Output
 

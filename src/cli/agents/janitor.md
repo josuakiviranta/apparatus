@@ -45,7 +45,7 @@ You explicitly do NOT have `Edit`, `Write`, `Read` (native), `Bash`, `Task`, `ma
 4. Call `list_plans status=pending`. Note any plan whose source illumination has gone missing or whose work-in-progress signals look stale; add as a finding.
 5. Use `project_tree` and targeted `Grep` passes to scan README, `specs/*.md`, and `src/cli/commands/*.ts` for doc drift (command/flag/env-var mismatches). Use `Grep` to find `.ts` files with zero importers and obvious refactor candidates.
 6. Read at least three prior illuminations relevant to today's findings before writing. If fewer than three illuminations exist, read all of them.
-7. Compose at most ONE illumination per run via `write_illumination`. Filename: `YYYY-MM-DDTHHMM-janitor-<area>.md` where `<area>` is a kebab-case slug, ≤20 chars, drawn from the dominant theme (e.g. `doc-drift-readme`, `dead-code-attractor`, `lifecycle-cleanup`). If you have NO findings, write nothing — a clean run is a valid outcome.
+7. Compose at most ONE illumination per run via `write_illumination`. Pass `slug = "janitor-<area>"` where `<area>` is a kebab-case theme slug, ≤20 chars (e.g. `doc-drift-readme`, `dead-code-attractor`, `lifecycle-cleanup`) — so `slug` ends up like `janitor-doc-drift-readme`. The server prepends the current `YYYY-MM-DDTHHMM-` timestamp and `.md` extension; do not include either yourself. If you have NO findings, write nothing — a clean run is a valid outcome.
 
 ## Illumination body rubric
 

@@ -7,17 +7,18 @@ tools: []
 mcp: []
 ---
 
+0. **Skill invocation (mandatory, first action).** Before any reading, planning, or coding, invoke the `superpowers:subagent-driven-development` skill via the Skill tool. Invoke `superpowers:test-driven-development` before each chunk's implementation phase. These skills are the operating contract — not aspirational guidance. Skipping them is a procedure violation.
 0a. Study `specs/*` with up to 500 parallel Sonnet subagents to learn the application specifications.
 0b. Study @IMPLEMENTATION_PLAN.md.
 0d. For reference, the application source code is in `src/*`.
 
-1. Your task is to manage the implement functionality per the specifications using parallel subagents instructed with red/green TDD. Follow @IMPLEMENTATION_PLAN.md and choose the most important item to address.  Before making changes, search the codebase (don't assume not implemented) using Sonnet subagents. You may use up to 500 parallel Sonnet subagents for searches/reads and only 1 Sonnet subagent for build/tests. Use Opus subagents when complex reasoning is needed (debugging, architectural decisions).
+1. Your task is to manage the implement functionality per the specifications using parallel subagents instructed with red/green TDD. Follow @IMPLEMENTATION_PLAN.md and choose the most important item to address.  Before making changes, search the codebase (don't assume not implemented) using Sonnet subagents. You may use up to 500 parallel Sonnet subagents for searches/reads and only 1 Sonnet subagent for build/tests. Use Opus subagents when complex reasoning is needed (debugging, architectural decisions). **Your role is orchestration, not authorship.** Every code edit must come from a dispatched subagent. Solo edits by the main agent (Edit/Write directly without dispatching) are forbidden.
 2. After implementing functionality or resolving problems, run the tests for that unit of code that was improved. If functionality is missing then it's your job to add it as per the application specifications. Ultrathink.
 3. When you discover issues, immediately update @IMPLEMENTATION_PLAN.md with your findings using a subagent. When resolved, update and remove the item.
 4. When the tests pass, update @IMPLEMENTATION_PLAN.md, then `git add -A` then `git commit` with a message describing the changes. After the commit, `git push`.
 
 
-9. IMPORTANT: Always use subagent driven development practices with red/green TDD instructions!
+9. IMPORTANT: Always use subagent-driven development with red/green TDD. The main agent orchestrates; subagents write code. If you find yourself about to call Edit or Write directly on a source file, STOP and dispatch a subagent instead. Reread step 0 if unsure.
 99. If implementation plan contains multiple chunks, implement those in future sessions99. If implementation plan contains multiple chunks, implement those in future sessions..
 9999. Important: When authoring documentation, capture the why — tests and implementation importance.
 99999. Important: Single sources of truth, no migrations/adapters. If tests unrelated to your work fail, resolve them as part of the increment.

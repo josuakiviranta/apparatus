@@ -7,12 +7,32 @@ import fg from "fast-glob";
 // ─── Exported pure helpers (for testing) ──────────────────────────────────────
 
 const FILENAME_RE = /^[\w-]+\.md$/;
+const SLUG_RE = /^[a-z0-9][a-z0-9-]*$/;
 
 export function validateFilename(filename: string): string | null {
   if (!FILENAME_RE.test(filename)) {
     return `Invalid filename "${filename}". Must match [\\w-]+\\.md (no slashes, colons, or path components).`;
   }
   return null;
+}
+
+export function validateSlug(slug: string): string | null {
+  if (!slug) return "slug is required";
+  if (!SLUG_RE.test(slug)) {
+    return `Invalid slug "${slug}". Must be lowercase alphanumeric with hyphens (e.g. "janitor-doc-drift").`;
+  }
+  return null;
+}
+
+export function composeIlluminationFilename(slug: string, now: Date = new Date()): string {
+  const err = validateSlug(slug);
+  if (err) throw new Error(err);
+  const yyyy = String(now.getFullYear()).padStart(4, "0");
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  const hh = String(now.getHours()).padStart(2, "0");
+  const mi = String(now.getMinutes()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}T${hh}${mi}-${slug}.md`;
 }
 
 export function writeIllumination(
@@ -527,15 +547,17 @@ if (!isTestEnv) {
     server.tool(
       "write_illumination",
       "Write a meditation illumination file to meditations/illuminations/. " +
-        "Use filename format: YYYY-MM-DDTHHMM-kebab-slug.md (e.g. 2026-04-04T1430-my-insight.md). " +
-        "Provide a one-sentence description summarizing the core insight — this is required.",
+        "Provide a kebab-case `slug` (lowercase alphanumeric + hyphens, e.g. `janitor-doc-drift` or `my-insight`); " +
+        "the server prepends the current YYYY-MM-DDTHHMM- timestamp and appends .md — do not include either yourself. " +
+        "Provide a one-sentence `description` summarizing the core insight — this is required.",
       {
-        filename: z.string(),
+        slug: z.string(),
         description: z.string(),
         content: z.string(),
       },
-      async ({ filename, description, content }: { filename: string; description: string; content: string }) => {
+      async ({ slug, description, content }: { slug: string; description: string; content: string }) => {
         try {
+          const filename = composeIlluminationFilename(slug);
           const filePath = writeIllumination(projectRoot, filename, description, content);
           return {
             content: [{ type: "text" as const, text: `Written to ${filePath}` }],

@@ -1,7 +1,9 @@
 ---
 date: 2026-04-25
-status: open
+status: dispatched
 description: The plans-have-no-lifecycle design creates mark_plan_implemented but defers the call site to "any implementing agent" — both terminal pipeline agents (implement, memory_writer) have mcp: [], making neither a viable caller, and the T1000 anti-pattern (tool with no caller) repeats at the plan layer.
+dispatched_at: 2026-04-25
+plan_path: docs/superpowers/plans/2026-04-26-mark-plan-implemented-will-have-no-caller.md
 ---
 
 ## Core Idea
