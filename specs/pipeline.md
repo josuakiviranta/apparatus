@@ -80,7 +80,7 @@ Edges carry `label`, optional `condition` (boolean expression over context), `we
 
 ### Run identity
 
-Each run receives an 8-character UUID-derived `runId`. All per-run state lives under `~/.ralph/runs/<runId>/` (plus `~/.ralph/runs/<slug>/checkpoint.json` where `<slug>` is derived from the graph name — the slug and runId directory are distinct; the checkpoint is per-pipeline and survives runs, the JSONL trace is per-run and regenerated fresh).
+Each run receives an 8-character UUID-derived `runId`. All per-run state lives under `~/.ralph/<projectKey>/runs/<runId>/`, which contains both `pipeline.jsonl` (tracer output) and `checkpoint.json` (engine state, written every transition). The directory name is the 8-hex `runId` minted at invocation time; the parent `<projectKey>` is `<basename>-<6 hex chars of sha256(absolute project path)>`. Cross-project collision is impossible because the project path participates in the key.
 
 ## Graph Validation
 
@@ -177,14 +177,14 @@ Nodes that declare `headless_safe="false"` raise an error when dispatched agains
 
 Covered in `specs/architecture.md` under "Checkpoint and Resume". In short:
 
-- `src/attractor/checkpoint.ts` persists a `CheckpointState = { timestamp, currentNode, completedNodes, nodeRetries, context }` to `<logsRoot>/checkpoint.json`, where `logsRoot` defaults to `~/.ralph/runs/<slug>/`.
+- `src/attractor/checkpoint.ts` persists a `CheckpointState = { timestamp, currentNode, completedNodes, nodeRetries, context }` to `<logsRoot>/checkpoint.json`, where `<logsRoot>` defaults to `~/.ralph/<projectKey>/runs/<runId>/`. Tests can override the parent root via the `RALPH_RUNS_ROOT` env var.
 - The engine writes the checkpoint at every state transition.
 - `pipeline run --resume` loads the checkpoint and restarts from `currentNode`, preserving `completedNodes`, `nodeRetries`, and `context`.
-- Without `--resume`, a fresh run deletes the prior run directory before starting. Tool scripts must therefore be idempotent (detect the desired outcome already exists and exit 0 as a no-op).
+- A fresh run gets a fresh `<runId>` directory and never overwrites a prior run. The engine garbage-collects older runs lazily at run-start, keeping the 50 newest per project (override with `RALPH_RUNS_KEEP=N`). Tool scripts called from tool nodes should still be idempotent because `--resume` may re-execute the node that failed within a single run.
 
 ## Tracer / Observability
 
-`src/attractor/tracer/jsonl-pipeline-tracer.ts` writes one JSON object per line to `~/.ralph/runs/<runId>/pipeline.jsonl`. It implements the `PipelineTracer` interface declared in `pipeline-tracer.ts`.
+`src/attractor/tracer/jsonl-pipeline-tracer.ts` writes one JSON object per line to `~/.ralph/<projectKey>/runs/<runId>/pipeline.jsonl`. It implements the `PipelineTracer` interface declared in `pipeline-tracer.ts`.
 
 ### Event types
 
@@ -195,7 +195,7 @@ Covered in `specs/architecture.md` under "Checkpoint and Resume". In short:
 | `node-end` | `nodeReceiveId`, `nodeId`, `success`, `contextUpdates`, `failureReason?` |
 | `pipeline-end` | `runId`, `outcome`, `timestamp` |
 
-`nodeReceiveId` is distinct from `nodeId` because a single node may execute more than once (retries, loops). The trace is append-only within a run and is recreated from scratch when the run directory is initialised; the checkpoint file lives alongside it but is updated in place.
+`nodeReceiveId` is distinct from `nodeId` because a single node may execute more than once (retries, loops). The trace is append-only within a run and is created fresh when the run directory is initialised; the checkpoint file shares the same directory and is updated in place every transition.
 
 ### `pipeline trace` command
 

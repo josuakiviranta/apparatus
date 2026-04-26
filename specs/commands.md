@@ -159,16 +159,17 @@ Manages DOT-graph pipelines for multi-step workflows.
 Runs a DOT-graph pipeline. Each node in the graph is executed by a handler resolved from node attributes (shape, agent, type). The `agent` attribute routes to named agents via the AgentHandler.
 
 **Flags:**
-- `--project <folder>` — sets `$project` and the cwd for work nodes.
+- `--project <folder>` — sets `$project` and the cwd for work nodes. Required in headless mode (cron / non-TTY); cwd is ambiguous otherwise.
 - `--var <key>=<value>` — passes a caller variable into the pipeline context (repeatable).
-- `--resume` — resumes from the last checkpoint instead of starting fresh.
+- `--resume [runId]` — resumes from the last checkpoint instead of starting fresh. Bare form auto-selects when exactly one prior run exists for the project; passes a list and exits 1 when more than one exists. Pass an explicit `<runId>` to disambiguate.
+
+**Path layout:**
+All per-run state lives at `~/.ralph/<projectKey>/runs/<runId>/`, which holds both `pipeline.jsonl` (the JSONL trace) and `checkpoint.json`. `<projectKey>` is `<basename>-<6 hex chars of sha256(absolute project path)>`; `<runId>` is a fresh 8-char UUID for every run. Tests can override the parent root via `RALPH_RUNS_ROOT`.
 
 **Checkpoint & resume:**
-The engine writes `~/.ralph/runs/<slug>/checkpoint.json` after every node advance (success, fail-edge routing, or retry exhaustion). The checkpoint captures the next `currentNode`, `completedNodes`, accumulated `context`, and `nodeRetries`. Running without `--resume` wipes `~/.ralph/runs/<slug>/` and starts from the `Mdiamond` start node. Running with `--resume` loads the checkpoint and continues from the node that was about to execute when the run stopped — this works after Ctrl-C, node failures, or process crashes alike.
+The engine writes `checkpoint.json` after every node advance (success, fail-edge routing, or retry exhaustion). The checkpoint captures the next `currentNode`, `completedNodes`, accumulated `context`, and `nodeRetries`. A fresh run mints a new `<runId>` directory and never overwrites a prior run; older runs are pruned lazily at run-start (last 50 per project, override with `RALPH_RUNS_KEEP=N`). Running with `--resume` loads the resolved checkpoint and continues from the node that was about to execute when the run stopped — this works after Ctrl-C, node failures, or process crashes alike.
 
-Two different paths under `~/.ralph/runs/` should not be confused:
-- `~/.ralph/runs/<slug>/` — stable across runs for a given pipeline; holds `checkpoint.json` and per-node `status.json`. `<slug>` is `graph.name` lowercased. This is what `--resume` reads.
-- `~/.ralph/runs/<runId>/pipeline.jsonl` — fresh `<runId>` (8-char UUID) regenerated every run; holds the JSONL trace. This is the `run:` path printed in the pipeline header and consumed by `ralph pipeline trace`.
+**`pipeline trace <runId>`:** accepts an optional `--project <folder>` to pin the lookup to one project. Without it, the runId is resolved by scanning `~/.ralph/*/runs/` across all projects; collision (same runId in multiple projects) is reported as an error.
 
 **Tool-node idempotency requirement:**
 Because `--resume` re-executes the node that was interrupted, scripts referenced by tool nodes (`type="tool"` + `script_file=`) must be idempotent. A script that enforces strict input-state invariants (e.g. "state must be X before I can act") will fail on resume when a prior partial attempt already advanced the state. Detect that the desired outcome is already present and exit 0 as a no-op instead. Reference pattern: `pipelines/scripts/mark-dispatched.mjs` — same `plan_path` → idempotent no-op, conflicting `plan_path` → error exit.
@@ -176,7 +177,7 @@ Because `--resume` re-executes the node that was interrupted, scripts referenced
 **Exit codes:**
 - Exits with code 1 on any of the four pre-engine guard failures: the `.dot` file is missing, DOT parsing fails, declared `Graph.inputs` are not satisfied by `--var` or resolved defaults, or the pipeline is marked headless-safe and no TTY is attached.
 - Exits with code 0 on engine success (all nodes advanced to an `exit` node without failure).
-- Exits with code 0 on engine failure as well — when a node's retry budget is exhausted the Ink renderer paints `fail`, a post-failure tip suggesting `ralph pipeline refine <name>` is emitted, and the process returns normally. This is a deliberate discoverability choice (see `specs/2026-04-17-refine-run-history-and-failure-tip-design.md`); scripts that need to detect run failure should parse the JSONL trace at `~/.ralph/runs/<runId>/pipeline.jsonl` rather than rely on the exit code.
+- Exits with code 0 on engine failure as well — when a node's retry budget is exhausted the Ink renderer paints `fail`, a post-failure tip suggesting `ralph pipeline refine <name>` is emitted, and the process returns normally. This is a deliberate discoverability choice (see `specs/2026-04-17-refine-run-history-and-failure-tip-design.md`); scripts that need to detect run failure should parse the JSONL trace at `~/.ralph/<projectKey>/runs/<runId>/pipeline.jsonl` rather than rely on the exit code.
 
 **Tool-node `cwd`:** every `type="tool"` node must declare a `cwd=` attribute. The command executes with that directory as cwd.
 

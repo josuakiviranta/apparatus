@@ -69,7 +69,7 @@ ralph pipeline run pipelines/my-pipeline.dot \
   --var specs_dir=docs/specs
 ```
 
-Pass `--resume` to continue a pipeline after Ctrl-C, a node failure, or a crash. The engine checkpoints after every node advance to `~/.ralph/runs/<slug>/checkpoint.json`; `--resume` reads that file and picks up at the node that was about to execute when the run stopped (do not confuse this with the per-run `~/.ralph/runs/<runId>/pipeline.jsonl` trace that is regenerated fresh every run). For `--resume` to be useful, tool-node scripts must be idempotent — a script that hard-requires "state before I act" will fail on retry; detect the desired outcome is already present and exit 0 as a no-op instead.
+Pass `--resume [runId]` to continue a pipeline after Ctrl-C, a node failure, or a crash. The engine checkpoints after every node advance to `~/.ralph/<projectKey>/runs/<runId>/checkpoint.json` — the trace `pipeline.jsonl` lives in the same directory. Bare `--resume` auto-selects when exactly one prior run exists for the project; pass an explicit `<runId>` to disambiguate. Older runs are pruned lazily (last 50 per project, override with `RALPH_RUNS_KEEP`). For `--resume` to be useful, tool-node scripts must be idempotent — a script that hard-requires "state before I act" will fail on retry; detect the desired outcome is already present and exit 0 as a no-op instead.
 
 ```bash
 ralph pipeline validate <pipeline.dot>

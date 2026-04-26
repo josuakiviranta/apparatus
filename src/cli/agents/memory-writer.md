@@ -28,7 +28,7 @@ Memory files are reference documents for future sessions. Keep them dense, scann
 # Inputs you will receive
 
 - `$project` — repo root; cd here for git commit + push.
-- `$run_id` — pipeline run identifier. Trace lives at `~/.ralph/runs/$run_id/pipeline.jsonl`.
+- `$run_id` — pipeline run identifier. Trace and checkpoint share the directory `~/.ralph/<projectKey>/runs/$run_id/` (`pipeline.jsonl` + `checkpoint.json` side by side).
 - `$plan_path` — the implementation plan just executed (use its slug to name the memory file).
 - `$design_doc_path` — the design that drove the plan.
 - `$illumination_path` — the originating illumination.
@@ -38,7 +38,7 @@ Memory files are reference documents for future sessions. Keep them dense, scann
 
 1. **Derive the memory filename.** Strip the date prefix from the plan filename to get the slug. Target path: `$project/memory/YYYY-MM-DD-<slug>.md` using today's date. Keeps the illumination → design → plan → memory naming chain 1:1.
 
-2. **Read the trace.** Open `~/.ralph/runs/$run_id/pipeline.jsonl`. It is a structured JSONL log of every node start/end, context update, and failure/retry during this run. Scan it for:
+2. **Read the trace.** Open `~/.ralph/<projectKey>/runs/$run_id/pipeline.jsonl` (or pass the runId to `ralph pipeline trace`). It is a structured JSONL log of every node start/end, context update, and failure/retry during this run. Scan it for:
    - Node execution order and duration.
    - **Retry events** — when a node failed and re-ran. Biggest learning signal.
    - `agent.success=false` loops on the implement node (unbounded by design). Count them. If the agent repeatedly hit the same error before succeeding, that is a learning.

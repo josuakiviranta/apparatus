@@ -56,7 +56,7 @@ Pipeline engine (DOT-graph workflows):
   ralph pipeline run workflow.dot                  Execute a pipeline
   ralph pipeline run review --project my-app       Run by workflow name
   ralph pipeline run workflow.dot --resume         Continue a pipeline after Ctrl-C or node failure
-                                                   (checkpoint in ~/.ralph/runs/<slug>/checkpoint.json)
+                                                   (checkpoint in ~/.ralph/<projectKey>/runs/<runId>/checkpoint.json)
 
   DOT file anatomy:
     digraph my_pipeline {
@@ -164,12 +164,13 @@ Examples:
 Work nodes (shape=box) require --project to know which codebase to operate on.
 Add max_iterations=N to cap how many agentic loop iterations a node can run.
 
-Checkpoints: the engine writes ~/.ralph/runs/<slug>/checkpoint.json after every
-node advance. --resume loads that checkpoint (currentNode, completedNodes,
-context, nodeRetries) and continues from the node that was about to execute
-when the run stopped. Works after Ctrl-C, node failures, or process crashes.
-Without --resume, a fresh run deletes the prior run directory and starts over.
-Scripts called from tool nodes should be idempotent so --resume can safely
+Checkpoints: the engine writes ~/.ralph/<projectKey>/runs/<runId>/checkpoint.json
+after every node advance. --resume loads that checkpoint (currentNode,
+completedNodes, context, nodeRetries) and continues from the node that was about
+to execute when the run stopped. Works after Ctrl-C, node failures, or process
+crashes. Without --resume, a fresh run starts in a new <runId> directory; older
+runs are pruned lazily (keep last 50, override with RALPH_RUNS_KEEP). Scripts
+called from tool nodes should still be idempotent so --resume can safely
 re-execute the node that failed.
 `)
     .option("--project <folder>", "Project folder ($project variable and cwd for work nodes)")
