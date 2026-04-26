@@ -1,7 +1,7 @@
 import { readFileSync, existsSync, readdirSync, mkdirSync, rmSync, statSync } from "fs";
 import { resolve, join, basename, dirname, relative } from "path";
 import { homedir } from "os";
-import { randomUUID } from "crypto";
+import { randomUUID, createHash } from "crypto";
 import { JsonlPipelineTracer } from "../../attractor/tracer/jsonl-pipeline-tracer.js";
 import type { PipelineTracer } from "../../attractor/tracer/pipeline-tracer.js";
 import { parseDot, validateGraph, validateOrRaise } from "../../attractor/core/graph.js";
@@ -45,6 +45,20 @@ export interface PipelineValidateOptions {
 }
 
 interface EdgeDiagnostic { severity: "warning" | "error"; message: string }
+
+/**
+ * Derive a stable, human-readable project key from an absolute project path.
+ * Shape: `<basename>-<6 hex chars of sha256(absolutePath)>`.
+ *
+ * Used to namespace per-project run state under `~/.ralph/<project-key>/runs/`.
+ * Pure function — no I/O — exported for tests.
+ */
+export function deriveProjectKey(projectPath: string): string {
+  const abs = resolve(projectPath);
+  const base = basename(abs);
+  const hash6 = createHash("sha256").update(abs).digest("hex").slice(0, 6);
+  return `${base}-${hash6}`;
+}
 
 export function diffEdgeLabels(prev: Graph, curr: Graph): EdgeDiagnostic[] {
   const out: EdgeDiagnostic[] = [];
