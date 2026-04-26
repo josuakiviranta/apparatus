@@ -19,4 +19,4 @@ No active plan. Previous plan (Meditations → Stimuli Reorganization) shipped:
 
 - IMPLEMENTATION_PLAN.md was swapped from the prior `memory_writer` lifecycle plan when the meditations refactor began — verify whether that prior plan should be restored or considered superseded before starting new work.
 - Pre-existing unstaged changes in `meditations/illuminations/2026-04-15T0000-pipeline-create-is-context-blind.md`, `2026-04-26T2200-janitor-t0900-plan-gap.md`, and untracked `2026-04-26T2300-stimuli-refactor-risk-review.md` were intentionally NOT touched by this refactor. Decide their fate (commit as illuminations or discard) in a separate change.
-- Pre-existing TS diagnostics (deprecated `server.tool` signature in `illumination-server.ts`; `render` field type mismatch in `agent-handler.test.ts:394`) remain — not blocking tests, but worth a future cleanup.
+- Verified 2026-04-26 (loop a76cc57c): typecheck clean, tests 1147/1147. Prior TS-diagnostic note (deprecated `server.tool` / `agent-handler.test.ts:394` `render` mismatch) was stale — `agent-handler.test.ts` does not exist and `tsc --noEmit` reports zero diagnostics. Removed.
