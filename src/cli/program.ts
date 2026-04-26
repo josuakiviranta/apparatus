@@ -173,9 +173,9 @@ Scripts called from tool nodes should be idempotent so --resume can safely
 re-execute the node that failed.
 `)
     .option("--project <folder>", "Project folder ($project variable and cwd for work nodes)")
-    .option("--resume", "Resume from last checkpoint (after Ctrl-C or node failure)")
+    .option("--resume [runId]", "Resume from a checkpoint. Bare flag auto-selects the only run; pass <runId> to pick one explicitly")
     .option("--var <key=value>", "pass caller variable (repeatable)", collectKV, {} as Record<string, string>)
-    .action(async (dotFile: string, opts: { project?: string; resume?: boolean }) => {
+    .action(async (dotFile: string, opts: { project?: string; resume?: boolean | string }) => {
       await pipelineRunCommand(dotFile, {
         project: opts.project,
         resume: opts.resume,

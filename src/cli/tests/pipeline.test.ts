@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync, existsSync } from "fs";
+// (mkdirSync is also used by resume tests below to seed run directories)
 import { tmpdir } from "os";
 import { join } from "path";
 
@@ -217,6 +218,74 @@ describe("pipelineRunCommand", () => {
     expect(nodes.join(" ")).not.toContain("Approve?");
     expect(nodes.join(" ")).not.toContain("start");
     expect(nodes.join(" ")).not.toContain("done");
+  });
+});
+
+describe("pipelineRunCommand — --resume resolution", () => {
+  let dir: string;
+  beforeEach(() => {
+    vi.clearAllMocks();
+    dir = mkdtempSync(join(tmpdir(), "ralph-pipeline-resume-"));
+    process.env.RALPH_RUNS_ROOT = dir;
+  });
+  afterEach(() => {
+    delete process.env.RALPH_RUNS_ROOT;
+    rmSync(dir, { recursive: true });
+  });
+
+  it("auto-selects the only run when --resume is bare and one run exists", async () => {
+    const dotFile = join(dir, "test.dot");
+    writeFileSync(dotFile, VALID_DOT);
+    await pipelineRunCommand(dotFile, { project: dir });
+    const calls = (engine.runPipeline as ReturnType<typeof vi.fn>).mock.calls;
+    const firstLogsRoot = calls[0][1].logsRoot as string;
+    // engine is mocked → no dir created on disk; seed manually so resolver finds it.
+    mkdirSync(firstLogsRoot, { recursive: true });
+
+    await pipelineRunCommand(dotFile, { project: dir, resume: true });
+    const secondLogsRoot = calls[calls.length - 1][1].logsRoot as string;
+    expect(secondLogsRoot).toBe(firstLogsRoot);
+  });
+
+  it("errors when --resume is bare and >1 runs exist", async () => {
+    const dotFile = join(dir, "test.dot");
+    writeFileSync(dotFile, VALID_DOT);
+    await pipelineRunCommand(dotFile, { project: dir });
+    const calls = (engine.runPipeline as ReturnType<typeof vi.fn>).mock.calls;
+    const firstLogsRoot = calls[0][1].logsRoot as string;
+    mkdirSync(firstLogsRoot, { recursive: true });
+    await pipelineRunCommand(dotFile, { project: dir });
+    const secondLogsRoot = calls[1][1].logsRoot as string;
+    mkdirSync(secondLogsRoot, { recursive: true });
+
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(((_c?: number) => {
+      throw new Error("__exit__");
+    }) as never);
+    const errSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      await expect(
+        pipelineRunCommand(dotFile, { project: dir, resume: true }),
+      ).rejects.toThrow("__exit__");
+      const err = (errSpy.mock.calls.map(c => String(c[0])).join(""));
+      expect(err).toMatch(/multiple runs|--resume <runId>/i);
+    } finally {
+      exitSpy.mockRestore();
+      errSpy.mockRestore();
+    }
+  });
+
+  it("loads the explicit runId when --resume <runId> is given", async () => {
+    const dotFile = join(dir, "test.dot");
+    writeFileSync(dotFile, VALID_DOT);
+    await pipelineRunCommand(dotFile, { project: dir });
+    const firstCall = (engine.runPipeline as ReturnType<typeof vi.fn>).mock.calls[0];
+    const firstLogsRoot = firstCall[1].logsRoot as string;
+    mkdirSync(firstLogsRoot, { recursive: true });
+    const targetRunId = firstLogsRoot.split(/[\\/]/).pop()!;
+
+    await pipelineRunCommand(dotFile, { project: dir, resume: targetRunId });
+    const calls = (engine.runPipeline as ReturnType<typeof vi.fn>).mock.calls;
+    expect(calls[calls.length - 1][1].logsRoot).toBe(firstLogsRoot);
   });
 });
 

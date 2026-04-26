@@ -31,7 +31,7 @@ import { parseClaudeEvent } from "../lib/parseClaudeEvent.js";
 
 export interface PipelineRunOptions {
   project?: string;
-  resume?: boolean;
+  resume?: boolean | string;
   logsRoot?: string;
   /** Extra key=value pairs injected as $variable context for variableExpansionTransform */
   variables?: Record<string, string>;
@@ -58,6 +58,49 @@ export function deriveProjectKey(projectPath: string): string {
   const base = basename(abs);
   const hash6 = createHash("sha256").update(abs).digest("hex").slice(0, 6);
   return `${base}-${hash6}`;
+}
+
+/**
+ * Resolve the target logsRoot for a `--resume` invocation.
+ *  - resume === string: that exact runId. Error if dir is missing.
+ *  - resume === true:
+ *      0 runs → return null and let the engine warn-and-start-fresh path run.
+ *      1 run  → auto-select.
+ *      N>1    → print list + exit 1.
+ */
+export function resolveResumeLogsRoot(
+  runsRoot: string,
+  resume: true | string,
+): string | null {
+  if (typeof resume === "string") {
+    const dir = join(runsRoot, resume);
+    if (!existsSync(dir)) {
+      process.stderr.write(`[ralph] --resume ${resume}: run dir not found: ${dir}\n`);
+      process.exit(1);
+    }
+    return dir;
+  }
+  if (!existsSync(runsRoot)) return null;
+  const entries: { name: string; path: string; mtime: number }[] = [];
+  for (const name of readdirSync(runsRoot)) {
+    const path = join(runsRoot, name);
+    try {
+      const st = lstatSync(path);
+      if (!st.isDirectory()) continue;
+      entries.push({ name, path, mtime: st.mtimeMs });
+    } catch { continue; }
+  }
+  if (entries.length === 0) return null;
+  if (entries.length === 1) return entries[0].path;
+  entries.sort((a, b) => b.mtime - a.mtime);
+  const list = entries
+    .map(e => `  ${e.name}  (${new Date(e.mtime).toISOString()})`)
+    .join("\n");
+  process.stderr.write(
+    `[ralph] multiple runs exist for this project; pass --resume <runId> to disambiguate:\n${list}\n`,
+  );
+  process.exit(1);
+  return null;
 }
 
 /**
@@ -317,7 +360,17 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
     const keep = Number(process.env.RALPH_RUNS_KEEP ?? "50");
     gcOldRuns(runsRoot, Number.isFinite(keep) && keep > 0 ? keep : 50);
   }
-  const logsRoot = opts.logsRoot ?? join(runsRoot, runId);
+  let logsRoot: string;
+  if (opts.logsRoot) {
+    logsRoot = opts.logsRoot;
+  } else if (opts.resume) {
+    const resolved = resolveResumeLogsRoot(runsRoot, opts.resume);
+    // resolved === null means 0 prior runs; engine.ts handles "no checkpoint"
+    // warning when --resume hits an empty logsRoot.
+    logsRoot = resolved ?? join(runsRoot, runId);
+  } else {
+    logsRoot = join(runsRoot, runId);
+  }
   const tracePath = join(logsRoot, "pipeline.jsonl");
   const jsonlTracer = new JsonlPipelineTracer(tracePath);
   let latestContext: Record<string, unknown> = {};
@@ -394,7 +447,7 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
         : new AutoApproveInterviewer(),
       signal: ac.signal,
       project: opts.project,
-      resume: opts.resume,
+      resume: Boolean(opts.resume),
       callerContext: opts.variables,
       traceWriter: tracer,
 
