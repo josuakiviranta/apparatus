@@ -171,14 +171,16 @@ describe("pipelineRunCommand", () => {
     }
   });
 
-  it("uses stable slug-based logsRoot when none provided", async () => {
+  it("places logsRoot under ~/.ralph/<projectKey>/runs/<runId> when none provided", async () => {
     const dotFile = join(dir, "test.dot");
     writeFileSync(dotFile, VALID_DOT);
-    await pipelineRunCommand(dotFile);
+    await pipelineRunCommand(dotFile, { project: dir });
     const call = (engine.runPipeline as ReturnType<typeof vi.fn>).mock.calls[0];
     const opts = call[1];
-    // logsRoot should be ~/.ralph/runs/<slug>, not contain a timestamp
-    expect(opts.logsRoot).toContain(join(".ralph", "runs", "g"));
+    // logsRoot shape: <ralph-root>/<basename>-<6hex>/runs/<8hex runId>
+    expect(opts.logsRoot).toMatch(
+      new RegExp(`\\.ralph[\\\\/].+-[0-9a-f]{6}[\\\\/]runs[\\\\/][0-9a-f]{8}$`),
+    );
     expect(opts.logsRoot).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
   });
 

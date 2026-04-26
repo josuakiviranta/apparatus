@@ -42,16 +42,22 @@ describe("pipeline run — failureReason surfacing", () => {
     }) as never);
 
     await expect(
-      pipelineRunCommand(join(work, "fail.dot"), { project: work, logsRoot: join(work, "logs") }),
+      pipelineRunCommand(join(work, "fail.dot"), { project: work }),
     ).rejects.toThrow("__exit__");
 
     exitSpy.mockRestore();
 
     expect(existsSync(runsRoot)).toBe(true);
-    const runDirs = readdirSync(runsRoot);
+    // New layout: runsRoot/<projectKey>/runs/<runId>/pipeline.jsonl
+    const projectDirs = readdirSync(runsRoot);
+    expect(projectDirs.length).toBeGreaterThan(0);
+    const projectDir = projectDirs[0];
+    const runsDir = join(runsRoot, projectDir, "runs");
+    const runDirs = readdirSync(runsDir);
     expect(runDirs.length).toBeGreaterThan(0);
-    const runDir = runDirs.find(d => existsSync(join(runsRoot, d, "pipeline.jsonl"))) ?? runDirs[0];
-    const trace = readFileSync(join(runsRoot, runDir, "pipeline.jsonl"), "utf8");
+    const runDir = runDirs.find(d => existsSync(join(runsDir, d, "pipeline.jsonl"))) ?? runDirs[0];
+    const tracePath = join(runsDir, runDir, "pipeline.jsonl");
+    const trace = readFileSync(tracePath, "utf8");
     const failingEnd = trace
       .trim()
       .split("\n")
@@ -62,6 +68,6 @@ describe("pipeline run — failureReason surfacing", () => {
 
     expect(writtenStderr).toMatch(/✗ pipeline failed at node runner: .*boom-stderr/);
     expect(writtenStderr).toContain("trace: ");
-    expect(writtenStderr).toContain(join(runsRoot, runDir, "pipeline.jsonl"));
+    expect(writtenStderr).toContain(tracePath);
   });
 });

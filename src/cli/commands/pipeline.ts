@@ -287,17 +287,12 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
     process.exit(1);
   }
 
-  const slug = graph.name.replace(/\s+/g, "-").toLowerCase();
-  const logsRoot = opts.logsRoot ?? join(homedir(), ".ralph", "runs", slug);
-
-  // For fresh runs (not --resume), clean any previous run directory
-  if (!opts.resume && existsSync(logsRoot) && !opts.logsRoot) {
-    rmSync(logsRoot, { recursive: true, force: true });
-  }
-
   const runId = randomUUID().slice(0, 8);
-  const runsRoot = process.env.RALPH_RUNS_ROOT ?? join(homedir(), ".ralph", "runs");
-  const tracePath = join(runsRoot, runId, "pipeline.jsonl");
+  const ralphRoot = process.env.RALPH_RUNS_ROOT ?? join(homedir(), ".ralph");
+  const projectKey = deriveProjectKey(opts.project ?? process.cwd());
+  const runsRoot = join(ralphRoot, projectKey, "runs");
+  const logsRoot = opts.logsRoot ?? join(runsRoot, runId);
+  const tracePath = join(logsRoot, "pipeline.jsonl");
   const jsonlTracer = new JsonlPipelineTracer(tracePath);
   let latestContext: Record<string, unknown> = {};
 
