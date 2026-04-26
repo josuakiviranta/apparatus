@@ -1,4 +1,4 @@
-import { readFileSync, existsSync, readdirSync, mkdirSync, rmSync, statSync, lstatSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync, rmSync, statSync, lstatSync } from "fs";
 import { resolve, join, basename, dirname, relative } from "path";
 import { homedir } from "os";
 import { randomUUID, createHash } from "crypto";
@@ -122,6 +122,28 @@ export function gcOldRuns(runsRoot: string, keep: number): void {
   entries.sort((a, b) => b.mtime - a.mtime);
   for (const e of entries.slice(keep)) {
     rmSync(e.path, { recursive: true, force: true });
+  }
+}
+
+/**
+ * One-time first-run notice: if legacy `~/.ralph/runs/` exists and
+ * `~/.ralph/.layout-v2` does not, print a one-line notice and touch the
+ * sentinel file. Idempotent thereafter.
+ */
+export function maybePrintLayoutV2Notice(): void {
+  const ralphRoot = process.env.RALPH_RUNS_ROOT ?? join(homedir(), ".ralph");
+  const legacy = join(ralphRoot, "runs");
+  const sentinel = join(ralphRoot, ".layout-v2");
+  if (!existsSync(legacy) || existsSync(sentinel)) return;
+  process.stderr.write(
+    "[ralph] Layout changed; previous runs at ~/.ralph/runs/ are preserved " +
+    "but unreachable from the new tooling. Delete with: rm -rf ~/.ralph/runs/\n",
+  );
+  try {
+    mkdirSync(ralphRoot, { recursive: true });
+    writeFileSync(sentinel, "");
+  } catch {
+    // Best-effort: if sentinel write fails, the user sees the notice next run.
   }
 }
 
@@ -360,6 +382,8 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
     );
     process.exit(1);
   }
+
+  maybePrintLayoutV2Notice();
 
   const runId = randomUUID().slice(0, 8);
   const ralphRoot = process.env.RALPH_RUNS_ROOT ?? join(homedir(), ".ralph");
