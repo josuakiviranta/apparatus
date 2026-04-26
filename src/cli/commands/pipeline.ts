@@ -352,6 +352,15 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
     process.exit(1);
   }
 
+  // Headless --project guard: cron/daemon invocations have no meaningful cwd,
+  // so refuse rather than silently using process.cwd() as the project key.
+  if (!process.stdin.isTTY && !opts.project) {
+    process.stderr.write(
+      "[ralph] Headless runs require --project; cwd is ambiguous when invoked from cron/daemon.\n",
+    );
+    process.exit(1);
+  }
+
   const runId = randomUUID().slice(0, 8);
   const ralphRoot = process.env.RALPH_RUNS_ROOT ?? join(homedir(), ".ralph");
   const projectKey = deriveProjectKey(opts.project ?? process.cwd());

@@ -135,7 +135,7 @@ describe("pipelineRunCommand", () => {
   it("calls runPipeline with parsed graph and done on success", async () => {
     const dotFile = join(dir, "test.dot");
     writeFileSync(dotFile, VALID_DOT);
-    await pipelineRunCommand(dotFile, { logsRoot: dir });
+    await pipelineRunCommand(dotFile, { logsRoot: dir, project: dir });
     expect(engine.runPipeline).toHaveBeenCalledTimes(1);
     // The new adapter calls done() on PipelineApp after runPipeline resolves.
     const { renderPipelineApp } = await import("../components/PipelineApp.js");
@@ -163,7 +163,7 @@ describe("pipelineRunCommand", () => {
     try {
       const dotFile = join(dir, "test.dot");
       writeFileSync(dotFile, VALID_DOT);
-      await pipelineRunCommand(dotFile, { logsRoot: dir });
+      await pipelineRunCommand(dotFile, { logsRoot: dir, project: dir });
       const call = (engine.runPipeline as ReturnType<typeof vi.fn>).mock.calls[0];
       const opts = call[1];
       expect(opts.interviewer.constructor.name).toBe("AutoApproveInterviewer");
@@ -188,7 +188,7 @@ describe("pipelineRunCommand", () => {
   it("passes --var values as callerContext to runPipeline", async () => {
     const dotFile = join(dir, "test.dot");
     writeFileSync(dotFile, VALID_DOT);
-    await pipelineRunCommand(dotFile, { logsRoot: dir, variables: { specs_dir: "/tmp/specs", foo: "bar" } });
+    await pipelineRunCommand(dotFile, { logsRoot: dir, project: dir, variables: { specs_dir: "/tmp/specs", foo: "bar" } });
     const call = (engine.runPipeline as ReturnType<typeof vi.fn>).mock.calls[0];
     const opts = call[1];
     expect(opts.callerContext).toEqual({ specs_dir: "/tmp/specs", foo: "bar" });
@@ -204,7 +204,7 @@ describe("pipelineRunCommand", () => {
     }`;
     const dotFile = join(dir, "test-labels.dot");
     writeFileSync(dotFile, dot);
-    await pipelineRunCommand(dotFile, { logsRoot: dir });
+    await pipelineRunCommand(dotFile, { logsRoot: dir, project: dir });
 
     // The new adapter passes node IDs directly as the `nodes` prop to renderPipelineApp.
     const { renderPipelineApp } = await import("../components/PipelineApp.js");
@@ -300,7 +300,7 @@ describe("pipelineRunCommand — onInteractiveRequest", () => {
   it("populates session.history with assistant turns so $node.output is available downstream", async () => {
     const dotFile = join(dir, "test.dot");
     writeFileSync(dotFile, VALID_DOT);
-    await pipelineRunCommand(dotFile, { logsRoot: dir });
+    await pipelineRunCommand(dotFile, { logsRoot: dir, project: dir });
 
     const call = (engine.runPipeline as ReturnType<typeof vi.fn>).mock.calls[0];
     const capturedOnInteractive = call[1].onInteractiveRequest as

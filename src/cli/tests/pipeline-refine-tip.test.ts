@@ -112,7 +112,7 @@ describe("pipelineRunCommand refine tip", () => {
     const dotPath = join(dir, "ok.dot");
     writeFileSync(dotPath, SUCCESS_DOT);
 
-    await pipelineRunCommand(dotPath, { logsRoot: dir });
+    await pipelineRunCommand(dotPath, { logsRoot: dir, project: dir });
 
     expect(findTipLine(logSpy)).toBeUndefined();
   });
@@ -144,7 +144,7 @@ describe("pipelineRunCommand refine tip", () => {
     const dotPath = join(dir, "will-fail.dot");
     writeFileSync(dotPath, SUCCESS_DOT);
 
-    await expect(pipelineRunCommand(dotPath, { logsRoot: dir })).rejects.toThrow("process.exit called");
+    await expect(pipelineRunCommand(dotPath, { logsRoot: dir, project: dir })).rejects.toThrow("process.exit called");
 
     const tipLine = findTipLine(logSpy);
     expect(tipLine).toBeDefined();
