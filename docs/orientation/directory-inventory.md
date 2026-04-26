@@ -11,7 +11,7 @@
 | `docs/` | Design specs (`superpowers/specs/`), code-review records (`superpowers/reviews/`), implementation plans (`superpowers/plans/`), orientation docs (`orientation/`), and the tmux harness guide (`harness/`). |
 | `specs/` | Authoritative feature specs (`architecture.md`, `commands.md`, `meditate.md`, etc.). Source of truth for what each subsystem is supposed to do. |
 | `pipelines/` | `.dot` pipeline definitions, JSON output schemas (`schemas/`), and `smoke/` sub-folder for CI-level pipeline fixtures. |
-| `meditations/` | Meta-meditation lenses (`.md` pattern files) and the `illuminations/` sub-folder for generated insights. |
+| `meditations/` | Two subfolders: `stimuli/` (meta-meditation lenses — `.md` pattern files used as reflection input) and `illuminations/` (LLM-generated insights — output of meditate sessions). |
 | `scenario-tests/` | Shell-based integration tests that drive the CLI end-to-end, organized by feature. Complement vitest unit/component tests in `src/`. |
 | `memory/` | Claude auto-memory files persisted across sessions. Session logs and architectural decisions. |
 | `.claude/` | Local Claude Code settings (`settings.local.json`). Machine-local only, not checked in. |

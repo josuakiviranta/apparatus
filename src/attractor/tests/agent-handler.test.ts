@@ -182,7 +182,7 @@ describe("AgentHandler", () => {
     const call = mockAgentRun.mock.calls[0][0];
     expect(call.variables.ILLUMINATION_SERVER_PATH).toMatch(/illumination-server\.(ts|js)$/);
     expect(call.variables.PROJECT_ROOT).toBe("/tmp/specific-project");
-    expect(call.variables.META_MEDITATIONS_DIR).toMatch(/meditations$/);
+    expect(call.variables.META_MEDITATIONS_DIR).toMatch(/meditations\/stimuli$/);
   });
 
   it("falls back PROJECT_ROOT to cwd when projectDir is not set", async () => {

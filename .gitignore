@@ -20,5 +20,5 @@ compose-*/
 S-*/
 # tsx runner cache
 tsx-*/
-meditations/.triage/
+meditations/stimuli/.triage/
 .worktrees

@@ -59,7 +59,7 @@ export function getMetaMeditationsDir(): string {
   const packageRoot = isProduction()
     ? join(__dirname, "../..")
     : join(__dirname, "../../..");
-  return join(packageRoot, "meditations");
+  return join(packageRoot, "meditations", "stimuli");
 }
 
 export function getIlluminationServerPath(): string {

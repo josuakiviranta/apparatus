@@ -1,4 +1,4 @@
-import { existsSync } from "fs";
+import { existsSync, readdirSync } from "fs";
 import { describe, it, expect } from "vitest";
 import { getAssetPath, getPromptPath, getKickoffPromptPath, getMeditationPromptPath, getIlluminationServerPath, getMetaMeditationsDir, getMeditateCreatePromptPath } from "../lib/assets";
 
@@ -28,14 +28,13 @@ describe("assets", () => {
     expect(p).toMatch(/illumination-server\.(ts|js)$/);
   });
 
-  it("getMetaMeditationsDir returns a path ending in meditations", () => {
+  it("getMetaMeditationsDir returns a path to the stimulus library with all lens files present", () => {
     const p = getMetaMeditationsDir();
-    expect(p).toMatch(/meditations$/);
-  });
-
-  it("getMetaMeditationsDir resolves to an existing directory in the current repo", () => {
-    const p = getMetaMeditationsDir();
+    expect(p).toMatch(/meditations\/stimuli$/);
     expect(existsSync(p)).toBe(true);
+    const files = readdirSync(p).filter((f) => f.endsWith(".md"));
+    expect(files.length).toBeGreaterThanOrEqual(29);
+    expect(files).toContain("red-green-tdd-is-non-negotiable.md");
   });
 
   it("getMeditateCreatePromptPath returns path ending in PROMPT_meditate_create.md", () => {

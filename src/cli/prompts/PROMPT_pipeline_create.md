@@ -83,7 +83,7 @@ project that registers the agent as `"code-review"`. A prompt that hardcodes
 |-------------------|-----------------|
 | `agent="implement"` | `agent="$implement_agent"` |
 | `prompt="Read docs/superpowers/specs/"` | `prompt="Read $specs_dir"` + add to `inputs=` |
-| `tool_command="ls meditations/"` | `tool_command="ls $illuminations_dir"` + `inputs=` |
+| `tool_command="ls meditations/stimuli/"` | `tool_command="ls $meditations_dir"` + `inputs=` |
 
 Rule: if a value would differ between two projects using this pipeline, it must be a `$variable`
 declared in `inputs=`.
