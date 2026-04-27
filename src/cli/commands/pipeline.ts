@@ -1040,6 +1040,12 @@ export interface PipelineShowOptions {
   project?: string;
 }
 
+async function renderDotToSvg(dotSrc: string): Promise<string> {
+  const { Graphviz } = await import("@hpcc-js/wasm-graphviz");
+  const gv = await Graphviz.load();
+  return gv.dot(dotSrc);
+}
+
 export async function pipelineShowCommand(
   dotFile: string,
   opts: PipelineShowOptions = {},
@@ -1088,7 +1094,25 @@ export async function pipelineShowCommand(
   for (const e of errors) await output.error(formatDiag(e));
   if (errors.length > 0) return 1;
 
-  // Renderer is wired in Chunk 3. For now, treat a valid graph as success
-  // without writing anything.
+  let svg: string;
+  try {
+    svg = await renderDotToSvg(src);
+  } catch (err) {
+    await output.error(`graphviz render failed: ${(err as Error).message}`);
+    return 1;
+  }
+
+  const svgPath = join(dirname(absPath), basename(absPath, ".dot") + ".svg");
+  try {
+    writeFileSync(svgPath, svg);
+  } catch (err) {
+    await output.error(`Failed to write ${svgPath}: ${(err as Error).message}`);
+    return 1;
+  }
+
+  await output.success(
+    `Wrote ${relative(process.cwd(), svgPath) || svgPath} ` +
+    `(${graph.nodes.size} nodes, ${graph.edges.length} edges)`,
+  );
   return 0;
 }
