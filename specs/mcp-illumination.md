@@ -29,16 +29,26 @@ Writes a file to the illuminations output directory.
 - **Path:** `<projectRoot>/meditations/illuminations/<filename>`
 - **Creates** the directory if it doesn't exist
 - **Restricted** to that single output directory — no writes elsewhere
+- After lifecycle transitions, files may be moved by `mark_implemented` or `mark_archived` to sibling directories (see those tool sections).
 
 ### `list_illuminations`
 
-Lists all illuminations written to this project, with descriptions.
+Lists illuminations written to this project, with descriptions. Routes to a directory by `status`.
 
-- **Params:** none
-- **Reads from** `<projectRoot>/meditations/illuminations/`
+- **Params:** `{ status?: "open" | "dispatched" | "archived" | "implemented" }`
+- **Reads from** (status determines source dir):
+
+  | `status` arg | Source dir | Inline frontmatter filter |
+  |---|---|---|
+  | `"open"` | `meditations/illuminations/` | `status: open` |
+  | `"dispatched"` | `meditations/illuminations/` | `status: dispatched` |
+  | `"archived"` | `meditations/archived-illuminations/` | none (whole dir is archived) |
+  | `"implemented"` | `meditations/implemented-illuminations/` | none (whole dir is implemented) |
+  | none / no filter | union of all three dirs | none |
+
 - **Returns** one line per file: `<filename> — <description>` (sorted by filename)
 - Files without frontmatter show `(no description)`
-- Returns `"No illuminations found."` if directory is empty or missing
+- Returns `"No illuminations found."` if matched directories are empty or missing
 
 ### `read_file`
 
@@ -83,7 +93,10 @@ Reads a specific meditation lens file.
 Marks an illumination as implemented. Valid from status `open` or `dispatched`.
 
 - **Params:** `{ filename: string }`
-- **Modifies** frontmatter `status` field in the illumination file
+- **Modifies** frontmatter `status` field to `implemented`, adds `implemented_at` key
+- **Moves** file from `meditations/illuminations/<filename>` to `meditations/implemented-illuminations/<filename>`
+- **Auto-commits** with message `meditate: implement <filename>` (best-effort; non-fatal if git unavailable)
+- **Returns** `{ success, filename, previous_status, new_status, new_path }` where `new_path` is the post-move location
 
 ### `mark_dispatched`
 
@@ -94,25 +107,28 @@ Marks an illumination as dispatched after a plan has been generated. Valid only 
 
 ### `mark_archived`
 
-Archives an illumination. Moves the file to an `archive/` subdirectory. Valid from any status except `archived`.
+Archives an illumination. Valid from any status except `archived`.
 
 - **Params:** `{ filename: string, reason: string }`
-- **Moves** file to `<projectRoot>/meditations/illuminations/archive/<filename>`
+- **Modifies** frontmatter `status` field to `archived`, adds `archived_at` and `reason` keys
+- **Moves** file from `<projectRoot>/meditations/illuminations/<filename>` to `<projectRoot>/meditations/archived-illuminations/<filename>`
+- **Auto-commits** with message `meditate: archive <filename>` (best-effort; non-fatal if git unavailable)
+- **Returns** `{ success, filename, previous_status, new_status, archive_path }` where `archive_path` is the post-move location
 
 ## Path Restrictions
 
 | Tool | Scope |
 |------|-------|
 | `write_illumination` | `<projectRoot>/meditations/illuminations/` only |
-| `list_illuminations` | `<projectRoot>/meditations/illuminations/` (read-only) |
+| `list_illuminations` | `<projectRoot>/meditations/{illuminations,archived-illuminations,implemented-illuminations}/` (read-only) |
 | `read_file` | Anywhere inside `projectRoot` |
 | `glob_files` | Anywhere inside `projectRoot` |
 | `project_tree` | Anywhere inside `projectRoot` |
 | `list_meta_meditations` | `meditationsDir` (read-only) |
 | `read_meta_meditation` | `meditationsDir` (read-only) |
-| `mark_implemented` | `<projectRoot>/meditations/illuminations/` (modify frontmatter) |
+| `mark_implemented` | `<projectRoot>/meditations/illuminations/` → `implemented-illuminations/` (move) |
 | `mark_dispatched` | `<projectRoot>/meditations/illuminations/` (modify frontmatter) |
-| `mark_archived` | `<projectRoot>/meditations/illuminations/` → `archive/` (move) |
+| `mark_archived` | `<projectRoot>/meditations/illuminations/` → `archived-illuminations/` (move) |
 
 ## Dependencies
 
