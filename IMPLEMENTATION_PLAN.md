@@ -1864,35 +1864,27 @@ git commit -m "test(pipeline): full-topology validation of illumination-to-imple
 
 The four locked assertions in `src/attractor/tests/illumination-pipeline-flow.test.ts` are real and falsifiable: dropping `inputs:` from `verifier.md` would break test 1; deleting `$project` from RESERVED_VARS would break test 2; removing any `default_refinements=""` on a converging branch would break test 3; turning the retry edge into a non-back-edge requirement would break test 4.
 
-### Task 2.13: Chunk-2 review checkpoint
+### Task 2.13: Chunk-2 review checkpoint — SHIPPED 2026-04-27
 
-- [ ] **Step 1: Verify the success criteria for the chunk**
+**Chunk 2 status: SHIPPED** — all 13 tasks complete, tag `chunk-2-inputs-flow-validator`. 1180/1180 vitest tests green; `tsc --noEmit` clean. plan-document-reviewer APPROVED with diff-pinned evidence per criterion.
+
+- [x] **Step 1: Verify the success criteria for the chunk** — all 8 criteria proven by `git show <sha> -- file` evidence (see plan-document-reviewer report).
 
 Check that:
-1. `produces_redundant_with_outputs` errors on subset/superset/disjoint, not just exact match (Task 2.1)
-2. `resolveAgent("verifier", { bundledDir })` end-to-end test in place (Task 2.2)
-3. `AgentConfig.inputs?: string[]` carries through frontmatter → registry → AgentConfig (Tasks 2.3, 2.4)
-4. `flow-analyzer.ts` exports `computeVarsInScope` with correct intersection-at-converging-branches semantics (Task 2.5)
-5. `missing_input_producer` rule is in place; `debugProducedKeys` hack is removed (Task 2.6)
-6. `branch_incomplete_input`, `input_type_mismatch`, `orphan_output`, `required_caller_vars` rules are in place (Tasks 2.7 — 2.10)
-7. `verifier.md` declares `inputs:`; pipeline validates green (Task 2.11)
-8. Full-topology test against `illumination-to-implementation.dot` is green (Task 2.12)
+1. `produces_redundant_with_outputs` errors on subset/superset/disjoint, not just exact match (Task 2.1) — proven `5b869b7` (`graph.ts` ~L421-449)
+2. `resolveAgent("verifier", { bundledDir })` end-to-end test in place (Task 2.2) — proven `19f3244` (`agent-registry-bundled.test.ts`)
+3. `AgentConfig.inputs?: string[]` carries through frontmatter → registry → AgentConfig (Tasks 2.3, 2.4) — proven `b709611` + `b1b7e1e`
+4. `flow-analyzer.ts` exports `computeVarsInScope` with correct intersection-at-converging-branches semantics (Task 2.5) — proven `389c468`
+5. `missing_input_producer` rule is in place; `debugProducedKeys` hack is removed (Task 2.6) — proven `df5a755`
+6. `branch_incomplete_input`, `input_type_mismatch`, `orphan_output`, `required_caller_vars` rules are in place (Tasks 2.7 — 2.10) — proven `113dd4d`, `8c3ee63`, `e111804`, `b7e5692`
+7. `verifier.md` declares `inputs:`; pipeline validates green (Task 2.11) — proven `534b1ea` (`verifier.md:19-23`)
+8. Full-topology test against `illumination-to-implementation.dot` is green (Task 2.12) — proven `7b38afc`
 
-- [ ] **Step 2: Run the full test suite**
+- [x] **Step 2: Run the full test suite** — `Test Files 105 passed (105)` / `Tests 1180 passed (1180)`; `tsc --noEmit` exit 0.
 
-```bash
-npm run test
-```
+- [x] **Step 3: Hand off chunk to plan-document-reviewer for review** — APPROVED.
 
-Expected: all green.
-
-- [ ] **Step 3: Hand off chunk to plan-document-reviewer for review.**
-
-- [ ] **Step 4: Tag the chunk in git**
-
-```bash
-git tag chunk-2-inputs-flow-validator
-```
+- [x] **Step 4: Tag the chunk in git** — `chunk-2-inputs-flow-validator`.
 
 **Surprises to capture in Chunk-2 memory file** (mirror Chunk 1's pattern):
 - Whether `condition="key=value"` parsing in `graph.ts` exposes the LHS/RHS in a structured form (Task 2.8 prereq). **Resolved (2026-04-27, Task 2.8):** parsing was buried inside `evaluateClause` (runtime-only). Extracted to module-level `parseConditionClauses` in `src/attractor/core/conditions.ts` exporting `ConditionClause = {key, op, val}` so validator + runtime now share the same parser → no drift. Refactored `evaluateCondition` to consume the helper.
