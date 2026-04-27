@@ -79,6 +79,18 @@ describe("ensureMeditationDirs", () => {
     ensureMeditationDirs(tmpDir);
     expect(() => ensureMeditationDirs(tmpDir)).not.toThrow();
   });
+
+  it("creates archived-illuminations and implemented-illuminations alongside illuminations", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ralph-meditate-dirs-"));
+    try {
+      ensureMeditationDirs(tmp);
+      expect(existsSync(join(tmp, "meditations", "illuminations"))).toBe(true);
+      expect(existsSync(join(tmp, "meditations", "archived-illuminations"))).toBe(true);
+      expect(existsSync(join(tmp, "meditations", "implemented-illuminations"))).toBe(true);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("appendMeditateGitignore", () => {
