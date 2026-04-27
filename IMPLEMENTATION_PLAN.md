@@ -2548,6 +2548,18 @@ Implemented per Decision 4. Surprises:
 
 **Why:** The meta-template *is* the new `ralph pipeline create` runtime. The scaffolder agent's body fully replaces `src/cli/prompts/PROMPT_pipeline_create.md` and `src/cli/agents/agent-creator.md`, with the runtime agent-table injection lifted up into the agent's own instructions (it inspects the filesystem itself).
 
+**Schema lesson (recorded during Chunk 5 execution, 2026-04-27):** The plan's prescribed `pipeline.dot` snippet had `inputs="pipeline_name,pipelines_dir"` on the **scaffolder node**. `AgentNodeSchema` does not recognize per-node `inputs=` and the validator rejects it. Caller-required vars belong on the **digraph** (matching `illumination-to-implementation/pipeline.dot:3`):
+
+```dot
+digraph pipeline_create {
+  goal="Scaffold a new ralph pipeline interactively"
+  inputs="pipeline_name, pipelines_dir"
+  ...
+}
+```
+
+Future plans for templates / pipelines should put declared caller inputs at the digraph level only.
+
 - [ ] **Step 1 (red): extend `templates-validate.test.ts` for `pipeline-create`**
 
   Add to the existing describe:

@@ -22,6 +22,9 @@ import { parseStreamJsonEvents, streamEvents } from "../lib/stream-formatter.js"
 import { composeCreatePrompt } from "../lib/pipeline-create-prompt.js";
 import { runTwoPhaseClaudeSession } from "../lib/session.js";
 import { resolveBundledTemplate } from "../lib/assets.js";
+// Self-namespace import lets test spies (`vi.spyOn(pipelineMod, "pipelineRunCommand")`)
+// intercept calls made from inside this file. ESM exports are read-only bindings, so
+// a plain `pipelineRunCommand(...)` call would bypass the spy.
 import * as self from "./pipeline.js";
 import * as output from "../lib/output.js";
 import { formatPipelineDiag } from "../lib/pipeline-diag-format.js";
