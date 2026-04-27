@@ -67,9 +67,11 @@ describe("scaffoldProject", () => {
     expect(gitignore).not.toContain("meditations/illuminations/");
   });
 
-  it("does not create meditations/ directory", () => {
+  it("scaffolds the three illumination subdirs", () => {
     scaffoldProject(tmpDir, "my-project");
-    expect(existsSync(join(tmpDir, "meditations"))).toBe(false);
+    expect(existsSync(join(tmpDir, "meditations", "illuminations"))).toBe(true);
+    expect(existsSync(join(tmpDir, "meditations", "archived-illuminations"))).toBe(true);
+    expect(existsSync(join(tmpDir, "meditations", "implemented-illuminations"))).toBe(true);
   });
 
   it("adds scenario-runs/ to .gitignore", () => {
