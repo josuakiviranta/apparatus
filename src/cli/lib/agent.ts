@@ -55,6 +55,7 @@ export interface AgentConfig {
   prompt: string;
   jsonSchema?: string;
   outputs?: Record<string, JsonSchemaFragment>;
+  inputs?: string[];
 }
 
 export interface RunOptions {
@@ -474,5 +475,6 @@ export function validateAgentConfig(
     prompt: config.prompt,
     ...(derivedJsonSchema !== undefined ? { jsonSchema: derivedJsonSchema } : {}),
     ...(config.outputs !== undefined ? { outputs: config.outputs } : {}),
+    ...(config.inputs !== undefined ? { inputs: config.inputs } : {}),
   };
 }
