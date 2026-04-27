@@ -1,7 +1,9 @@
 ---
 date: 2026-04-25
-status: open
+status: archived
 description: mark_plan_implemented is a live MCP tool and the janitor reads plan status to close illuminations, but no pipeline node writes `status: implemented` after work ships — so every plan the automated pipeline produces stays pending indefinitely, and the janitor's reconciliation loop has a permanent open seam at the plan-completion boundary.
+archived_at: 2026-04-27
+reason: Plan closure already wired via memory-writer rubric step 7a calling mark_plan_implemented MCP tool
 ---
 
 ## Core Idea
