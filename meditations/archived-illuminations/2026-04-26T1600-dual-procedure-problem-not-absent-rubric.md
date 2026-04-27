@@ -1,7 +1,9 @@
 ---
 date: 2026-04-26
-status: open
+status: archived
 description: The rubric-prepend fix (shipped v0.1.32) means memory_writer now receives two competing numbered step lists in one prompt — the 8-step rubric and the 6-step node-task inline procedure — and the shorter, later list wins; the fix is deleting the inline steps, not adding tool nodes.
+archived_at: 2026-04-27
+reason: Already shipped - inline steps removed and mark_implemented wired in step 7b of rubric
 ---
 
 ## Core Idea
