@@ -1896,7 +1896,11 @@ Check that:
 
 ---
 
-## Chunk 3: gates as `.md` files (D3)
+## Chunk 3: gates as `.md` files (D3) — SHIPPED 2026-04-27
+
+**Status:** All 9 tasks shipped. Tag `chunk-3-gates-as-md`. 9 commits (`f95821e`..`bf5f080`). Full suite 1202/1202 green; `pipeline validate pipelines/illumination-to-implementation.dot` reports zero errors.
+
+**One unplanned change:** `GateNodeSchema.label` was made optional during Task 3.5 (was required). The schema-level requirement was redundant once `gate_handler_missing` rule exists — semantic enforcement now lives in the validator. Smoke gate (`pipelines/smoke/gate.dot`) still passes (its inline `label=` satisfies the optional schema; gate_handler_missing doesn't fire because label is present).
 
 **Purpose:** Move gate prompts out of `.dot` `label=` attributes into sibling `<node-id>.md` files. Gates self-describe `choices`, `inputs:`, and `outputs:` via YAML frontmatter — matching the agent file shape. The `.dot` keeps `shape=hexagon` (the existing handler discriminator); the new `type: gate` lives only inside the `.md` frontmatter. Inline `label=` remains supported for backward compatibility (smoke fixtures + simple cases).
 
@@ -1917,7 +1921,7 @@ Check that:
 
 ---
 
-### Task 3.1: `GateMdFrontmatterSchema` in `schemas.ts`
+### Task 3.1: `GateMdFrontmatterSchema` in `schemas.ts` — SHIPPED `f95821e`
 
 Define the Zod schema for the gate `.md` frontmatter so downstream loaders / validators have a single source of truth.
 
@@ -1976,7 +1980,7 @@ export type GateMdFrontmatter = z.infer<typeof GateMdFrontmatterSchema>;
 
 ---
 
-### Task 3.2: `parseGateFile` + `resolveGate` loader
+### Task 3.2: `parseGateFile` + `resolveGate` loader — SHIPPED `8648fd3`
 
 New loader that reads `<dotDir>/<nodeId>.md`, parses frontmatter, validates against `GateMdFrontmatterSchema`, and returns `GateConfig` (frontmatter fields + prompt body).
 
@@ -2019,7 +2023,7 @@ export function resolveGate(nodeId: string, opts: { dotDir: string }): GateConfi
 
 ---
 
-### Task 3.3: `WaitHumanHandler` loads body from `.md` when no inline label
+### Task 3.3: `WaitHumanHandler` loads body from `.md` when no inline label — SHIPPED `6dadcbc`
 
 Wire `dotDir` through `EngineOptions` → handler so the handler can call `resolveGate` when `node.label` is missing. Inline-label path stays untouched.
 
@@ -2062,7 +2066,7 @@ if (node.label) {
 
 ---
 
-### Task 3.4: Validator rule `gate_handler_missing` + edge-label/choice consistency
+### Task 3.4: Validator rule `gate_handler_missing` + edge-label/choice consistency — SHIPPED `5a19fa8`
 
 Two related rules:
 1. `gate_handler_missing` — gate has neither inline `label=` nor a parseable sibling `<id>.md`.
@@ -2098,7 +2102,12 @@ Reuse `resolveGate` from Task 3.2; wrap parse in try/catch so a malformed `.md` 
 
 ---
 
-### Tasks 3.5 — 3.8: Migrate the four gates in `illumination-to-implementation.dot`
+### Tasks 3.5 — 3.8: Migrate the four gates in `illumination-to-implementation.dot` — SHIPPED
+
+- Task 3.5 `remove_gate` → `d1b8b60`
+- Task 3.6 `approval_gate` → `e384fdd`
+- Task 3.7 `review_gate` → `f8bcd53`
+- Task 3.8 `tmux_confirm_gate` → `bf5f080`
 
 One task per gate, one commit each. Each task has the same shape (template below). Order matters: smaller / safer gates first.
 
@@ -2140,7 +2149,7 @@ inputs:
 
 ---
 
-### Task 3.9: Chunk-3 review checkpoint
+### Task 3.9: Chunk-3 review checkpoint — SHIPPED 2026-04-27
 
 - [ ] **Step 1: Verify success criteria:**
   1. `GateMdFrontmatterSchema` rejects bad input (Task 3.1).
