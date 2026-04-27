@@ -1,5 +1,4 @@
 import type { Graph } from "../types.js";
-import { toCamel } from "./dot-common.js";
 
 /**
  * Compute the set of variable names in scope at each node.
@@ -109,14 +108,16 @@ export function computeVarsInScope(
       }
     }
 
-    // default_<varname> in DOT is normalized to camelCase defaultVarname at parse time.
-    // Detect these keys and add the original var name (snake_case) to scope.
-    // e.g. node.defaultFoo → adds "foo"; node.defaultTestResult → adds "testResult"
-    // We reverse the toCamel by checking all keys starting with "default" (camelCase prefix).
+    // default_<varname> in DOT is normalized to camelCase defaultVarname at parse time
+    // (toCamel: `_x` → `X`). Recover the original snake_case var name by stripping the
+    // "default" prefix and inverting each capital letter back to `_<lower>`.
+    // e.g. defaultFoo → "foo"; defaultTestResult → "test_result"
     for (const attrKey of Object.keys(node)) {
       if (attrKey.startsWith("default") && attrKey.length > 7) {
-        // Recover the var name: strip the "default" prefix and lowercase the first char
-        const varName = attrKey.charAt(7).toLowerCase() + attrKey.slice(8);
+        const suffix = attrKey.slice(7);
+        const varName =
+          suffix.charAt(0).toLowerCase() +
+          suffix.slice(1).replace(/[A-Z]/g, c => "_" + c.toLowerCase());
         if (varName.length > 0) {
           nodeScope.add(varName);
         }

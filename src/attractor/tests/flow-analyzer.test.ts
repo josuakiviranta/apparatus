@@ -91,6 +91,19 @@ describe("computeVarsInScope", () => {
     expect(scope.get("a")).toEqual(new Set(["project", "run_id"]));
   });
 
+  it("default_<multi_word_key>= recovers snake_case var name (camelCase parse-time normalization is inverted)", () => {
+    const { graph, nodeProduces } = mkGraph(
+      [
+        { id: "start" },
+        { id: "a", defaults: ["test_result"] },
+        { id: "exit" },
+      ],
+      [["start", "a"], ["a", "exit"]],
+    );
+    const scope = computeVarsInScope(graph, nodeProduces);
+    expect(scope.get("a")).toContain("test_result");
+  });
+
   it("cycle (retry loop): back-edge does not contribute to forward scope", () => {
     const { graph, nodeProduces } = mkGraph(
       [
