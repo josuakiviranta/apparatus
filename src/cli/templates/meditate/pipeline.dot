@@ -1,0 +1,11 @@
+digraph meditate {
+  inputs="steer"
+
+  start [shape=Mdiamond];
+  end   [shape=Msquare];
+
+  meditate [shape=box, agent="meditate", interactive=true,
+            prompt="$steer"];
+
+  start -> meditate -> end;
+}
