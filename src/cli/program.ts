@@ -12,6 +12,7 @@ import {
   pipelineRefineCommand,
   pipelineListCommand,
   pipelineTraceCommand,
+  pipelineShowCommand,
 } from "./commands/pipeline";
 import { collectKV } from "./lib/collect-kv.js";
 import { agentListAction, agentShowAction, agentCreateAction } from "./commands/agent";
@@ -245,6 +246,25 @@ Scans <project>/pipelines/*.dot and prints each workflow's name and goal.
     .option("--project <folder>", "Pin trace lookup to one project (skips the cross-project scan)")
     .action(async (runId: string, opts: { nodeReceive?: string; full?: boolean; project?: string }) => {
       await pipelineTraceCommand(runId, opts);
+    });
+
+  pipeline
+    .command("show <dotfile>")
+    .description("Render a pipeline as SVG next to the source file")
+    .addHelpText("after", `
+Examples:
+  ralph pipeline show pipelines/illumination-to-implementation.dot
+  ralph pipeline show review --project my-app
+
+Validates the DOT file (same gate as 'pipeline validate'). On success, writes
+<basename>.svg next to the source file using the bundled WASM graphviz —
+no system 'dot' install required. On any validation error, prints
+file:line:col diagnostics and writes nothing.
+`)
+    .option("--project <folder>", "Project folder (for name shorthand resolution, defaults to cwd)")
+    .action(async (dotFile: string, opts: { project?: string }) => {
+      const code = await pipelineShowCommand(dotFile, opts);
+      process.exit(code);
     });
 
   const agent = program.command("agent").description("Manage agent definitions");

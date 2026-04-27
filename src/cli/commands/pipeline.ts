@@ -1034,3 +1034,26 @@ export async function pipelineRefineCommand(name: string, opts: PipelineRefineOp
   const validateExit = await pipelineValidateCommand(dotPath, { previousGraph });
   process.exit(validateExit);
 }
+
+export interface PipelineShowOptions {
+  /** Project folder used for name-shorthand resolution (mirrors validate/run). */
+  project?: string;
+}
+
+export async function pipelineShowCommand(
+  dotFile: string,
+  opts: PipelineShowOptions = {},
+): Promise<number> {
+  const project = resolve(opts.project ?? process.cwd());
+  const absPath = isNameShorthand(dotFile)
+    ? resolvePipelineArg(dotFile, project)
+    : resolve(dotFile);
+
+  if (!existsSync(absPath)) {
+    await output.error(`Dot file not found: ${absPath}`);
+    return 1;
+  }
+
+  // Validation gate and rendering are added in later chunks.
+  return 0;
+}
