@@ -1,3 +1,7 @@
+> **SUPERSEDED 2026-04-27** by `specs/2026-04-27-illuminations-status-dirs-design.md`. The `archive/` subdir layout described below was never shipped; the new design uses top-level sibling dirs (`meditations/archived-illuminations/`, `meditations/implemented-illuminations/`) instead. Auto-commit and archive-readability fixes from this design are reaffirmed and shipped as part of the supersede.
+
+---
+
 # State Machine Exists, Verifier Ignores It — Design
 
 **Date:** 2026-04-25
