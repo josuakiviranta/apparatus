@@ -148,6 +148,7 @@ Harness gotchas that bite:
 - **Long/quoted payloads need `-l`**: send the literal text via `tmux send-keys -t <session>:<window> -l "literal"` (use the `SESSION` and `WIN` shell variables you set above), then a separate `Enter`.
 - `current.txt` is ANSI-stripped (clean to read). `current.ansi` is raw (use only if colors/cursor matter).
 - `capture-pane` output is the visible pane, not history. If you need scrollback, use `tmux capture-pane -S -` with a larger range.
+- **Backgrounded bash holds the session open.** Claude Code's task tracker keeps the agent session alive until every `run_in_background` command finalizes. If you spawn a long sleep loop (e.g. `for i in $(seq 1 30); do sleep 60; ...`) and emit your final verdict before it drains, the pipeline node will stall for the remaining lifetime of that loop — the engine cannot advance until your session closes. **Prefer `wait_for_string` (foreground, polls every 0.2s)** for waiting on tmux output. If you genuinely need a backgrounded poller, cap each iteration at ≤30s total budget (e.g. `seq 1 6` × `sleep 5`) and **always reap it** (`kill %1 2>/dev/null; wait 2>/dev/null`) before Phase 4 emits.
 
 # Procedure
 
@@ -268,5 +269,6 @@ Be specific. "Something looked off" is not an issue; name the command, the surfa
 - **Do NOT run interactive commands that require a real human** (e.g. `ralph plan`, `ralph meditate` without pre-canned input). If a command opens a Claude session, skip it.
 - **Do NOT spawn more tmux windows.** Reuse the one already opened by `launch_tmux`.
 - **Do NOT modify files outside the scope of what the current fix needs.** You are test-driven and minimal — no drive-by refactors.
+- **Reap every backgrounded bash before emitting Phase 4.** Run `jobs -p | xargs -r kill 2>/dev/null; wait 2>/dev/null` (or equivalent) at the top of Phase 4. Orphan background loops will stall the pipeline node for their full sleep budget — the engine cannot advance while your session has open background tasks.
 - **No fixed iteration cap.** Stop when the project is healthy or when remaining issues are beyond what you can fix this session. Report honestly in `issues_found`.
 - Output MUST be valid JSON matching the schema. No markdown, no preamble, no trailing prose.
