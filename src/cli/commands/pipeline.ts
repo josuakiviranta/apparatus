@@ -21,6 +21,8 @@ import { PassThrough } from "stream";
 import { parseStreamJsonEvents, streamEvents } from "../lib/stream-formatter.js";
 import { composeCreatePrompt } from "../lib/pipeline-create-prompt.js";
 import { runTwoPhaseClaudeSession } from "../lib/session.js";
+import { resolveBundledTemplate } from "../lib/assets.js";
+import * as self from "./pipeline.js";
 import * as output from "../lib/output.js";
 import { renderCodeFrame } from "../lib/code-frame.js";
 import { formatPipelineDiag } from "../lib/pipeline-diag-format.js";
@@ -879,66 +881,21 @@ export async function pipelineTraceCommand(
 }
 
 export async function pipelineCreateCommand(name: string, opts: PipelineCreateOptions = {}): Promise<void> {
-  const which = spawnSync("which", ["claude"], { encoding: "utf8" });
-  if (which.status !== 0) {
-    await output.error("Error: claude CLI not found.\nInstall it: npm install -g @anthropic-ai/claude-code");
-    process.exit(1);
-  }
-
-  const project = resolve(opts.project ?? process.cwd());
-  const pipelinesDir = getPipelinesDir(project);
-  const dotPath = join(pipelinesDir, `${name}.dot`);
-
-  // Validate name via resolvePipelineArg (checks alphanumeric/hyphens/underscores)
-  try {
-    resolvePipelineArg(name, project);
-  } catch (err) {
-    await output.error((err as Error).message);
-    process.exit(1);
-  }
-
-  // Conflict check
-  if (existsSync(dotPath)) {
+  if (!isNameShorthand(name)) {
     await output.error(
-      `Pipeline already exists: ${dotPath}\n` +
-        `Use 'ralph pipeline refine ${name}' to modify it, ` +
-        `or delete the file first to start over.`,
+      `Invalid pipeline name "${name}": use only letters, numbers, hyphens, underscores`,
     );
     process.exit(1);
   }
-
-  // Create pipelines/ dir
-  if (!existsSync(pipelinesDir)) {
-    try {
-      mkdirSync(pipelinesDir, { recursive: true });
-    } catch (err) {
-      await output.error(`Failed to create pipelines/ directory: ${(err as Error).message}`);
-      process.exit(1);
-    }
-  }
-
-  // Read prompt (with dynamically injected project agents)
-  const promptContent = composeCreatePrompt(project);
-
-  const trigger = `${promptContent}\n\n---\nCreate a new pipeline named "${name}". Write it to: ${dotPath}`;
-
-  await output.step(`Creating pipeline: ${name}`);
-  await output.step(`Target: ${dotPath}`);
-
-  const { exitCode } = await runTwoPhaseClaudeSession({ cwd: project, trigger });
-
-  if (exitCode !== 0) {
-    process.exit(exitCode);
-  }
-
-  if (!existsSync(dotPath)) {
-    await output.warn(`Session ended but ${dotPath} was not created.`);
-    process.exit(1);
-  }
-
-  await output.step("Validating pipeline...");
-  const validateExit = await pipelineValidateCommand(dotPath);
-  process.exit(validateExit);
+  const project = resolve(opts.project ?? process.cwd());
+  const dotFile = resolveBundledTemplate("pipeline-create");
+  return self.pipelineRunCommand(dotFile, {
+    project,
+    variables: {
+      pipeline_name: name,
+      pipelines_dir: getPipelinesDir(project),
+    },
+  });
 }
 
 

@@ -41,6 +41,7 @@ vi.mock("../components/PipelineApp.js", () => ({
 }));
 vi.mock("../lib/assets.js", () => ({
   getBundledPipelinePath: vi.fn((name: string) => `/fake/pipelines/${name}.dot`),
+  resolveBundledTemplate: vi.fn((name: string) => `/fake/templates/${name}/pipeline.dot`),
 }));
 vi.mock("../lib/pipeline-create-prompt.js", () => ({
   composeCreatePrompt: vi.fn().mockReturnValue("# Test prompt"),
@@ -57,6 +58,7 @@ import {
   pipelineCreateCommand,
   pipelineRefineCommand,
 } from "../commands/pipeline.js";
+import * as pipelineMod from "../commands/pipeline.js";
 import type { Graph, Node, Edge } from "../../attractor/types.js";
 import * as childProcess from "child_process";
 import { composeCreatePrompt } from "../lib/pipeline-create-prompt.js";
@@ -367,7 +369,7 @@ describe("pipelineListCommand", () => {
   });
 });
 
-describe("pipelineCreateCommand", () => {
+describe("pipelineCreateCommand (shim)", () => {
   let dir: string;
   beforeEach(() => {
     vi.clearAllMocks();
@@ -375,48 +377,17 @@ describe("pipelineCreateCommand", () => {
   });
   afterEach(() => { rmSync(dir, { recursive: true }); });
 
-  it("errors if claude CLI not found", async () => {
-    (childProcess.spawnSync as ReturnType<typeof vi.fn>).mockReturnValueOnce({ status: 1 });
-    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("exit"); });
-    await expect(pipelineCreateCommand("review", { project: dir })).rejects.toThrow();
-    expect(out.error).toHaveBeenCalledWith(expect.stringContaining("claude CLI not found"));
-    exitSpy.mockRestore();
-  });
-
-  it("errors if pipelines/name.dot already exists", async () => {
-    mkdirSync(join(dir, "pipelines"));
-    writeFileSync(join(dir, "pipelines", "review.dot"), VALID_DOT);
-    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("exit"); });
-    await expect(pipelineCreateCommand("review", { project: dir })).rejects.toThrow();
-    expect(out.error).toHaveBeenCalledWith(expect.stringContaining("already exists"));
-    expect(out.error).toHaveBeenCalledWith(expect.stringContaining("ralph pipeline refine review"));
-    exitSpy.mockRestore();
-  });
-
-  it("errors on invalid pipeline name", async () => {
-    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("exit"); });
-    await expect(pipelineCreateCommand("bad name!", { project: dir })).rejects.toThrow();
-    expect(out.error).toHaveBeenCalled();
-    exitSpy.mockRestore();
-  });
-
-  it("creates pipelines/ directory if missing and spawns claude", async () => {
-    (composeCreatePrompt as ReturnType<typeof vi.fn>).mockReturnValue("# Fake prompt");
-    const dotPath = join(dir, "pipelines", "review.dot");
-    // Mock spawnSync: first call is `which claude` (just pass), second is the actual claude spawn
-    (childProcess.spawnSync as ReturnType<typeof vi.fn>).mockImplementation((cmd: string) => {
-      if (cmd === "which") return { status: 0 };
-      // Simulate Claude writing the .dot file during the interactive session
-      writeFileSync(dotPath, VALID_DOT);
-      return { status: 0 };
+  it("delegates to pipelineRunCommand with the bundled pipeline-create template + pipeline_name var", async () => {
+    const calls: Array<{ dotFile: string; opts: any }> = [];
+    const spy = vi.spyOn(pipelineMod, "pipelineRunCommand").mockImplementation(async (dotFile, opts) => {
+      calls.push({ dotFile, opts });
     });
-    // process.exit is called at the end with the validation exit code
-    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("exit"); });
-    await expect(pipelineCreateCommand("review", { project: dir })).rejects.toThrow("exit");
-    expect(existsSync(join(dir, "pipelines"))).toBe(true);
-    expect(childProcess.spawnSync).toHaveBeenCalled();
-    exitSpy.mockRestore();
-    (childProcess.spawnSync as ReturnType<typeof vi.fn>).mockImplementation(() => ({ status: 0 }));
+    await pipelineCreateCommand("review", { project: dir });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].dotFile.endsWith("pipeline-create/pipeline.dot")).toBe(true);
+    expect(calls[0].opts.variables.pipeline_name).toBe("review");
+    expect(calls[0].opts.variables.pipelines_dir).toBe(join(dir, "pipelines"));
+    spy.mockRestore();
   });
 });
 
