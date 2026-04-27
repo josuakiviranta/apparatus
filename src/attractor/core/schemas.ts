@@ -54,6 +54,14 @@ export const GateNodeSchema = BaseNodeSchema.extend({
   label: z.string().min(1).describe("Required question or choice label shown to the user."),
 }).strict();
 
+export const GateMdFrontmatterSchema = z.object({
+  type: z.literal("gate").describe("Discriminator — must be the literal \"gate\"."),
+  choices: z.array(z.string().min(1)).min(1, "gate choices: must declare at least one choice").describe("Ordered list of choices presented to the user at this gate."),
+  inputs: z.array(z.string().min(1)).optional().describe("Context keys this gate reads from upstream nodes."),
+}).strict();
+
+export type GateMdFrontmatter = z.infer<typeof GateMdFrontmatterSchema>;
+
 export const StartNodeSchema = BaseNodeSchema.extend({
   shape: z.literal("Mdiamond").describe("Must be the literal \"Mdiamond\" for the start node."),
 }).strict();

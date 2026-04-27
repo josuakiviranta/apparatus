@@ -4,6 +4,7 @@ import {
   AgentNodeSchema,
   ToolNodeSchema,
   GateNodeSchema,
+  GateMdFrontmatterSchema,
   StartNodeSchema,
   ExitNodeSchema,
   classifyNode,
@@ -361,6 +362,51 @@ describe("isDefaultSeedKey", () => {
     ["refinements", false],
   ])("isDefaultSeedKey(%s) === %s", (key, expected) => {
     expect(isDefaultSeedKey(key as string)).toBe(expected);
+  });
+});
+
+describe("GateMdFrontmatterSchema", () => {
+  it("accepts full valid object with inputs", () => {
+    const result = GateMdFrontmatterSchema.safeParse({
+      type: "gate",
+      choices: ["Approve", "Reject", "Chat"],
+      inputs: ["plan_path"],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.choices).toEqual(["Approve", "Reject", "Chat"]);
+      expect(result.data.inputs).toEqual(["plan_path"]);
+    }
+  });
+
+  it("rejects empty choices array", () => {
+    const result = GateMdFrontmatterSchema.safeParse({
+      type: "gate",
+      choices: [],
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some(i => /choices/i.test(i.message))).toBe(true);
+    }
+  });
+
+  it("rejects type !== 'gate'", () => {
+    const result = GateMdFrontmatterSchema.safeParse({
+      type: "agent",
+      choices: ["a", "b"],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("makes inputs optional", () => {
+    const result = GateMdFrontmatterSchema.safeParse({
+      type: "gate",
+      choices: ["yes", "no"],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.inputs).toBeUndefined();
+    }
   });
 });
 
