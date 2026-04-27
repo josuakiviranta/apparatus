@@ -52,7 +52,7 @@ describe("WaitHumanHandler", () => {
 
   it("auto-approves with AutoApproveInterviewer", async () => {
     const h = new WaitHumanHandler(new AutoApproveInterviewer());
-    const node: Node = { id: "gate", shape: "hexagon" };
+    const node: Node = { id: "gate", shape: "hexagon", label: "Proceed?" };
     const outcome = await h.execute(node, baseCtx(), makeContext({ outgoingLabels: ["Approve", "Reject"] }));
     expect(outcome.preferredLabel).toBe("Approve");
   });

@@ -50,7 +50,7 @@ function buildHandlerMap(opts: EngineOptions): Map<string, NodeHandler> {
   m.set("exit", new ExitHandler());
   m.set("codergen", agentHandler);
   m.set("conditional", new ConditionalHandler());
-  m.set("wait.human", new WaitHumanHandler(opts.interviewer));
+  m.set("wait.human", new WaitHumanHandler(opts.interviewer, opts.dotDir));
   m.set("tool", new ToolHandler());
   m.set("ralph.implement", agentHandler);
   m.set("ralph.meditate", new RalphMeditateHandler());

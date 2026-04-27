@@ -1,4 +1,7 @@
 import { describe, it, expect } from "vitest";
+import { mkdtempSync, writeFileSync, rmSync } from "fs";
+import { join } from "path";
+import { tmpdir } from "os";
 import { WaitHumanHandler } from "../handlers/wait-human.js";
 import type { Interviewer, Question, Answer } from "../interviewer/index.js";
 import type { Node, PipelineContext } from "../types.js";
@@ -40,7 +43,7 @@ describe("WaitHumanHandler — label variable expansion (Bug B.1)", () => {
     expect(captured[0].prompt).toBe("Just continue");
   });
 
-  it("falls back to node.id when label is undefined", async () => {
+  it("falls back to node.id when label is undefined (legacy: now returns fail without dotDir)", async () => {
     const captured: Question[] = [];
     const interviewer: Interviewer = {
       ask: async (q: Question): Promise<Answer> => {
@@ -51,8 +54,10 @@ describe("WaitHumanHandler — label variable expansion (Bug B.1)", () => {
     const handler = new WaitHumanHandler(interviewer);
     const node: Node = { id: "gate" };
     const ctx: PipelineContext = { values: {} };
-    await handler.execute(node, ctx, { outgoingLabels: ["continue"] });
-    expect(captured[0].prompt).toBe("gate");
+    const outcome = await handler.execute(node, ctx, { outgoingLabels: ["continue"] });
+    // Behavior changed in Task 3.3: no label + no dotDir → fail (use sibling .md instead)
+    expect(outcome.status).toBe("fail");
+    expect(outcome.failureReason).toMatch(/no dotDir/);
   });
 
   it("uses default_<var> attribute when the label var is not in context", async () => {
@@ -155,5 +160,122 @@ describe("WaitHumanHandler — gate choice namespacing", () => {
     expect(merged["approval_gate.choice"]).toBe("Approve");
     expect(merged["review_gate.choice"]).toBe("Decline");
     expect(merged.choice).toBe("Decline");
+  });
+});
+
+describe("WaitHumanHandler — .md fallback", () => {
+  const makeInterviewer = (value: string): Interviewer => ({
+    ask: async (): Promise<Answer> => ({ value }),
+  });
+
+  it("happy path: loads prompt and choices from sibling .md file", async () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ralph-gate-test-"));
+    try {
+      writeFileSync(
+        join(tmp, "foo_gate.md"),
+        `---\ntype: gate\nchoices:\n  - Yes\n  - No\n---\nPick a choice`,
+      );
+      const handler = new WaitHumanHandler(makeInterviewer("Yes"), tmp);
+      const node: Node = { id: "foo_gate" };
+      const ctx: PipelineContext = { values: {} };
+      const outcome = await handler.execute(node, ctx, { outgoingLabels: [] });
+      expect(outcome.status).toBe("success");
+      expect(outcome.preferredLabel).toBe("Yes");
+      expect(outcome.contextUpdates).toEqual({
+        "foo_gate.choice": "Yes",
+        choice: "Yes",
+      });
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("prompt is variable-expanded from .md body", async () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ralph-gate-test-"));
+    try {
+      writeFileSync(
+        join(tmp, "approve_gate.md"),
+        `---\ntype: gate\nchoices:\n  - Yes\n  - No\n---\nApprove $plan_path?`,
+      );
+      const captured: Question[] = [];
+      const interviewer: Interviewer = {
+        ask: async (q: Question): Promise<Answer> => {
+          captured.push(q);
+          return { value: "Yes" };
+        },
+      };
+      const handler = new WaitHumanHandler(interviewer, tmp);
+      const node: Node = { id: "approve_gate" };
+      const ctx: PipelineContext = { values: { plan_path: "/p/foo.md" } };
+      await handler.execute(node, ctx, { outgoingLabels: [] });
+      expect(captured[0].prompt).toBe("Approve /p/foo.md?");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("choices come from frontmatter, not edge labels", async () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ralph-gate-test-"));
+    try {
+      writeFileSync(
+        join(tmp, "pick_gate.md"),
+        `---\ntype: gate\nchoices:\n  - A\n  - B\n  - C\n---\nPick one`,
+      );
+      const captured: Question[] = [];
+      const interviewer: Interviewer = {
+        ask: async (q: Question): Promise<Answer> => {
+          captured.push(q);
+          return { value: "A" };
+        },
+      };
+      const handler = new WaitHumanHandler(interviewer, tmp);
+      const node: Node = { id: "pick_gate" };
+      await handler.execute(node, { values: {} }, { outgoingLabels: ["X", "Y"] });
+      expect(captured[0].options).toEqual(["A", "B", "C"]);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("missing .md → fail with Gate file not found", async () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ralph-gate-test-"));
+    try {
+      const handler = new WaitHumanHandler(makeInterviewer("Yes"), tmp);
+      const node: Node = { id: "missing_gate" };
+      const outcome = await handler.execute(node, { values: {} }, { outgoingLabels: [] });
+      expect(outcome.status).toBe("fail");
+      expect(outcome.failureReason).toMatch(/Gate file not found/);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("no label and no dotDir → fail with no dotDir message", async () => {
+    const interviewer = makeInterviewer("Yes");
+    const handler = new WaitHumanHandler(interviewer);
+    const node: Node = { id: "bare_gate" };
+    const outcome = await handler.execute(node, { values: {} }, { outgoingLabels: [] });
+    expect(outcome.status).toBe("fail");
+    expect(outcome.failureReason).toMatch(/no dotDir/);
+  });
+
+  it("regression: inline label still works when dotDir provided", async () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ralph-gate-test-"));
+    try {
+      const captured: Question[] = [];
+      const interviewer: Interviewer = {
+        ask: async (q: Question): Promise<Answer> => {
+          captured.push(q);
+          return { value: "continue" };
+        },
+      };
+      const handler = new WaitHumanHandler(interviewer, tmp);
+      const node: Node = { id: "my_gate", label: "Continue?" };
+      await handler.execute(node, { values: {} }, { outgoingLabels: ["continue"] });
+      expect(captured[0].prompt).toBe("Continue?");
+      expect(captured[0].options).toEqual(["continue"]);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
   });
 });
