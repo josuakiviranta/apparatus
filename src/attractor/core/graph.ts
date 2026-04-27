@@ -9,7 +9,7 @@ import {
 } from "./dot-common.js";
 import { resolveAgent } from "../../cli/lib/agent-registry.js";
 import type { AgentConfig } from "../../cli/lib/agent.js";
-import { computeVarsInScope } from "./flow-analyzer.js";
+import { computeVarsInScope, computeVarsInAnyScope } from "./flow-analyzer.js";
 
 export function parseDot(src: string): Graph {
   return parseDotV2(src);
@@ -412,13 +412,23 @@ function checkMissingInputProducer(
   diags: Diagnostic[],
 ): void {
   const varsInScope = computeVarsInScope(graph, nodeProduces);
+  const varsInAnyScope = computeVarsInAnyScope(graph, nodeProduces);
   for (const [id, node] of graph.nodes) {
     if (!node.agent) continue;
     const agentConfig = tryResolveAgent(node, dotDir);
     if (!agentConfig || !agentConfig.inputs) continue;
     const scope = varsInScope.get(id) ?? new Set<string>();
+    const anyScope = varsInAnyScope.get(id) ?? new Set<string>();
     for (const inputKey of agentConfig.inputs) {
-      if (!scope.has(inputKey)) {
+      if (scope.has(inputKey)) continue;
+      if (anyScope.has(inputKey)) {
+        diags.push({
+          rule: "branch_incomplete_input",
+          severity: "error",
+          message: `Agent "${node.agent}" at node "${id}" requires input "${inputKey}" but only some upstream paths produce it. Either ensure every path produces "${inputKey}" before reaching this node, or declare default_${inputKey}= on this node as a fallback.`,
+          location: node.sourceLocation,
+        });
+      } else {
         diags.push({
           rule: "missing_input_producer",
           severity: "error",

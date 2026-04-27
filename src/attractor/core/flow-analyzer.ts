@@ -21,6 +21,29 @@ export function computeVarsInScope(
   graph: Graph,
   nodeProduces: Map<string, Set<string>>,
 ): Map<string, Set<string>> {
+  return computeScope(graph, nodeProduces, "intersect");
+}
+
+/**
+ * Companion to {@link computeVarsInScope}: returns the set of vars that are
+ * available on AT LEAST ONE path to each node (predecessor union semantics).
+ *
+ * Used by `branch_incomplete_input` to distinguish "no producer anywhere"
+ * (→ `missing_input_producer`) from "some predecessor has it but not all"
+ * (→ `branch_incomplete_input`).
+ */
+export function computeVarsInAnyScope(
+  graph: Graph,
+  nodeProduces: Map<string, Set<string>>,
+): Map<string, Set<string>> {
+  return computeScope(graph, nodeProduces, "union");
+}
+
+function computeScope(
+  graph: Graph,
+  nodeProduces: Map<string, Set<string>>,
+  combine: "intersect" | "union",
+): Map<string, Set<string>> {
   const { nodes, edges } = graph;
   const callerInputs = new Set<string>(
     Array.isArray(graph.inputs) ? graph.inputs : [],
@@ -89,7 +112,7 @@ export function computeVarsInScope(
       const visitedPreds = (rev.get(id) ?? []).filter(p => scope.has(p));
       if (visitedPreds.length === 0) {
         nodeScope = new Set();
-      } else {
+      } else if (combine === "intersect") {
         let intersected: Set<string> | null = null;
         for (const pred of visitedPreds) {
           const predUnion = new Set([
@@ -105,6 +128,14 @@ export function computeVarsInScope(
           }
         }
         nodeScope = intersected ?? new Set();
+      } else {
+        // union: any-path semantics
+        const merged = new Set<string>();
+        for (const pred of visitedPreds) {
+          for (const v of scope.get(pred)!) merged.add(v);
+          for (const v of (nodeProduces.get(pred) ?? [])) merged.add(v);
+        }
+        nodeScope = merged;
       }
     }
 

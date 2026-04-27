@@ -1721,21 +1721,17 @@ git add src/attractor/core/graph.ts src/attractor/tests/graph-inputs-flow.test.t
 git commit -m "feat(validator): missing_input_producer (replaces debugProducedKeys hack)"
 ```
 
-### Task 2.7: Validator rule `branch_incomplete_input`
+### Task 2.7: Validator rule `branch_incomplete_input` — SHIPPED
 
 When some (but not all) paths to a consumer produce an input key, emit `branch_incomplete_input` — UNLESS the consumer has `default_<key>=`. (Distinct from `missing_input_producer`, which fires when NO path produces the key.)
 
-- [ ] **Step 1: Add failing tests to `graph-inputs-flow.test.ts`** for the partial-branch case + the `default_<key>=` suppression case.
+- [x] **Step 1: Add failing tests to `graph-inputs-flow.test.ts`** — diamond with one producing branch (RED), both producing, default_<key>= suppression, and no-producer regression (still emits `missing_input_producer`, NOT `branch_incomplete_input`).
 
-- [ ] **Step 2 — 5: Standard TDD pattern** (run-fail → implement → run-pass).
+- [x] **Step 2 — 5: Standard TDD pattern** — RED confirmed (1 fail), implemented, GREEN: 8/8 tests in file, full suite 1156/1156.
 
-The implementation in `graph.ts` modifies the input-check loop from Task 2.6: when `scope.has(inputKey)` is FALSE, distinguish between "no producer anywhere" (→ `missing_input_producer`) and "some predecessor union has it but the intersection doesn't" (→ `branch_incomplete_input`). Compute `someProducerExists = ∃ predecessor whose forward set has the key`.
+Implementation: added `computeVarsInAnyScope` (union-semantics sibling of `computeVarsInScope`) in `flow-analyzer.ts`; factored shared body via `computeScope(combine: "intersect" | "union")`. In `checkMissingInputProducer` (graph.ts), when `scope.has(inputKey)` is FALSE, branch on `anyScope.has(inputKey)`: hit → `branch_incomplete_input`, miss → `missing_input_producer`. `default_<key>=` keeps adding to nodeScope so it suppresses both rules naturally.
 
-- [ ] **Step 6: Commit**
-
-```bash
-git commit -m "feat(validator): branch_incomplete_input rule"
-```
+- [x] **Step 6: Commit** (this commit)
 
 ### Task 2.8: Validator rule `input_type_mismatch`
 
