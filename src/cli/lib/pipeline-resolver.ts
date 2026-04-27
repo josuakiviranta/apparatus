@@ -29,7 +29,7 @@ export function resolvePipelineArg(arg: string, project: string): string {
   const projectFolderPath = join(getPipelinesDir(project), arg, "pipeline.dot");
   if (existsSync(projectFolderPath)) return projectFolderPath;
 
-  // 2. Project-local — flat-form (back-compat until Chunk 4 finishes migrating every pipeline)
+  // 2. Project-local — flat-form (user-authored pipelines may still use flat layout)
   const projectPath = join(getPipelinesDir(project), `${arg}.dot`);
   if (existsSync(projectPath)) return projectPath;
 

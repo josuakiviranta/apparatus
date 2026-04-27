@@ -2309,40 +2309,443 @@ Implemented per Decision 4. Surprises:
 
 **Spec drift to address later:** `specs/architecture.md:112` still describes the old "project-local `.ralph/agents/` → user → bundled" precedence. Update during Chunk 5/6 or a separate spec-sync pass.
 
-### Task 4.20: Chunk-4 review checkpoint
+### Task 4.20: Chunk-4 review checkpoint — SHIPPED 2026-04-27
 
-- Dispatch `superpowers:code-reviewer` against the chunk-4 commit range with the spec at `docs/superpowers/specs/2026-04-27-pipeline-folder-architecture-redesign.md` (or successor) and this plan section.
-- Address feedback in-chunk; re-dispatch if needed.
-- Tag `chunk-4-per-pipeline-folders` for bisectable history.
-- Dispatch `memory-writer` per the Post-execution memory capture procedure at the bottom of this plan.
-- Expand Chunk 5 outline into full TDD steps (this happens in the session after the chunk lands).
+- `superpowers:code-reviewer` ran against `chunk-3-gates-as-md..chunk-4-per-pipeline-folders` (23 commits). Verdict: **APPROVED**, no CRITICAL/IMPORTANT issues. One NIT (stale comment in `src/cli/lib/pipeline-resolver.ts:32`) addressed in-chunk.
+- Tag `chunk-4-per-pipeline-folders` published (points at `edb4647`).
+- Memory captured: `2026-04-27-chunk-4-completion-per-folder-architecture.md` + this checkpoint commit.
+- Chunk 5 outline expanded below into full TDD steps.
+
+**Chunk 4 status: SHIPPED** — Tasks 4.0–4.19 executed; reviewer-approved. 1176/1176 vitest green; `tsc --noEmit` clean. 14 smoke pipelines + janitor + illumination-to-implementation converted to per-folder layout. 11 bundled agents deleted; runtime fallback to bundled agents removed for pipeline nodes (`allowBundledFallback: false` at every pipeline call site). Per-pipeline folder is now SSoT.
 
 ---
 
-## Chunk 5: `src/cli/templates/` + `pipeline create` is a pipeline (D7) — outline
+## Chunk 5: `src/cli/templates/` + `pipeline create` is a pipeline (D7)
 
-**Purpose:** Create the bundled-template infrastructure and convert `ralph pipeline create` into a thin shim that runs a bundled pipeline.
+**Purpose:** Land bundled-template infrastructure (`src/cli/templates/` + asset helpers + tsup copy) and convert `ralph pipeline create` into a thin shim that runs the bundled `pipeline-create/` template. After this chunk: `agent-creator.md`, `PROMPT_pipeline_create.md`, and the bespoke `composeCreatePrompt` injection path are deleted.
 
-**High-level shape:**
-- Add `getBundledTemplatesDir()` to `src/cli/lib/assets.ts` (Task 5.1) mirroring `getBundledAgentsDir()`.
-- Create `src/cli/templates/blank/` (Task 5.2): minimal scaffold with `pipeline.dot` (start → first_step → end), one `first-step.md` agent stub, README.
-- Create `src/cli/templates/pipeline-create/` (Task 5.3): the meta-template. `pipeline.dot` has one interactive agent node `scaffolder` whose prompt body teaches Claude how to author a pipeline given the new file shape.
-- Migrate `src/cli/agents/agent-creator.md` into `templates/pipeline-create/scaffolder.md` (with new `outputs:`/`inputs:` frontmatter).
-- Convert `pipelineCreateCommand` in `src/cli/commands/pipeline.ts` into a thin shim (Task 5.4):
-  ```typescript
-  export async function pipelineCreateCommand(name: string) {
-    return runPipeline(
-      resolveBundledTemplate("pipeline-create/pipeline.dot"),
-      { vars: { pipeline_name: name } }
-    );
+**Dependencies:** Chunks 1–4. Templates use the post-Chunk-1/2 agent frontmatter (`outputs:`/`inputs:`). Pipeline lookup must already prefer `<name>/pipeline.dot` (Chunk 4 / Task 4.1).
+
+**Spec anchor:** `docs/superpowers/specs/2026-04-27-pipeline-folder-architecture-redesign.md` § D7 (lines 162–188) and § R4 (lines 337–339).
+
+**Architectural decisions resolved up-front (no re-litigation in tasks):**
+
+1. **Where templates live in dev vs prod.** Source: `src/cli/templates/`. tsup `onSuccess` copies the tree to `dist/templates/`. `getBundledTemplatesDir()` resolves to `<base>/templates/` where `<base>` is `dist/cli/`'s parent in prod and `src/cli/`'s parent in dev — same convention as the existing `prompts/`, `agents/`, `pipelines/` triple.
+2. **What `resolveBundledTemplate(name)` returns.** A path of the form `<templatesDir>/<name>/pipeline.dot`. Errors with a clear message if the file is missing. Mirrors `getBundledPipelinePath` but for the per-folder template layout.
+3. **Dropping `composeCreatePrompt`.** The current command injects a Markdown table of available agents into the prompt. The replacement scaffolder agent does this itself — its prompt body instructs Claude to `Bash: ls ~/.ralph/agents/ <project>/.ralph/agents/ <project>/pipelines/*/[a-z]*.md`. The runtime synthesis function and its associated test go away. (No need to thread the agent list as a `--var` — the scaffolder is an interactive Claude session with shell access.)
+4. **Variables passed by the shim.** `pipeline_name` and `pipelines_dir` (absolute path to `<project>/pipelines/`). The scaffolder writes the new pipeline to `<pipelines_dir>/<pipeline_name>/pipeline.dot` (per-folder, matching the layout enforced in Chunk 4).
+5. **`blank` template's role.** Bundled starter the meta-template's scaffolder can copy from. Not invoked directly by any command in Chunk 5. It exists so Chunk 5 ships D7's full directory structure, not so it gets a CLI flag.
+6. **Existing CLI surface preserved.** `ralph pipeline create <name>` keeps the same argv shape. `--project <folder>` still works (passed through to `pipelineRunCommand` as `--var project=<folder>` if non-default).
+7. **No new validator rules.** Templates are validated by the existing `pipeline validate` rules (Chunk 1–3 outputs/inputs/gate machinery). Chunk 5 only adds a smoke test that runs `validateGraph` against each bundled template's `pipeline.dot` and asserts no errors.
+
+### Task 5.1: `getBundledTemplatesDir()` + `resolveBundledTemplate(name)` in `assets.ts`
+
+**Why:** Both the shim (Task 5.6) and templates' tests need a single resolver that handles dev/prod parity. Without this, every call site re-derives `__dirname`-relative paths and drifts.
+
+- [ ] **Step 1 (red): test for `getBundledTemplatesDir()` parity with `getBundledAgentsDir()`**
+
+  Add `src/cli/tests/assets-templates.test.ts`:
+
+  ```ts
+  import { describe, it, expect } from "vitest";
+  import { existsSync } from "fs";
+  import { getBundledTemplatesDir, resolveBundledTemplate } from "../lib/assets.js";
+
+  describe("getBundledTemplatesDir", () => {
+    it("returns a path to a directory that exists", () => {
+      const dir = getBundledTemplatesDir();
+      expect(existsSync(dir)).toBe(true);
+    });
+  });
+
+  describe("resolveBundledTemplate", () => {
+    it("resolves to <templatesDir>/<name>/pipeline.dot", () => {
+      const path = resolveBundledTemplate("pipeline-create");
+      expect(path.endsWith("pipeline-create/pipeline.dot")).toBe(true);
+    });
+    it("throws a clear error when the template is missing", () => {
+      expect(() => resolveBundledTemplate("does-not-exist")).toThrow(/template/i);
+      expect(() => resolveBundledTemplate("does-not-exist")).toThrow(/does-not-exist/);
+    });
+  });
+  ```
+
+  Run: `npx vitest run src/cli/tests/assets-templates.test.ts` → expected to fail (no exports yet).
+
+- [ ] **Step 2 (green): add the helpers to `src/cli/lib/assets.ts`**
+
+  Just under `getBundledAgentsDir`:
+
+  ```ts
+  export function getBundledTemplatesDir(): string {
+    return getAssetPath("templates");
+  }
+
+  export function resolveBundledTemplate(name: string): string {
+    const dir = getBundledTemplatesDir();
+    const path = join(dir, name, "pipeline.dot");
+    if (!existsSync(path)) {
+      throw new Error(
+        `Bundled template not found: "${name}" (expected ${path}). ` +
+          `Available templates ship under src/cli/templates/.`,
+      );
+    }
+    return path;
   }
   ```
-- Delete `src/cli/prompts/PROMPT_pipeline_create.md`.
-- Delete `src/cli/agents/agent-creator.md`.
-- Update `src/cli/tests/pipeline-create-prompt.test.ts` (or delete + replace with template-shape test).
-- Chunk-5 review checkpoint.
 
-**Dependencies:** Chunks 1-4 (template files use the new agent shape; lookup uses pipeline-folder-first).
+  Add `import { existsSync } from "fs";` at the top of `assets.ts` (currently it doesn't import it).
+
+  Run: `npx vitest run src/cli/tests/assets-templates.test.ts` → expected to pass once Task 5.3 lands the `pipeline-create/pipeline.dot` file. Until then, the **first** test ("directory exists") and the **third** ("throws on missing") pass; the **second** ("resolves to …") will pass after Task 5.3. Mark Task 5.1 done only when the directory exists; the second assertion is gated on Task 5.3.
+
+- [ ] **Step 3: verify typecheck**
+
+  `npx tsc --noEmit` → clean.
+
+- [ ] **Step 4: commit**
+
+  `feat(assets): getBundledTemplatesDir + resolveBundledTemplate (D7 chunk-5)`
+
+### Task 5.2: tsup copies `src/cli/templates/` recursively to `dist/templates/`
+
+**Why:** The other bundled assets (`prompts/`, `agents/`, `pipelines/`) are flat directories and use a single `readdirSync` loop. Templates are a *tree* (`templates/<name>/{pipeline.dot,*.md,...}`), so the copy step must recurse. Without this the prod build can't find any template.
+
+- [ ] **Step 1 (red): smoke test from prod-output shape**
+
+  Add `src/cli/tests/tsup-templates-copy.test.ts`:
+
+  ```ts
+  import { describe, it, expect } from "vitest";
+  import { existsSync } from "fs";
+  import { join } from "path";
+
+  // Sanity that the source directory ships its meta-template.
+  // Prod-bundle copy is verified by the smoke test (npm run build && cli runs).
+  describe("templates source layout", () => {
+    const root = process.cwd();
+    it("ships pipeline-create as a folder template", () => {
+      expect(existsSync(join(root, "src/cli/templates/pipeline-create/pipeline.dot"))).toBe(true);
+    });
+    it("ships blank as a folder template", () => {
+      expect(existsSync(join(root, "src/cli/templates/blank/pipeline.dot"))).toBe(true);
+    });
+  });
+  ```
+
+  Run → fails (no `src/cli/templates/`).
+
+- [ ] **Step 2 (green): extend `tsup.config.ts` `onSuccess`**
+
+  Add a recursive copy helper and a new block:
+
+  ```ts
+  import { copyFileSync, mkdirSync, readdirSync, statSync } from "fs";
+  import { join } from "path";
+
+  function copyDirRecursive(src: string, dst: string) {
+    mkdirSync(dst, { recursive: true });
+    for (const entry of readdirSync(src)) {
+      const s = join(src, entry);
+      const d = join(dst, entry);
+      if (statSync(s).isDirectory()) copyDirRecursive(s, d);
+      else copyFileSync(s, d);
+    }
+  }
+  ```
+
+  In `onSuccess`, after the `dist/pipelines` block:
+
+  ```ts
+  // Copy bundled templates (per-folder layout, recurse into subdirs).
+  copyDirRecursive("src/cli/templates", "dist/templates");
+  ```
+
+  Run `npm run build` → expected: tsup completes, `dist/templates/pipeline-create/pipeline.dot` exists.
+
+- [ ] **Step 3: smoke + typecheck**
+
+  - `npx vitest run src/cli/tests/tsup-templates-copy.test.ts` → green (after Tasks 5.3 + 5.4 land the actual files; both run before this in the chunk's commit order, so re-run to confirm).
+  - `npx tsc --noEmit` → clean.
+
+- [ ] **Step 4: commit (squash with Task 5.1 if both green together; otherwise separate)**
+
+  `chore(tsup): copy src/cli/templates recursively to dist/templates (D7 chunk-5)`
+
+### Task 5.3: Create `src/cli/templates/blank/` starter
+
+**Why:** D7 specifies that `blank/` ships in `src/cli/templates/`. It exists so the meta-template scaffolder has a known "minimal valid pipeline" to reference / copy from, and so any tool that traverses `templates/` always sees a working starter. Per the spec (line 218), `blank` is `start → first_step → end` (3 nodes) — not a single-node skeleton.
+
+- [ ] **Step 1 (red): test asserting `blank` validates clean**
+
+  Add `src/cli/tests/templates-validate.test.ts`:
+
+  ```ts
+  import { describe, it, expect } from "vitest";
+  import { readFileSync } from "fs";
+  import { dirname, join } from "path";
+  import { getBundledTemplatesDir } from "../lib/assets.js";
+  import { parseDot } from "../../attractor/core/dot-parser.js";
+  import { validateGraph } from "../../attractor/core/graph.js";
+
+  function loadAndValidate(templateName: string) {
+    const path = join(getBundledTemplatesDir(), templateName, "pipeline.dot");
+    const dot = readFileSync(path, "utf-8");
+    const graph = parseDot(dot);
+    return validateGraph(graph, dirname(path));
+  }
+
+  describe("bundled templates: validateGraph", () => {
+    it("blank has no errors", () => {
+      const diags = loadAndValidate("blank");
+      const errors = diags.filter(d => d.severity === "error");
+      expect(errors).toEqual([]);
+    });
+  });
+  ```
+
+  Run → fails (no `blank/pipeline.dot`).
+
+- [ ] **Step 2 (green): create the files**
+
+  - `src/cli/templates/blank/pipeline.dot`:
+
+    ```dot
+    digraph blank {
+      start [shape=Mdiamond];
+      end   [shape=Msquare];
+
+      first_step [shape=box, agent="first-step"];
+
+      start -> first_step -> end;
+    }
+    ```
+
+  - `src/cli/templates/blank/first-step.md` — agent stub with `outputs:` so the validator doesn't complain about it producing no keys consumed downstream:
+
+    ```markdown
+    ---
+    description: Placeholder first step. Replace this with a real agent that does meaningful work.
+    outputs:
+      result: string
+    ---
+    Replace this body with the actual instructions for your first step.
+    ```
+
+  - `src/cli/templates/blank/README.md`:
+
+    ```markdown
+    # blank
+    Minimal 3-node pipeline starter. Edit `pipeline.dot` and `first-step.md` to fit your workflow.
+    ```
+
+  Re-run vitest → green.
+
+- [ ] **Step 3: commit**
+
+  `feat(templates): bundled "blank" 3-node starter (D7 chunk-5)`
+
+### Task 5.4: Create `src/cli/templates/pipeline-create/` (meta-template + scaffolder agent)
+
+**Why:** The meta-template *is* the new `ralph pipeline create` runtime. The scaffolder agent's body fully replaces `src/cli/prompts/PROMPT_pipeline_create.md` and `src/cli/agents/agent-creator.md`, with the runtime agent-table injection lifted up into the agent's own instructions (it inspects the filesystem itself).
+
+- [ ] **Step 1 (red): extend `templates-validate.test.ts` for `pipeline-create`**
+
+  Add to the existing describe:
+
+  ```ts
+  it("pipeline-create has no errors", () => {
+    const diags = loadAndValidate("pipeline-create");
+    const errors = diags.filter(d => d.severity === "error");
+    expect(errors).toEqual([]);
+  });
+  ```
+
+  Add a second describe verifying the scaffolder agent's frontmatter shape:
+
+  ```ts
+  import { parseAgentFile } from "../lib/agent-registry.js";
+
+  describe("pipeline-create scaffolder agent", () => {
+    it("declares pipeline_name and pipelines_dir as inputs", () => {
+      const path = join(getBundledTemplatesDir(), "pipeline-create", "scaffolder.md");
+      const cfg = parseAgentFile(path);
+      expect(cfg.inputs).toContain("pipeline_name");
+      expect(cfg.inputs).toContain("pipelines_dir");
+    });
+  });
+  ```
+
+  Run → fails.
+
+- [ ] **Step 2 (green): create the files**
+
+  - `src/cli/templates/pipeline-create/pipeline.dot`:
+
+    ```dot
+    digraph pipeline_create {
+      start [shape=Mdiamond];
+      end   [shape=Msquare];
+
+      // Single interactive node: Claude scaffolds a new pipeline file based on $pipeline_name.
+      scaffolder [shape=box, agent="scaffolder", interactive=true,
+                  inputs="pipeline_name,pipelines_dir"];
+
+      start -> scaffolder -> end;
+    }
+    ```
+
+  - `src/cli/templates/pipeline-create/scaffolder.md` — body is the previous `PROMPT_pipeline_create.md` content **plus** instructions to enumerate available agents itself, **plus** the `agent-creator` whitelist if any tool restrictions need to carry over. Frontmatter must declare `inputs:` and `outputs:`:
+
+    ```markdown
+    ---
+    description: Scaffolds a new ralph pipeline. Inspects available agents in the project, drafts <pipeline_name>/pipeline.dot under <pipelines_dir>/, and runs ralph pipeline validate against it before exiting.
+    interactive: true
+    inputs:
+      - pipeline_name
+      - pipelines_dir
+    outputs:
+      created_path: string
+    ---
+    You are scaffolding a ralph pipeline named "$pipeline_name".
+
+    1. Inspect available agents:
+       - `ls ~/.ralph/agents/ 2>/dev/null` (user-scope)
+       - `ls $pipelines_dir/*/[a-z]*.md 2>/dev/null` (per-pipeline scope, post-Chunk-4)
+       - `ls ~/.ralph/<project-cache>/agents/ 2>/dev/null` (project-scope)
+       Print the resulting agent inventory before drafting.
+
+    2. Author `$pipelines_dir/$pipeline_name/pipeline.dot` (per-folder layout).
+       Co-locate any agent .md files the new pipeline references — do NOT rely on bundled fallback.
+
+    3. … <port the rest of PROMPT_pipeline_create.md verbatim, with `$pipeline_name`/`$pipelines_dir` substituted for the old hard-coded paths> …
+
+    4. Run `ralph pipeline validate $pipelines_dir/$pipeline_name/pipeline.dot`. If it errors, edit and re-run until it passes.
+
+    Set `created_path` in your final JSON to the absolute path of the new pipeline.dot.
+    ```
+
+    *Implementer note:* the verbatim port from `PROMPT_pipeline_create.md` happens here in one motion — don't split across tasks. After porting, `git diff` between the old prompt and the new agent body should be small (substitutions + the inspection block at the top).
+
+  Re-run vitest `templates-validate.test.ts` → green.
+
+- [ ] **Step 3: commit**
+
+  `feat(templates): pipeline-create meta-template + scaffolder agent (D7 chunk-5)`
+
+### Task 5.5: Convert `pipelineCreateCommand` to a thin shim
+
+**Why:** D7's payoff. After this task, `src/cli/commands/pipeline.ts:881-940` (the existing 60-line implementation) collapses to a few lines of `pipelineRunCommand` delegation; all the bespoke `which claude` + `runTwoPhaseClaudeSession` + manual prompt assembly disappears.
+
+- [ ] **Step 1 (red): replace the existing test suite for `pipelineCreateCommand`**
+
+  In `src/cli/tests/pipeline.test.ts`, the `describe("pipelineCreateCommand", …)` block currently asserts behavior that is going away (`composeCreatePrompt` injection, manual `mkdir pipelines/`, `runTwoPhaseClaudeSession` spawning). Replace with a single shim-shape test that asserts the command calls `pipelineRunCommand` with the bundled template path and the right vars:
+
+  ```ts
+  describe("pipelineCreateCommand (shim)", () => {
+    it("delegates to pipelineRunCommand with the bundled pipeline-create template + pipeline_name var", async () => {
+      const calls: Array<{ dotFile: string; opts: any }> = [];
+      vi.spyOn(pipelineMod, "pipelineRunCommand").mockImplementation(async (dotFile, opts) => {
+        calls.push({ dotFile, opts });
+      });
+      await pipelineCreateCommand("review", { project: "/tmp/x" });
+      expect(calls).toHaveLength(1);
+      expect(calls[0].dotFile.endsWith("pipeline-create/pipeline.dot")).toBe(true);
+      expect(calls[0].opts.vars.pipeline_name).toBe("review");
+      expect(calls[0].opts.vars.pipelines_dir).toBe("/tmp/x/pipelines");
+    });
+  });
+  ```
+
+  Delete the four existing tests in the old `describe("pipelineCreateCommand")` (claude-not-found, already-exists, invalid-name, creates-pipelines-dir). The first three are now responsibilities of `pipelineRunCommand` + the scaffolder agent and shouldn't be re-asserted at the shim level. The fourth tests behavior the shim no longer owns.
+
+  Run → fails.
+
+- [ ] **Step 2 (green): rewrite `pipelineCreateCommand`**
+
+  In `src/cli/commands/pipeline.ts`, replace the entire 60-line body with:
+
+  ```ts
+  export async function pipelineCreateCommand(
+    name: string,
+    opts: PipelineCreateOptions = {},
+  ): Promise<void> {
+    if (!isNameShorthand(name)) {
+      await output.error(`Invalid pipeline name "${name}": use only letters, numbers, hyphens, underscores`);
+      process.exit(1);
+    }
+    const project = resolve(opts.project ?? process.cwd());
+    const dotFile = resolveBundledTemplate("pipeline-create");
+    return pipelineRunCommand(dotFile, {
+      project,
+      vars: {
+        pipeline_name: name,
+        pipelines_dir: getPipelinesDir(project),
+      },
+    });
+  }
+  ```
+
+  Drop the `composeCreatePrompt` import. Add `resolveBundledTemplate` to the existing `assets.js` import. Remove `runTwoPhaseClaudeSession`, `spawnSync`, `mkdirSync`, the conflict check (now scaffolder's job per the agent body's step 2), and the post-validate block.
+
+  Re-run the shim test → green.
+
+- [ ] **Step 3: typecheck + full test run**
+
+  - `npx tsc --noEmit` → clean.
+  - `npx vitest run` → all suites green.
+
+- [ ] **Step 4: commit**
+
+  `refactor(pipeline-create): convert command to thin shim over pipeline-create template (D7 chunk-5)`
+
+### Task 5.6: Delete dead code paths
+
+**Why:** Prevent the old wiring from rotting in the tree. Once the shim works end-to-end, every path it bypassed is dead.
+
+- [ ] **Step 1: delete files**
+
+  - `src/cli/prompts/PROMPT_pipeline_create.md`
+  - `src/cli/agents/agent-creator.md`
+  - `src/cli/lib/pipeline-create-prompt.ts`
+  - `src/cli/tests/compose-create-prompt.test.ts`
+
+- [ ] **Step 2: drop the now-unused `getPipelineCreatePromptPath()` from `src/cli/lib/assets.ts`**
+
+  Search for callers first: `grep -rn 'getPipelineCreatePromptPath' src/`. Should yield zero hits after Task 5.5. If it does, remove the export.
+
+- [ ] **Step 3: full test run + typecheck**
+
+  - `npx vitest run` → still green.
+  - `npx tsc --noEmit` → clean.
+
+- [ ] **Step 4: commit**
+
+  `chore(pipeline-create): drop PROMPT_pipeline_create + agent-creator + composeCreatePrompt (D7 chunk-5)`
+
+### Task 5.7: End-to-end smoke (`ralph pipeline create` against a temp project)
+
+**Why:** Unit tests above mock `pipelineRunCommand`. Confirm the wiring actually hangs together once before the chunk lands.
+
+- [ ] **Step 1 (manual smoke; document outcome in plan):** in a temp dir,
+
+  ```bash
+  cd /tmp && mkdir ralph-c5-smoke && cd ralph-c5-smoke && git init
+  ralph pipeline create demo
+  # …interactive Claude session; expect demo/pipeline.dot under pipelines/
+  ralph pipeline validate pipelines/demo/pipeline.dot   # should pass
+  ```
+
+  Add the captured trace path / outcome notes to this task as evidence.
+
+- [ ] **Step 2:** if any friction surfaces, fix it before Task 5.8.
+
+### Task 5.8: Chunk-5 review checkpoint
+
+- Dispatch `superpowers:code-reviewer` against `chunk-4-per-pipeline-folders..HEAD` with the spec at `docs/superpowers/specs/2026-04-27-pipeline-folder-architecture-redesign.md` § D7 + § R4 and this plan section.
+- Address feedback in-chunk; re-dispatch if needed.
+- Tag `chunk-5-templates-and-create-shim` for bisectable history.
+- Dispatch `memory-writer` per the Post-execution memory capture procedure at the bottom of this plan.
+- Expand Chunk 6 outline into full TDD steps (this happens in the session after the chunk lands).
 
 ---
 
