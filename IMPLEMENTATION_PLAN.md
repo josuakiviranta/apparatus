@@ -2939,7 +2939,7 @@ export async function <name>Command(args, opts = {}): Promise<void> {
 
 ---
 
-### Sub-chunk 6b: `meditate` + `meditate-create` → templates
+### Sub-chunk 6b: `meditate` + `meditate-create` → templates — SHIPPED 2026-04-28
 
 **Why two templates in one sub-chunk:** they share concerns (meditation-folder hygiene, agent vocabulary) and the conversion patterns are nearly identical; bundling avoids two review cycles for very similar diffs.
 
@@ -2953,9 +2953,9 @@ export async function <name>Command(args, opts = {}): Promise<void> {
 - Modify: `src/cli/tests/meditate.test.ts`, `src/cli/tests/meditate-create.test.ts`, `src/cli/tests/pipeline-smoke-meditate-steer-folder.test.ts`
 - Delete: `src/cli/agents/meditate.md`, `src/cli/agents/meditate-create.md`
 
-#### Task 6b.1: Create `src/cli/templates/meditate/`
+#### Task 6b.1: Create `src/cli/templates/meditate/` — SHIPPED `0fc0bc1`
 
-- [ ] **Step 1 (red): templates-validate test for `meditate`**
+- [x] **Step 1 (red): templates-validate test for `meditate`**
 
   ```ts
   it("meditate has no errors", () => {
@@ -2965,7 +2965,7 @@ export async function <name>Command(args, opts = {}): Promise<void> {
   });
   ```
 
-- [ ] **Step 2 (green): create files**
+- [x] **Step 2 (green): create files**
 
   `src/cli/templates/meditate/pipeline.dot`:
   ```dot
@@ -2988,17 +2988,17 @@ export async function <name>Command(args, opts = {}): Promise<void> {
 
   Re-run vitest → green.
 
-- [ ] **Step 3: commit**
+- [x] **Step 3: commit** — `0fc0bc1`
 
   `feat(templates): meditate single-node interactive template with steer var (D8 chunk-6b)`
 
-#### Task 6b.2: Create `src/cli/templates/meditate-create/`
+#### Task 6b.2: Create `src/cli/templates/meditate-create/` — SHIPPED `d844144`
 
-- [ ] **Step 1 (red): templates-validate test for `meditate-create`**
+- [x] **Step 1 (red): templates-validate test for `meditate-create`**
 
   Same shape as 6b.1.
 
-- [ ] **Step 2 (green): create files**
+- [x] **Step 2 (green): create files**
 
   `src/cli/templates/meditate-create/pipeline.dot`:
   ```dot
@@ -3016,13 +3016,13 @@ export async function <name>Command(args, opts = {}): Promise<void> {
 
   Re-run vitest → green.
 
-- [ ] **Step 3: commit**
+- [x] **Step 3: commit** — `d844144`
 
   `feat(templates): meditate-create single-node interactive template (D8 chunk-6b)`
 
-#### Task 6b.3: Convert `meditateCommand` to thin shim
+#### Task 6b.3: Convert `meditateCommand` to thin shim — SHIPPED `f4b69fb`
 
-- [ ] **Step 1 (red): replace test in `src/cli/tests/meditate.test.ts`**
+- [x] **Step 1 (red): replace test in `src/cli/tests/meditate.test.ts`**
 
   Add a shim-shape test alongside the existing PID-lock / dir-creation / gitignore tests (those preflight invariants stay; only the session-launch path changes):
 
@@ -3046,7 +3046,7 @@ export async function <name>Command(args, opts = {}): Promise<void> {
 
   Run → fails.
 
-- [ ] **Step 2 (green): rewrite `meditateCommand`**
+- [x] **Step 2 (green): rewrite `meditateCommand`**
 
   Replace the body:
 
@@ -3085,58 +3085,49 @@ export async function <name>Command(args, opts = {}): Promise<void> {
 
   Re-run tests → green.
 
-- [ ] **Step 3: commit**
+- [x] **Step 3: commit** — `f4b69fb`
 
   `refactor(meditate): convert command to thin shim over meditate template (D8 chunk-6b)`
 
-#### Task 6b.4: Convert `meditateCreateCommand` to thin shim
+#### Task 6b.4: Convert `meditateCreateCommand` to thin shim — SHIPPED `1d8adaa`
 
-- [ ] **Step 1 (red): rewrite `src/cli/tests/meditate-create.test.ts`** as the shim-shape test (same shape as 6a.2).
+- [x] **Step 1 (red): rewrite `src/cli/tests/meditate-create.test.ts`** as the shim-shape test (same shape as 6a.2).
 
-- [ ] **Step 2 (green): rewrite `meditateCreateCommand`** — same shape as `planCommand`'s 6a.2 result, no `--steer` and no preflight side-effects.
+- [x] **Step 2 (green): rewrite `meditateCreateCommand`** — same shape as `planCommand`'s 6a.2 result, no `--steer` and no preflight side-effects.
 
-- [ ] **Step 3: commit**
+- [x] **Step 3: commit** — `1d8adaa`
 
   `refactor(meditate-create): convert command to thin shim over meditate-create template (D8 chunk-6b)`
 
-#### Task 6b.5: Replace `--steer <text>` with `--var steer=...`
+#### Task 6b.5: Replace `--steer <text>` with `--var steer=...` — SHIPPED `770ed90`
+
+**Implementation note (2026-04-28):** Plan called for narrow change in `program.ts`. In practice the flag rippled through `heartbeat.ts` (heartbeat meditate scheduler), `ralph-meditate.ts` (pipeline handler), `meditate-observer.md` (agent rubric), and `tmux-tester/pipeline.dot` (smoke pipeline) — all updated together to keep `--var key=value` as the single canonical UX.
 
 **Why:** `--steer` was a one-off flag tying meditate to a hard-coded substitution. Now that the template declares `inputs="steer"`, the canonical `--var key=value` UX (already the standard for `pipeline run`) covers the same case for free.
 
-- [ ] **Step 1 (red): test the wiring**
+- [x] **Step 1 (red): wiring tests landed inside `src/cli/tests/meditate.test.ts`** — the shim test asserts `opts.variables.steer === "focus on auth flow"` instead of the old `opts.steer` shape; the heartbeat wiring is covered by `src/cli/tests/heartbeat.test.ts`'s `--var steer=...` cases.
 
-  In `src/cli/tests/program.test.ts` (or the closest commander wiring test — find via `git grep "med\.command" src/cli/tests/`), add:
+- [x] **Step 2 (green): update commander wiring**
 
-  ```ts
-  it("ralph meditate forwards --var steer=... to pipelineRunCommand", async () => {
-    /* spy on pipelineRunCommand, invoke `program.parseAsync(["node","ralph","meditate","/tmp/proj","--var","steer=hello"])`,
-       assert opts.variables.steer === "hello". */
-  });
-  ```
+  Done in `src/cli/program.ts:118-130`. `meditateCommand` signature is now `opts: { variables?: Record<string, string> }`; the shim reads `opts.variables?.steer`.
 
-  Run → fails.
+  `src/cli/tests/pipeline-smoke-meditate-steer-folder.test.ts` only validates the .dot file shape (no CLI invocation), so no test edit was needed there.
 
-- [ ] **Step 2 (green): update commander wiring**
+- [x] **Step 3: docs**
 
-  In `src/cli/program.ts`, replace the meditate subcommand's `--steer <text>` option with the standard `--var key=value` collector (mirror the syntax `pipeline run` uses). The `meditateCommand` signature changes from `opts: { steer?: string }` to `opts: { variables?: Record<string,string> }`; the shim reads `opts.variables?.steer`.
+  - `README.md`: example updated to `[--var steer=<text>]`.
+  - `specs/meditate.md`: no `--steer` reference present (verified via grep).
+  - `src/cli/agents/meditate-observer.md`: rubric body updated.
+  - `pipelines/smoke/tmux-tester/pipeline.dot`: agent prompt updated.
 
-  Update the smoke test `src/cli/tests/pipeline-smoke-meditate-steer-folder.test.ts` to invoke `--var steer=...` instead of `--steer ...`.
-
-  Re-run tests → green.
-
-- [ ] **Step 3: docs**
-
-  - `specs/meditate.md`: replace any `--steer <text>` example with `--var steer=...`.
-  - `README.md`: same.
-
-- [ ] **Step 4: commit**
+- [x] **Step 4: commit** — `770ed90`
 
   `refactor(meditate): replace --steer flag with --var steer=... (D8 chunk-6b)`
 
-#### Task 6b.6: Delete `src/cli/agents/meditate.md` and `meditate-create.md`
+#### Task 6b.6: Delete `src/cli/agents/meditate.md` and `meditate-create.md` — SHIPPED `2d84c7a`
 
-- [ ] **Step 1: confirm no other caller** via `git grep -n 'resolveAgent("meditate' src/`.
-- [ ] **Step 2: delete + commit**: `chore(agents): remove meditate / meditate-create (D8 chunk-6b)`.
+- [x] **Step 1: confirm no other caller** — `grep` returned zero hits for `resolveAgent\(.meditate` and `agents/meditate` under `src/`.
+- [x] **Step 2: delete + commit** — `2d84c7a` `chore(agents): remove meditate / meditate-create (D8 chunk-6b)`.
 
 ---
 
