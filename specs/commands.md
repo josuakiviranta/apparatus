@@ -21,10 +21,9 @@ Runs the agentic implementation loop.
 
 **Behavior:**
 1. Resolves absolute path; exits if folder missing
-2. Calls `bootstrapPrompts()` — if prompts were injected, exits with instructions to review
-3. Resolves the `implement` agent definition via the agent registry
-4. Loops `agent.run()` calls with `onStdout` piped through `streamEvents()` for display
-5. Git pushes after each iteration; retries once on failure
+2. Resolves the `implement` agent definition via the agent registry
+3. Loops `agent.run()` calls with `onStdout` piped through `streamEvents()` for display
+4. Git pushes after each iteration; retries once on failure
 
 See [loop.md](loop.md) for iteration details, signal handling, and git push behavior.
 
@@ -40,8 +39,7 @@ Scaffolds a new project and launches a kickoff session.
    - `scenario-tests/`
    - `scenario-runs/`
    - Empty files: `README.md`, `AGENTS.md`, `IMPLEMENTATION_PLAN.md`
-   - Copies bundled `PROMPT_plan.md` and `PROMPT_build.md`
-   - `.gitignore` with `PROMPT_*.md`, `IMPLEMENTATION_PLAN.md`
+   - `.gitignore` with `IMPLEMENTATION_PLAN.md`, `scenario-runs/`
 3. Runs `git init -b main`
 4. Two-phase kickoff session using bundled `PROMPT_kickoff.md`:
    - Phase 1: Non-interactive — substitutes `{{PROJECT_NAME}}`, Claude writes `README.md` + `specs/README.md`
@@ -57,7 +55,7 @@ Launches a sandboxed meditation Claude session.
 3. Writes per-PID MCP config for the illumination server
 4. Spawns Claude with strict `dontAsk` permissions:
    - `Read` — globally allowed
-   - `Write` — restricted to `meditations/illuminations/` only
+   - `Write` — restricted to `meditations/illuminations/` only (after `mark_implemented` or `mark_archived`, the MCP server moves the file to `meditations/implemented-illuminations/` or `meditations/archived-illuminations/`; agents must not write directly to those sibling dirs)
 5. Claude runs as an interactive session with MCP illumination server access
 
 **Stopping:** Press `Ctrl-C` on the running session, or use `ralph heartbeat stop meditate:<project>` for scheduled sessions. Signal handlers clean up the PID lock file and MCP config automatically.
@@ -239,7 +237,6 @@ After each loop iteration, `implement.ts` pushes changes:
 |-----------|---------|----------|
 | Project folder missing | `implement`, `meditate`, `run-scenarios` | Exit with error |
 | Project folder already exists | `new` | Warn and exit |
-| Prompt file missing | `implement` (via loop) | Throws error |
 | `claude` not in PATH | `implement` (via loop) | Throws error |
 | Claude exits non-zero | `implement` (via loop) | `log.warn()`, loop continues |
 | `git push` fails twice | `implement` (via loop) | `log.warn()`, loop continues |

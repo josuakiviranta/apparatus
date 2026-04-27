@@ -23,19 +23,9 @@ describe("scaffoldProject", () => {
     }
   });
 
-  it("creates PROMPT files with bundled default content", () => {
-    scaffoldProject(tmpDir, "my-project");
-    for (const f of ["PROMPT_plan.md", "PROMPT_build.md"]) {
-      expect(existsSync(join(tmpDir, f)), `${f} should exist`).toBe(true);
-      expect(readFileSync(join(tmpDir, f), "utf8").length).toBeGreaterThan(0);
-    }
-  });
-
   it("creates .gitignore with correct entries", () => {
     scaffoldProject(tmpDir, "my-project");
     const content = readFileSync(join(tmpDir, ".gitignore"), "utf8");
-    expect(content).toContain("PROMPT_plan.md");
-    expect(content).toContain("PROMPT_build.md");
     expect(content).toContain("IMPLEMENTATION_PLAN.md");
   });
 

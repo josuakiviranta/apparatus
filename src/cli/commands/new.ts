@@ -1,7 +1,7 @@
-import { mkdirSync, writeFileSync, existsSync, readFileSync, copyFileSync } from "fs";
+import { mkdirSync, writeFileSync, existsSync, readFileSync } from "fs";
 import { join, resolve } from "path";
 import { spawnSync, spawn } from "child_process";
-import { getKickoffPromptPath, getPromptPath } from "../lib/assets";
+import { getKickoffPromptPath } from "../lib/assets";
 import * as output from "../lib/output.js";
 import { streamEvents } from "../lib/stream-formatter.js";
 
@@ -102,14 +102,9 @@ export function scaffoldProject(targetPath: string, _projectName: string): void 
     writeFileSync(join(targetPath, f), "");
   }
 
-  copyFileSync(getPromptPath("plan"), join(targetPath, "PROMPT_plan.md"));
-  copyFileSync(getPromptPath("build"), join(targetPath, "PROMPT_build.md"));
-
   writeFileSync(
     join(targetPath, ".gitignore"),
     [
-      "PROMPT_plan.md",
-      "PROMPT_build.md",
       "IMPLEMENTATION_PLAN.md",
       "scenario-runs/",
     ].join("\n") + "\n"

@@ -19,12 +19,6 @@ export function getAssetPath(filename: string): string {
   return join(base, filename);
 }
 
-export function getPromptPath(type: "plan" | "build"): string {
-  const filename =
-    type === "plan" ? "PROMPT_plan.md" : "PROMPT_build.md";
-  return getAssetPath(join("prompts", filename));
-}
-
 export function getKickoffPromptPath(): string {
   return getAssetPath(join("prompts", "PROMPT_kickoff.md"));
 }

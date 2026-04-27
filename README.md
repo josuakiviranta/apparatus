@@ -16,13 +16,13 @@ Requires: Node.js >=18, [`claude` CLI](https://www.npmjs.com/package/@anthropic-
 ralph plan <project-folder>
 ```
 Opens an interactive Claude session in the project folder for planning/spec writing.
-Uses `PROMPT_plan.md` as the system prompt.
+The session is driven by the bundled `plan` agent definition (`src/cli/agents/plan.md`).
 
 ```bash
 ralph implement <project-folder> [--max N] [--model <name>]
 ```
 Runs the agentic build loop. Claude iterates, commits, and pushes changes until done (or `N` iterations).
-Uses `PROMPT_build.md` as the loop prompt. `--model` overrides the LLM model for the session.
+Driven by the bundled `implement` agent definition (`src/cli/agents/implement.md`); `--model` overrides the LLM model for the session.
 
 Each agent turn is annotated with:
 - `→ [read] path`, `→ [write] path`, `→ [edit] path` — file operations
@@ -38,7 +38,7 @@ Shorthand for `implement`.
 ```bash
 ralph new <project-name>
 ```
-Scaffold a new ralph project in `./<project-name>/`. Creates `AGENTS.md`, `IMPLEMENTATION_PLAN.md`, prompt files, `specs/`, and `src/tests/` directories, runs `git init -b main`, then launches an interactive Claude kickoff session to populate `README.md` and initial specs.
+Scaffold a new ralph project in `./<project-name>/`. Creates `AGENTS.md`, `IMPLEMENTATION_PLAN.md`, `specs/`, and `src/tests/` directories, runs `git init -b main`, then launches an interactive Claude kickoff session to populate `README.md` and initial specs.
 
 ```bash
 ralph meditate <project-folder> [--steer <text>]
@@ -122,11 +122,6 @@ If any node references `$project` in any attribute, `pipeline run` requires
 
 Press `Ctrl+C`. Ralph cleanly terminates its own claude subprocess without affecting any other running claude sessions.
 
-## First Run
-
-On first run in a project, ralph injects default `PROMPT_plan.md` and `PROMPT_build.md` files and exits.
-Review and customize them, then re-run.
-
 ## Directory Map
 
 | Directory | Purpose |
@@ -136,7 +131,7 @@ Review and customize them, then re-run.
 | `docs/` | Harness docs + `superpowers/specs/` (design history, not authoritative specs) |
 | `pipelines/` | `.dot` pipeline definitions + JSON schemas; `smoke/` for smoke tests |
 | `scenario-tests/` | Shell-based end-to-end scenario tests per command |
-| `meditations/` | Curated lenses (meta-meditations) + `illuminations/` subfolder |
+| `meditations/` | Curated lenses in `stimuli/` + three illumination status dirs: `illuminations/` (open + dispatched), `archived-illuminations/`, `implemented-illuminations/` |
 | `memory/` | Session memory written by Claude agents across conversations |
 
 > **specs/ vs docs/superpowers/specs/:** `specs/` holds current behavioral specifications that are authoritative. `docs/superpowers/specs/` holds historical design documents that motivated those specs.
@@ -154,5 +149,4 @@ npm link           # test ralph binary locally
 
 - [Architecture](specs/architecture.md)
 - [Commands](specs/commands.md)
-- [Prompt Bootstrap](specs/bootstrap.md)
 - [Loop Script](specs/loop.md)

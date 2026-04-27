@@ -42,7 +42,6 @@ ralph-cli/
 │   │   │   ├── pipeline-resolver.ts    # Resolves DOT file → pipeline config
 │   │   │   ├── pipelineEvents.ts       # Pipeline event types and emitter
 │   │   │   ├── pipelineReducer.ts      # Pipeline state reducer for TUI
-│   │   │   ├── prompts.ts              # bootstrap logic
 │   │   │   ├── session.ts              # Claude session management
 │   │   │   ├── slash-commands.ts        # Slash command parsing
 │   │   │   ├── stream-formatter.ts     # stream-json → human-readable output
@@ -64,9 +63,7 @@ ralph-cli/
 │   │   │   ├── meditate-create.md
 │   │   │   ├── chat.md
 │   │   │   └── agent-creator.md
-│   │   └── prompts/
-│   │       ├── PROMPT_plan.md          # bundled default
-│   │       └── PROMPT_build.md         # bundled default
+│   │   └── prompts/                     # bundled session prompts (kickoff, meditation, scenario, etc.)
 │   ├── attractor/                       # Pipeline execution engine
 │   │   ├── types.ts                    # Pipeline type definitions
 │   │   ├── checkpoint.ts              # Pipeline checkpoint/resume support

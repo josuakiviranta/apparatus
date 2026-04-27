@@ -10,7 +10,6 @@ Reference specifications for ralph-cli — an agentic loop runner for AI-assiste
 |------|---------------|
 | [architecture.md](architecture.md) | Package structure, file layout, build entry points, asset bundling |
 | [commands.md](commands.md) | All CLI commands — flags, behavior, error handling |
-| [bootstrap.md](bootstrap.md) | Prompt file injection logic (implement command) |
 | [loop.md](loop.md) | Loop module — claude spawning, stream-formatter piping, git push, signal handling |
 | [stream-formatter.md](stream-formatter.md) | stream-json → terminal output — subagent buffering, ctx growth gating |
 | [meditate.md](meditate.md) | Meditation commands — persistent claude sessions with MCP write access |

@@ -1,6 +1,5 @@
 import { existsSync } from "fs";
 import { resolve } from "path";
-import { bootstrapPrompts } from "../lib/prompts.js";
 import { pipelineRunCommand } from "./pipeline.js";
 import * as output from "../lib/output.js";
 
@@ -18,15 +17,6 @@ export async function implementCommand(
   if (!existsSync(absPath)) {
     await output.error(`Error: project folder not found: ${absPath}`);
     process.exit(1);
-  }
-
-  const bootstrap = await bootstrapPrompts(absPath);
-  if (bootstrap.needsSetup) {
-    await output.info(`\nInjected default prompts into ${absPath}:`);
-    bootstrap.injected.forEach((f) => console.log(`  + ${f}`));
-    console.log(`  + Added entries to .gitignore`);
-    console.log("\nReview and customize these prompts, then re-run your command.\n");
-    process.exit(0);
   }
 
   await pipelineRunCommand("implement", {

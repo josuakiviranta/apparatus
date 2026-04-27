@@ -1,9 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("fs", () => ({ existsSync: vi.fn().mockReturnValue(true) }));
-vi.mock("../lib/prompts.js", () => ({
-  bootstrapPrompts: vi.fn().mockResolvedValue({ needsSetup: false, injected: [] }),
-}));
 vi.mock("../commands/pipeline.js", () => ({
   pipelineRunCommand: vi.fn().mockResolvedValue(undefined),
 }));
