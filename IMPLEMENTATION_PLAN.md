@@ -1807,11 +1807,11 @@ git commit -m "feat(verifier): declare inputs: in frontmatter (D5 migration)"
 
 Commit: `534b1ea`.
 
-### Task 2.12: Test against `illumination-to-implementation.dot`'s full topology
+### Task 2.12: Test against `illumination-to-implementation.dot`'s full topology — SHIPPED 2026-04-27
 
 The pipeline has conditional edges (`preferred_label=true|false|empty`), retry loops (`implement → implement on agent.success=false`), default fallbacks (`default_refinements=""`, `default_test_result=""`), gates with multi-choice `label=`s, and chat loop-back edges (`chat_summarizer → verifier`). Lock the validator's behavior on this real-world graph.
 
-- [ ] **Step 1: Write integration test**
+- [x] **Step 1: Write integration test**
 
 Create `src/attractor/tests/illumination-pipeline-flow.test.ts`:
 
@@ -1848,13 +1848,21 @@ describe("illumination-to-implementation.dot — full flow validation", () => {
 });
 ```
 
-- [ ] **Step 2 — 5: TDD cycle.** If the live pipeline fails any rule, that's a real bug to address before locking the test.
+- [x] **Step 2 — 5: TDD cycle.** If the live pipeline fails any rule, that's a real bug to address before locking the test.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git commit -m "test(pipeline): full-topology validation of illumination-to-implementation.dot"
 ```
+
+**Surprises captured:** None. The live pipeline validated clean on the first run after Task 2.11's verifier migration — zero errors, one `required_caller_vars` info banner (`illuminations_dir, plans_dir, specs_dir`; `$project` correctly excluded as RESERVED), and 22 pre-existing `variable_coverage` warnings (unrelated to flow rules; tracked separately). The four tricky topology constructs all behave as designed:
+- Conditional edges (`preferred_label=true|false|empty`) — `input_type_mismatch` does not fire because the verifier's `outputs.preferred_label.enum` covers all three values.
+- `implement → implement` retry back-edge — flow analyzer's BFS visits each node once, so the back-edge contributes nothing to the consumer's upstream set; no `missing_input_producer`/`branch_incomplete_input` blames the `implement` node.
+- `default_refinements=""` on `verifier`, `explainer`, `approval_gate`, `chat_session`, `chat_summarizer` — `hasDefault()` short-circuits the flow check before it can fire `branch_incomplete_input`.
+- Gate multi-choice `label=`s + chat loop-back edges — neither construct emits a flow diagnostic; gate `<nodeId>.choice` keys are produced via the `wait.human` augmentation in `nodeProduces`.
+
+The four locked assertions in `src/attractor/tests/illumination-pipeline-flow.test.ts` are real and falsifiable: dropping `inputs:` from `verifier.md` would break test 1; deleting `$project` from RESERVED_VARS would break test 2; removing any `default_refinements=""` on a converging branch would break test 3; turning the retry edge into a non-back-edge requirement would break test 4.
 
 ### Task 2.13: Chunk-2 review checkpoint
 
