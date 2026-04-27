@@ -634,6 +634,8 @@ One-shot migration ran clean. Disk + index now reflect the new layout end-to-end
 
 **Final on-disk state:** 53 in `meditations/illuminations/` (47 open + 5 dispatched + 1 no-status), 28 in `meditations/archived-illuminations/`, 9 in `meditations/implemented-illuminations/`. No `^status: superseded` lines remain anywhere under `meditations/`.
 
+**Latent bug fix shipped 2026-04-27 as `200dbca`:** the migration script's superseded-branch did `fs.writeFileSync(src, updated)` followed by `execFileSync("git", ["mv", src, target])`. `git mv` only renames the existing index blob — it does not stage on-disk modifications to the source. So the rename commit (`cb5f7a3`) carried the OLD `status: superseded` frontmatter for those 3 files; only working-tree had the re-stamp. Reconciled by `git add` + commit. If the migration script is ever resurrected, fix order: `writeFileSync` → `git mv` → `git add target` (or skip `git mv` and use `writeFileSync(target) + rmSync(src)` like the MCP markImplemented does).
+
 **Live-Claude smoke pipelines (`pipelines/smoke/meditate-steer.dot`, `pipelines/smoke/tmux-tester.dot`) deferred** — both validate clean structurally; the plan's own rationale notes these read from `meditations/illuminations/` for open files, which the migration left untouched. Running them under live Claude is out of scope for the verification step (cost) but they remain available for manual smoke if desired.
 
 <details>
