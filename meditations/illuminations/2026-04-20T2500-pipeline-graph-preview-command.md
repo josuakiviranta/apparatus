@@ -1,6 +1,7 @@
 ---
 date: 2026-04-20
-status: dispatched
+status: implemented
+implemented_in: a39d046
 description: Pipeline `.dot` files routinely reach 200+ lines and 20+ nodes (e.g. `pipelines/illumination-to-implementation.dot`); reading them flat to trace variable flow or edge routing is the biggest ongoing maintainability tax; a `ralph pipeline show <file>` command that renders an annotated graph (ASCII or SVG) with produces/consumes pairs on edges would collapse that tax dramatically.
 dispatched_at: 2026-04-27
 plan_path: docs/superpowers/plans/2026-04-27-pipeline-graph-preview-command.md

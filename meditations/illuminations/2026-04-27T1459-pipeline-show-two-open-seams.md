@@ -1,7 +1,10 @@
 ---
 date: 2026-04-27
-status: open
+status: implemented
+implemented_in: a39d046
 description: pipeline show shipped correctly as a zero-flag, validate-first SVG renderer, but left two open seams: formatDiag is a verbatim copy inside pipelineShowCommand (the design spec warned against this), and committed SVGs have no staleness guard — both compound with the next pipeline command that needs diagnostic output.
+dispatched_at: 2026-04-27
+plan_path: docs/superpowers/plans/2026-04-27-pipeline-show-two-open-seams.md
 ---
 
 ## Core Idea
