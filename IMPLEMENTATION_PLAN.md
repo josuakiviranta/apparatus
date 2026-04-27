@@ -2799,7 +2799,7 @@ export async function <name>Command(args, opts = {}): Promise<void> {
 
 ---
 
-### Sub-chunk 6a: `plan` → `templates/plan/`
+### Sub-chunk 6a: `plan` → `templates/plan/` — SHIPPED 2026-04-27
 
 **Files:**
 - Create: `src/cli/templates/plan/pipeline.dot`
@@ -2811,7 +2811,7 @@ export async function <name>Command(args, opts = {}): Promise<void> {
 
 #### Task 6a.1: Create `src/cli/templates/plan/`
 
-- [ ] **Step 1 (red): extend `templates-validate.test.ts` for `plan`**
+- [x] **Step 1 (red): extend `templates-validate.test.ts` for `plan`**
 
   ```ts
   it("plan has no errors", () => {
@@ -2823,7 +2823,7 @@ export async function <name>Command(args, opts = {}): Promise<void> {
 
   Run → fails (template directory missing).
 
-- [ ] **Step 2 (green): create the files**
+- [x] **Step 2 (green): create the files**
 
   `src/cli/templates/plan/pipeline.dot`:
   ```dot
@@ -2853,13 +2853,13 @@ export async function <name>Command(args, opts = {}): Promise<void> {
 
   Re-run vitest `templates-validate.test.ts` → green.
 
-- [ ] **Step 3: commit**
+- [x] **Step 3: commit** — `097d000`
 
   `feat(templates): plan single-node interactive template (D8 chunk-6a)`
 
 #### Task 6a.2: Convert `planCommand` to thin shim
 
-- [ ] **Step 1 (red): create `src/cli/tests/plan.test.ts`**
+- [x] **Step 1 (red): create `src/cli/tests/plan.test.ts`**
 
   ```ts
   import { describe, it, expect, vi } from "vitest";
@@ -2882,7 +2882,7 @@ export async function <name>Command(args, opts = {}): Promise<void> {
 
   Run → fails (current `planCommand` does its own two-phase Claude session, never touches `pipelineRunCommand`).
 
-- [ ] **Step 2 (green): rewrite `planCommand`**
+- [x] **Step 2 (green): rewrite `planCommand`**
 
   Replace `src/cli/commands/plan.ts` body in full:
 
@@ -2908,18 +2908,18 @@ export async function <name>Command(args, opts = {}): Promise<void> {
 
   Re-run shim test → green.
 
-- [ ] **Step 3: typecheck + full test run**
+- [x] **Step 3: typecheck + full test run**
 
   - `npx tsc --noEmit` → clean.
   - `npx vitest run` → all suites green.
 
-- [ ] **Step 4: commit**
+- [x] **Step 4: commit** — `4d60bb9`
 
   `refactor(plan): convert command to thin shim over plan template (D8 chunk-6a)`
 
 #### Task 6a.3: Delete `src/cli/agents/plan.md`
 
-- [ ] **Step 1: confirm no other caller**
+- [x] **Step 1: confirm no other caller**
 
   ```sh
   git grep -n 'resolveAgent("plan")' src/
@@ -2928,7 +2928,7 @@ export async function <name>Command(args, opts = {}): Promise<void> {
 
   Both should return zero hits after 6a.2 lands.
 
-- [ ] **Step 2: delete + commit**
+- [x] **Step 2: delete + commit** — `652efbf`
 
   ```sh
   rm src/cli/agents/plan.md
