@@ -1533,7 +1533,7 @@ git commit -m "feat(validator): flow-analyzer computes per-node varsInScope"
 
 Now the analyzer is in place, replace the Chunk-1 `debugProducedKeys` hack with the real diagnostic. An agent node's declared `inputs:` keys must all appear in the node's `varsInScope` set; otherwise emit `missing_input_producer` (error).
 
-- [ ] **Step 1: Read the current debug scaffold**
+- [x] **Step 1: Read the current debug scaffold** — `(graph as any).debugProducedKeys = nodeProduces` confirmed at the location specified.
 
 ```bash
 sed -n '388,394p' src/attractor/core/graph.ts
@@ -1541,7 +1541,7 @@ sed -n '388,394p' src/attractor/core/graph.ts
 
 Expected: the `(graph as any).debugProducedKeys = nodeProduces` line.
 
-- [ ] **Step 2: Write failing test**
+- [x] **Step 2: Write failing test** — `graph-inputs-flow.test.ts` created with 3 cases (4th `default_<key>=` case added in 94f3b41).
 
 Create `src/attractor/tests/graph-inputs-flow.test.ts`:
 
@@ -1638,7 +1638,7 @@ body
 });
 ```
 
-- [ ] **Step 3: Run test to verify it fails**
+- [x] **Step 3: Run test to verify it fails** — first case failed as expected (rule didn't exist); other two passed because the absence assertion holds vacuously.
 
 ```bash
 npx vitest run src/attractor/tests/graph-inputs-flow.test.ts -t "missing_input_producer"
@@ -1646,7 +1646,7 @@ npx vitest run src/attractor/tests/graph-inputs-flow.test.ts -t "missing_input_p
 
 Expected: FAIL — rule doesn't exist.
 
-- [ ] **Step 4: Implement the rule and remove `debugProducedKeys`**
+- [x] **Step 4: Implement the rule and remove `debugProducedKeys`** — done in `df5a755`. Refactored to extracted helpers (`tryResolveAgent`, `checkMissingInputProducer`) in `94f3b41` per code review.
 
 In `src/attractor/core/graph.ts`, before `(graph as any).debugProducedKeys = ...` at `:391`, add an import and rule block:
 
@@ -1688,7 +1688,7 @@ Remove the line:
 
 …and the TODO comment above it.
 
-- [ ] **Step 5: Run test to verify it passes**
+- [x] **Step 5: Run test to verify it passes** — `graph-inputs-flow.test.ts` 4 passed.
 
 ```bash
 npx vitest run src/attractor/tests/graph-inputs-flow.test.ts -t "missing_input_producer"
@@ -1696,7 +1696,7 @@ npx vitest run src/attractor/tests/graph-inputs-flow.test.ts -t "missing_input_p
 
 Expected: PASS.
 
-- [ ] **Step 6: Update Chunk-1 fallout — `graph-outputs-derives-produces.test.ts`**
+- [x] **Step 6: Update Chunk-1 fallout — `graph-outputs-derives-produces.test.ts`** — assertions on `(graph as any).debugProducedKeys` replaced with `missing_input_producer`-absence checks driven by a downstream consumer node.
 
 The Chunk-1 test file uses `(graph as any).debugProducedKeys`. Replace those assertions with `missing_input_producer` observations: synthesize a downstream `inputs: [<key>]` consumer and assert NO `missing_input_producer` is emitted (proving the derivation works).
 
@@ -1706,7 +1706,7 @@ npx vitest run src/attractor/tests/graph-outputs-derives-produces.test.ts
 
 Expected: PASS after refactor.
 
-- [ ] **Step 7: Run full validator suite**
+- [x] **Step 7: Run full validator suite** — 7 files, 113 tests passed; `npx tsc --noEmit` exit 0.
 
 ```bash
 npx vitest run src/attractor/tests/graph
@@ -1714,7 +1714,7 @@ npx vitest run src/attractor/tests/graph
 
 Expected: all green.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit** — done in `df5a755` (initial implementation) + `94f3b41` (helper extraction per code review).
 
 ```bash
 git add src/attractor/core/graph.ts src/attractor/tests/graph-inputs-flow.test.ts src/attractor/tests/graph-outputs-derives-produces.test.ts
