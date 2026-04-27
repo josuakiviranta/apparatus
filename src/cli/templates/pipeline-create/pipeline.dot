@@ -1,0 +1,11 @@
+digraph pipeline_create {
+  goal="Scaffold a new ralph pipeline interactively"
+  inputs="pipeline_name, pipelines_dir"
+
+  start [shape=Mdiamond]
+  done  [shape=Msquare]
+
+  scaffolder [agent="scaffolder", interactive=true, prompt="Scaffold a new pipeline named $pipeline_name under $pipelines_dir."]
+
+  start -> scaffolder -> done
+}

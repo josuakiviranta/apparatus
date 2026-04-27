@@ -38,7 +38,7 @@ function getBundledDir(opts?: RegistryOptions): string {
   return opts?.bundledDir ?? getBundledAgentsDir();
 }
 
-function parseAgentFile(content: string): AgentConfig {
+export function parseAgentFile(content: string): AgentConfig {
   const { attributes, body } = parseFrontmatter(content);
   return validateAgentConfig({ ...attributes, prompt: body } as any);
 }
