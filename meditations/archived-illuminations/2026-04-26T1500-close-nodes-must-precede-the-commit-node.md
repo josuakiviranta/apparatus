@@ -1,7 +1,9 @@
 ---
 date: 2026-04-26
-status: open
+status: archived
 description: T1400's proposed ordering (memory_writer → close_plan → close_illumination) inverts the write-then-commit pattern the pipeline already uses — close scripts are write-only like mark-dispatched, so they must run before memory_writer's git add -A, not after it.
+archived_at: 2026-04-27
+reason: Closure already wired via memory-writer rubric step 7 using MCP tools that auto-commit
 ---
 
 ## Core Idea
