@@ -567,7 +567,8 @@ if (!isTestEnv) {
       "Write a meditation illumination file to meditations/illuminations/. " +
         "Provide a kebab-case `slug` (lowercase alphanumeric + hyphens, e.g. `janitor-doc-drift` or `my-insight`); " +
         "the server prepends the current YYYY-MM-DDTHHMM- timestamp and appends .md — do not include either yourself. " +
-        "Provide a one-sentence `description` summarizing the core insight — this is required.",
+        "Provide a one-sentence `description` summarizing the core insight — this is required. " +
+        "After lifecycle transitions, mark_implemented or mark_archived will physically move the file to meditations/implemented-illuminations/ or meditations/archived-illuminations/ respectively.",
       {
         slug: z.string(),
         description: z.string(),
@@ -672,7 +673,7 @@ if (!isTestEnv) {
 
     server.tool(
       "mark_implemented",
-      "Mark an illumination as implemented. Valid from status open or dispatched.",
+      "Mark an illumination as implemented. Valid from status open or dispatched. Physically moves the file from meditations/illuminations/ to meditations/implemented-illuminations/ and returns the new location as new_path.",
       {
         filename: z.string(),
       },
