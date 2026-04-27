@@ -1,7 +1,9 @@
 ---
 date: 2026-04-14
-status: open
+status: archived
 description: Consumer projects have no guided path from `npm install -g ralph-cli` to a first working pipeline — `ralph new` serves brand-new projects, `ralph pipeline create` requires ralph-awareness that doesn't yet exist, and there is no `ralph init` command to bridge the two for existing codebases.
+archived_at: 2026-04-27
+reason: Depends on unbuilt ralph.config.js and bundled-pipelines prerequisites - scope creep
 ---
 
 ## Core Idea
