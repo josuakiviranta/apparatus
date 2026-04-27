@@ -16,11 +16,8 @@ import {
 import { InkInterviewer } from "../../attractor/interviewer/ink.js";
 import { AutoApproveInterviewer } from "../../attractor/interviewer/auto-approve.js";
 import { getPipelinesDir, resolvePipelineArg, isNameShorthand } from "../lib/pipeline-resolver.js";
-import { spawnSync } from "child_process";
 import { PassThrough } from "stream";
 import { parseStreamJsonEvents, streamEvents } from "../lib/stream-formatter.js";
-import { composeCreatePrompt } from "../lib/pipeline-create-prompt.js";
-import { runTwoPhaseClaudeSession } from "../lib/session.js";
 import { resolveBundledTemplate } from "../lib/assets.js";
 // Self-namespace import lets test spies (`vi.spyOn(pipelineMod, "pipelineRunCommand")`)
 // intercept calls made from inside this file. ESM exports are read-only bindings, so
@@ -910,17 +907,10 @@ export interface PipelineRefineOptions {
 }
 
 export async function pipelineRefineCommand(name: string, opts: PipelineRefineOptions = {}): Promise<void> {
-  const which = spawnSync("which", ["claude"], { encoding: "utf8" });
-  if (which.status !== 0) {
-    await output.error("Error: claude CLI not found.\nInstall it: npm install -g @anthropic-ai/claude-code");
-    process.exit(1);
-  }
-
   const project = resolve(opts.project ?? process.cwd());
   const pipelinesDir = getPipelinesDir(project);
   const dotPath = join(pipelinesDir, `${name}.dot`);
 
-  // Validate name via resolvePipelineArg (same rules as create)
   try {
     resolvePipelineArg(name, project);
   } catch (err) {
@@ -928,7 +918,6 @@ export async function pipelineRefineCommand(name: string, opts: PipelineRefineOp
     process.exit(1);
   }
 
-  // Must exist (inverse of create's conflict check)
   if (!existsSync(dotPath)) {
     await output.error(
       `Pipeline not found: ${dotPath}\n` +
@@ -938,52 +927,37 @@ export async function pipelineRefineCommand(name: string, opts: PipelineRefineOp
   }
 
   const existingContent = readFileSync(dotPath, "utf8");
-  const relativePath = dotPath.startsWith(project + "/") ? dotPath.slice(project.length + 1) : dotPath;
   let previousGraph: Graph | undefined;
   try { previousGraph = parseDot(existingContent); } catch { /* unparsable — skip diff */ }
 
-  const basePrompt = composeCreatePrompt(project);
-
-  let traceBlock = "";
+  let traceDigest = "";
   if (opts.traces !== false) {
     const tracePaths = listRecentTraces(name, REFINE_TRACE_COUNT, { tracesRoot: opts.tracesRoot });
     if (tracePaths.length > 0) {
-      const digests = tracePaths.map(p => digestTraceFile(p));
-      traceBlock =
+      traceDigest =
         `Recent run traces for ${name}:\n\n` +
-        digests.join("\n\n") +
-        "\n\n---\n\n";
+        tracePaths.map(p => digestTraceFile(p)).join("\n\n");
     }
   }
-
-  const refineFraming =
-    traceBlock +
-    `Here is the current pipeline workflow at ${relativePath}:\n\n` +
-    "```dot\n" +
-    existingContent +
-    (existingContent.endsWith("\n") ? "" : "\n") +
-    "```\n\n" +
-    `The user wants to refine it. Discuss what they want to change, propose targeted edits ` +
-    `to the existing graph (do not redesign from scratch), then write the updated version back ` +
-    `to ${dotPath}. Preserve node IDs and edge labels that the user does not explicitly want ` +
-    `changed — downstream tooling routes on edge labels.`;
-
-  const trigger = `${basePrompt}\n\n---\n${refineFraming}`;
 
   await output.step(`Refining pipeline: ${name}`);
   await output.step(`Target: ${dotPath}`);
 
-  const { exitCode } = await runTwoPhaseClaudeSession({ cwd: project, trigger });
-
-  if (exitCode !== 0) {
-    process.exit(exitCode);
-  }
+  const dotFile = resolveBundledTemplate("pipeline-refine");
+  await self.pipelineRunCommand(dotFile, {
+    project,
+    variables: {
+      pipeline_name: name,
+      dot_path: dotPath,
+      current_dot: existingContent,
+      trace_digest: traceDigest,
+    },
+  });
 
   if (!existsSync(dotPath)) {
     await output.warn(`Session ended but ${dotPath} was removed.`);
     process.exit(1);
   }
-
   await output.step("Validating pipeline...");
   const validateExit = await pipelineValidateCommand(dotPath, { previousGraph });
   process.exit(validateExit);

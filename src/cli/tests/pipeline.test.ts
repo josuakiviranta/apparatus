@@ -60,8 +60,6 @@ import {
 } from "../commands/pipeline.js";
 import * as pipelineMod from "../commands/pipeline.js";
 import type { Graph, Node, Edge } from "../../attractor/types.js";
-import * as childProcess from "child_process";
-import { composeCreatePrompt } from "../lib/pipeline-create-prompt.js";
 import * as engine from "../../attractor/core/engine.js";
 import * as out from "../lib/output.js";
 
@@ -396,19 +394,8 @@ describe("pipelineRefineCommand", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     dir = mkdtempSync(join(tmpdir(), "ralph-pipeline-refine-"));
-    (childProcess.spawnSync as ReturnType<typeof vi.fn>).mockImplementation(() => ({ status: 0 }));
   });
   afterEach(() => { rmSync(dir, { recursive: true }); });
-
-  it("errors if claude CLI not found", async () => {
-    (childProcess.spawnSync as ReturnType<typeof vi.fn>).mockReturnValueOnce({ status: 1 });
-    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("exit"); });
-    await expect(
-      pipelineRefineCommand("review", { project: dir }),
-    ).rejects.toThrow();
-    expect(out.error).toHaveBeenCalledWith(expect.stringContaining("claude CLI not found"));
-    exitSpy.mockRestore();
-  });
 
   it("errors when pipeline does not exist and points at create", async () => {
     const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("exit"); });
@@ -429,29 +416,33 @@ describe("pipelineRefineCommand", () => {
     exitSpy.mockRestore();
   });
 
-  it("injects existing .dot content verbatim into the kickoff trigger", async () => {
+  it("delegates to pipelineRunCommand with the pipeline-refine template + variables", async () => {
     mkdirSync(join(dir, "pipelines"));
     const dotPath = join(dir, "pipelines", "review.dot");
     writeFileSync(dotPath, VALID_DOT);
-    (composeCreatePrompt as ReturnType<typeof vi.fn>).mockReturnValue("# Base prompt");
 
-    const spawnMock = childProcess.spawn as ReturnType<typeof vi.fn>;
-    spawnMock.mockClear();
+    const calls: Array<{ dotFile: string; opts: { project?: string; variables?: Record<string, string> } }> = [];
+    const runSpy = vi.spyOn(pipelineMod, "pipelineRunCommand").mockImplementation(async (dotFile, opts) => {
+      calls.push({ dotFile, opts: opts ?? {} });
+    });
 
-    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("exit"); });
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(((code?: number | string | null) => {
+      throw new Error(`exit:${code ?? 0}`);
+    }) as (code?: number | string | null | undefined) => never);
     await expect(
       pipelineRefineCommand("review", { project: dir }),
-    ).rejects.toThrow("exit");
+    ).rejects.toThrow("exit:0");
     exitSpy.mockRestore();
+    runSpy.mockRestore();
 
-    expect(spawnMock).toHaveBeenCalled();
-    const args = spawnMock.mock.calls[0][1] as string[];
-    const trigger = args[1];
-    expect(trigger).toContain("# Base prompt");
-    expect(trigger).toContain("Here is the current pipeline");
-    expect(trigger).toContain("```dot");
-    expect(trigger).toContain(VALID_DOT);
-    expect(trigger).toContain(dotPath);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].dotFile.endsWith("pipeline-refine/pipeline.dot")).toBe(true);
+    expect(calls[0].opts.project).toBe(dir);
+    const vars = calls[0].opts.variables ?? {};
+    expect(vars.pipeline_name).toBe("review");
+    expect(vars.dot_path).toBe(dotPath);
+    expect(vars.current_dot).toBe(VALID_DOT);
+    expect(typeof vars.trace_digest).toBe("string");
   });
 
   it("runs validate after a clean session exit", async () => {
@@ -459,7 +450,7 @@ describe("pipelineRefineCommand", () => {
     const dotPath = join(dir, "pipelines", "review.dot");
     writeFileSync(dotPath, VALID_DOT);
 
-    (childProcess.spawnSync as ReturnType<typeof vi.fn>).mockImplementation(() => ({ status: 0 }));
+    const runSpy = vi.spyOn(pipelineMod, "pipelineRunCommand").mockImplementation(async () => {});
 
     const exitSpy = vi.spyOn(process, "exit").mockImplementation(((code?: number | string | null) => {
       throw new Error(`exit:${code ?? 0}`);
@@ -469,6 +460,7 @@ describe("pipelineRefineCommand", () => {
     ).rejects.toThrow("exit:0");
     expect(out.success).toHaveBeenCalledWith(expect.stringContaining("Pipeline valid"));
     exitSpy.mockRestore();
+    runSpy.mockRestore();
   });
 
   it("warns and exits non-zero if the file is gone after a clean session", async () => {
@@ -476,9 +468,8 @@ describe("pipelineRefineCommand", () => {
     const dotPath = join(dir, "pipelines", "review.dot");
     writeFileSync(dotPath, VALID_DOT);
 
-    (childProcess.spawnSync as ReturnType<typeof vi.fn>).mockImplementation((cmd: string) => {
-      if (cmd === "claude") rmSync(dotPath);
-      return { status: 0 };
+    const runSpy = vi.spyOn(pipelineMod, "pipelineRunCommand").mockImplementation(async () => {
+      rmSync(dotPath);
     });
 
     const exitSpy = vi.spyOn(process, "exit").mockImplementation(((code?: number | string | null) => {
@@ -489,27 +480,7 @@ describe("pipelineRefineCommand", () => {
     ).rejects.toThrow("exit:1");
     expect(out.warn).toHaveBeenCalledWith(expect.stringContaining("was removed"));
     exitSpy.mockRestore();
-  });
-
-  it("exits non-zero without validating when claude resume returns non-zero", async () => {
-    mkdirSync(join(dir, "pipelines"));
-    const dotPath = join(dir, "pipelines", "review.dot");
-    writeFileSync(dotPath, VALID_DOT);
-
-    let nthCall = 0;
-    (childProcess.spawnSync as ReturnType<typeof vi.fn>).mockImplementation(() => {
-      nthCall += 1;
-      return nthCall === 1 ? { status: 0 } : { status: 2 };
-    });
-
-    const exitSpy = vi.spyOn(process, "exit").mockImplementation(((code?: number | string | null) => {
-      throw new Error(`exit:${code ?? 0}`);
-    }) as (code?: number | string | null | undefined) => never);
-    await expect(
-      pipelineRefineCommand("review", { project: dir }),
-    ).rejects.toThrow("exit:2");
-    expect(out.success).not.toHaveBeenCalledWith(expect.stringContaining("Pipeline valid"));
-    exitSpy.mockRestore();
+    runSpy.mockRestore();
   });
 });
 
@@ -683,36 +654,39 @@ describe("pipelineRefineCommand — trace injection", () => {
     return tracePath;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let runSpy: any;
+
   beforeEach(() => {
     vi.clearAllMocks();
     dir = mkdtempSync(join(tmpdir(), "ralph-pipeline-refine-traces-"));
     tracesRoot = mkdtempSync(join(tmpdir(), "ralph-traces-"));
     mkdirSync(join(dir, "pipelines"));
     writeFileSync(join(dir, "pipelines", "review.dot"), VALID_DOT);
-    (childProcess.spawnSync as ReturnType<typeof vi.fn>).mockImplementation(() => ({ status: 0 }));
-    (composeCreatePrompt as ReturnType<typeof vi.fn>).mockReturnValue("# Base prompt");
+    runSpy = vi.spyOn(pipelineMod, "pipelineRunCommand").mockImplementation(async () => {});
   });
   afterEach(() => {
+    runSpy?.mockRestore();
     rmSync(dir, { recursive: true });
     rmSync(tracesRoot, { recursive: true });
   });
 
-  function captureTrigger(): string {
-    const spawnMock = childProcess.spawn as ReturnType<typeof vi.fn>;
-    const args = spawnMock.mock.calls[0][1] as string[];
-    return args[1];
+  function captureTraceDigest(): string {
+    const calls = (runSpy as unknown as { mock: { calls: Array<[string, { variables?: Record<string, string> }]> } }).mock.calls;
+    expect(calls.length).toBeGreaterThan(0);
+    return calls[0][1]?.variables?.trace_digest ?? "";
   }
 
-  it("includes trace digests in trigger when traces exist", async () => {
+  it("includes trace digests in trace_digest when traces exist", async () => {
     seedTrace("run-1", "review");
     const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("exit"); });
     await expect(
       pipelineRefineCommand("review", { project: dir, tracesRoot }),
     ).rejects.toThrow("exit");
     exitSpy.mockRestore();
-    const trigger = captureTrigger();
-    expect(trigger).toContain("Recent run traces for review:");
-    expect(trigger).toContain("run-1");
+    const digest = captureTraceDigest();
+    expect(digest).toContain("Recent run traces for review:");
+    expect(digest).toContain("run-1");
   });
 
   it("caps injection at REFINE_TRACE_COUNT (3)", async () => {
@@ -726,24 +700,23 @@ describe("pipelineRefineCommand — trace injection", () => {
       pipelineRefineCommand("review", { project: dir, tracesRoot }),
     ).rejects.toThrow("exit");
     exitSpy.mockRestore();
-    const trigger = captureTrigger();
+    const digest = captureTraceDigest();
     // 3 newest must appear
-    expect(trigger).toContain("run-new-2");
-    expect(trigger).toContain("run-new-1");
-    expect(trigger).toContain("run-mid");
+    expect(digest).toContain("run-new-2");
+    expect(digest).toContain("run-new-1");
+    expect(digest).toContain("run-mid");
     // 2 oldest must NOT appear
-    expect(trigger).not.toContain("run-old-1");
-    expect(trigger).not.toContain("run-old-2");
+    expect(digest).not.toContain("run-old-1");
+    expect(digest).not.toContain("run-old-2");
   });
 
-  it("skips the trace block entirely when no traces exist", async () => {
+  it("trace_digest is empty when no traces exist", async () => {
     const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("exit"); });
     await expect(
       pipelineRefineCommand("review", { project: dir, tracesRoot }),
     ).rejects.toThrow("exit");
     exitSpy.mockRestore();
-    const trigger = captureTrigger();
-    expect(trigger).not.toContain("Recent run traces");
+    expect(captureTraceDigest()).toBe("");
   });
 
   it("honors --no-traces option", async () => {
@@ -753,23 +726,7 @@ describe("pipelineRefineCommand — trace injection", () => {
       pipelineRefineCommand("review", { project: dir, tracesRoot, traces: false }),
     ).rejects.toThrow("exit");
     exitSpy.mockRestore();
-    const trigger = captureTrigger();
-    expect(trigger).not.toContain("Recent run traces");
-  });
-
-  it("trace block precedes the current-graph block", async () => {
-    seedTrace("run-1", "review");
-    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("exit"); });
-    await expect(
-      pipelineRefineCommand("review", { project: dir, tracesRoot }),
-    ).rejects.toThrow("exit");
-    exitSpy.mockRestore();
-    const trigger = captureTrigger();
-    const tracesIdx = trigger.indexOf("Recent run traces");
-    const graphIdx  = trigger.indexOf("Here is the current pipeline");
-    expect(tracesIdx).toBeGreaterThanOrEqual(0);
-    expect(graphIdx).toBeGreaterThanOrEqual(0);
-    expect(tracesIdx).toBeLessThan(graphIdx);
+    expect(captureTraceDigest()).toBe("");
   });
 
   it("filters traces by pipelineName (does not leak other pipelines)", async () => {
@@ -780,8 +737,8 @@ describe("pipelineRefineCommand — trace injection", () => {
       pipelineRefineCommand("review", { project: dir, tracesRoot }),
     ).rejects.toThrow("exit");
     exitSpy.mockRestore();
-    const trigger = captureTrigger();
-    expect(trigger).toContain("run-review");
-    expect(trigger).not.toContain("run-deploy");
+    const digest = captureTraceDigest();
+    expect(digest).toContain("run-review");
+    expect(digest).not.toContain("run-deploy");
   });
 });

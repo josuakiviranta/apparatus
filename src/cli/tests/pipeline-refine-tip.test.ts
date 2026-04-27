@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "fs";
+// (mkdtempSync etc. used by both the existing tip suite and the new shim suite)
 import { tmpdir } from "os";
 import { join } from "path";
 
@@ -32,7 +33,9 @@ vi.mock("../components/PipelineApp.js", () => ({
     waitUntilExit: vi.fn(async () => {}),
   })),
 }));
-vi.mock("../lib/assets.js", () => ({}));
+vi.mock("../lib/assets.js", () => ({
+  resolveBundledTemplate: vi.fn((name: string) => `/fake/templates/${name}/pipeline.dot`),
+}));
 vi.mock("../lib/pipeline-create-prompt.js", () => ({
   composeCreatePrompt: vi.fn().mockReturnValue("# Test prompt"),
 }));
@@ -41,7 +44,8 @@ vi.mock("../lib/stream-formatter.js", () => ({
   parseStreamJsonEvents: vi.fn(async function* () {}),
 }));
 
-import { pipelineRunCommand } from "../commands/pipeline.js";
+import { pipelineRunCommand, pipelineRefineCommand } from "../commands/pipeline.js";
+import * as pipelineMod from "../commands/pipeline.js";
 
 const MISSING_INPUTS_DOT = `digraph g {
   goal="test"
@@ -149,5 +153,49 @@ describe("pipelineRunCommand refine tip", () => {
     const tipLine = findTipLine(logSpy);
     expect(tipLine).toBeDefined();
     expect(tipLine).toContain("will-fail");
+  });
+});
+
+describe("pipelineRefineCommand — shim shape", () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let exitSpy: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let runSpy: any;
+  let dir: string;
+
+  beforeEach(() => {
+    exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called");
+    }) as never);
+    dir = mkdtempSync(join(tmpdir(), "ralph-refine-shim-"));
+    runSpy = vi.spyOn(pipelineMod, "pipelineRunCommand").mockImplementation(async () => {});
+  });
+
+  afterEach(() => {
+    exitSpy.mockRestore();
+    runSpy.mockRestore();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("forwards pipeline_name, dot_path, current_dot, trace_digest to pipelineRunCommand", async () => {
+    const pipelinesDir = join(dir, "pipelines");
+    mkdirSync(pipelinesDir, { recursive: true });
+    const dotPath = join(pipelinesDir, "review.dot");
+    const dotBody = "digraph g { start [shape=Mdiamond] done [shape=Msquare] start -> done }";
+    writeFileSync(dotPath, dotBody);
+
+    await expect(
+      pipelineRefineCommand("review", { project: dir }),
+    ).rejects.toThrow("process.exit called");
+
+    expect(runSpy).toHaveBeenCalledTimes(1);
+    const [dotFile, opts] = runSpy.mock.calls[0];
+    expect(typeof dotFile).toBe("string");
+    expect(dotFile.endsWith("pipeline-refine/pipeline.dot")).toBe(true);
+    expect(opts.project).toBe(dir);
+    expect(opts.variables.pipeline_name).toBe("review");
+    expect(opts.variables.dot_path).toBe(dotPath);
+    expect(opts.variables.current_dot).toBe(dotBody);
+    expect(typeof opts.variables.trace_digest).toBe("string");
   });
 });
