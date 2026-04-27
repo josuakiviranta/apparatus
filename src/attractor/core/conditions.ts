@@ -19,25 +19,41 @@ function resolveKey(key: string, outcome: Outcome, ctx: ContextMap): string {
   return JSON.stringify(v);
 }
 
-function evaluateClause(clause: string, outcome: Outcome, ctx: ContextMap): boolean {
-  clause = clause.trim();
-  const neq = clause.indexOf("!=");
-  const eq  = clause.indexOf("=");
+export type ConditionClause = { key: string; op: "=" | "!="; val: string };
 
-  if (neq !== -1) {
-    const key = clause.slice(0, neq).trim();
-    const val = clause.slice(neq + 2).trim().replace(/^'|'$/g, "");
-    return resolveKey(key, outcome, ctx) !== val;
-  } else if (eq !== -1) {
-    const key = clause.slice(0, eq).trim();
-    const val = clause.slice(eq + 1).trim().replace(/^'|'$/g, "");
-    return resolveKey(key, outcome, ctx) === val;
+export function parseConditionClauses(condition: string): ConditionClause[] {
+  if (!condition || condition.trim() === "") return [];
+  const out: ConditionClause[] = [];
+  for (const raw of condition.split("&&")) {
+    const clause = raw.trim();
+    if (clause === "") continue;
+    const neq = clause.indexOf("!=");
+    const eq = clause.indexOf("=");
+    if (neq !== -1) {
+      out.push({
+        key: clause.slice(0, neq).trim(),
+        op: "!=",
+        val: clause.slice(neq + 2).trim().replace(/^'|'$/g, ""),
+      });
+    } else if (eq !== -1) {
+      out.push({
+        key: clause.slice(0, eq).trim(),
+        op: "=",
+        val: clause.slice(eq + 1).trim().replace(/^'|'$/g, ""),
+      });
+    }
   }
-  return true;
+  return out;
+}
+
+function evaluateClause(clause: ConditionClause, outcome: Outcome, ctx: ContextMap): boolean {
+  const actual = resolveKey(clause.key, outcome, ctx);
+  return clause.op === "!=" ? actual !== clause.val : actual === clause.val;
 }
 
 export function evaluateCondition(condition: string, outcome: Outcome, ctx: ContextMap): boolean {
   if (!condition || condition.trim() === "") return true;
-  const clauses = condition.split("&&");
+  const clauses = parseConditionClauses(condition);
+  if (clauses.length === 0) return true;
   return clauses.every(c => evaluateClause(c, outcome, ctx));
 }

@@ -10,6 +10,7 @@ import {
 import { resolveAgent } from "../../cli/lib/agent-registry.js";
 import type { AgentConfig } from "../../cli/lib/agent.js";
 import { computeVarsInScope, computeVarsInAnyScope } from "./flow-analyzer.js";
+import { parseConditionClauses } from "./conditions.js";
 
 export function parseDot(src: string): Graph {
   return parseDotV2(src);
@@ -391,9 +392,57 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
   // resolveAgent needs projectDir to locate project-local agents; without dotDir we can't fetch agent configs.
   if (dotDir) {
     checkMissingInputProducer(graph, nodeProduces, dotDir, diags);
+    checkInputTypeMismatch(graph, dotDir, diags);
   }
 
   return diags;
+}
+
+function checkInputTypeMismatch(
+  graph: Graph,
+  dotDir: string,
+  diags: Diagnostic[],
+): void {
+  // Collect every (nodeId, key, enum[]) tuple declared in agent frontmatter.
+  // The check is global across the graph: if any agent declares enum for a key
+  // and a condition uses a value outside that enum, it's a typo.
+  type EnumDecl = { nodeId: string; agent: string; enums: string[] };
+  const enumsByKey = new Map<string, EnumDecl[]>();
+  for (const [id, node] of graph.nodes) {
+    if (!node.agent) continue;
+    const cfg = tryResolveAgent(node, dotDir);
+    if (!cfg?.outputs) continue;
+    for (const [key, frag] of Object.entries(cfg.outputs)) {
+      if (typeof frag !== "object" || frag === null) continue;
+      const e = (frag as { enum?: unknown }).enum;
+      if (!Array.isArray(e) || e.length === 0) continue;
+      const enums = e.filter((v): v is string => typeof v === "string");
+      if (enums.length === 0) continue;
+      const arr = enumsByKey.get(key) ?? [];
+      arr.push({ nodeId: id, agent: String(node.agent), enums });
+      enumsByKey.set(key, arr);
+    }
+  }
+  if (enumsByKey.size === 0) return;
+
+  for (const edge of graph.edges) {
+    if (!edge.condition) continue;
+    const clauses = parseConditionClauses(String(edge.condition));
+    for (const clause of clauses) {
+      if (clause.key === "outcome") continue;
+      const decls = enumsByKey.get(clause.key);
+      if (!decls || decls.length === 0) continue;
+      // A clause is valid if at least one declaring agent's enum accepts the value.
+      if (decls.some(d => d.enums.includes(clause.val))) continue;
+      const first = decls[0];
+      diags.push({
+        rule: "input_type_mismatch",
+        severity: "error",
+        message: `Edge "${edge.from}" -> "${edge.to}" condition uses "${clause.key}${clause.op}${clause.val}" but agent "${first.agent}" declares outputs.${clause.key}.enum=[${first.enums.map(v => `"${v}"`).join(", ")}]; "${clause.val}" is not a member. Fix the condition value or update the enum.`,
+        location: edge.sourceLocation,
+      });
+    }
+  }
 }
 
 function tryResolveAgent(node: Node, dotDir: string | undefined): AgentConfig | undefined {

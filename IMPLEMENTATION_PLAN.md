@@ -1733,17 +1733,15 @@ Implementation: added `computeVarsInAnyScope` (union-semantics sibling of `compu
 
 - [x] **Step 6: Commit** (this commit)
 
-### Task 2.8: Validator rule `input_type_mismatch`
+### Task 2.8: Validator rule `input_type_mismatch` — SHIPPED 2026-04-27
 
 When a downstream `condition="key=value"` references an output key, validate that `value` is in the producer's `enum` (when the output declares one). Catches typos like `condition="preferred_label=tru"`.
 
-- [ ] **Step 1 — 6: Standard TDD cycle.**
+- [x] **Step 1 — 6: Standard TDD cycle.** RED → GREEN: 7 new tests under `describe("validator — input_type_mismatch")` in `src/attractor/tests/graph-inputs-flow.test.ts` (enum mismatch errors, in-enum passes, no-enum producer skips, `outcome=` ignored, compound `&&` typo caught, `!=` membership checked, single-quote stripping). File suite 15/15 PASS; full suite 1163/1163 PASS; `npx tsc --noEmit` clean.
 
-The implementation walks `graph.edges` looking for `edge.condition === "<key>=<value>"`. Look up the producing node (any node in `varsInScope[edge.from]`'s producer set with `outputs[key]`), check `outputs[key].enum` if present, error if `value` is not a member.
+Implementation: added module-level `parseConditionClauses` helper to `src/attractor/core/conditions.ts` exporting `ConditionClause = {key, op: '=' | '!=', val}` (refactored `evaluateCondition` to use it — single source of truth for clause parsing, validator + runtime now share). Added `checkInputTypeMismatch` rule in `src/attractor/core/graph.ts`, called from `validateGraph` only when `dotDir` is provided (alongside `checkMissingInputProducer`). Rule walks `graph.edges`, parses each `condition=` into clauses, and for each non-`outcome` clause looks up agent declarations of `outputs.<key>.enum`; errors when value not in any declared enum. Behaviors: `outcome=` clauses skipped (pipeline-level status, separate semantics); `!=` operator also validates membership (catches typos on negative match); single quotes around value stripped before comparison (matches existing `evaluateClause` behavior). Diagnostic shape: `{rule: "input_type_mismatch", severity: "error", message: 'Edge "X" -> "Y" condition uses "key=val" but agent "A" declares outputs.key.enum=["a","b"]; "val" is not a member. Fix the condition value or update the enum.', location: edge.sourceLocation}`.
 
-**Pre-step:** Verify `graph.ts` parses `condition=` into structured LHS/RHS. If not, the parser (or the rule itself) needs a small split-on-`=` helper. Capture in chunk's surprises if more invasive than expected.
-
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit** — done in `<commit-sha>`.
 
 ```bash
 git commit -m "feat(validator): input_type_mismatch rule (enum value check)"
@@ -1904,9 +1902,12 @@ git tag chunk-2-inputs-flow-validator
 ```
 
 **Surprises to capture in Chunk-2 memory file** (mirror Chunk 1's pattern):
-- Whether `condition="key=value"` parsing in `graph.ts` exposes the LHS/RHS in a structured form (Task 2.8 prereq).
+- Whether `condition="key=value"` parsing in `graph.ts` exposes the LHS/RHS in a structured form (Task 2.8 prereq). **Resolved (2026-04-27, Task 2.8):** parsing was buried inside `evaluateClause` (runtime-only). Extracted to module-level `parseConditionClauses` in `src/attractor/core/conditions.ts` exporting `ConditionClause = {key, op, val}` so validator + runtime now share the same parser → no drift. Refactored `evaluateCondition` to consume the helper.
 - Whether the CLI's `pipeline validate` command currently prints info-level diagnostics (Task 2.10 prereq).
 - Whether any other bundled agent (besides verifier) has `outputs:` and would now trip the broadened `produces_redundant_with_outputs` rule.
+
+**Known carry-over / flaky test (root-cause later):**
+- `src/cli/tests/pipeline-app-integration.test.tsx` flips on parallel timing (React 18 batched dispatch). Verified pre-existing during Task 2.8 by stash/run/unstash — passes in isolation and on subsequent runs. Worth hardening in a follow-up.
 
 ---
 
