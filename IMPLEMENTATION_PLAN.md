@@ -1896,25 +1896,269 @@ Check that:
 
 ---
 
-## Chunk 3: gates as `.md` files (D3) — outline
+## Chunk 3: gates as `.md` files (D3)
 
-**Purpose:** Move gate prompts out of `.dot` `label=` attributes into `.md` files matching the agent shape, with `type: gate` discriminator in frontmatter.
+**Purpose:** Move gate prompts out of `.dot` `label=` attributes into sibling `<node-id>.md` files. Gates self-describe `choices`, `inputs:`, and `outputs:` via YAML frontmatter — matching the agent file shape. The `.dot` keeps `shape=hexagon` (the existing handler discriminator); the new `type: gate` lives only inside the `.md` frontmatter. Inline `label=` remains supported for backward compatibility (smoke fixtures + simple cases).
 
-**High-level shape:**
-- Add `GateNodeFrontmatterSchema` to `src/attractor/core/schemas.ts` (Task 3.1):
-  ```typescript
-  type: literal("gate"),
-  choices: array(string),
-  inputs: optional array(string),
-  outputs: { choice: { enum: choices } },
-  ```
-- Extend the engine's gate handler to load prompt body from `<node-id>.md` when no inline `label=` is set (Task 3.2).
-- Validator rule (Task 3.3): every gate node either has an inline `label=` OR a sibling `<node-id>.md` with `type: gate`. Diagnostic `gate_handler_missing` if neither.
-- Migrate the four gates in `illumination-to-implementation.dot` (`remove_gate`, `approval_gate`, `review_gate`, `tmux_confirm_gate`) to `.md` files (Tasks 3.4 — 3.7, one per gate).
-- Smoke gates (`pipelines/smoke/gate.dot`) keep inline labels — they test the inline path.
-- Chunk-3 review checkpoint.
+**Codebase facts grounding this chunk** (verified before writing):
+- `WaitHumanHandler` (src/attractor/handlers/wait-human.ts:9-52) reads `node.label ?? node.id` and presents it via `Interviewer.ask` as a MULTIPLE_CHOICE prompt. The handler does NOT know its `.dot` directory today — `dotDir` is not threaded through `EngineOptions` to the handler.
+- Engine dispatcher (src/attractor/core/engine.ts:46-63) builds a handler map at startup. `resolveHandlerType` (src/attractor/core/graph.ts:32-45) maps `shape=hexagon` → `wait.human`.
+- `parseFrontmatter` (src/cli/lib/frontmatter.ts:1-11) returns `{ attributes, body }` from any file via gray-matter.
+- `resolveAgent` (src/cli/lib/agent-registry.ts:35-67) shows the file-resolution pattern: `projectDir → userDir → bundledDir`. Gates live alongside the `.dot` and have NO bundled fallback (gates are always project-specific) — so the resolver is simpler.
+- Gate produces (src/attractor/core/graph.ts:155-180) already emit `<id>.choice` + `choice` alias unconditionally — no change needed for that.
+- Existing schemas (src/attractor/core/schemas.ts:52-55) — `GateNodeSchema` describes the `.dot` node (shape=hexagon, label optional after this chunk). The new `GateMdFrontmatterSchema` describes the sibling `.md` file's frontmatter — different artifact.
+- Pipeline files live at `pipelines/<name>.dot` (per-folder migration is Chunk 4). For Chunk 3, gate `.md` siblings land at `pipelines/<gate-id>.md`.
 
-**Dependencies:** Chunks 1 + 2 (so gates can self-describe their `outputs:` + `inputs:`).
+**Architecture:** Eight tasks. Tasks 3.1-3.4 land schema + loader + handler wiring + validator rule (the plumbing). Tasks 3.5-3.8 migrate the four gates in `illumination-to-implementation.dot` (one task per gate, each its own commit so a regression is bisectable). Task 3.9 is the chunk review checkpoint.
+
+**Dependencies:** Chunks 1 + 2 (so gates can self-describe their `outputs:` + `inputs:` via the same plumbing already wired for agents).
+
+**Backward-compat invariant:** `pipelines/smoke/gate.dot` keeps its inline `label=` and continues to pass — the inline-label code path is preserved, not replaced.
+
+---
+
+### Task 3.1: `GateMdFrontmatterSchema` in `schemas.ts`
+
+Define the Zod schema for the gate `.md` frontmatter so downstream loaders / validators have a single source of truth.
+
+- [ ] **Step 1: Add a failing test in `src/attractor/tests/schemas.test.ts`**
+
+```typescript
+describe("GateMdFrontmatterSchema", () => {
+  it("accepts type=gate with choices and optional inputs", () => {
+    const parsed = GateMdFrontmatterSchema.parse({
+      type: "gate",
+      choices: ["Approve", "Reject", "Chat"],
+      inputs: ["plan_path"],
+    });
+    expect(parsed.choices).toEqual(["Approve", "Reject", "Chat"]);
+    expect(parsed.inputs).toEqual(["plan_path"]);
+  });
+
+  it("rejects empty choices array", () => {
+    expect(() => GateMdFrontmatterSchema.parse({ type: "gate", choices: [] }))
+      .toThrow(/choices/i);
+  });
+
+  it("rejects type !== 'gate'", () => {
+    expect(() => GateMdFrontmatterSchema.parse({ type: "agent", choices: ["a", "b"] }))
+      .toThrow();
+  });
+
+  it("makes inputs optional", () => {
+    const parsed = GateMdFrontmatterSchema.parse({ type: "gate", choices: ["yes", "no"] });
+    expect(parsed.inputs).toBeUndefined();
+  });
+});
+```
+
+- [ ] **Step 2: Run test, expect FAIL** — `npx vitest run src/attractor/tests/schemas.test.ts` (RED).
+
+- [ ] **Step 3: Implement schema in `src/attractor/core/schemas.ts`**
+
+```typescript
+export const GateMdFrontmatterSchema = z.object({
+  type: z.literal("gate"),
+  choices: z.array(z.string().min(1)).min(1, "gate must declare at least one choice"),
+  inputs: z.array(z.string().min(1)).optional(),
+}).strict();
+
+export type GateMdFrontmatter = z.infer<typeof GateMdFrontmatterSchema>;
+```
+
+**Note:** `outputs` is NOT a frontmatter field for gates — the gate's only output is `choice`, derived implicitly from `choices` (constraint is `enum: choices`). The validator (Task 3.4) consumes `choices` directly to enforce this. This deviates from the original outline (`outputs: { choice: { enum: choices } }`) — having `choices` as the canonical declaration avoids two sources of truth and matches how gates implicitly produce `<id>.choice` today.
+
+- [ ] **Step 4: Run test, expect GREEN** — all 4 cases pass.
+
+- [ ] **Step 5: Run full suite** — `npx vitest run`. Expected: still 1180/1180.
+
+- [ ] **Step 6: Commit** — `feat(schemas): GateMdFrontmatterSchema for gate .md files (D3 chunk-3)`.
+
+---
+
+### Task 3.2: `parseGateFile` + `resolveGate` loader
+
+New loader that reads `<dotDir>/<nodeId>.md`, parses frontmatter, validates against `GateMdFrontmatterSchema`, and returns `GateConfig` (frontmatter fields + prompt body).
+
+- [ ] **Step 1: Failing test in `src/cli/tests/gate-registry.test.ts` (new)**
+
+Use `mkdtempSync` to write a fake `.md` to a temp dir, then assert `resolveGate("approval_gate", { dotDir })` returns `{ choices, inputs, prompt }` matching the file. Add cases for: missing file → throws `Gate file not found`; invalid frontmatter (no `type`) → throws with zod issue; body is trimmed.
+
+- [ ] **Step 2: Run test, expect FAIL** — module does not exist (RED).
+
+- [ ] **Step 3: Implement `src/cli/lib/gate-registry.ts`**
+
+```typescript
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { parseFrontmatter } from "./frontmatter.js";
+import { GateMdFrontmatterSchema } from "../../attractor/core/schemas.js";
+
+export interface GateConfig {
+  choices: string[];
+  inputs?: string[];
+  prompt: string;
+}
+
+export function resolveGate(nodeId: string, opts: { dotDir: string }): GateConfig {
+  const path = join(opts.dotDir, `${nodeId}.md`);
+  if (!existsSync(path)) {
+    throw new Error(`Gate file not found: ${path}`);
+  }
+  const { attributes, body } = parseFrontmatter(readFileSync(path, "utf-8"));
+  const fm = GateMdFrontmatterSchema.parse(attributes);
+  return { choices: fm.choices, inputs: fm.inputs, prompt: body.trim() };
+}
+```
+
+- [ ] **Step 4: GREEN** — all loader tests pass.
+
+- [ ] **Step 5: Full suite** — 1180+ pass.
+
+- [ ] **Step 6: Commit** — `feat(gate-registry): resolveGate loader for sibling .md files`.
+
+---
+
+### Task 3.3: `WaitHumanHandler` loads body from `.md` when no inline label
+
+Wire `dotDir` through `EngineOptions` → handler so the handler can call `resolveGate` when `node.label` is missing. Inline-label path stays untouched.
+
+- [ ] **Step 1: Failing tests in `src/attractor/tests/wait-human.test.ts`**
+
+Add two cases:
+1. `node.label = undefined`, dotDir contains `<id>.md` → handler reads `.md` body, expands variables, presents as prompt. Choices come from `.md` frontmatter (NOT outgoing edge labels — see Step 3 design note).
+2. `node.label = undefined`, dotDir has no `.md` → handler returns `{ status: "fail", failureReason: /gate file not found/i }`. (The validator catches this earlier in real runs; the handler's behavior on this path is the safety net.)
+
+Existing inline-label test (regression check): unchanged behavior when `node.label` is set.
+
+- [ ] **Step 2: Run, expect FAIL.**
+
+- [ ] **Step 3: Implement**
+
+Thread `dotDir?: string` through `EngineOptions` (src/attractor/core/engine.ts), pass to `WaitHumanHandler` constructor. In `execute`:
+
+```typescript
+let prompt: string;
+let choices: string[];
+if (node.label) {
+  prompt = expandVariables(node.label, ctx.values, extractDefaults(node));
+  choices = meta.outgoingLabels.length > 0 ? meta.outgoingLabels : ["continue"];
+} else if (this.dotDir) {
+  const gate = resolveGate(node.id, { dotDir: this.dotDir });
+  prompt = expandVariables(gate.prompt, ctx.values, extractDefaults(node));
+  choices = gate.choices;
+} else {
+  return { status: "fail", failureReason: `Gate "${node.id}" has no inline label and no dotDir to resolve .md` };
+}
+```
+
+**Design note on choice source:** when loading from `.md`, the canonical choices come from frontmatter (NOT outgoing-edge labels). This makes the `.md` self-describing for static analysis — Task 3.4's validator and Chunk 2's `input_type_mismatch` both consume `choices` from the frontmatter. Edge labels still drive routing (the engine maps `answer.value` → outgoing edge with `label="..."`); a Task 3.4 validator rule asserts they match.
+
+- [ ] **Step 4: GREEN** — both new cases pass; inline-label regression test still green.
+
+- [ ] **Step 5: Full suite — must include `pipelines/smoke/gate.dot` smoke** (asserts inline path still works end-to-end).
+
+- [ ] **Step 6: Commit** — `feat(wait-human): load gate prompt from sibling .md when label is missing`.
+
+---
+
+### Task 3.4: Validator rule `gate_handler_missing` + edge-label/choice consistency
+
+Two related rules:
+1. `gate_handler_missing` — gate has neither inline `label=` nor a parseable sibling `<id>.md`.
+2. `gate_choice_edge_mismatch` — when the `.md` is used, every choice MUST appear as an outgoing edge label, and every outgoing edge label must be a declared choice. (No silent dead branches; no choices that don't route anywhere.)
+
+- [ ] **Step 1: Failing tests in `src/attractor/tests/graph-gate-validation.test.ts` (new)**
+
+Cases:
+- Gate with inline label, no `.md` → no diagnostics.
+- Gate with no label, valid `.md`, edges match choices → no diagnostics.
+- Gate with no label, no `.md` → `gate_handler_missing` diagnostic.
+- Gate with no label, `.md` declares `["A","B"]`, edges labeled `["A","C"]` → `gate_choice_edge_mismatch` diagnostic citing `B` (declared but no edge) and `C` (edge but not declared).
+- Gate with inline label and `.md` both present → `gate_inline_md_conflict` diagnostic (third rule, same task — pick one source of truth). Inline wins at runtime; conflict signals authorial confusion.
+
+- [ ] **Step 2: RED.**
+
+- [ ] **Step 3: Implement in `src/attractor/core/graph.ts`**
+
+In the existing per-node validation pass, for each `wait.human` node:
+- `hasInlineLabel = !!node.label`
+- `hasMdFile = dotDir ? existsSync(join(dotDir, `${id}.md`)) : false`
+- If `!hasInlineLabel && !hasMdFile`: emit `gate_handler_missing`.
+- If `hasInlineLabel && hasMdFile`: emit `gate_inline_md_conflict`.
+- If `hasMdFile`: parse the `.md`, compare frontmatter `choices` against outgoing edge labels (set diff both directions); emit `gate_choice_edge_mismatch` per side that has extras.
+
+Reuse `resolveGate` from Task 3.2; wrap parse in try/catch so a malformed `.md` becomes its own `gate_md_parse_error` diagnostic (don't crash the validator).
+
+- [ ] **Step 4: GREEN.**
+
+- [ ] **Step 5: Full suite + `pipeline validate` against `pipelines/illumination-to-implementation.dot`** — should still pass since inline labels are present at this point (migrations come in 3.5-3.8).
+
+- [ ] **Step 6: Commit** — `feat(validator): gate_handler_missing + choice/edge consistency rules`.
+
+---
+
+### Tasks 3.5 — 3.8: Migrate the four gates in `illumination-to-implementation.dot`
+
+One task per gate, one commit each. Each task has the same shape (template below). Order matters: smaller / safer gates first.
+
+- **Task 3.5: `remove_gate`** — choices `["Archive", "Keep", "Chat"]`, three out-edges to `mark_archived`, `done`, `chat_session`. Has `condition="preferred_label=false"` on its incoming edge.
+- **Task 3.6: `approval_gate`** — choices `["Decline", "Approve", "Chat"]`, three out-edges. Body uses `$explainer_render` variable.
+- **Task 3.7: `review_gate`** — choices `["Approve", "Tmux", "Retry"]`, three out-edges (one is a back-edge to `implement`). Body references `$project` and `$plan_path`.
+- **Task 3.8: `tmux_confirm_gate`** — choices `["Commit", "Retry"]`, two out-edges. Body references `$run_id` and `$test_render`.
+
+**Per-gate migration template:**
+
+- [ ] **Step 1: Read the current `label=` value verbatim** from `pipelines/illumination-to-implementation.dot`. Note the exact text (multi-line `\n` escapes preserved as Markdown line breaks in the body).
+
+- [ ] **Step 2: Failing test in `src/attractor/tests/illumination-pipeline.test.ts`** (extend the chunk-2 full-topology test). Assert that `pipeline validate pipelines/illumination-to-implementation.dot` reports zero errors AFTER the migration. Run with the gate already removed from `.dot` but the `.md` not yet written → expect `gate_handler_missing` (RED).
+
+- [ ] **Step 3: Create `pipelines/<gate-id>.md`**
+
+```markdown
+---
+type: gate
+choices:
+  - Approve
+  - Decline
+  - Chat
+inputs:
+  - explainer_render
+---
+<verbatim label body, with `\n` → real newlines, variable refs preserved as `$var`>
+```
+
+`inputs:` lists every `$variable` referenced in the body so chunk-2's flow validator catches missing producers.
+
+- [ ] **Step 4: Edit `.dot` to remove the `label=` attribute** from the gate node. Keep `shape=hexagon` and any `condition=` on incoming edges. Ensure `choices` in the `.md` exactly match outgoing edge labels.
+
+- [ ] **Step 5: Run validator + tests** — full suite must stay green. `pipeline validate pipelines/illumination-to-implementation.dot` reports zero errors. `npx vitest run src/attractor/tests/illumination-pipeline.test.ts` GREEN.
+
+- [ ] **Step 6: Live smoke (light)** — `npx tsx src/cli/index.ts pipeline validate pipelines/illumination-to-implementation.dot` from CLI. Verifies the actual binary path, not just unit tests.
+
+- [ ] **Step 7: Commit** — `refactor(pipelines): migrate <gate-id> to sibling .md (D3 chunk-3)`. Single gate per commit.
+
+---
+
+### Task 3.9: Chunk-3 review checkpoint
+
+- [ ] **Step 1: Verify success criteria:**
+  1. `GateMdFrontmatterSchema` rejects bad input (Task 3.1).
+  2. `resolveGate` loads + validates `.md` files (Task 3.2).
+  3. `WaitHumanHandler` falls back to `.md` body when no inline label, choices come from frontmatter (Task 3.3).
+  4. Validator catches `gate_handler_missing` + `gate_choice_edge_mismatch` + `gate_inline_md_conflict` + `gate_md_parse_error` (Task 3.4).
+  5. All four gates in `illumination-to-implementation.dot` migrated; `.dot` has no `label=` on those gates (Tasks 3.5-3.8).
+  6. `pipelines/smoke/gate.dot` still passes (inline-label regression).
+  7. `pipeline validate pipelines/illumination-to-implementation.dot` reports zero errors.
+  8. Full suite green.
+
+- [ ] **Step 2: Run full suite** — record total count.
+
+- [ ] **Step 3: Hand off to `superpowers:code-reviewer`** against the chunk's commits + the spec excerpt.
+
+- [ ] **Step 4: Tag** — `chunk-3-gates-as-md`.
+
+- [ ] **Step 5: Memory capture** — note any plan deviations + reviewer feedback for Chunk 4 expansion.
 
 ---
 
