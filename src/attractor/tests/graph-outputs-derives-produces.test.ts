@@ -5,7 +5,7 @@ import { join } from "path";
 import { parseDot, validateGraph } from "../core/graph.js";
 
 describe("validator — derive produces from agent outputs", () => {
-  it("treats agent's outputs keys as produced when node.produces unset", () => {
+  it("treats agent's outputs keys as produced when node.produces unset (no missing_input_producer for downstream consumer)", () => {
     const dir = join(tmpdir(), `produces-derive-${Date.now()}`);
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, "verifier.md"), `---
@@ -17,9 +17,20 @@ outputs:
 ---
 body
 `);
+    writeFileSync(join(dir, "consumer.md"), `---
+name: consumer
+description: consumes preferred_label
+inputs:
+  - preferred_label
+---
+body
+`);
     const dot = `digraph g {
+      start [shape=Mdiamond]
       v [agent="verifier"]
-      v -> done
+      c [agent="consumer"]
+      done [shape=Msquare]
+      start -> v -> c -> done
     }`;
     writeFileSync(join(dir, "p.dot"), dot);
 
@@ -27,9 +38,8 @@ body
     const diags = validateGraph(graph, dir);
 
     expect(diags.find(d => d.rule === "agent_produces_unknown")).toBeUndefined();
-    expect((graph as any).debugProducedKeys?.get("v")).toEqual(
-      new Set(["preferred_label", "summary"])
-    );
+    // Derivation works: consumer sees preferred_label in scope → no missing_input_producer
+    expect(diags.find(d => d.rule === "missing_input_producer")).toBeUndefined();
   });
 
   it("skips derivation when dotDir is undefined (no filesystem context)", () => {
@@ -39,7 +49,7 @@ body
     expect(diags.every(d => d.rule !== "agent_file_unresolvable")).toBe(true);
   });
 
-  it("falls back to node.produces when agent file has no outputs", () => {
+  it("falls back to node.produces when agent file has no outputs (downstream consumer sees key in scope)", () => {
     const dir = join(tmpdir(), `produces-fallback-${Date.now()}`);
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, "legacy.md"), `---
@@ -48,10 +58,25 @@ description: legacy
 ---
 body
 `);
-    const dot = `digraph g { v [agent="legacy", produces="manual_key"]; v -> done; }`;
+    writeFileSync(join(dir, "consumer.md"), `---
+name: consumer
+description: consumes manual_key
+inputs:
+  - manual_key
+---
+body
+`);
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      v [agent="legacy", produces="manual_key"]
+      c [agent="consumer"]
+      done [shape=Msquare]
+      start -> v -> c -> done
+    }`;
     writeFileSync(join(dir, "p.dot"), dot);
     const graph = parseDot(dot);
-    validateGraph(graph, dir);
-    expect((graph as any).debugProducedKeys?.get("v")).toContain("manual_key");
+    const diags = validateGraph(graph, dir);
+    // node.produces="manual_key" should satisfy consumer's input requirement
+    expect(diags.find(d => d.rule === "missing_input_producer")).toBeUndefined();
   });
 });

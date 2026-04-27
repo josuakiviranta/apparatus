@@ -8,6 +8,7 @@ import {
   toCamel,
 } from "./dot-common.js";
 import { resolveAgent } from "../../cli/lib/agent-registry.js";
+import { computeVarsInScope } from "./flow-analyzer.js";
 
 export function parseDot(src: string): Graph {
   return parseDotV2(src);
@@ -386,9 +387,32 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
     checkAgentOutputsConflict(node, dotDir, diags);
   }
 
-  // TODO(chunk-2): remove debugProducedKeys once missing_input_producer
-  // (Chunk 2's flow validator) asserts derivation through real diagnostics.
-  (graph as any).debugProducedKeys = nodeProduces;
+  // missing_input_producer: agent's declared inputs must be in scope at that node
+  // Only runs when dotDir is available (needed to resolve agent configs).
+  if (dotDir) {
+    const varsInScope = computeVarsInScope(graph, nodeProduces);
+    for (const [id, node] of nodes) {
+      if (!node.agent) continue;
+      let agentConfig;
+      try {
+        agentConfig = resolveAgent(node.agent as string, { projectDir: dotDir });
+      } catch {
+        continue;
+      }
+      if (!agentConfig.inputs) continue;
+      const scope = varsInScope.get(id) ?? new Set<string>();
+      for (const inputKey of agentConfig.inputs) {
+        if (!scope.has(inputKey)) {
+          diags.push({
+            rule: "missing_input_producer",
+            severity: "error",
+            message: `Agent "${node.agent}" at node "${id}" requires input "${inputKey}" but no upstream node produces it on every path. Either route through a producer, declare default_${inputKey}= on this node, or add "${inputKey}" to the digraph's inputs="..." for caller-supplied vars.`,
+            location: node.sourceLocation,
+          });
+        }
+      }
+    }
+  }
 
   return diags;
 }
