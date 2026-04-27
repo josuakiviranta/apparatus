@@ -66,7 +66,7 @@ export function writeIllumination(
 export function markImplemented(
   projectRoot: string,
   filename: string,
-): { success: true; filename: string; previous_status: string; new_status: string }
+): { success: true; filename: string; previous_status: string; new_status: string; new_path: string }
   | { success: false; error: string } {
   const fnErr = validateFilename(filename);
   if (fnErr) return { success: false, error: fnErr };
@@ -79,8 +79,6 @@ export function markImplemented(
   }
 
   const raw = readFileSync(filePath, "utf-8");
-
-  // Parse frontmatter block: content between first --- and second ---
   const fmMatch = raw.match(/^---\n([\s\S]*?)\n---\n/);
   if (!fmMatch) {
     return { success: false, error: "No frontmatter found in illumination file" };
@@ -89,11 +87,9 @@ export function markImplemented(
   const fmBlock = fmMatch[1];
   const body = raw.slice(fmMatch[0].length);
 
-  // Extract current status
   const statusMatch = fmBlock.match(/^status:\s*(.+)$/m);
   const currentStatus = statusMatch ? statusMatch[1].trim() : "open";
 
-  // Validate transition
   const allowed = ["open", "dispatched"];
   if (!allowed.includes(currentStatus)) {
     return {
@@ -102,20 +98,25 @@ export function markImplemented(
     };
   }
 
-  // Update frontmatter
   const today = new Date().toISOString().slice(0, 10);
   let updatedFm = statusMatch
     ? fmBlock.replace(/^status:\s*.+$/m, "status: implemented")
     : fmBlock + "\nstatus: implemented";
   updatedFm += `\nimplemented_at: ${today}`;
 
+  const targetDir = join(projectRoot, "meditations", "implemented-illuminations");
+  mkdirSync(targetDir, { recursive: true });
+  const targetPath = join(targetDir, filename);
+
   const updatedContent = `---\n${updatedFm}\n---\n${body}`;
-  writeFileSync(filePath, updatedContent);
+  writeFileSync(targetPath, updatedContent);
+  rmSync(filePath);
 
   try {
     execSync(`git -C "${projectRoot}" add "${filePath}"`, { stdio: "ignore" });
+    execSync(`git -C "${projectRoot}" add "${targetPath}"`, { stdio: "ignore" });
     execSync(
-      `git -C "${projectRoot}" commit -m "meditate: mark ${filename} implemented"`,
+      `git -C "${projectRoot}" commit -m "meditate: implement ${filename}"`,
       { stdio: "ignore" },
     );
   } catch {
@@ -127,6 +128,7 @@ export function markImplemented(
     filename,
     previous_status: currentStatus,
     new_status: "implemented",
+    new_path: join("meditations", "implemented-illuminations", filename),
   };
 }
 

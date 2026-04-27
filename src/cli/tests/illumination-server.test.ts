@@ -657,8 +657,9 @@ describe("markImplemented", () => {
       filename: "insight.md",
       previous_status: "dispatched",
       new_status: "implemented",
+      new_path: "meditations/implemented-illuminations/insight.md",
     });
-    const content = readFileSync(join(tmpDir, "meditations", "illuminations", "insight.md"), "utf-8");
+    const content = readFileSync(join(tmpDir, "meditations", "implemented-illuminations", "insight.md"), "utf-8");
     expect(content).toContain("status: implemented");
   });
 
@@ -670,6 +671,7 @@ describe("markImplemented", () => {
       filename: "open-insight.md",
       previous_status: "open",
       new_status: "implemented",
+      new_path: "meditations/implemented-illuminations/open-insight.md",
     });
   });
 
@@ -710,14 +712,14 @@ describe("markImplemented", () => {
     const body = "# My Insight\n\nSome detailed content here.\n\n- bullet 1\n- bullet 2";
     writeIlluminationFile("preserve.md", "status: dispatched", body);
     markImplemented(tmpDir, "preserve.md");
-    const content = readFileSync(join(tmpDir, "meditations", "illuminations", "preserve.md"), "utf-8");
+    const content = readFileSync(join(tmpDir, "meditations", "implemented-illuminations", "preserve.md"), "utf-8");
     expect(content).toContain(body);
   });
 
   it("adds implemented_at as UTC date in YYYY-MM-DD format", () => {
     writeIlluminationFile("dated.md", "status: open", "# Body");
     markImplemented(tmpDir, "dated.md");
-    const content = readFileSync(join(tmpDir, "meditations", "illuminations", "dated.md"), "utf-8");
+    const content = readFileSync(join(tmpDir, "meditations", "implemented-illuminations", "dated.md"), "utf-8");
     const today = new Date().toISOString().slice(0, 10);
     expect(content).toContain(`implemented_at: ${today}`);
     expect(content).toMatch(/implemented_at: \d{4}-\d{2}-\d{2}/);
@@ -728,16 +730,16 @@ describe("markImplemented", () => {
     writeIlluminationFile("commit-impl.md", "status: dispatched", "# Body");
     const result = markImplemented(tmpDir, "commit-impl.md");
     expect(result.success).toBe(true);
-    expect(mockExecSync).toHaveBeenCalledTimes(2);
+    expect(mockExecSync).toHaveBeenCalledTimes(3);
     const addCall = mockExecSync.mock.calls[0][0] as string;
-    const commitCall = mockExecSync.mock.calls[1][0] as string;
+    const commitCall = mockExecSync.mock.calls[2][0] as string;
     expect(addCall).toContain("git -C");
     expect(addCall).toContain(tmpDir);
     expect(addCall).toContain("add");
     expect(addCall).toContain("commit-impl.md");
     expect(commitCall).toContain("git -C");
     expect(commitCall).toContain("commit");
-    expect(commitCall).toContain("meditate: mark commit-impl.md implemented");
+    expect(commitCall).toContain("meditate: implement commit-impl.md");
   });
 
   it("returns success even when git commands fail (fail-open)", () => {
@@ -748,6 +750,53 @@ describe("markImplemented", () => {
     writeIlluminationFile("fail-open-impl.md", "status: open", "# Body");
     const result = markImplemented(tmpDir, "fail-open-impl.md");
     expect(result.success).toBe(true);
+  });
+
+  it("moves file from illuminations/ to implemented-illuminations/", () => {
+    const illumDir = join(tmpDir, "meditations", "illuminations");
+    mkdirSync(illumDir, { recursive: true });
+    writeFileSync(
+      join(illumDir, "T6000-impl.md"),
+      "---\ndate: 2026-04-12\nstatus: open\ndescription: Will be implemented\n---\n\nBody"
+    );
+
+    const result = markImplemented(tmpDir, "T6000-impl.md");
+
+    expect(result.success).toBe(true);
+    expect(existsSync(join(illumDir, "T6000-impl.md"))).toBe(false);
+    const newPath = join(tmpDir, "meditations", "implemented-illuminations", "T6000-impl.md");
+    expect(existsSync(newPath)).toBe(true);
+    const written = readFileSync(newPath, "utf-8");
+    expect(written).toMatch(/status: implemented/);
+    expect(written).toMatch(/implemented_at: \d{4}-\d{2}-\d{2}/);
+  });
+
+  it("returns new_path pointing to implemented-illuminations/", () => {
+    const illumDir = join(tmpDir, "meditations", "illuminations");
+    mkdirSync(illumDir, { recursive: true });
+    writeFileSync(
+      join(illumDir, "T6100-newpath.md"),
+      "---\ndate: 2026-04-12\nstatus: dispatched\ndescription: Dispatched then done\n---\n\nBody"
+    );
+    const result = markImplemented(tmpDir, "T6100-newpath.md");
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.new_path).toBe("meditations/implemented-illuminations/T6100-newpath.md");
+    }
+  });
+
+  it("auto-commits move with implement message", () => {
+    const illumDir = join(tmpDir, "meditations", "illuminations");
+    mkdirSync(illumDir, { recursive: true });
+    writeFileSync(
+      join(illumDir, "T6200-commit.md"),
+      "---\ndate: 2026-04-12\nstatus: open\ndescription: Test commit\n---\n\nBody"
+    );
+    markImplemented(tmpDir, "T6200-commit.md");
+    const calls = mockExecSync.mock.calls.map((c) => String(c[0]));
+    const commitCall = calls.find((c) => c.includes("commit -m"));
+    expect(commitCall).toBeDefined();
+    expect(commitCall).toContain("meditate: implement T6200-commit.md");
   });
 });
 
