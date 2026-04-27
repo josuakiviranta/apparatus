@@ -16,7 +16,7 @@ Validates `projectRoot` exists; exits with code 1 if missing.
 - Version: `"1.0.0"`
 - Transport: `StdioServerTransport` (stdin/stdout)
 
-## MCP Tools (10)
+## MCP Tools (12)
 
 ### `write_illumination`
 
@@ -88,6 +88,16 @@ Reads a specific meditation lens file.
 - **Params:** `{ filename: string }`
 - **Reads from** `meditationsDir`
 
+### `list_plans`
+
+Lists implementation plans in `docs/superpowers/plans/`, optionally filtered by lifecycle status. Each entry shows the filename and the H1 title parsed from the plan body.
+
+- **Params:** `{ status?: "pending" | "implemented" }`
+- **Reads from** `<projectRoot>/docs/superpowers/plans/`
+- **Returns** one line per file: `<filename> — <H1 title>` (sorted by filename); `(no description)` if no `# heading` is found in the body
+- Returns `"No plans found."` if the directory is empty or missing
+- Plans without frontmatter are skipped when `status` is provided
+
 ### `mark_implemented`
 
 Marks an illumination as implemented. Valid from status `open` or `dispatched`.
@@ -115,6 +125,15 @@ Archives an illumination. Valid from any status except `archived`.
 - **Auto-commits** with message `meditate: archive <filename>` (best-effort; non-fatal if git unavailable)
 - **Returns** `{ success, filename, previous_status, new_status, archive_path }` where `archive_path` is the post-move location
 
+### `mark_plan_implemented`
+
+Marks an implementation plan as implemented by flipping its frontmatter `status` from `pending` to `implemented`. Valid only from status `pending`. Used by the janitor agent and lifecycle-closing pipeline nodes.
+
+- **Params:** `{ plan_filename: string }` — basename only (e.g. `2026-04-27-foo.md`); resolves under `docs/superpowers/plans/`
+- **Modifies** frontmatter `status` field to `implemented` (only — no timestamp key is added; this is asymmetric with the illumination-side `mark_implemented` which does add `implemented_at`)
+- **Auto-commits** with message `meditate: mark plan <plan_filename> implemented` (best-effort; non-fatal if git unavailable)
+- **Returns** `{ success, plan_filename, previous_status, new_status }` on success, or `{ success: false, error }` on rejection
+
 ## Path Restrictions
 
 | Tool | Scope |
@@ -129,6 +148,8 @@ Archives an illumination. Valid from any status except `archived`.
 | `mark_implemented` | `<projectRoot>/meditations/illuminations/` → `implemented-illuminations/` (move) |
 | `mark_dispatched` | `<projectRoot>/meditations/illuminations/` (modify frontmatter) |
 | `mark_archived` | `<projectRoot>/meditations/illuminations/` → `archived-illuminations/` (move) |
+| `list_plans` | `<projectRoot>/docs/superpowers/plans/` (read-only) |
+| `mark_plan_implemented` | `<projectRoot>/docs/superpowers/plans/` (modify frontmatter + commit) |
 
 ## Dependencies
 
