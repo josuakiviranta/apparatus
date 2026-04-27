@@ -2735,10 +2735,19 @@ No code changes in this task. Resume with Task 5.7.
   - `required_caller_vars` info banner correctly enumerates `pipeline_name, pipelines_dir`.
 - [x] Live `ralph pipeline create demo` interactive run is human-in-the-loop and was not executed in this autonomous session — covered by Task 5.8 review checkpoint and (eventually) by the human's Chunk-5 acceptance run.
 
-### Task 5.8: Chunk-5 review checkpoint
+### Task 5.8: Chunk-5 review checkpoint — SHIPPED 2026-04-27 (`chunk-5-templates-and-create-shim` / v0.1.55)
 
-- Dispatch `superpowers:code-reviewer` against `chunk-4-per-pipeline-folders..HEAD` with the spec at `docs/superpowers/specs/2026-04-27-pipeline-folder-architecture-redesign.md` § D7 + § R4 and this plan section.
-- Address feedback in-chunk; re-dispatch if needed.
+- [x] Dispatched `superpowers:code-reviewer` against `chunk-4-per-pipeline-folders..HEAD` with the spec at `docs/superpowers/specs/2026-04-27-pipeline-folder-architecture-redesign.md` § D7 + § R4 and this plan section. Verdict: **APPROVE** (no blocking issues).
+- [x] Reviewer nits addressed in-chunk (commit `87c00da`):
+  - `tsup.config.ts` simplified to `fs.cpSync(... { recursive: true })` (drops bespoke recurse helper).
+  - `pipeline.ts:25` — added explanatory comment for `import * as self` (vi.spyOn ESM workaround).
+  - Plan §5.4 — recorded schema lesson (per-node `inputs=` rejected; caller-required vars belong on digraph).
+- [x] Tagged `chunk-5-templates-and-create-shim` and `v0.1.55`. Pushed both.
+- [ ] Memory-writer dispatch + Chunk 6 expansion happen in the next session per the post-execution capture procedure.
+
+**Reviewer carry-overs (cosmetic, deferred):**
+- `name:` field redundancy in `scaffolder.md` and `blank/first-step.md` — registry keys agents by filename, but existing agents (`janitor.md` etc.) include `name:` so we kept the field for convention consistency. Decision documented; no action.
+- `parseAgentFile` was un-private-ed (`agent-registry.ts`) for the `templates-validate.test.ts` inputs assertion. Reviewer suggested using `parseFrontmatter` directly instead. Acceptable; revisit if tests grow further.
 - Tag `chunk-5-templates-and-create-shim` for bisectable history.
 - Dispatch `memory-writer` per the Post-execution memory capture procedure at the bottom of this plan.
 - Expand Chunk 6 outline into full TDD steps (this happens in the session after the chunk lands).
