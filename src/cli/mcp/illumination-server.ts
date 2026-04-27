@@ -331,28 +331,44 @@ function parseIlluminationDescription(filePath: string): string {
 
 export function listIlluminations(projectRoot: string, status?: string): string {
   const baseDir = join(projectRoot, "meditations", "illuminations");
-  const dir = status === "archived" ? join(baseDir, "archive") : baseDir;
-  try {
-    let files = readdirSync(dir)
-      .filter((f) => f.endsWith(".md"))
-      .sort();
-    if (status) {
-      files = files.filter((f) => {
-        const content = readFileSync(join(dir, f), "utf-8");
+  const archivedDir = join(projectRoot, "meditations", "archived-illuminations");
+  const implementedDir = join(projectRoot, "meditations", "implemented-illuminations");
+
+  function readDir(dir: string): string[] {
+    try {
+      return readdirSync(dir).filter((f) => f.endsWith(".md")).sort();
+    } catch {
+      return [];
+    }
+  }
+
+  let files: { name: string; dir: string }[];
+  if (status === "archived") {
+    files = readDir(archivedDir).map((name) => ({ name, dir: archivedDir }));
+  } else if (status === "implemented") {
+    files = readDir(implementedDir).map((name) => ({ name, dir: implementedDir }));
+  } else if (status === "open" || status === "dispatched") {
+    files = readDir(baseDir)
+      .map((name) => ({ name, dir: baseDir }))
+      .filter(({ name }) => {
+        const content = readFileSync(join(baseDir, name), "utf-8");
         const fmMatch = content.match(/^---\n([\s\S]*?)\n---\n/);
         if (!fmMatch) return status === "open"; // no frontmatter = open
         const statusMatch = fmMatch[1].match(/^status:\s*(.+)$/m);
         const fileStatus = statusMatch ? statusMatch[1].trim() : "open";
         return fileStatus === status;
       });
-    }
-    if (files.length === 0) return NO_ILLUMINATIONS_MESSAGE;
-    return files
-      .map((f) => `${f} — ${parseIlluminationDescription(join(dir, f))}`)
-      .join("\n");
-  } catch {
-    return NO_ILLUMINATIONS_MESSAGE;
+  } else {
+    files = [
+      ...readDir(baseDir).map((name) => ({ name, dir: baseDir })),
+      ...readDir(archivedDir).map((name) => ({ name, dir: archivedDir })),
+      ...readDir(implementedDir).map((name) => ({ name, dir: implementedDir })),
+    ];
+    files.sort((a, b) => a.name.localeCompare(b.name));
   }
+
+  if (files.length === 0) return NO_ILLUMINATIONS_MESSAGE;
+  return files.map(({ name, dir }) => `${name} — ${parseIlluminationDescription(join(dir, name))}`).join("\n");
 }
 
 const NO_PLANS_MESSAGE = "No plans found.";
