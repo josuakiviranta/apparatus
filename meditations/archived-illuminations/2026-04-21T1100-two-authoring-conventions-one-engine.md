@@ -1,9 +1,9 @@
 ---
 date: 2026-04-21
-status: superseded
-superseded_by: memory/user-spider-web-mental-model.md
-superseded_at: 2026-04-21
+status: archived
 description: The pipeline has two implicit node-authoring conventions — inline-procedure (prompt= contains the full task) and reference-procedure (prompt= defers to the rubric with "Follow your agent-level procedure") — but the engine treats both identically, dropping the rubric in both cases and making all 7 reference-procedure nodes structurally broken.
+archived_at: 2026-04-27
+archive_reason: superseded by memory/user-spider-web-mental-model.md
 ---
 
 ## Superseded by spider/web mental model (2026-04-21)

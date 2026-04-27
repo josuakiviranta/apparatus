@@ -1,9 +1,9 @@
 ---
 date: 2026-04-21
-status: superseded
-superseded_by: memory/user-spider-web-mental-model.md
-superseded_at: 2026-04-21
+status: archived
 description: T0700's rubric-prepend fix is correct for procedure-style agents (tmux-tester, verifier) but harmful for loop-style agents (implement) whose rubrics encode standalone behaviors — git push, study 500 specs — that pipeline node prompts currently rely on the rubric being dropped to suppress.
+archived_at: 2026-04-27
+archive_reason: superseded by memory/user-spider-web-mental-model.md
 ---
 
 ## Superseded by spider/web mental model (2026-04-21)

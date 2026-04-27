@@ -1,9 +1,9 @@
 ---
 date: 2026-04-21
-status: superseded
-superseded_by: memory/user-spider-web-mental-model.md
-superseded_at: 2026-04-21
+status: archived
 description: T0600–T0800 exposed a genuine agent archetype split — procedure agents need their rubric prepended in pipeline context, loop agents need it dropped — and the resolution is a single `pipeline_rubric: include|exclude` frontmatter field, not a universal behavioral change.
+archived_at: 2026-04-27
+archive_reason: superseded by memory/user-spider-web-mental-model.md
 ---
 
 ## Superseded by spider/web mental model (2026-04-21)
