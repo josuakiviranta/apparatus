@@ -33,7 +33,7 @@ if (parts.length < 3) {
 }
 
 const statusMatch = parts[1].match(/status:\s*(.+)\n/);
-const status = statusMatch ? statusMatch[1].trim() : "";
+const status = statusMatch ? statusMatch[1].trim() : "open";
 
 if (status === "archived") {
   // Idempotent: already archived. File may already live in the new dir or still in the old.
@@ -55,7 +55,9 @@ if (status !== "open") {
 }
 
 const frontmatter =
-  parts[1].replace(/status:\s*open\n/, "status: archived\n") +
+  (statusMatch
+    ? parts[1].replace(/status:\s*open\n/, "status: archived\n")
+    : parts[1] + "status: archived\n") +
   `archived_at: ${today}\n` +
   `reason: ${reason}\n`;
 const updated = `---\n${frontmatter}---\n${parts.slice(2).join("---\n")}`;
