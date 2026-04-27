@@ -1,7 +1,9 @@
 ---
 date: 2026-04-13
-status: open
+status: archived
 description: The pipeline engine's extension surface is perfectly designed but entirely sealed — NodeHandler is the right interface, buildHandlerMap is the right entry point, but package.json exports nothing and EngineOptions has no extraHandlers slot, leaving consumer projects stranded at the tool node ceiling.
+archived_at: 2026-04-27
+reason: Speculative library-export scope, no validated consumer needing custom NodeHandler today
 ---
 
 ## Core Idea
