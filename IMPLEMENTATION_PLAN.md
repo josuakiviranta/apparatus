@@ -3131,7 +3131,11 @@ export async function <name>Command(args, opts = {}): Promise<void> {
 
 ---
 
-### Sub-chunk 6c: `new` → `templates/new/`
+### Sub-chunk 6c: `new` → `templates/new/` ✅ SHIPPED
+
+**Commits:** `b3f0c5d` (6c.1 template) → `becb7ee` (6c.2 shim + assets cleanup) → `d4e1e88` (6c.3 prompt delete).
+
+**Implementation note:** The `getKickoffPromptPath` helper and its assets.test.ts assertion were removed in 6c.2 (single edit) rather than as a separate teardown — the helper had only one caller (the pre-shim `newCommand`) and the test pinned to the deleted helper, so the cleanup naturally rode along with the shim refactor.
 
 **Preflight that stays in shim:** `scaffoldProject` (creates dirs + empty files + `.gitignore`) and `git init -b main`. Both must run before any Claude session because the kickoff agent expects the directory to exist as a git repo. The shim is "thin but not zero" here by design — Claude can technically write files but not run `git init`.
 
