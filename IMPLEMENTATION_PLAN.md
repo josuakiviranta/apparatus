@@ -3237,7 +3237,15 @@ export async function <name>Command(args, opts = {}): Promise<void> {
 
 ---
 
-### Sub-chunk 6d: `pipeline refine` → `templates/pipeline-refine/`
+### Sub-chunk 6d: `pipeline refine` → `templates/pipeline-refine/` ✅ SHIPPED
+
+**Commits:** `0ff621c` (6d.1 template) → `e09aa58` (6d.2 shim).
+
+**Implementation note:** `traceDigest` keeps its `Recent run traces for X:\n\n` header in the shim (not bare-digest as the spec sketch showed). This preserves a clean empty-string case when no traces exist — body inserts `$trace_digest` plain, so an empty digest produces an empty section instead of a stray header. The agent body in `refiner.md` ports the framing block (current-graph + edit instructions) from the old `pipeline.ts:961-967` with `$dot_path` / `$current_dot` substitutions. Variables inside `$current_dot` are not re-expanded (they fall outside fenced code, so `expandVariables`'s `splitFences` rule does not skip them, but the engine substitutes only declared inputs — anything not in `inputs=` of the *outer* pipeline never reaches the agent body).
+
+**Tests:** `pipeline.test.ts` refine block rewritten to spy on `pipelineMod.pipelineRunCommand`. Trace-injection block keeps 5 behavioural tests, now reading `variables.trace_digest`. The "trigger ordering" test was deleted (template body owns ordering). `pipeline-refine-tip.test.ts` gains a single shim-shape test asserting all 4 variables are forwarded.
+
+**Cleanup pending in 6e:** `composeCreatePrompt` (no callers) and `runTwoPhaseClaudeSession` (no callers in src/cli/commands/) imports were dropped from `pipeline.ts`. The modules still exist; 6e deletes them and their tests.
 
 **Preflight that stays in shim:** dotPath existence check (refine refuses to run on a non-existent pipeline) and `parseDot` of the previous-graph snapshot (used by the post-validate diff). Post-step also stays: after the Claude session ends, run `pipelineValidateCommand(dotPath, { previousGraph })`.
 
@@ -3256,9 +3264,9 @@ Under the template model, all three become `--var`-injected strings. The agent b
 
 #### Task 6d.1: Create `src/cli/templates/pipeline-refine/`
 
-- [ ] **Step 1 (red): templates-validate test** — same shape.
+- [x] **Step 1 (red): templates-validate test** — same shape.
 
-- [ ] **Step 2 (green): create files**
+- [x] **Step 2 (green): create files**
 
   `src/cli/templates/pipeline-refine/pipeline.dot`:
   ```dot
@@ -3290,19 +3298,19 @@ Under the template model, all three become `--var`-injected strings. The agent b
 
   Re-run vitest → green.
 
-- [ ] **Step 3: commit**
+- [x] **Step 3: commit**
 
   `feat(templates): pipeline-refine template + refiner agent (D8 chunk-6d)`
 
 #### Task 6d.2: Convert `pipelineRefineCommand` to thin shim
 
-- [ ] **Step 1 (red): rewrite the test**
+- [x] **Step 1 (red): rewrite the test**
 
   In `src/cli/tests/pipeline-refine-tip.test.ts`, keep the validation-failure-tip assertions. Add a shim-shape test that mocks `pipelineRunCommand` and asserts the right `variables` (`pipeline_name`, `dot_path`, `current_dot`, `trace_digest`) are forwarded.
 
   Run → fails.
 
-- [ ] **Step 2 (green): rewrite `pipelineRefineCommand`**
+- [x] **Step 2 (green): rewrite `pipelineRefineCommand`**
 
   ```ts
   export async function pipelineRefineCommand(name: string, opts: PipelineRefineOptions = {}): Promise<void> {
@@ -3352,9 +3360,9 @@ Under the template model, all three become `--var`-injected strings. The agent b
 
   Re-run tests → green.
 
-- [ ] **Step 3: typecheck + full test run.**
+- [x] **Step 3: typecheck + full test run.**
 
-- [ ] **Step 4: commit**
+- [x] **Step 4: commit**
 
   `refactor(pipeline-refine): convert command to thin shim over pipeline-refine template (D8 chunk-6d)`
 
