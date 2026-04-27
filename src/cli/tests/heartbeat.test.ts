@@ -203,34 +203,6 @@ describe("ralph heartbeat implement", () => {
   });
 });
 
-describe("ralph heartbeat run-scenarios", () => {
-  it("sends register_task with correct args", async () => {
-    vi.mocked(request).mockResolvedValue({ type: "ok", taskId: "run-scenarios:proj" });
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-    await makeProgram().parseAsync([
-      "node", "ralph", "heartbeat", "run-scenarios", FIXTURE_DIR, "--every", "60",
-    ]);
-    expect(request).toHaveBeenCalledWith("register_task", {
-      command: "run-scenarios",
-      args: [FIXTURE_DIR],
-      interval: 60,
-    });
-    logSpy.mockRestore();
-  });
-
-  it("rejects a nonexistent folder before calling the daemon", async () => {
-    const s = silence();
-    const bogus = join(FIXTURE_DIR, "does-not-exist");
-    await expect(
-      makeProgram().parseAsync([
-        "node", "ralph", "heartbeat", "run-scenarios", bogus, "--every", "60",
-      ])
-    ).rejects.toThrow(/exit:1/);
-    expect(request).not.toHaveBeenCalled();
-    s.restore();
-  });
-});
-
 describe("ralph heartbeat pipeline", () => {
   it("sends register_task with run subcommand args and computed id", async () => {
     vi.mocked(request).mockResolvedValue({ type: "ok", taskId: "pipeline:smoke" });

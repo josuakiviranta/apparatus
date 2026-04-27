@@ -11,7 +11,6 @@ import { StartHandler, ExitHandler } from "../handlers/start-exit.js";
 import { WaitHumanHandler } from "../handlers/wait-human.js";
 import { ToolHandler } from "../handlers/tool.js";
 import { RalphMeditateHandler } from "../handlers/ralph-meditate.js";
-import { RalphScenariosHandler } from "../handlers/ralph-scenarios.js";
 import { ParallelHandler, FanInHandler } from "../handlers/parallel.js";
 import { AgentHandler } from "../handlers/agent-handler.js";
 import { StoreHandler } from "../handlers/store.js";
@@ -55,7 +54,6 @@ function buildHandlerMap(opts: EngineOptions): Map<string, NodeHandler> {
   m.set("tool", new ToolHandler());
   m.set("ralph.implement", agentHandler);
   m.set("ralph.meditate", new RalphMeditateHandler());
-  m.set("ralph.run-scenarios", new RalphScenariosHandler());
   m.set("parallel", new ParallelHandler());
   m.set("parallel.fan_in", new FanInHandler());
   m.set("store", new StoreHandler());

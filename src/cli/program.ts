@@ -5,7 +5,6 @@ import { newCommand } from "./commands/new";
 import { meditateCommand } from "./commands/meditate";
 import { registerHeartbeatCommand } from "./commands/heartbeat";
 import { meditateCreateCommand } from "./commands/meditate-create";
-import { runScenariosCommand } from "./commands/run-scenarios";
 import {
   pipelineRunCommand,
   pipelineValidateCommand,
@@ -33,12 +32,10 @@ Getting started (typical workflow):
   ralph plan my-app                       Open an interactive planning session
   ralph implement my-app                  Run the agentic build loop (Ctrl-C to stop)
   ralph implement my-app --max 3          Run at most 3 iterations
-  ralph run-scenarios my-app              Discover and run scenario tests
 
 Background scheduling (heartbeat):
   ralph heartbeat meditate my-app --every 30            Run meditate on my-app every 30 min
   ralph heartbeat implement my-app --every 60           Run implement on my-app every 60 min
-  ralph heartbeat run-scenarios my-app --every 120      Run scenario tests every 2 hours
   ralph heartbeat pipeline workflow.dot --project my-app --every 60   Run a pipeline every 60 min
   ralph heartbeat list                                  Show all scheduled tasks
   ralph heartbeat logs meditate:my-app --follow         Stream live logs for a task
@@ -79,10 +76,6 @@ Pipeline engine (DOT-graph workflows):
     box        Work node  — invokes the agentic loop (prompt= required, max_iterations= recommended)
     hexagon    Human gate — pauses and asks for a decision, routes on edge labels
     diamond    Conditional — branches without human input (condition= on edges)
-
-  Saved to scenario-tests/attractor/ by convention. Examples:
-    ralph pipeline validate scenario-tests/attractor/smoke.dot
-    ralph pipeline run scenario-tests/attractor/work_test.dot --project .
 
 Meditation (restricted insight sessions):
   ralph meditate my-app                   Run a one-shot meditation session
@@ -138,15 +131,6 @@ Agent management:
     .addHelpText("after", "\nExamples:\n  ralph meditate create my-app\n")
     .action(async (projectFolder: string) => {
       await meditateCreateCommand(projectFolder);
-    });
-
-  program
-    .command("run-scenarios <project-folder>")
-    .description("Discover scenario-tests/*.md files, run them with Claude, and write reports to scenario-runs/")
-    .addHelpText("after", "\nExamples:\n  ralph run-scenarios my-app\n  ralph run-scenarios my-app --all\n")
-    .option("--all", "Run all scenarios without interactive selection")
-    .action(async (projectFolder: string, options: { all?: boolean }) => {
-      await runScenariosCommand(projectFolder, options);
     });
 
   const pipeline = program.command("pipeline").description("Pipeline engine commands");

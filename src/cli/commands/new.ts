@@ -91,8 +91,6 @@ export function scaffoldProject(targetPath: string, _projectName: string): void 
   mkdirSync(targetPath, { recursive: true });
   mkdirSync(join(targetPath, "specs"), { recursive: true });
   mkdirSync(join(targetPath, "src"), { recursive: true });
-  mkdirSync(join(targetPath, "scenario-tests"), { recursive: true });
-  mkdirSync(join(targetPath, "scenario-runs"), { recursive: true });
   mkdirSync(join(targetPath, "meditations", "illuminations"), { recursive: true });
   mkdirSync(join(targetPath, "meditations", "archived-illuminations"), { recursive: true });
   mkdirSync(join(targetPath, "meditations", "implemented-illuminations"), { recursive: true });
@@ -106,7 +104,6 @@ export function scaffoldProject(targetPath: string, _projectName: string): void 
     join(targetPath, ".gitignore"),
     [
       "IMPLEMENTATION_PLAN.md",
-      "scenario-runs/",
     ].join("\n") + "\n"
   );
 }

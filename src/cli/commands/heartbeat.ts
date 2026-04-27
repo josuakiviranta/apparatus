@@ -139,31 +139,6 @@ Examples:
     });
 
   hb
-    .command("run-scenarios <folder>")
-    .description("Schedule scenario tests to run on a project folder at a fixed interval")
-    .addHelpText("after", "\nExamples:\n  ralph heartbeat run-scenarios my-app --every 120\n")
-    .requiredOption("--every <n>", "interval in minutes", (v) => {
-      const n = parseInt(v, 10);
-      if (isNaN(n) || n < 1) throw new Error("--every must be a positive integer");
-      return n;
-    })
-    .action(async (folder: string, opts: { every: number }) => {
-      const absPath = resolve(folder);
-      validatePathArg(folder, absPath, "directory", "Project folder");
-      try {
-        const res = await request("register_task", {
-          command: "run-scenarios",
-          args: [absPath],
-          interval: opts.every,
-        });
-        await output.success(`Registered: ${res.taskId} (every ${opts.every} min)`);
-      } catch (err: any) {
-        await output.error(`Error: ${err.message}`);
-        process.exit(1);
-      }
-    });
-
-  hb
     .command("pipeline <dotfile>")
     .description("Schedule a DOT-graph pipeline to run at a fixed interval")
     .addHelpText("after", "\nExamples:\n  ralph heartbeat pipeline workflow.dot --project my-app --every 60\n")

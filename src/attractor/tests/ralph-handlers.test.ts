@@ -6,7 +6,6 @@ vi.mock("child_process", () => ({
 
 import { spawnSync } from "child_process";
 import { RalphMeditateHandler } from "../handlers/ralph-meditate.js";
-import { RalphScenariosHandler } from "../handlers/ralph-scenarios.js";
 import type { HandlerExecutionContext } from "../handlers/registry.js";
 import type { Node, PipelineContext } from "../types.js";
 
@@ -83,37 +82,3 @@ describe("RalphMeditateHandler", () => {
   });
 });
 
-describe("RalphScenariosHandler", () => {
-  it("returns success and scenarios.passed=true when exit 0", async () => {
-    mockSpawnSync.mockReturnValue({ status: 0 } as any);
-    const h = new RalphScenariosHandler();
-    const outcome = await h.execute({ id: "sc" }, baseCtx(), makeContext());
-    expect(outcome.status).toBe("success");
-    expect(outcome.contextUpdates?.["scenarios.passed"]).toBe("true");
-  });
-
-  it("returns fail and scenarios.passed=false when exit non-zero", async () => {
-    mockSpawnSync.mockReturnValue({ status: 1 } as any);
-    const h = new RalphScenariosHandler();
-    const outcome = await h.execute({ id: "sc" }, baseCtx(), makeContext());
-    expect(outcome.status).toBe("fail");
-    expect(outcome.contextUpdates?.["scenarios.passed"]).toBe("false");
-  });
-
-  it("passes cwd and run-scenarios in spawn args", async () => {
-    mockSpawnSync.mockReturnValue({ status: 0 } as any);
-    const h = new RalphScenariosHandler();
-    await h.execute({ id: "sc" }, baseCtx(), makeContext({ cwd: "/test/proj" }));
-    const args = mockSpawnSync.mock.calls[0][1] as string[];
-    expect(args).toContain("/test/proj");
-    expect(args).toContain("run-scenarios");
-  });
-
-  it("uses inherited stdio", async () => {
-    mockSpawnSync.mockReturnValue({ status: 0 } as any);
-    const h = new RalphScenariosHandler();
-    await h.execute({ id: "sc" }, baseCtx(), makeContext());
-    const opts = mockSpawnSync.mock.calls[0][2] as any;
-    expect(opts.stdio).toBe("inherit");
-  });
-});

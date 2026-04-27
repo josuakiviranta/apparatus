@@ -36,14 +36,10 @@ describe("scaffoldProject", () => {
     expect(existsSync(join(tmpDir, "src", "tests"))).toBe(false);
   });
 
-  it("creates scenario-tests/ directory", () => {
+  it("does not scaffold scenario-tests/ or scenario-runs/", () => {
     scaffoldProject(tmpDir, "my-project");
-    expect(existsSync(join(tmpDir, "scenario-tests"))).toBe(true);
-  });
-
-  it("creates scenario-runs/ directory", () => {
-    scaffoldProject(tmpDir, "my-project");
-    expect(existsSync(join(tmpDir, "scenario-runs"))).toBe(true);
+    expect(existsSync(join(tmpDir, "scenario-tests"))).toBe(false);
+    expect(existsSync(join(tmpDir, "scenario-runs"))).toBe(false);
   });
 
   it("creates specs/ directory", () => {
@@ -64,10 +60,10 @@ describe("scaffoldProject", () => {
     expect(existsSync(join(tmpDir, "meditations", "implemented-illuminations"))).toBe(true);
   });
 
-  it("adds scenario-runs/ to .gitignore", () => {
+  it("does not include scenario-runs/ in .gitignore", () => {
     scaffoldProject(tmpDir, "my-project");
     const gitignore = readFileSync(join(tmpDir, ".gitignore"), "utf8");
-    expect(gitignore).toContain("scenario-runs/");
+    expect(gitignore).not.toContain("scenario-runs/");
   });
 
   it("does not create src/tests/ subdirectories", () => {
