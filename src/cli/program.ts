@@ -254,7 +254,7 @@ Scans <project>/pipelines/*.dot and prints each workflow's name and goal.
     .description("Render a pipeline as SVG next to the source file")
     .addHelpText("after", `
 Examples:
-  ralph pipeline show pipelines/illumination-to-implementation.dot
+  ralph pipeline show pipelines/illumination-to-implementation/pipeline.dot
   ralph pipeline show review --project my-app
 
 Validates the DOT file (same gate as 'pipeline validate'). On success, writes

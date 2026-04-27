@@ -3,10 +3,10 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 import { parseDot, validateGraph } from "../core/graph.js";
 
-describe("illumination-to-implementation.dot — full flow validation", () => {
+describe("illumination-to-implementation pipeline — full flow validation", () => {
   const root = resolve(__dirname, "../../..");
-  const dotPath = resolve(root, "pipelines/illumination-to-implementation.dot");
-  const dotDir = resolve(root, "pipelines");
+  const dotPath = resolve(root, "pipelines/illumination-to-implementation/pipeline.dot");
+  const dotDir = resolve(root, "pipelines/illumination-to-implementation");
   const dot = readFileSync(dotPath, "utf-8");
   const graph = parseDot(dot);
   const diags = validateGraph(graph, dotDir);
