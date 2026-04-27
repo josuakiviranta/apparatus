@@ -4,13 +4,14 @@ All commands are registered in `src/cli/program.ts` via Commander.
 
 ## `ralph plan <project-folder>`
 
-Opens an interactive Claude planning session.
+Opens an interactive Claude planning session. This command is a thin shim backed by the bundled `templates/plan/` pipeline template.
 
 **Behavior:**
-1. Non-interactive kickoff phase: spawns `claude -p --output-format=stream-json` to capture a session ID
-2. Interactive resume phase: spawns `claude --resume <session-id>` in the project folder as an interactive TUI
+1. Validates the project folder exists.
+2. Calls `resolveBundledTemplate("plan")` to get the bundled `templates/plan/pipeline.dot` path.
+3. Delegates to `pipelineRunCommand(dotFile, { project })`.
 
-No prompt files required — injects a brainstorm trigger prompt directly.
+The pipeline template handles the full planning workflow (non-interactive kickoff → session capture → interactive TUI resume).
 
 ## `ralph implement <project-folder>`
 
@@ -29,43 +30,46 @@ See [loop.md](loop.md) for iteration details, signal handling, and git push beha
 
 ## `ralph new <project-name>`
 
-Scaffolds a new project and launches a kickoff session.
+Scaffolds a new project and launches a kickoff session. This command is a thin shim backed by the bundled `templates/new/` pipeline template.
 
 **Behavior:**
-1. Conflict check: warns and exits if `./project-name/` already exists
+1. Conflict check: warns and exits if `./project-name/` already exists.
 2. Creates directory scaffold:
-   - `specs/`
-   - `src/`
+   - `specs/`, `src/`
+   - `meditations/illuminations/`, `meditations/archived-illuminations/`, `meditations/implemented-illuminations/`
    - Empty files: `README.md`, `AGENTS.md`, `IMPLEMENTATION_PLAN.md`
    - `.gitignore` with `IMPLEMENTATION_PLAN.md`
-3. Runs `git init -b main`
-4. Two-phase kickoff session using bundled `PROMPT_kickoff.md`:
-   - Phase 1: Non-interactive — substitutes `{{PROJECT_NAME}}`, Claude writes `README.md` + `specs/README.md`
-   - Phase 2: Interactive TUI resume for user to refine
+3. Runs `git init -b main`.
+4. Calls `resolveBundledTemplate("new")` and delegates to `pipelineRunCommand(dotFile, { project, variables: { project_name } })`.
+
+The pipeline template handles the kickoff session (non-interactive Claude run → interactive TUI resume for refinement).
 
 ## `ralph meditate <project-folder>`
 
-Launches a sandboxed meditation Claude session.
+Launches a meditation pipeline session. This command is a thin shim backed by the bundled `templates/meditate/` pipeline template.
 
 **Behavior:**
-1. Validates project folder exists
-2. Writes PID lock file at `<project-folder>/.ralph-meditate.pid`
-3. Writes per-PID MCP config for the illumination server
-4. Spawns Claude with strict `dontAsk` permissions:
-   - `Read` — globally allowed
-   - `Write` — restricted to `meditations/illuminations/` only (after `mark_implemented` or `mark_archived`, the MCP server moves the file to `meditations/implemented-illuminations/` or `meditations/archived-illuminations/`; agents must not write directly to those sibling dirs)
-5. Claude runs as an interactive session with MCP illumination server access
+1. Validates project folder exists.
+2. Checks for an already-running meditate session (PID lock at `<project-folder>/.meditate.pid`); exits early if alive.
+3. Ensures `meditations/{illuminations,archived-illuminations,implemented-illuminations}/` directories exist.
+4. Appends meditate-specific entries (`.meditate.json`, `.meditate.pid`, MCP config glob) to `.gitignore` if missing.
+5. Writes a PID lock file (`<project-folder>/.meditate.pid`).
+6. Calls `resolveBundledTemplate("meditate")` and delegates to `pipelineRunCommand(dotFile, { project, variables: { steer } })`.
+7. Removes the PID lock file in a `finally` block.
 
-**Stopping:** Press `Ctrl-C` on the running session, or use `ralph heartbeat stop meditate:<project>` for scheduled sessions. Signal handlers clean up the PID lock file and MCP config automatically.
+**`--var steer=<text>` flag:** passes a steering directive into the pipeline context as the `steer` variable (replaces the old `--steer` flag). This lets the caller influence which kind of meditation the pipeline runs without modifying the template.
+
+**Stopping:** `Ctrl-C` on the session, or `ralph heartbeat stop meditate:<project>` for scheduled sessions.
 
 ## `ralph meditate create <project-folder>`
 
-Creates a new meditation script via a non-interactive Claude session.
+Creates a new meditate stimuli script via a pipeline session. This command is a thin shim backed by the bundled `templates/meditate-create/` pipeline template.
 
 **Behavior:**
-1. Spawns a non-interactive Claude session to generate meditation topics
-2. No PID lock file, no permission restrictions
-3. Result is stored in the project's meditation directory
+1. Validates project folder exists.
+2. Calls `resolveBundledTemplate("meditate-create")` and delegates to `pipelineRunCommand(dotFile, { project })`.
+
+No PID lock file is written; the pipeline itself handles the Claude session for generating new meditation topics.
 
 ## `ralph heartbeat` (subcommands)
 
@@ -176,14 +180,20 @@ Exit 0 when the graph is valid; exit 1 on any structural error. When invoked int
 
 ### `ralph pipeline refine <name> [--project <folder>] [--no-traces]`
 
-Opens an interactive Claude session to refine an existing pipeline. Requires the target `.dot` to already exist (inverse of `create`'s must-not-exist conflict check). The session prompt is built via `composeCreatePrompt()` so the refined graph is aware of project-local agents; up to three recent run-trace digests are injected via `listRecentTraces()` + `digestTraceFile()` to ground refinements in observed behavior. On exit, the previous graph is passed to `pipelineValidateCommand` for an edge-label diff against the refined graph.
+Opens an interactive Claude session to refine an existing pipeline. This command is a thin shim backed by the bundled `templates/pipeline-refine/` pipeline template. Requires the target `.dot` to already exist (inverse of `create`'s must-not-exist conflict check).
+
+**Behavior:**
+1. Resolves the target `.dot` path from `<pipelinesDir>/<name>.dot`; exits if not found.
+2. Reads the existing DOT content and parses it (saved as `previousGraph` for post-session diff).
+3. Optionally builds a `trace_digest` from up to three recent run traces via `listRecentTraces()` + `digestTraceFile()`.
+4. Calls `resolveBundledTemplate("pipeline-refine")` and delegates to `pipelineRunCommand(dotFile, { project, variables: { pipeline_name, dot_path, current_dot, trace_digest } })`.
+5. After the session, validates the refined graph and emits an edge-label diff against `previousGraph`.
 
 **Flags:**
-- `--project <folder>` — resolves the pipelines-dir and sets the project scope used by `composeCreatePrompt()`.
-- `--no-traces` — suppresses the recent-traces digest block in the prompt (useful when trace noise is misleading the session).
+- `--project <folder>` — resolves the pipelines-dir and sets the project scope.
+- `--no-traces` — suppresses the recent-traces digest block (useful when trace noise is misleading the session).
 
 **Exit codes:**
-- Exits non-zero if `claude` is not on PATH.
 - Exits non-zero if the `.dot` file does not exist after the session completes.
 - Otherwise exits with the result of the final `pipelineValidateCommand` call (0 on valid, 1 on structural error).
 
@@ -201,7 +211,7 @@ Without flags, prints every node invocation with status and a summary of relevan
 
 ### `ralph pipeline create <name>`
 
-Interactive session to create a new pipeline DOT file.
+Interactive session to create a new pipeline DOT file. This command is a thin shim backed by the bundled `templates/pipeline-create/` pipeline template. Delegates to `pipelineRunCommand` with the resolved template and passes `pipeline_name` as a variable.
 
 ## Git Push Behavior
 

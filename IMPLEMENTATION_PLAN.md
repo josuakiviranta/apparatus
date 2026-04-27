@@ -3485,11 +3485,11 @@ Also cleaned: `getPipelineCreatePromptPath` in `assets.ts` (orphaned) + stale `v
 
 #### Task 6f.4: Update `specs/architecture.md` and `specs/commands.md`
 
-- [ ] **Step 1**: in `specs/architecture.md`, replace the agent/prompt resolution diagram with the new template-resolution flow (`resolveBundledTemplate(name)` → `pipelineRunCommand`).
+- [x] **Step 1**: in `specs/architecture.md`, replace the agent/prompt resolution diagram with the new template-resolution flow (`resolveBundledTemplate(name)` → `pipelineRunCommand`).
 
-- [ ] **Step 2**: in `specs/commands.md`, regenerate the per-command sections for `plan`, `meditate`, `meditate-create`, `new`, `pipeline refine` to reflect they are template-backed; document the `--var` UX for meditate's steer.
+- [x] **Step 2**: in `specs/commands.md`, regenerate the per-command sections for `plan`, `meditate`, `meditate-create`, `new`, `pipeline refine` to reflect they are template-backed; document the `--var` UX for meditate's steer.
 
-- [ ] **Step 3**: commit `docs(specs): align architecture + commands with D8 templates (chunk-6f)`.
+- [x] **Step 3**: commit `docs(specs): align architecture + commands with D8 templates (chunk-6f)`.
 
 ---
 
