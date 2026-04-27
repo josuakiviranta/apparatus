@@ -1103,7 +1103,7 @@ The Chunk-1 migration test reads `src/cli/agents/verifier.md` directly. A future
 
 Mirror Task 1.1+1.2 — but the parser already handles arrays (`gray-matter` → `js-yaml`), so this is mostly a 1-line interface + factory extension.
 
-- [ ] **Step 1: Read the AgentConfig and validateAgentConfig**
+- [x] **Step 1: Read the AgentConfig and validateAgentConfig**
 
 ```bash
 sed -n '48,58p' src/cli/lib/agent.ts
@@ -1112,7 +1112,7 @@ sed -n '453,478p' src/cli/lib/agent.ts
 
 Expected: AgentConfig with `outputs?` at line 57; factory ending in conditional spreads at line 476.
 
-- [ ] **Step 2: Write failing tests**
+- [x] **Step 2: Write failing tests**
 
 Create `src/cli/tests/agent-inputs-frontmatter.test.ts`:
 
@@ -1173,7 +1173,7 @@ describe("validateAgentConfig — inputs", () => {
 });
 ```
 
-- [ ] **Step 3: Run test to verify it fails**
+- [x] **Step 3: Run test to verify it fails**
 
 ```bash
 npx vitest run src/cli/tests/agent-inputs-frontmatter.test.ts
@@ -1181,7 +1181,7 @@ npx vitest run src/cli/tests/agent-inputs-frontmatter.test.ts
 
 Expected: FAIL — `config.inputs` is undefined (factory drops the field).
 
-- [ ] **Step 4: Extend interface and factory**
+- [x] **Step 4: Extend interface and factory**
 
 In `src/cli/lib/agent.ts:48-58`, add to the AgentConfig interface:
 
@@ -1202,7 +1202,7 @@ return {
 };
 ```
 
-- [ ] **Step 5: Run test to verify it passes**
+- [x] **Step 5: Run test to verify it passes**
 
 ```bash
 npx vitest run src/cli/tests/agent-inputs-frontmatter.test.ts
@@ -1210,7 +1210,7 @@ npx vitest run src/cli/tests/agent-inputs-frontmatter.test.ts
 
 Expected: PASS for all 5 tests.
 
-- [ ] **Step 6: Run full agent test suite**
+- [x] **Step 6: Run full agent test suite**
 
 ```bash
 npx vitest run src/cli/tests
@@ -1218,7 +1218,7 @@ npx vitest run src/cli/tests
 
 Expected: all green.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/cli/lib/agent.ts src/cli/tests/agent-inputs-frontmatter.test.ts
@@ -1229,7 +1229,7 @@ git commit -m "feat(agent): inputs: frontmatter field on AgentConfig"
 
 Mirror Task 1.3 — verification-only. `parseAgentFile` already spreads `...attributes` into `validateAgentConfig`; once the validator accepts `inputs:`, the registry path works automatically.
 
-- [ ] **Step 1: Write failing integration test**
+- [x] **Step 1: Write failing integration test**
 
 Create `src/attractor/tests/agent-registry-inputs.test.ts`:
 
@@ -1263,7 +1263,7 @@ prompt body
 });
 ```
 
-- [ ] **Step 2: Run test to verify it passes (Task 2.3's plumbing covers this)**
+- [x] **Step 2: Run test to verify it passes (Task 2.3's plumbing covers this)**
 
 ```bash
 npx vitest run src/attractor/tests/agent-registry-inputs.test.ts
@@ -1271,7 +1271,7 @@ npx vitest run src/attractor/tests/agent-registry-inputs.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/attractor/tests/agent-registry-inputs.test.ts
