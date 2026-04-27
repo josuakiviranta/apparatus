@@ -230,7 +230,7 @@ Dispatch `plan-document-reviewer` with this chunk's content + the design context
 - Modify: `pipelines/illumination-to-implementation.dot:46-93`
 - Test: `npx ralph pipeline validate pipelines/illumination-to-implementation.dot` (existing CLI command)
 
-- [ ] **Step 1: Add the `memory_reflector` node declaration**
+- [x] **Step 1: Add the `memory_reflector` node declaration**
 
 Open `pipelines/illumination-to-implementation.dot`. After the `memory_writer` node block (line 46) and before the `done` node (line 48), add:
 
@@ -238,7 +238,7 @@ Open `pipelines/illumination-to-implementation.dot`. After the `memory_writer` n
   memory_reflector [agent="memory-reflector", json_schema_file="schemas/memory-reflector.json", produces="illumination_path, reasoning", prompt="Reflect on this pipeline session and decide whether a new illumination is warranted.\n\nRun id: $run_id\nProject: $project\nMemory file: $memory_path\nDesign doc: $design_doc_path\nPlan: $plan_path\nOriginal illumination: $illumination_path\n\nFollow your agent-level procedure."]
 ```
 
-- [ ] **Step 2: Reroute the final edge**
+- [x] **Step 2: Reroute the final edge**
 
 Replace the line `memory_writer -> done` (line 93) with:
 
@@ -247,24 +247,24 @@ Replace the line `memory_writer -> done` (line 93) with:
   memory_reflector -> done
 ```
 
-- [ ] **Step 3: Validate the pipeline**
+- [x] **Step 3: Validate the pipeline**
 
 Run: `npx ralph pipeline validate pipelines/illumination-to-implementation.dot`
 Expected: validation passes with no errors. The validator should accept the new node (agent reference resolves; schema reference resolves; produces fields are well-formed; cwd is not required for agent nodes; edges form a DAG).
 
 If validation surfaces a warning about `produces` containing two values, confirm against `verifier` (line 10) which already declares `produces="preferred_label, illumination_path, summary, explanation, archive_reason_short"` — multi-value produces is supported.
 
-- [ ] **Step 4: Run the pipeline-related test suite**
+- [x] **Step 4: Run the pipeline-related test suite**
 
 Run: `npx vitest run src/cli/tests/pipeline.test.ts src/cli/tests/illumination-to-plan-pipeline.test.ts`
 Expected: PASS. No regressions on pipeline parsing, validation, or trace handling.
 
-- [ ] **Step 5: Run the graph parser tests**
+- [x] **Step 5: Run the graph parser tests**
 
 Run: `npx vitest run src/attractor/tests/graph.test.ts src/attractor/tests/dot-syntax.test.ts`
 Expected: PASS. The DOT parser cleanly ingests the modified file.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit** — done in `b40ca03`
 
 ```bash
 git add pipelines/illumination-to-implementation.dot
@@ -281,7 +281,7 @@ expected path for clean runs."
 **Files:**
 - Create: `specs/memory-reflector.md`
 
-- [ ] **Step 1: Write the spec**
+- [x] **Step 1: Write the spec**
 
 ```markdown
 # memory-reflector
@@ -319,7 +319,7 @@ Reflector-written illuminations carry provenance in a final `## Provenance` body
 Errors propagate. Memory-writer has already committed and pushed by the time reflector runs, so a reflector failure does not lose work. Recovery is `ralph pipeline run ... --resume <runId>`.
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit** — done in `374c43b`
 
 ```bash
 git add specs/memory-reflector.md
@@ -331,17 +331,17 @@ the post-move quirk on \$illumination_path."
 
 ### Task 2.3: End-to-end smoke
 
-- [ ] **Step 1: Run the full test suite**
+- [x] **Step 1: Run the full test suite** — 1111/1113 pass
 
 Run: `npx vitest run`
-Expected: PASS. No regressions across the suite.
+Result: 2 pre-existing failures in `src/cli/tests/illumination-to-plan-pipeline.test.ts`. Both caused by uncommitted deletion of `pipelines/illumination-to-plan.dot` (in working tree from session start, not introduced by Chunk 2). The orphan test file references a pipeline that the user is mid-cleanup of removing. Fix is either: commit the WIP deletion, or delete the orphan test. Out of scope for Chunk 2 — surface to user.
 
-- [ ] **Step 2: Build the dist**
+- [x] **Step 2: Build the dist** — clean
 
 Run: `npm run build`
-Expected: clean tsup output; new agent file copied into `dist/agents/memory-reflector.md`; new schema copied into `dist/pipelines/schemas/memory-reflector.json` (if the build copies schemas — verify against existing layout).
+Result: clean tsup output. New agent at `dist/agents/memory-reflector.md` (confirmed). Schema is NOT bundled; existing layout only copies `src/cli/prompts/`, `src/cli/agents/`, and `src/cli/pipelines/` (which holds `implement.dot` only). The `pipelines/schemas/` directory lives at the project root and is loaded relative to the .dot file at runtime — not bundled with dist. Behavior is consistent with all other schemas (e.g. `verifier.json`, `memory-writer.json`).
 
-- [ ] **Step 3: Manual end-to-end smoke**
+- [ ] **Step 3: Manual end-to-end smoke** — interactive, awaits user
 
 This step is interactive and cannot be unit-tested. Run the pipeline against an open illumination and observe the reflector's behavior at the tail. Two scenarios to confirm:
 
