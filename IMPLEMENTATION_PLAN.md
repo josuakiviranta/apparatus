@@ -1755,21 +1755,13 @@ Implementation lives in `checkOrphanOutput` (`src/attractor/core/graph.ts`), wir
 
 Verified clean on `pipelines/illumination-to-implementation.dot` — no orphan warnings emitted on the live graph.
 
-### Task 2.10: Validator rule `required_caller_vars` (info-level banner)
+### Task 2.10: Validator rule `required_caller_vars` (info-level banner) — SHIPPED 2026-04-27
 
-Compute the set of vars NOT produced internally that the pipeline expects. Result = required `--var` keys. Print at the top of `pipeline validate` output as an info-level diagnostic.
+Implemented in `checkRequiredCallerVars` (`src/attractor/core/graph.ts:498-552`) — computes `(graph.inputs ∪ agent_inputs_consumed_anywhere) MINUS internally_produced MINUS RESERVED_VARS`, emits a single `severity:"info"` diagnostic with `rule:"required_caller_vars"` listing sorted keys when the set is non-empty. Called at the end of `validateGraph` after the `if (dotDir)` block. Diagnostic message: `"This pipeline requires the following --var keys at runtime: <keys>"`.
 
-- [ ] **Step 1 — 6: Standard TDD cycle.**
+CLI print loop patched in `src/cli/commands/pipeline.ts:215,219` — info diagnostics now print first via `output.info()`, before warnings and errors. Tests: `src/attractor/tests/graph-required-caller-vars.test.ts` (6 cases — empty graph, all internally produced, `graph.inputs=` listed, RESERVED excluded, agent `inputs:` unproduced var listed, internally-produced var excluded). Diagnostic union in `src/attractor/types.ts:96` extended to include `"info"`.
 
-Implementation: at the end of `validateGraph`, compute `required = (callerInputs ∪ consumed_at_any_node) MINUS internally_produced_anywhere`. Emit a single diagnostic with `severity: "info"`, `rule: "required_caller_vars"`, message lists keys.
-
-**Pre-step:** Verify the CLI's `pipeline validate` command (`src/cli/commands/pipeline.ts` or similar) prints info-level diagnostics. If it filters to `warning|error`, patch the print-loop in the same task. Capture in chunk's surprises if invasive.
-
-- [ ] **Step 7: Commit**
-
-```bash
-git commit -m "feat(validator): required_caller_vars info banner"
-```
+Commit: `b7e5692`. All 1176 tests pass; typecheck clean.
 
 ### Task 2.11: Migrate `verifier.md` to declare `inputs:`
 
@@ -1897,7 +1889,7 @@ git tag chunk-2-inputs-flow-validator
 
 **Surprises to capture in Chunk-2 memory file** (mirror Chunk 1's pattern):
 - Whether `condition="key=value"` parsing in `graph.ts` exposes the LHS/RHS in a structured form (Task 2.8 prereq). **Resolved (2026-04-27, Task 2.8):** parsing was buried inside `evaluateClause` (runtime-only). Extracted to module-level `parseConditionClauses` in `src/attractor/core/conditions.ts` exporting `ConditionClause = {key, op, val}` so validator + runtime now share the same parser → no drift. Refactored `evaluateCondition` to consume the helper.
-- Whether the CLI's `pipeline validate` command currently prints info-level diagnostics (Task 2.10 prereq).
+- Whether the CLI's `pipeline validate` command currently prints info-level diagnostics (Task 2.10 prereq). **Resolved (2026-04-27, Task 2.10):** the print loop in `src/cli/commands/pipeline.ts:215,219` filtered to `warning|error` only — patched in-task to print info diagnostics first via `output.info()`. Also extended `Diagnostic.severity` union in `src/attractor/types.ts` to admit `"info"`. Minor DRY follow-up noted by both reviewers: `RESERVED` set is duplicated locally in `validateGraph` (graph.ts:150) and `checkRequiredCallerVars` (graph.ts:518) — hoist to module-level constant when next validator needs it.
 - Whether any other bundled agent (besides verifier) has `outputs:` and would now trip the broadened `produces_redundant_with_outputs` rule.
 
 **Known carry-over / flaky test (root-cause later):**
