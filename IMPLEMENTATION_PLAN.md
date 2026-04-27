@@ -3477,11 +3477,11 @@ Also cleaned: `getPipelineCreatePromptPath` in `assets.ts` (orphaned) + stale `v
 
 #### Task 6f.3: Update README.md
 
-- [ ] **Step 1**: rewrite the "Commands" section to describe `plan`, `meditate`, `meditate-create`, `new`, `pipeline refine` as bundled-template-backed pipelines. Replace any `--steer` example with `--var steer=...`.
+- [x] **Step 1**: rewrite the "Commands" section to describe `plan`, `meditate`, `meditate-create`, `new`, `pipeline refine` as bundled-template-backed pipelines. Replace any `--steer` example with `--var steer=...`.
 
-- [ ] **Step 2**: in the architecture overview paragraph, replace any reference to `src/cli/agents/` or `src/cli/prompts/` with `src/cli/templates/<name>/`.
+- [x] **Step 2**: in the architecture overview paragraph, replace any reference to `src/cli/agents/` or `src/cli/prompts/` with `src/cli/templates/<name>/`.
 
-- [ ] **Step 3**: commit `docs(readme): update commands + architecture for D8 (chunk-6f)`.
+- [x] **Step 3**: commit `docs(readme): update commands + architecture for D8 (chunk-6f)`.
 
 #### Task 6f.4: Update `specs/architecture.md` and `specs/commands.md`
 
