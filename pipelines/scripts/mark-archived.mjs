@@ -65,7 +65,7 @@ fs.writeFileSync(targetPath, updated);
 fs.rmSync(illuminationPath);
 
 try {
-  execFileSync("git", ["-C", projectRoot, "add", "-A", "meditations"], { stdio: "ignore" });
+  execFileSync("git", ["-C", projectRoot, "add", illuminationPath, targetPath], { stdio: "ignore" });
   execFileSync("git", ["-C", projectRoot, "commit", "-m", `meditate: archive ${filename} (${reason})`], { stdio: "ignore" });
 } catch {
   // git unavailable / nothing to commit — non-fatal.

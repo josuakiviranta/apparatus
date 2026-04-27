@@ -185,6 +185,35 @@ describe("mark-archived.mjs", () => {
     expect(reasonCount).toBe(1);
   });
 
+  it("returns idempotent: true even when called with a different reason than the existing one", () => {
+    const { target } = setupIllum(
+      tmp,
+      join(FIXTURES, "mark-archived-archived-different-reason.md"),
+      "archived-different.md",
+    );
+
+    const before = readFileSync(target, "utf8");
+    const originalReason =
+      "Some prior reason that will mismatch the test-supplied reason.";
+    expect(before).toContain(`reason: ${originalReason}\n`);
+
+    const newReason = "A completely different new reason";
+    const result = runScript([target, newReason]);
+    expect(result.status).toBe(0);
+
+    const parsed = JSON.parse(result.stdout.trim());
+    expect(parsed.idempotent).toBe(true);
+    expect(typeof parsed.archive_path).toBe("string");
+
+    // File content not rewritten — original reason preserved, new reason absent.
+    const after = readFileSync(target, "utf8");
+    expect(after).toBe(before);
+    expect(after).toContain(`reason: ${originalReason}\n`);
+    expect(after).not.toContain(`reason: ${newReason}`);
+    const reasonCount = (after.match(/reason:/g) || []).length;
+    expect(reasonCount).toBe(1);
+  });
+
   it("fails with exit 1 and 'status not open' when status is dispatched", () => {
     const target = join(tmp, "dispatched.md");
     copyFileSync(join(FIXTURES, "mark-archived-dispatched.md"), target);
