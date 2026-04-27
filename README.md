@@ -74,7 +74,7 @@ Check a pipeline for structural errors and `portability_heuristic` warnings (har
 ```bash
 ralph pipeline create <project-folder>
 ```
-Open an interactive Claude session to author a new pipeline. Backed by the bundled pipeline template `src/cli/templates/pipeline-create/`. Available local agents (`.ralph/agents/*.md`) are automatically injected into the authoring prompt.
+Open an interactive Claude session to author a new pipeline. Backed by the bundled pipeline template `src/cli/templates/pipeline-create/`. The scaffolder agent inspects the project's existing `pipelines/<name>/` folders for reusable agent files.
 
 ```bash
 ralph meditate-create <project-folder>

@@ -23,9 +23,9 @@
 
 - CLI entry: `src/cli/index.ts` → commander setup
 - Commands: `src/cli/commands/{plan,implement,new,meditate,meditate-create,agent,pipeline}.ts`
-- Lib: `src/cli/lib/{agent,agent-registry,assets,frontmatter,output,prompts,stream-formatter}.ts`
+- Lib: `src/cli/lib/{agent,agent-registry,assets,frontmatter,output,stream-formatter}.ts`
 - Tests: `src/cli/tests/*.test.ts` (vitest)
-- Bundled prompts: `src/cli/prompts/PROMPT_{plan,build,kickoff}.md`
+- Bundled templates: `src/cli/templates/{plan,meditate,meditate-create,new,pipeline-create,pipeline-refine,blank}/{pipeline.dot,*.md}`
 - Daemon: `src/daemon/{state,scheduler,runner,socket,index}.ts`
 - Shared lib: `src/lib/daemon-client.ts`
 - Ink UI components: `src/cli/components/ui.tsx` (Step, Info, Warn, Error, Success, Header, StreamLine, StreamOutput, SpinnerLine)
