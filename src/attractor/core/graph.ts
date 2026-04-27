@@ -381,11 +381,62 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
     }
   }
 
+  // agent outputs conflict checks — outputs_and_schema_file_conflict + produces_redundant_with_outputs
+  for (const node of nodes.values()) {
+    checkAgentOutputsConflict(node, dotDir, diags);
+  }
+
   // TODO(chunk-2): remove debugProducedKeys once missing_input_producer
   // (Chunk 2's flow validator) asserts derivation through real diagnostics.
   (graph as any).debugProducedKeys = nodeProduces;
 
   return diags;
+}
+
+function checkAgentOutputsConflict(
+  node: Node,
+  dotDir: string | undefined,
+  diags: Diagnostic[],
+): void {
+  if (!node.agent) return;
+
+  // When dotDir is undefined, resolveAgent skips project-local lookup and will
+  // throw "Unknown agent" for any non-bundled agent. The try/catch absorbs that
+  // gracefully — the third test case relies on this path.
+  let agentConfig;
+  try {
+    agentConfig = resolveAgent(node.agent as string, { projectDir: dotDir });
+  } catch {
+    return; // unresolvable agent — handled by other rules
+  }
+  if (!agentConfig.outputs) return;
+
+  // outputs_and_schema_file_conflict — agent outputs + json_schema_file are mutually exclusive
+  if (node.jsonSchemaFile) {
+    diags.push({
+      rule: "outputs_and_schema_file_conflict",
+      severity: "error",
+      message: `Agent "${node.agent}" declares outputs in frontmatter; node also sets json_schema_file=. Remove json_schema_file= (and delete the orphaned schema file).`,
+      location: node.sourceLocation,
+    });
+  }
+
+  // produces_redundant_with_outputs — produces= key set mirrors agent outputs keys exactly
+  if (typeof node.produces === "string" && node.produces.trim().length > 0) {
+    const declared = Object.keys(agentConfig.outputs);
+    const onNode = node.produces.split(/\s*,\s*/).map(s => s.trim()).filter(Boolean);
+    const sameSet =
+      declared.length === onNode.length &&
+      declared.every(k => onNode.includes(k));
+    if (sameSet) {
+      diags.push({
+        rule: "produces_redundant_with_outputs",
+        severity: "warning",
+        message: `produces= on this node is redundant; derived from agent "${node.agent}"'s outputs: keys.`,
+        location: node.sourceLocation,
+      });
+    }
+  }
 }
 
 export function validateOrRaise(graph: Graph): void {
