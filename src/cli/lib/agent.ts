@@ -13,6 +13,38 @@ export interface McpServerConfig {
   args: string[];
 }
 
+// Shorthand strings cover the common scalar types. Other JSON Schema types
+// (array, object, integer, etc.) use the full object form: {type: "array", items: ...}.
+export type JsonSchemaShorthand = "string" | "number" | "boolean";
+export type JsonSchemaFragment =
+  | JsonSchemaShorthand
+  | { type?: string; enum?: unknown[]; [k: string]: unknown };
+
+interface DerivedJsonSchema {
+  type: "object";
+  properties: Record<string, { type?: string; enum?: unknown[]; [k: string]: unknown }>;
+  required: string[];
+  additionalProperties: false;
+}
+
+function deriveJsonSchemaString(outputs: Record<string, JsonSchemaFragment>): string {
+  const properties: DerivedJsonSchema["properties"] = {};
+  for (const [key, frag] of Object.entries(outputs)) {
+    if (typeof frag === "string") {
+      properties[key] = { type: frag };
+    } else {
+      properties[key] = frag as { type?: string; enum?: unknown[] };
+    }
+  }
+  const schema: DerivedJsonSchema = {
+    type: "object",
+    properties,
+    required: Object.keys(outputs),
+    additionalProperties: false,
+  };
+  return JSON.stringify(schema);
+}
+
 export interface AgentConfig {
   name: string;
   description: string;
@@ -22,6 +54,7 @@ export interface AgentConfig {
   mcp: McpServerConfig[];
   prompt: string;
   jsonSchema?: string;
+  outputs?: Record<string, JsonSchemaFragment>;
 }
 
 export interface RunOptions {
@@ -425,6 +458,12 @@ export function validateAgentConfig(
   // Empty string is valid (procedure-less agents like `task`); only missing field is invalid.
   if (typeof config.prompt !== "string") throw new Error("prompt body is required");
 
+  // Derive jsonSchema from outputs only when not explicitly provided. Explicit
+  // jsonSchema wins (legacy agents that hand-author the schema string).
+  const derivedJsonSchema = (config.outputs && !config.jsonSchema)
+    ? deriveJsonSchemaString(config.outputs)
+    : config.jsonSchema;
+
   return {
     name: config.name,
     description: config.description,
@@ -433,5 +472,7 @@ export function validateAgentConfig(
     tools: config.tools ?? DEFAULTS.tools!,
     mcp: config.mcp ?? DEFAULTS.mcp!,
     prompt: config.prompt,
+    ...(derivedJsonSchema !== undefined ? { jsonSchema: derivedJsonSchema } : {}),
+    ...(config.outputs !== undefined ? { outputs: config.outputs } : {}),
   };
 }

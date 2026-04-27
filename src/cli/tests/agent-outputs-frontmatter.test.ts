@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { parseFrontmatter } from "../lib/frontmatter.js";
+import { validateAgentConfig } from "../lib/agent.js";
 
 describe("parseFrontmatter — outputs block", () => {
   it("parses a typed outputs map with inline JSON Schema fragments", () => {
@@ -52,5 +53,86 @@ model: sonnet
 
     const { attributes } = parseFrontmatter(input);
     expect(attributes.outputs).toBeUndefined();
+  });
+});
+
+describe("validateAgentConfig — outputs", () => {
+  it("attaches outputs and serializes a JSON Schema into jsonSchema string", () => {
+    const config = validateAgentConfig({
+      name: "verifier",
+      description: "Verifier agent",
+      outputs: {
+        preferred_label: { enum: ["true", "false", "empty"] },
+        illumination_path: "string",
+      },
+      prompt: "Body",
+    } as any);
+
+    expect(config.outputs).toEqual({
+      preferred_label: { enum: ["true", "false", "empty"] },
+      illumination_path: "string",
+    });
+
+    expect(config.jsonSchema).toBeDefined();
+    const parsed = JSON.parse(config.jsonSchema!);
+    expect(parsed).toEqual({
+      type: "object",
+      properties: {
+        preferred_label: { enum: ["true", "false", "empty"] },
+        illumination_path: { type: "string" },
+      },
+      required: ["preferred_label", "illumination_path"],
+      additionalProperties: false,
+    });
+  });
+
+  it("normalizes shorthand strings to {type: ...} fragments", () => {
+    const config = validateAgentConfig({
+      name: "x", description: "x agent",
+      outputs: { foo: "string", bar: "number", baz: "boolean" },
+      prompt: "",
+    } as any);
+    const parsed = JSON.parse(config.jsonSchema!);
+    expect(parsed.properties).toEqual({
+      foo: { type: "string" },
+      bar: { type: "number" },
+      baz: { type: "boolean" },
+    });
+  });
+
+  it("does not set outputs or jsonSchema when outputs absent (legacy agents)", () => {
+    const config = validateAgentConfig({
+      name: "legacy", description: "legacy agent", prompt: "Body",
+    } as any);
+    expect(config.outputs).toBeUndefined();
+    expect(config.jsonSchema).toBeUndefined();
+  });
+
+  it("treats outputs with zero keys as empty schema (degenerate but valid)", () => {
+    const config = validateAgentConfig({
+      name: "x", description: "x agent",
+      outputs: {},
+      prompt: "",
+    } as any);
+    expect(config.outputs).toEqual({});
+    const parsed = JSON.parse(config.jsonSchema!);
+    expect(parsed).toEqual({
+      type: "object",
+      properties: {},
+      required: [],
+      additionalProperties: false,
+    });
+  });
+
+  it("does NOT overwrite an explicit jsonSchema string when outputs is also set", () => {
+    const explicit = '{"type":"object","properties":{},"required":[]}';
+    const config = validateAgentConfig({
+      name: "x", description: "x agent",
+      jsonSchema: explicit,
+      outputs: { foo: "string" },
+      prompt: "",
+    } as any);
+    expect(config.jsonSchema).toBe(explicit);
+    expect(config.outputs).toEqual({ foo: "string" });
   });
 });
