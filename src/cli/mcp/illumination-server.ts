@@ -699,7 +699,7 @@ if (!isTestEnv) {
 
     server.tool(
       "mark_archived",
-      "Archive an illumination. Moves file to archive/ subdirectory. Valid from any status except archived.",
+      "Archive an illumination. Physically moves the file to meditations/archived-illuminations/ and returns the new path as archive_path. Valid from any status except archived.",
       {
         filename: z.string(),
         reason: z.string(),
