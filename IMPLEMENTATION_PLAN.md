@@ -2242,30 +2242,28 @@ Gating prerequisite from Chunk 1 review. Required only before Task 4.17 (illumin
 7. `git rm pipelines/janitor.svg` (stale SVG — `pipeline show` regenerates on demand).
 8. Commit `refactor(pipelines): migrate janitor to per-folder layout (D1 chunk-4)`.
 
-### Tasks 4.3 — 4.16: Migrate the 14 smoke pipelines
+### Tasks 4.3 — 4.16: Migrate the 14 smoke pipelines — SHIPPED 2026-04-27
 
-Each smoke pipeline is its own task; each is one commit. Recipe = the per-pipeline migration recipe above. Order is alphabetical for predictability:
+Each smoke pipeline migrated in its own commit. Per-pipeline regression test added at `src/cli/tests/pipeline-smoke-<name>-folder.test.ts` (3 cases each: pipeline.dot exists, agent .md exists when applicable, validateGraph emits zero error-level diagnostics).
 
-| # | Pipeline | Agents to copy in | Scripts | Schemas |
+| # | Pipeline | Commit | Agents copied | Schema migrated |
 |---|---|---|---|---|
-| 4.3 | `agent-implement` | `task` | — | — |
-| 4.4 | `agent-json-vars` | `task` | — | `agent-json-vars.json` (folder-local; or drop if agent migrates `outputs:`) |
-| 4.5 | `chat-end-to-end` | `task`, `chat` | — | `summary.json` |
-| 4.6 | `chat-only` | `chat` | — | — |
-| 4.7 | `conditional` | `task` | — | `conditional-result.json` |
-| 4.8 | `gate` | `task` (+ gate `.md` file resolution stays via dotDir) | — | — |
-| 4.9 | `json-schema-stream` | `task` | — | `file-list.json` |
-| 4.10 | `meditate-steer` | (no `agent=` references; meditate-steer relies on built-ins) | — | — |
-| 4.11 | `missing-caller-var` | (designed-to-fail fixture, agents may be missing) | — | — |
-| 4.12 | `static-multi-node` | `task` | — | — |
-| 4.13 | `store` | (no `agent=` references) | — | — |
-| 4.14 | `tmux-tester` | `tmux-tester` (the agent), `task` | — | `meditate-observe.json` (currently `../schemas/...` — the kludge dies) |
-| 4.15 | `tool` | (tool node, no agent) | — | — |
-| 4.16 | `tool-runtime-vars` | (tool node, no agent) | — | — |
+| 4.3 | `agent-implement` | `92ce9f3` | `task` | — |
+| 4.4 | `agent-json-vars` | `14e922b` | `task` | `agent-json-vars.json` (rewrote `schemas/...` → bare filename) |
+| 4.5 | `chat-end-to-end` | `0ce6ddc` | `chat` | `summary.json` |
+| 4.6 | `chat-only` | `fc3e5d8` | `chat` | — |
+| 4.7 | `conditional` | `5563318` | `task` | `conditional-result.json` |
+| 4.8 | `gate` | `1142223` | `task` | — (gate node uses inline `label="..."`) |
+| 4.9 | `json-schema-stream` | `79c73ed` | `task` | `file-list.json` |
+| 4.10 | `meditate-steer` | `95909e7` | — | — |
+| 4.11 | `missing-caller-var` | `3ceaceb` | — | — |
+| 4.12 | `static-multi-node` | `bd5441c` | `task` | — |
+| 4.13 | `store` | `8cf700b` | — | — |
+| 4.14 | `tmux-tester` | `cdd6d78` | `tmux-tester` | `meditate-observe.json` (from `pipelines/schemas/`; rewrote `../schemas/...` → bare filename) |
+| 4.15 | `tool` | `5044041` | — | — |
+| 4.16 | `tool-runtime-vars` | `7511632` | — | — |
 
-Per task: run `npx ralph pipeline validate smoke/<name>` and the targeted smoke test (e.g. `npx vitest run src/cli/tests/smoke.test.ts -t '<name>'`) before committing.
-
-After Tasks 4.3 — 4.16: `pipelines/smoke/schemas/` should be empty (all migrated or dropped); `git rm -r pipelines/smoke/schemas/`. Reflect in test assertions if any test references `smoke/schemas/`.
+`pipelines/smoke/schemas/` removed (was empty after migrations). `pipelines/schemas/` still holds non-smoke schemas (Task 4.18 cleanup later). Full suite green: 122 test files / 1230 tests passed.
 
 ### Task 4.17: Migrate `illumination-to-implementation.dot`
 
