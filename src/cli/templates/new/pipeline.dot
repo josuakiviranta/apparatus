@@ -1,0 +1,11 @@
+digraph new_project {
+  inputs="project_name"
+
+  start [shape=Mdiamond];
+  end   [shape=Msquare];
+
+  kickoff [shape=box, agent="scaffolder", interactive=true,
+           prompt="You are initializing project \"$project_name\". Follow the scaffolder agent's instructions."];
+
+  start -> kickoff -> end;
+}
