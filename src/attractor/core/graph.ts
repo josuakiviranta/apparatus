@@ -8,6 +8,7 @@ import {
   toCamel,
 } from "./dot-common.js";
 import { resolveAgent } from "../../cli/lib/agent-registry.js";
+import type { AgentConfig } from "../../cli/lib/agent.js";
 import { computeVarsInScope } from "./flow-analyzer.js";
 
 export function parseDot(src: string): Graph {
@@ -387,34 +388,46 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
     checkAgentOutputsConflict(node, dotDir, diags);
   }
 
-  // missing_input_producer: agent's declared inputs must be in scope at that node
-  // Only runs when dotDir is available (needed to resolve agent configs).
+  // resolveAgent needs projectDir to locate project-local agents; without dotDir we can't fetch agent configs.
   if (dotDir) {
-    const varsInScope = computeVarsInScope(graph, nodeProduces);
-    for (const [id, node] of nodes) {
-      if (!node.agent) continue;
-      let agentConfig;
-      try {
-        agentConfig = resolveAgent(node.agent as string, { projectDir: dotDir });
-      } catch {
-        continue;
-      }
-      if (!agentConfig.inputs) continue;
-      const scope = varsInScope.get(id) ?? new Set<string>();
-      for (const inputKey of agentConfig.inputs) {
-        if (!scope.has(inputKey)) {
-          diags.push({
-            rule: "missing_input_producer",
-            severity: "error",
-            message: `Agent "${node.agent}" at node "${id}" requires input "${inputKey}" but no upstream node produces it on every path. Either route through a producer, declare default_${inputKey}= on this node, or add "${inputKey}" to the digraph's inputs="..." for caller-supplied vars.`,
-            location: node.sourceLocation,
-          });
-        }
-      }
-    }
+    checkMissingInputProducer(graph, nodeProduces, dotDir, diags);
   }
 
   return diags;
+}
+
+function tryResolveAgent(node: Node, dotDir: string | undefined): AgentConfig | undefined {
+  if (!node.agent) return undefined;
+  try {
+    return resolveAgent(node.agent as string, { projectDir: dotDir });
+  } catch {
+    return undefined;
+  }
+}
+
+function checkMissingInputProducer(
+  graph: Graph,
+  nodeProduces: Map<string, Set<string>>,
+  dotDir: string,
+  diags: Diagnostic[],
+): void {
+  const varsInScope = computeVarsInScope(graph, nodeProduces);
+  for (const [id, node] of graph.nodes) {
+    if (!node.agent) continue;
+    const agentConfig = tryResolveAgent(node, dotDir);
+    if (!agentConfig || !agentConfig.inputs) continue;
+    const scope = varsInScope.get(id) ?? new Set<string>();
+    for (const inputKey of agentConfig.inputs) {
+      if (!scope.has(inputKey)) {
+        diags.push({
+          rule: "missing_input_producer",
+          severity: "error",
+          message: `Agent "${node.agent}" at node "${id}" requires input "${inputKey}" but no upstream node produces it on every path. Either route through a producer, declare default_${inputKey}= on this node, or add "${inputKey}" to the digraph's inputs="..." for caller-supplied vars.`,
+          location: node.sourceLocation,
+        });
+      }
+    }
+  }
 }
 
 function checkAgentOutputsConflict(
@@ -425,14 +438,10 @@ function checkAgentOutputsConflict(
   if (!node.agent) return;
 
   // When dotDir is undefined, resolveAgent skips project-local lookup and will
-  // throw "Unknown agent" for any non-bundled agent. The try/catch absorbs that
+  // throw "Unknown agent" for any non-bundled agent. tryResolveAgent absorbs that
   // gracefully — the third test case relies on this path.
-  let agentConfig;
-  try {
-    agentConfig = resolveAgent(node.agent as string, { projectDir: dotDir });
-  } catch {
-    return; // unresolvable agent — handled by other rules
-  }
+  const agentConfig = tryResolveAgent(node, dotDir);
+  if (!agentConfig) return; // unresolvable agent — handled by other rules
   if (!agentConfig.outputs) return;
 
   // outputs_and_schema_file_conflict — agent outputs + json_schema_file are mutually exclusive

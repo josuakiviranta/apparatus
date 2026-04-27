@@ -29,7 +29,7 @@ body
     const d = diags.find(d => d.rule === "missing_input_producer");
     expect(d).toBeDefined();
     expect(d!.severity).toBe("error");
-    expect(d!.message).toMatch(/foo/);
+    expect(d!.message).toMatch(/input "foo"/);
   });
 
   it("does not fire when an upstream node produces the input", () => {
@@ -79,6 +79,30 @@ body
       inputs="project"
       start [shape=Mdiamond]
       c [agent="consumer"]
+      done [shape=Msquare]
+      start -> c -> done
+    }`;
+    writeFileSync(join(dir, "p.dot"), dot);
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    expect(diags.find(d => d.rule === "missing_input_producer")).toBeUndefined();
+  });
+
+  it("default_<key>= on the consumer node satisfies the requirement", () => {
+    const dir = join(tmpdir(), `mip-default-${Date.now()}`);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "consumer.md"), `---
+name: consumer
+description: needs foo
+inputs:
+  - foo
+---
+body
+`);
+    const dot = `digraph g {
+      inputs="project"
+      start [shape=Mdiamond]
+      c [agent="consumer", default_foo="bar"]
       done [shape=Msquare]
       start -> c -> done
     }`;
