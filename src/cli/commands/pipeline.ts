@@ -24,7 +24,6 @@ import { runTwoPhaseClaudeSession } from "../lib/session.js";
 import { resolveBundledTemplate } from "../lib/assets.js";
 import * as self from "./pipeline.js";
 import * as output from "../lib/output.js";
-import { renderCodeFrame } from "../lib/code-frame.js";
 import { formatPipelineDiag } from "../lib/pipeline-diag-format.js";
 import type { Diagnostic } from "../../attractor/types.js";
 import { DotSyntaxError } from "../../attractor/core/dot-syntax.js";
