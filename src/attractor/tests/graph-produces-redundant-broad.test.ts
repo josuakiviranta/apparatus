@@ -68,6 +68,16 @@ describe("produces_redundant_with_outputs — broad (D2)", () => {
     expect(d!.severity).toBe("error");
   });
 
+  it("does not fire on whitespace-only produces (\" , , \")", () => {
+    const dir = join(tmpdir(), `prw-ws-${Date.now()}`);
+    setupAgent(dir);
+    const dot = `digraph g { v [agent="verifier", produces=" , , "]; v -> done; }`;
+    writeFileSync(join(dir, "p.dot"), dot);
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    expect(diags.find(d => d.rule === "produces_redundant_with_outputs")).toBeUndefined();
+  });
+
   it("does not fire when agent has no outputs (legacy nodes still allowed produces=)", () => {
     const dir = join(tmpdir(), `prw-legacy-${Date.now()}`);
     mkdirSync(dir, { recursive: true });

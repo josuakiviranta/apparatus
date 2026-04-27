@@ -426,6 +426,7 @@ function checkAgentOutputsConflict(
   if (typeof node.produces === "string" && node.produces.trim().length > 0) {
     const declared = new Set(Object.keys(agentConfig.outputs));
     const onNode = node.produces.split(/\s*,\s*/).map(s => s.trim()).filter(Boolean);
+    if (onNode.length === 0) return;
     const extra = onNode.filter(k => !declared.has(k));
     const missing = [...declared].filter(k => !onNode.includes(k));
     let detail: string;
