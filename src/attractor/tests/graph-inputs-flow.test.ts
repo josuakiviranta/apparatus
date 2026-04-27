@@ -111,6 +111,32 @@ body
     const diags = validateGraph(graph, dir);
     expect(diags.find(d => d.rule === "missing_input_producer")).toBeUndefined();
   });
+
+  it("does not fire when input is a RESERVED runtime var (run_id, goal, project)", () => {
+    const dir = join(tmpdir(), `mip-reserved-${Date.now()}`);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "consumer.md"), `---
+name: consumer
+description: needs run_id (auto-injected by runtime)
+inputs:
+  - run_id
+  - goal
+  - project
+---
+body
+`);
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      c [agent="consumer"]
+      done [shape=Msquare]
+      start -> c -> done
+    }`;
+    writeFileSync(join(dir, "p.dot"), dot);
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    expect(diags.find(d => d.rule === "missing_input_producer")).toBeUndefined();
+    expect(diags.find(d => d.rule === "branch_incomplete_input")).toBeUndefined();
+  });
 });
 
 describe("validator — branch_incomplete_input", () => {

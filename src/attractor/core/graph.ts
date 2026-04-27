@@ -560,6 +560,7 @@ function checkMissingInputProducer(
   dotDir: string,
   diags: Diagnostic[],
 ): void {
+  const RESERVED = new Set(["goal", "project", "run_id"]);
   const varsInScope = computeVarsInScope(graph, nodeProduces);
   const varsInAnyScope = computeVarsInAnyScope(graph, nodeProduces);
   for (const [id, node] of graph.nodes) {
@@ -569,6 +570,7 @@ function checkMissingInputProducer(
     const scope = varsInScope.get(id) ?? new Set<string>();
     const anyScope = varsInAnyScope.get(id) ?? new Set<string>();
     for (const inputKey of agentConfig.inputs) {
+      if (RESERVED.has(inputKey)) continue;
       if (scope.has(inputKey)) continue;
       if (anyScope.has(inputKey)) {
         diags.push({
