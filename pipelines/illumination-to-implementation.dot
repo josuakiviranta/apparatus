@@ -23,7 +23,7 @@ digraph illumination_to_implementation {
 
   explainer [agent="change-explainer", default_refinements="", json_schema_file="schemas/explainer.json", produces="explainer_render", prompt="Render a before/after explainer for the verified illumination.\n\nIllumination: $illumination_path\nVerifier summary: $summary\nVerifier explanation: $explanation\nRefinements (cumulative; empty on first pass):\n$refinements\n\nFollow your agent-level format and procedure. Use up to 10 subagents to pull verbatim evidence. Return only the structured JSON with the explainer_render field."]
 
-  approval_gate [shape=hexagon, default_refinements="", label="Proceed with plan?\n\nIllumination: $illumination_path\nSummary: $summary\nVerifier: $explanation\n\n$explainer_render\n\nRefinements (cumulative; empty on first entry):\n$refinements"]
+  approval_gate [shape=hexagon, default_refinements=""]
 
   chat_session [agent="chat-refiner", interactive=true, default_refinements="", prompt="Discuss the illumination with the user.\n\nIllumination: $illumination_path\nSummary: $summary\nVerifier explanation: $explanation\nPrior refinements (empty on first chat round):\n$refinements\n\nWrite agreed conclusions to: $illuminations_dir/.triage/$run_id/chat-notes.md\n\nFollow your agent-level format and append rule. Do NOT modify any other project files."]
 
