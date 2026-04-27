@@ -876,32 +876,1081 @@ Check that:
 
 ---
 
-## Chunk 2: `inputs:` frontmatter + flow validator (D5) — outline
+## Chunk 2: `inputs:` frontmatter + flow validator (D5)
 
-**Carry-overs from Chunk 1 review (must address in Chunk 2):**
-- **Broaden `produces_redundant_with_outputs`:** today the diagnostic only fires on exact key-set match. D2 says ANY `produces=` on an outputs-bearing node is redundant. Update the rule so a subset / mismatch on a node that already has `outputs:` becomes either an error (preferred — the `outputs:` block is the SSoT) or a warning that names the divergent keys explicitly.
-- **Add `resolveAgent` registry-path test for verifier:** the migration test reads the bundled file directly. Add a unit test that exercises `resolveAgent("verifier", { bundledDir })` end-to-end so a future bundled-vs-user-dir behavioral change can't slip past.
-- **Consider startup warning** when `~/.ralph/agents/<name>.md` is older than `getBundledAgentsDir()/<name>.md` — a low-cost guard for users who haven't refreshed their cached agents post-migration. May defer to Chunk 4 (per-pipeline-folder lookup obsoletes the user-dir cache for project pipelines anyway).
+**Purpose:** Add per-node `inputs:` declaration on agent frontmatter (and address two Chunk-1 carry-overs first), then build the static flow-analysis validator that catches missing producers, branch-incomplete inputs, type mismatches, orphan outputs, and required `--var` keys before any live run. By end of chunk, `verifier.md` declares `inputs:`, the `debugProducedKeys` hack is removed, and `pipeline validate` reports a per-pipeline-folder "required caller vars" banner.
 
-**Purpose:** Add per-node `inputs:` declaration and the static flow-analysis validator that catches missing producers, branch-incomplete inputs, type mismatches, orphan outputs, and required `--var` keys before any live run.
+**Codebase facts grounding this chunk** (verified before writing):
+- `src/cli/lib/agent.ts:48-58` — `AgentConfig` already carries `outputs?: Record<string, JsonSchemaFragment>` (Chunk 1). Adding `inputs?: string[]` is a 1-line interface extension; `validateAgentConfig` at `:453-478` just needs one more conditional spread.
+- `src/cli/lib/agent-registry.ts:35-38` — `parseAgentFile` does `validateAgentConfig({ ...attributes, prompt: body })`. The `inputs:` key flows through automatically once the validator accepts it; only a test is needed.
+- `src/attractor/core/schemas.ts:17-34` — `AgentNodeSchema` is `.strict()`. The `inputs:` declaration lives in the agent **.md** frontmatter, NOT on the .dot node. AgentNodeSchema does NOT need a new field. (D5 explicitly rules: "agent declares inputs in its own frontmatter.")
+- `src/attractor/core/graph.ts:53` — `validateGraph(graph: Graph, dotDir?: string)` takes **positional `dotDir`** (no opts object). `parseDot(src)` at `:12-14` returns `Graph` directly with **only one arg**. Tests must use `validateGraph(graph, dir)` and `parseDot(dot)`, NOT the opts-object form some Chunk-1 snippets show.
+- `src/attractor/core/graph.ts:165-200` — `nodeProduces` is built once per validation pass, including derivation from agent outputs (Chunk 1's wire-up at `:186-198`). The flow analyzer in this chunk consumes the SAME `nodeProduces` map.
+- `src/attractor/core/graph.ts:391` — `(graph as any).debugProducedKeys = nodeProduces;` is a TODO scaffold from Chunk 1 (Task 1.4). Task 2.6 replaces it with the real `missing_input_producer` diagnostic and removes the debug field.
+- `src/attractor/core/graph.ts:396-440` — `checkAgentOutputsConflict` currently only fires `produces_redundant_with_outputs` on **exact key-set match** (`sameSet` at `:428-431`). D2 intent: ANY `produces=` on an outputs-bearing node is redundant. Task 2.1 escalates this to **error**.
+- `src/attractor/transforms/variable-expansion.ts:162-169` — `collectProducers` reads only `node.produces`; agent `outputs:` keys are NOT considered for default-seed extraction. The flow analyzer's "vars in scope" computation must NOT regress this — Task 2.5 tests assert default-seed behavior is unchanged.
+- `src/cli/agents/verifier.md:1-25` — current frontmatter has `outputs:` but no `inputs:`. The verifier's prompt at `pipelines/illumination-to-implementation.dot:10` references `$refinements` and `$illuminations_dir` and `$illumination_path` and `$run_id` — those are the inputs to declare in Task 2.11.
 
-**High-level shape:**
-- Extend `parseAgentFile` and `validateAgentConfig` with `inputs?: string[]` (Task 2.1).
-- Extend `AgentNodeSchema` with `inputs?: string[]` (Task 2.2).
-- Add `flow-analyzer.ts` to `src/attractor/core/` that walks the DAG and computes per-node "vars in scope" (Task 2.3).
-- Add validator rules (Task 2.4):
-  - `missing_input_producer` (error)
-  - `branch_incomplete_input` (error unless `default_<key>=` set)
-  - `input_type_mismatch` (error — output enum doesn't satisfy condition value)
-  - `orphan_output` (warning)
-  - `required_caller_vars` (info-level — printed at top of validate output)
-- Migrate `verifier.md` to declare `inputs:` (Task 2.5).
-- Test against `illumination-to-implementation.dot`'s full topology — conditional edges, retry loops, default fallbacks (Task 2.6).
-- Chunk-2 review checkpoint (Task 2.7).
+**Architectural choice — flow analyzer as a new file:** A new module `src/attractor/core/flow-analyzer.ts` exports `computeVarsInScope(graph, nodeProduces)` returning `Map<nodeId, Set<varName>>`. Justification:
+1. `graph.ts` is already 449 lines mixing schema validation, reachability, variable coverage, portability, and script rules. Flow analysis (BFS with set-intersection at converging nodes) is a distinct algorithmic concern.
+2. Synthetic Graph fixtures unit-test the analyzer without parsing .dot strings.
+3. `variable-expansion.ts` is in `transforms/` (runtime path); static analysis belongs in `core/`.
 
-**Dependencies:** Chunk 1 (the parser + AgentConfig must understand new frontmatter keys).
+`validateGraph` adds five rule blocks that read `varsInScope` to produce diagnostics. `varsInScope[node]` is the **intersection** across all DAG paths from start to that node (a var is "in scope" only if every path produces it).
 
-**Plan-expansion note:** Fully detailed TDD steps to be written when Chunk 1 lands.
+**Deferred to Chunk 4:** Startup warning when `~/.ralph/agents/<name>.md` is older than `getBundledAgentsDir()/<name>.md` (per-pipeline-folder lookup in Chunk 4 obsoletes the user-dir cache for project pipelines anyway).
+
+**Files:**
+- Modify: `src/attractor/core/graph.ts:396-440` — broaden `produces_redundant_with_outputs` to fire on any `produces=` presence; escalate to error (Task 2.1).
+- Create: `src/attractor/tests/agent-registry-bundled.test.ts` — `resolveAgent("verifier", { bundledDir })` end-to-end test (Task 2.2).
+- Modify: `src/cli/lib/agent.ts:48-58` (interface) and `:467-477` (factory) — add `inputs?: string[]` field (Task 2.3).
+- Create: `src/cli/tests/agent-inputs-frontmatter.test.ts` — parser + AgentConfig tests for `inputs:` (Task 2.3).
+- Create: `src/attractor/tests/agent-registry-inputs.test.ts` — `resolveAgent` end-to-end test for `inputs:` (Task 2.4).
+- Create: `src/attractor/core/flow-analyzer.ts` — new module exporting `computeVarsInScope` (Task 2.5).
+- Create: `src/attractor/tests/flow-analyzer.test.ts` — unit tests with synthetic graph fixtures (Task 2.5).
+- Modify: `src/attractor/core/graph.ts` (near `:380-391`) — call flow analyzer; add `missing_input_producer`, `branch_incomplete_input`, `input_type_mismatch`, `orphan_output`, `required_caller_vars` rules; remove `debugProducedKeys` (Tasks 2.6 — 2.10).
+- Create: `src/attractor/tests/graph-inputs-flow.test.ts` — validator rule tests (Tasks 2.6 — 2.10).
+- Modify: `src/cli/agents/verifier.md:13-25` — add `inputs:` block (Task 2.11).
+- Create: `src/attractor/tests/illumination-pipeline-flow.test.ts` — full-topology test against `pipelines/illumination-to-implementation.dot` (Task 2.12).
+- Modify: `src/attractor/tests/graph-outputs-derives-produces.test.ts` — replace `debugProducedKeys` assertions with `missing_input_producer` observations (Task 2.6 fallout).
+
+### Task 2.1: Broaden `produces_redundant_with_outputs` to ANY-presence error (carry-over)
+
+D2 says: when an agent declares `outputs:`, the agent file is the SSoT. Any `produces=` on the calling node is redundant — and worse, divergent (subset / superset / disjoint) `produces=` silently drops or invents keys. Today's `sameSet` check only catches the harmless exact-match case. Escalate to **error** for any presence.
+
+- [ ] **Step 1: Read the current rule**
+
+```bash
+sed -n '424,440p' src/attractor/core/graph.ts
+```
+
+Expected: the existing `if (typeof node.produces === "string" && node.produces.trim().length > 0)` block, with the `sameSet` filter at `:428-431`.
+
+- [ ] **Step 2: Write failing tests for subset / superset / disjoint cases**
+
+Create `src/attractor/tests/graph-produces-redundant-broad.test.ts`:
+
+```typescript
+import { describe, it, expect } from "vitest";
+import { writeFileSync, mkdirSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
+import { parseDot, validateGraph } from "../core/graph.js";
+
+function setupAgent(dir: string) {
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "verifier.md"), `---
+name: verifier
+description: verifier
+outputs:
+  foo: string
+  bar: number
+---
+body
+`);
+}
+
+describe("produces_redundant_with_outputs — broad (D2)", () => {
+  it("errors on exact match (was warning before)", () => {
+    const dir = join(tmpdir(), `prw-exact-${Date.now()}`);
+    setupAgent(dir);
+    const dot = `digraph g { v [agent="verifier", produces="foo, bar"]; v -> done; }`;
+    writeFileSync(join(dir, "p.dot"), dot);
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    const d = diags.find(d => d.rule === "produces_redundant_with_outputs");
+    expect(d).toBeDefined();
+    expect(d!.severity).toBe("error");
+  });
+
+  it("errors on subset (produces=\"foo\" when outputs has foo+bar)", () => {
+    const dir = join(tmpdir(), `prw-subset-${Date.now()}`);
+    setupAgent(dir);
+    const dot = `digraph g { v [agent="verifier", produces="foo"]; v -> done; }`;
+    writeFileSync(join(dir, "p.dot"), dot);
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    const d = diags.find(d => d.rule === "produces_redundant_with_outputs");
+    expect(d).toBeDefined();
+    expect(d!.severity).toBe("error");
+    expect(d!.message).toMatch(/foo/);
+  });
+
+  it("errors on superset (produces declares a key the agent does not output)", () => {
+    const dir = join(tmpdir(), `prw-super-${Date.now()}`);
+    setupAgent(dir);
+    const dot = `digraph g { v [agent="verifier", produces="foo, bar, baz"]; v -> done; }`;
+    writeFileSync(join(dir, "p.dot"), dot);
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    const d = diags.find(d => d.rule === "produces_redundant_with_outputs");
+    expect(d).toBeDefined();
+    expect(d!.severity).toBe("error");
+    expect(d!.message).toMatch(/baz/);
+  });
+
+  it("errors on disjoint (produces declares only keys the agent does not output)", () => {
+    const dir = join(tmpdir(), `prw-disjoint-${Date.now()}`);
+    setupAgent(dir);
+    const dot = `digraph g { v [agent="verifier", produces="qux"]; v -> done; }`;
+    writeFileSync(join(dir, "p.dot"), dot);
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    const d = diags.find(d => d.rule === "produces_redundant_with_outputs");
+    expect(d).toBeDefined();
+    expect(d!.severity).toBe("error");
+  });
+
+  it("does not fire when agent has no outputs (legacy nodes still allowed produces=)", () => {
+    const dir = join(tmpdir(), `prw-legacy-${Date.now()}`);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "legacy.md"), `---
+name: legacy
+description: legacy
+---
+body
+`);
+    const dot = `digraph g { v [agent="legacy", produces="foo"]; v -> done; }`;
+    writeFileSync(join(dir, "p.dot"), dot);
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    expect(diags.find(d => d.rule === "produces_redundant_with_outputs")).toBeUndefined();
+  });
+});
+```
+
+- [ ] **Step 3: Run test to verify it fails**
+
+```bash
+npx vitest run src/attractor/tests/graph-produces-redundant-broad.test.ts
+```
+
+Expected: FAIL — exact-match still emits warning (not error); subset/superset/disjoint emit nothing.
+
+- [ ] **Step 4: Broaden the rule**
+
+In `src/attractor/core/graph.ts:424-440`, replace the rule body:
+
+```typescript
+// produces_redundant_with_outputs — outputs: is SSoT; any produces= on an
+// outputs-bearing node is redundant or divergent. Escalated to error per D2.
+if (typeof node.produces === "string" && node.produces.trim().length > 0) {
+  const declared = new Set(Object.keys(agentConfig.outputs));
+  const onNode = node.produces.split(/\s*,\s*/).map(s => s.trim()).filter(Boolean);
+  const extra = onNode.filter(k => !declared.has(k));
+  const missing = [...declared].filter(k => !onNode.includes(k));
+  let detail: string;
+  if (extra.length === 0 && missing.length === 0) {
+    detail = `keys are identical to outputs: — drop produces= entirely.`;
+  } else if (extra.length > 0 && missing.length === 0) {
+    detail = `produces= adds keys the agent does not output: ${extra.join(", ")}.`;
+  } else if (missing.length > 0 && extra.length === 0) {
+    detail = `produces= drops keys the agent outputs: ${missing.join(", ")}.`;
+  } else {
+    detail = `produces= diverges from outputs: extra=[${extra.join(", ")}], missing=[${missing.join(", ")}].`;
+  }
+  diags.push({
+    rule: "produces_redundant_with_outputs",
+    severity: "error",
+    message: `Agent "${node.agent}" declares outputs: in frontmatter (the SSoT). ${detail} Remove produces= from this node.`,
+    location: node.sourceLocation,
+  });
+}
+```
+
+- [ ] **Step 5: Run test to verify it passes**
+
+```bash
+npx vitest run src/attractor/tests/graph-produces-redundant-broad.test.ts
+```
+
+Expected: PASS for all 5 tests.
+
+- [ ] **Step 6: Run the full validator test suite to confirm no regression**
+
+```bash
+npx vitest run src/attractor/tests/graph
+```
+
+Expected: all green. The Chunk-1 `graph-outputs-conflict.test.ts` test that asserts `severity === "warning"` for the exact-match case will need to be updated to `severity === "error"` — fix it in the same commit.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add src/attractor/core/graph.ts src/attractor/tests/graph-produces-redundant-broad.test.ts src/attractor/tests/graph-outputs-conflict.test.ts
+git commit -m "feat(validator): escalate produces_redundant_with_outputs to error and broaden coverage"
+```
+
+### Task 2.2: Add `resolveAgent` bundled-registry test for verifier (carry-over)
+
+The Chunk-1 migration test reads `src/cli/agents/verifier.md` directly. A future bundled-vs-user-dir behavioral change (e.g. Chunk 4's per-pipeline-folder lookup) could regress the registry path silently. Lock the contract with a unit test.
+
+- [ ] **Step 1: Read the registry signature**
+
+```bash
+sed -n '40,67p' src/cli/lib/agent-registry.ts
+```
+
+Expected: `resolveAgent(name, opts)` searches `projectDir → userDir → bundledDir`. The `bundledDir` option overrides `getBundledAgentsDir()`.
+
+- [ ] **Step 2: Write failing test**
+
+Create `src/attractor/tests/agent-registry-bundled.test.ts`:
+
+```typescript
+import { describe, it, expect } from "vitest";
+import { resolveAgent } from "../../cli/lib/agent-registry.js";
+import { resolve } from "path";
+
+describe("resolveAgent — verifier via bundledDir", () => {
+  it("loads outputs from bundled verifier.md (registry path, not direct read)", () => {
+    const bundledDir = resolve(__dirname, "../../cli/agents");
+    const config = resolveAgent("verifier", { bundledDir });
+    expect(config.name).toBe("verifier");
+    expect(config.outputs).toBeDefined();
+    expect(Object.keys(config.outputs!)).toEqual(
+      expect.arrayContaining([
+        "preferred_label",
+        "illumination_path",
+        "summary",
+        "explanation",
+        "archive_reason_short",
+      ]),
+    );
+    expect(config.jsonSchema).toBeDefined();
+    const schema = JSON.parse(config.jsonSchema!);
+    expect(schema.required).toContain("preferred_label");
+  });
+});
+```
+
+- [ ] **Step 3: Run test to verify it passes (this is a regression-lock test)**
+
+```bash
+npx vitest run src/attractor/tests/agent-registry-bundled.test.ts
+```
+
+Expected: PASS. If it fails, the bundled-path lookup is broken — root-cause before proceeding.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add src/attractor/tests/agent-registry-bundled.test.ts
+git commit -m "test(agent-registry): lock bundled resolveAgent path for verifier"
+```
+
+### Task 2.3: `inputs:` parses through frontmatter → AgentConfig
+
+Mirror Task 1.1+1.2 — but the parser already handles arrays (`gray-matter` → `js-yaml`), so this is mostly a 1-line interface + factory extension.
+
+- [ ] **Step 1: Read the AgentConfig and validateAgentConfig**
+
+```bash
+sed -n '48,58p' src/cli/lib/agent.ts
+sed -n '453,478p' src/cli/lib/agent.ts
+```
+
+Expected: AgentConfig with `outputs?` at line 57; factory ending in conditional spreads at line 476.
+
+- [ ] **Step 2: Write failing tests**
+
+Create `src/cli/tests/agent-inputs-frontmatter.test.ts`:
+
+```typescript
+import { describe, it, expect } from "vitest";
+import { parseFrontmatter } from "../lib/frontmatter.js";
+import { validateAgentConfig } from "../lib/agent.js";
+
+describe("parseFrontmatter — inputs block", () => {
+  it("parses inputs: as a string array", () => {
+    const input = `---
+name: a
+inputs:
+  - illumination_path
+  - refinements
+  - run_id
+---
+body`;
+    const { attributes } = parseFrontmatter(input);
+    expect(attributes.inputs).toEqual(["illumination_path", "refinements", "run_id"]);
+  });
+
+  it("returns no inputs key when frontmatter omits it", () => {
+    const { attributes } = parseFrontmatter(`---
+name: a
+---
+body`);
+    expect(attributes.inputs).toBeUndefined();
+  });
+});
+
+describe("validateAgentConfig — inputs", () => {
+  it("attaches inputs array to AgentConfig", () => {
+    const config = validateAgentConfig({
+      name: "x", description: "x agent",
+      inputs: ["foo", "bar"],
+      prompt: "",
+    } as any);
+    expect(config.inputs).toEqual(["foo", "bar"]);
+  });
+
+  it("does not set inputs when absent (legacy agents)", () => {
+    const config = validateAgentConfig({
+      name: "legacy", description: "legacy",
+      prompt: "",
+    } as any);
+    expect(config.inputs).toBeUndefined();
+  });
+
+  it("treats empty inputs array as valid (zero-input agent)", () => {
+    const config = validateAgentConfig({
+      name: "x", description: "x agent",
+      inputs: [],
+      prompt: "",
+    } as any);
+    expect(config.inputs).toEqual([]);
+  });
+});
+```
+
+- [ ] **Step 3: Run test to verify it fails**
+
+```bash
+npx vitest run src/cli/tests/agent-inputs-frontmatter.test.ts
+```
+
+Expected: FAIL — `config.inputs` is undefined (factory drops the field).
+
+- [ ] **Step 4: Extend interface and factory**
+
+In `src/cli/lib/agent.ts:48-58`, add to the AgentConfig interface:
+
+```typescript
+export interface AgentConfig {
+  // ... existing fields ...
+  outputs?: Record<string, JsonSchemaFragment>;
+  inputs?: string[];
+}
+```
+
+In `validateAgentConfig` at `:467-477`, add one more conditional spread:
+
+```typescript
+return {
+  // ... existing fields, jsonSchema spread, outputs spread ...
+  ...(config.inputs !== undefined ? { inputs: config.inputs } : {}),
+};
+```
+
+- [ ] **Step 5: Run test to verify it passes**
+
+```bash
+npx vitest run src/cli/tests/agent-inputs-frontmatter.test.ts
+```
+
+Expected: PASS for all 5 tests.
+
+- [ ] **Step 6: Run full agent test suite**
+
+```bash
+npx vitest run src/cli/tests
+```
+
+Expected: all green.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add src/cli/lib/agent.ts src/cli/tests/agent-inputs-frontmatter.test.ts
+git commit -m "feat(agent): inputs: frontmatter field on AgentConfig"
+```
+
+### Task 2.4: `parseAgentFile` / `resolveAgent` carry `inputs:` end-to-end
+
+Mirror Task 1.3 — verification-only. `parseAgentFile` already spreads `...attributes` into `validateAgentConfig`; once the validator accepts `inputs:`, the registry path works automatically.
+
+- [ ] **Step 1: Write failing integration test**
+
+Create `src/attractor/tests/agent-registry-inputs.test.ts`:
+
+```typescript
+import { describe, it, expect } from "vitest";
+import { writeFileSync, mkdirSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
+import { resolveAgent } from "../../cli/lib/agent-registry.js";
+
+describe("resolveAgent — inputs end-to-end", () => {
+  it("loads inputs from frontmatter and exposes them on AgentConfig", () => {
+    const dir = join(tmpdir(), `resolve-inputs-${Date.now()}`);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "demo-agent.md"), `---
+name: demo-agent
+description: demo
+inputs:
+  - illumination_path
+  - run_id
+outputs:
+  status: {enum: [ok, fail]}
+---
+prompt body
+`);
+
+    const config = resolveAgent("demo-agent", { projectDir: dir });
+    expect(config.inputs).toEqual(["illumination_path", "run_id"]);
+    expect(config.outputs).toBeDefined();
+  });
+});
+```
+
+- [ ] **Step 2: Run test to verify it passes (Task 2.3's plumbing covers this)**
+
+```bash
+npx vitest run src/attractor/tests/agent-registry-inputs.test.ts
+```
+
+Expected: PASS.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add src/attractor/tests/agent-registry-inputs.test.ts
+git commit -m "test(agent-registry): inputs: flows through resolveAgent"
+```
+
+### Task 2.5: Flow analyzer scaffolding (`computeVarsInScope`)
+
+Create `src/attractor/core/flow-analyzer.ts`. The analyzer walks the DAG and computes per-node "vars in scope" — the **intersection** across all paths from start to that node of the union of upstream produced sets. A var is in scope at node N only if every path to N produces it.
+
+**Algorithm:** Topological-order pass with set-merge at converging nodes:
+1. Initialize `varsInScope[start] = callerInputs` (the `inputs="..."` on the digraph).
+2. For each node in topo order: `varsInScope[node] = ⋂(varsInScope[pred] ∪ produces[pred])` over all `pred` that have an edge to `node`. (Intersection across predecessors — pessimistic, models "every path must produce".) For nodes with `default_<key>=`, the key is added to the in-scope set unconditionally.
+3. Cycles (retry loops): break by treating back-edges as "no contribution" on the first pass. (D5 doesn't require fixed-point iteration; the validator can warn if a back-edge node introduces a key its forward-path predecessors don't.)
+
+- [ ] **Step 1: Write failing tests with synthetic graph fixtures**
+
+Create `src/attractor/tests/flow-analyzer.test.ts`:
+
+```typescript
+import { describe, it, expect } from "vitest";
+import { computeVarsInScope } from "../core/flow-analyzer.js";
+import type { Graph } from "../types.js";
+
+function mkGraph(
+  nodes: { id: string; produces?: string[]; defaults?: string[] }[],
+  edges: [string, string][],
+  callerInputs: string[] = [],
+): { graph: Graph; nodeProduces: Map<string, Set<string>> } {
+  const nodeMap = new Map();
+  const nodeProduces = new Map<string, Set<string>>();
+  for (const n of nodes) {
+    const nodeObj: any = { id: n.id, sourceLocation: { line: 1, file: "test.dot" } };
+    for (const d of n.defaults ?? []) {
+      // Use snake_case key form — matches actual Node attribute shape
+      nodeObj[`default_${d}`] = "x";
+    }
+    nodeMap.set(n.id, nodeObj);
+    nodeProduces.set(n.id, new Set(n.produces ?? []));
+  }
+  const graph: Graph = {
+    nodes: nodeMap,
+    edges: edges.map(([from, to]) => ({ from, to, sourceLocation: { line: 1, file: "test.dot" } })),
+    inputs: callerInputs,
+  } as any;
+  return { graph, nodeProduces };
+}
+
+describe("computeVarsInScope", () => {
+  it("linear chain: each node sees union of upstream produces", () => {
+    const { graph, nodeProduces } = mkGraph(
+      [
+        { id: "start" },
+        { id: "a", produces: ["foo"] },
+        { id: "b", produces: ["bar"] },
+        { id: "c" },
+        { id: "exit" },
+      ],
+      [["start", "a"], ["a", "b"], ["b", "c"], ["c", "exit"]],
+    );
+    const scope = computeVarsInScope(graph, nodeProduces);
+    expect(scope.get("a")).toEqual(new Set());
+    expect(scope.get("b")).toEqual(new Set(["foo"]));
+    expect(scope.get("c")).toEqual(new Set(["foo", "bar"]));
+  });
+
+  it("converging branches: intersection — only vars produced on EVERY path are in scope", () => {
+    const { graph, nodeProduces } = mkGraph(
+      [
+        { id: "start" },
+        { id: "a", produces: ["foo", "bar"] },
+        { id: "b", produces: ["foo"] },
+        { id: "c" },
+        { id: "exit" },
+      ],
+      [["start", "a"], ["start", "b"], ["a", "c"], ["b", "c"], ["c", "exit"]],
+    );
+    const scope = computeVarsInScope(graph, nodeProduces);
+    expect(scope.get("c")).toEqual(new Set(["foo"]));
+  });
+
+  it("default_<key>= adds the key unconditionally, even when not all branches produce", () => {
+    const { graph, nodeProduces } = mkGraph(
+      [
+        { id: "start" },
+        { id: "a", produces: ["foo"] },
+        { id: "b" },
+        { id: "c", defaults: ["foo"] },
+        { id: "exit" },
+      ],
+      [["start", "a"], ["start", "b"], ["a", "c"], ["b", "c"], ["c", "exit"]],
+    );
+    const scope = computeVarsInScope(graph, nodeProduces);
+    expect(scope.get("c")).toContain("foo");
+  });
+
+  it("caller inputs are in scope from start onwards", () => {
+    const { graph, nodeProduces } = mkGraph(
+      [
+        { id: "start" },
+        { id: "a" },
+        { id: "exit" },
+      ],
+      [["start", "a"], ["a", "exit"]],
+      ["project", "run_id"],
+    );
+    const scope = computeVarsInScope(graph, nodeProduces);
+    expect(scope.get("a")).toEqual(new Set(["project", "run_id"]));
+  });
+
+  it("cycle (retry loop): back-edge does not contribute to forward scope", () => {
+    const { graph, nodeProduces } = mkGraph(
+      [
+        { id: "start" },
+        { id: "a", produces: ["foo"] },
+        { id: "b", produces: ["bar"] },
+        { id: "exit" },
+      ],
+      [["start", "a"], ["a", "b"], ["b", "a"], ["b", "exit"]],
+    );
+    const scope = computeVarsInScope(graph, nodeProduces);
+    expect(scope.get("a")).toEqual(new Set());
+    expect(scope.get("b")).toEqual(new Set(["foo"]));
+  });
+});
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+```bash
+npx vitest run src/attractor/tests/flow-analyzer.test.ts
+```
+
+Expected: FAIL — module does not exist.
+
+- [ ] **Step 3: Implement `flow-analyzer.ts`**
+
+Create `src/attractor/core/flow-analyzer.ts`:
+
+```typescript
+import type { Graph } from "../types.js";
+
+/**
+ * Compute the set of variable names in scope at each node.
+ *
+ * "In scope at N" means: there is some declaration on every path from the start
+ * node to N that makes the variable available. This is the intersection
+ * across predecessors of (predecessor's in-scope ∪ predecessor's produces).
+ *
+ * Caller inputs (graph.inputs) are in scope from the start node onward.
+ *
+ * default_<key>= on a node adds that key to its in-scope set unconditionally,
+ * regardless of whether incoming branches produce it.
+ *
+ * Cycles are handled by computing a forward-only topological order; back-edges
+ * do not contribute on the first pass. Retry-loop branches (e.g. implement →
+ * implement on agent.success=false) thus see only their forward-path scope.
+ */
+export function computeVarsInScope(
+  graph: Graph,
+  nodeProduces: Map<string, Set<string>>,
+): Map<string, Set<string>> {
+  const { nodes, edges } = graph;
+  const callerInputs = new Set<string>(
+    Array.isArray((graph as any).inputs) ? (graph as any).inputs : [],
+  );
+
+  const fwd = new Map<string, string[]>();
+  const rev = new Map<string, string[]>();
+  for (const id of nodes.keys()) { fwd.set(id, []); rev.set(id, []); }
+  for (const e of edges) {
+    if (fwd.has(e.from) && fwd.has(e.to)) {
+      fwd.get(e.from)!.push(e.to);
+      rev.get(e.to)!.push(e.from);
+    }
+  }
+
+  const inDegree = new Map<string, number>();
+  for (const [id, preds] of rev) inDegree.set(id, preds.length);
+  const startId = [...nodes.values()].find(n =>
+    n.shape === "Mdiamond" || n.id === "start"
+  )?.id;
+  const queue: string[] = startId ? [startId] : [];
+  const topo: string[] = [];
+  const visitedIn = new Map(inDegree);
+  while (queue.length > 0) {
+    const cur = queue.shift()!;
+    topo.push(cur);
+    for (const next of fwd.get(cur) ?? []) {
+      const d = (visitedIn.get(next) ?? 0) - 1;
+      visitedIn.set(next, d);
+      if (d <= 0) queue.push(next);
+    }
+  }
+  for (const id of nodes.keys()) {
+    if (!topo.includes(id)) topo.push(id);
+  }
+
+  const scope = new Map<string, Set<string>>();
+  for (const id of topo) {
+    const node = nodes.get(id);
+    if (!node) continue;
+
+    let nodeScope: Set<string>;
+    if (id === startId) {
+      nodeScope = new Set(callerInputs);
+    } else {
+      const visitedPreds = (rev.get(id) ?? []).filter(p => scope.has(p));
+      if (visitedPreds.length === 0) {
+        nodeScope = new Set();
+      } else {
+        let intersected: Set<string> | null = null;
+        for (const pred of visitedPreds) {
+          const predUnion = new Set([
+            ...scope.get(pred)!,
+            ...(nodeProduces.get(pred) ?? []),
+          ]);
+          if (intersected === null) {
+            intersected = new Set(predUnion);
+          } else {
+            for (const v of [...intersected]) {
+              if (!predUnion.has(v)) intersected.delete(v);
+            }
+          }
+        }
+        nodeScope = intersected ?? new Set();
+      }
+    }
+
+    for (const attrKey of Object.keys(node)) {
+      if (attrKey.startsWith("default_") && attrKey.length > 8) {
+        nodeScope.add(attrKey.slice(8));
+      }
+    }
+
+    scope.set(id, nodeScope);
+  }
+
+  return scope;
+}
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+```bash
+npx vitest run src/attractor/tests/flow-analyzer.test.ts
+```
+
+Expected: PASS for all 5 tests. The key form for default-attributes (snake_case `default_foo` vs camelCase `defaultFoo`) must match how `parseDot` actually exposes them — verify via the existing `Node` type before locking the test.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/attractor/core/flow-analyzer.ts src/attractor/tests/flow-analyzer.test.ts
+git commit -m "feat(validator): flow-analyzer computes per-node varsInScope"
+```
+
+### Task 2.6: Validator rule `missing_input_producer` (replaces `debugProducedKeys`)
+
+Now the analyzer is in place, replace the Chunk-1 `debugProducedKeys` hack with the real diagnostic. An agent node's declared `inputs:` keys must all appear in the node's `varsInScope` set; otherwise emit `missing_input_producer` (error).
+
+- [ ] **Step 1: Read the current debug scaffold**
+
+```bash
+sed -n '388,394p' src/attractor/core/graph.ts
+```
+
+Expected: the `(graph as any).debugProducedKeys = nodeProduces` line.
+
+- [ ] **Step 2: Write failing test**
+
+Create `src/attractor/tests/graph-inputs-flow.test.ts`:
+
+```typescript
+import { describe, it, expect } from "vitest";
+import { writeFileSync, mkdirSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
+import { parseDot, validateGraph } from "../core/graph.js";
+
+describe("validator — missing_input_producer", () => {
+  it("errors when an agent's declared input has no producer on every path", () => {
+    const dir = join(tmpdir(), `mip-${Date.now()}`);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "consumer.md"), `---
+name: consumer
+description: needs foo
+inputs:
+  - foo
+---
+body
+`);
+    const dot = `digraph g {
+      inputs="project"
+      start [shape=Mdiamond]
+      c [agent="consumer"]
+      done [shape=Msquare]
+      start -> c -> done
+    }`;
+    writeFileSync(join(dir, "p.dot"), dot);
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    const d = diags.find(d => d.rule === "missing_input_producer");
+    expect(d).toBeDefined();
+    expect(d!.severity).toBe("error");
+    expect(d!.message).toMatch(/foo/);
+  });
+
+  it("does not fire when an upstream node produces the input", () => {
+    const dir = join(tmpdir(), `mip-ok-${Date.now()}`);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "producer.md"), `---
+name: producer
+description: produces foo
+outputs:
+  foo: string
+---
+body
+`);
+    writeFileSync(join(dir, "consumer.md"), `---
+name: consumer
+description: needs foo
+inputs:
+  - foo
+---
+body
+`);
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      p [agent="producer"]
+      c [agent="consumer"]
+      done [shape=Msquare]
+      start -> p -> c -> done
+    }`;
+    writeFileSync(join(dir, "p.dot"), dot);
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    expect(diags.find(d => d.rule === "missing_input_producer")).toBeUndefined();
+  });
+
+  it("caller-input on the digraph satisfies the requirement", () => {
+    const dir = join(tmpdir(), `mip-caller-${Date.now()}`);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "consumer.md"), `---
+name: consumer
+description: needs project
+inputs:
+  - project
+---
+body
+`);
+    const dot = `digraph g {
+      inputs="project"
+      start [shape=Mdiamond]
+      c [agent="consumer"]
+      done [shape=Msquare]
+      start -> c -> done
+    }`;
+    writeFileSync(join(dir, "p.dot"), dot);
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    expect(diags.find(d => d.rule === "missing_input_producer")).toBeUndefined();
+  });
+});
+```
+
+- [ ] **Step 3: Run test to verify it fails**
+
+```bash
+npx vitest run src/attractor/tests/graph-inputs-flow.test.ts -t "missing_input_producer"
+```
+
+Expected: FAIL — rule doesn't exist.
+
+- [ ] **Step 4: Implement the rule and remove `debugProducedKeys`**
+
+In `src/attractor/core/graph.ts`, before `(graph as any).debugProducedKeys = ...` at `:391`, add an import and rule block:
+
+```typescript
+import { computeVarsInScope } from "./flow-analyzer.js";
+
+// ... inside validateGraph, after the nodeProduces loop:
+
+const varsInScope = computeVarsInScope(graph, nodeProduces);
+
+for (const [id, node] of nodes) {
+  if (!node.agent || !dotDir) continue;
+  let agentConfig;
+  try {
+    agentConfig = resolveAgent(node.agent as string, { projectDir: dotDir });
+  } catch {
+    continue;
+  }
+  if (!agentConfig.inputs) continue;
+  const scope = varsInScope.get(id) ?? new Set<string>();
+  for (const inputKey of agentConfig.inputs) {
+    if (!scope.has(inputKey)) {
+      diags.push({
+        rule: "missing_input_producer",
+        severity: "error",
+        message: `Agent "${node.agent}" at node "${id}" requires input "${inputKey}" but no upstream node produces it on every path. Either route through a producer, declare default_${inputKey}= on this node, or add "${inputKey}" to the digraph's inputs="..." for caller-supplied vars.`,
+        location: node.sourceLocation,
+      });
+    }
+  }
+}
+```
+
+Remove the line:
+
+```typescript
+(graph as any).debugProducedKeys = nodeProduces;
+```
+
+…and the TODO comment above it.
+
+- [ ] **Step 5: Run test to verify it passes**
+
+```bash
+npx vitest run src/attractor/tests/graph-inputs-flow.test.ts -t "missing_input_producer"
+```
+
+Expected: PASS.
+
+- [ ] **Step 6: Update Chunk-1 fallout — `graph-outputs-derives-produces.test.ts`**
+
+The Chunk-1 test file uses `(graph as any).debugProducedKeys`. Replace those assertions with `missing_input_producer` observations: synthesize a downstream `inputs: [<key>]` consumer and assert NO `missing_input_producer` is emitted (proving the derivation works).
+
+```bash
+npx vitest run src/attractor/tests/graph-outputs-derives-produces.test.ts
+```
+
+Expected: PASS after refactor.
+
+- [ ] **Step 7: Run full validator suite**
+
+```bash
+npx vitest run src/attractor/tests/graph
+```
+
+Expected: all green.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add src/attractor/core/graph.ts src/attractor/tests/graph-inputs-flow.test.ts src/attractor/tests/graph-outputs-derives-produces.test.ts
+git commit -m "feat(validator): missing_input_producer (replaces debugProducedKeys hack)"
+```
+
+### Task 2.7: Validator rule `branch_incomplete_input`
+
+When some (but not all) paths to a consumer produce an input key, emit `branch_incomplete_input` — UNLESS the consumer has `default_<key>=`. (Distinct from `missing_input_producer`, which fires when NO path produces the key.)
+
+- [ ] **Step 1: Add failing tests to `graph-inputs-flow.test.ts`** for the partial-branch case + the `default_<key>=` suppression case.
+
+- [ ] **Step 2 — 5: Standard TDD pattern** (run-fail → implement → run-pass).
+
+The implementation in `graph.ts` modifies the input-check loop from Task 2.6: when `scope.has(inputKey)` is FALSE, distinguish between "no producer anywhere" (→ `missing_input_producer`) and "some predecessor union has it but the intersection doesn't" (→ `branch_incomplete_input`). Compute `someProducerExists = ∃ predecessor whose forward set has the key`.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git commit -m "feat(validator): branch_incomplete_input rule"
+```
+
+### Task 2.8: Validator rule `input_type_mismatch`
+
+When a downstream `condition="key=value"` references an output key, validate that `value` is in the producer's `enum` (when the output declares one). Catches typos like `condition="preferred_label=tru"`.
+
+- [ ] **Step 1 — 6: Standard TDD cycle.**
+
+The implementation walks `graph.edges` looking for `edge.condition === "<key>=<value>"`. Look up the producing node (any node in `varsInScope[edge.from]`'s producer set with `outputs[key]`), check `outputs[key].enum` if present, error if `value` is not a member.
+
+**Pre-step:** Verify `graph.ts` parses `condition=` into structured LHS/RHS. If not, the parser (or the rule itself) needs a small split-on-`=` helper. Capture in chunk's surprises if more invasive than expected.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git commit -m "feat(validator): input_type_mismatch rule (enum value check)"
+```
+
+### Task 2.9: Validator rule `orphan_output` (warning)
+
+When an agent's `outputs:` includes a key that no downstream node consumes (via `inputs:` or `condition=`), emit a warning. Catches stale schema entries.
+
+- [ ] **Step 1 — 6: Standard TDD cycle.**
+
+Implementation: collect all consumed keys (downstream `inputs:` declarations + `condition="key=val"` references + `$key` references in prompts/labels). For each `outputs[key]` not in the consumed set, emit `orphan_output` warning.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git commit -m "feat(validator): orphan_output warning"
+```
+
+### Task 2.10: Validator rule `required_caller_vars` (info-level banner)
+
+Compute the set of vars NOT produced internally that the pipeline expects. Result = required `--var` keys. Print at the top of `pipeline validate` output as an info-level diagnostic.
+
+- [ ] **Step 1 — 6: Standard TDD cycle.**
+
+Implementation: at the end of `validateGraph`, compute `required = (callerInputs ∪ consumed_at_any_node) MINUS internally_produced_anywhere`. Emit a single diagnostic with `severity: "info"`, `rule: "required_caller_vars"`, message lists keys.
+
+**Pre-step:** Verify the CLI's `pipeline validate` command (`src/cli/commands/pipeline.ts` or similar) prints info-level diagnostics. If it filters to `warning|error`, patch the print-loop in the same task. Capture in chunk's surprises if invasive.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git commit -m "feat(validator): required_caller_vars info banner"
+```
+
+### Task 2.11: Migrate `verifier.md` to declare `inputs:`
+
+Now that all five rules are in place, migrate the verifier. Per `pipelines/illumination-to-implementation.dot:10`, the verifier's prompt references `$refinements`, `$illuminations_dir`, `$illumination_path`, `$run_id`. Declare these.
+
+- [ ] **Step 1: Inspect current frontmatter**
+
+```bash
+sed -n '1,25p' src/cli/agents/verifier.md
+```
+
+- [ ] **Step 2: Add `inputs:` block**
+
+Modify `src/cli/agents/verifier.md` frontmatter — between `mcp:` and `outputs:`:
+
+```yaml
+inputs:
+  - illuminations_dir
+  - illumination_path
+  - refinements
+  - run_id
+```
+
+- [ ] **Step 3: Run `pipeline validate` against the modified pipeline**
+
+```bash
+npm run build
+node dist/cli/index.js pipeline validate pipelines/illumination-to-implementation.dot
+```
+
+Expected: validates green. The `inputs:` declaration is satisfied because:
+- `illuminations_dir` is in the digraph's `inputs="project, illuminations_dir, ..."` (caller-supplied).
+- `illumination_path` and `refinements` have `default_*=` on the verifier node.
+- `run_id` is in `RESERVED_VARS`.
+
+If any rule fires unexpectedly: that's a real flow error to address before committing — do NOT loosen the rule to silence it.
+
+- [ ] **Step 4: Live-run the migrated pipeline** (mirror Task 1.6 Step 7 — scratch project, ~30 second cap).
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/cli/agents/verifier.md
+git commit -m "feat(verifier): declare inputs: in frontmatter (D5 migration)"
+```
+
+### Task 2.12: Test against `illumination-to-implementation.dot`'s full topology
+
+The pipeline has conditional edges (`preferred_label=true|false|empty`), retry loops (`implement → implement on agent.success=false`), default fallbacks (`default_refinements=""`, `default_test_result=""`), gates with multi-choice `label=`s, and chat loop-back edges (`chat_summarizer → verifier`). Lock the validator's behavior on this real-world graph.
+
+- [ ] **Step 1: Write integration test**
+
+Create `src/attractor/tests/illumination-pipeline-flow.test.ts`:
+
+```typescript
+import { describe, it, expect } from "vitest";
+import { readFileSync } from "fs";
+import { resolve } from "path";
+import { parseDot, validateGraph } from "../core/graph.js";
+
+describe("illumination-to-implementation.dot — full flow validation", () => {
+  it("validates clean (no errors) on the live pipeline post-migration", () => {
+    const root = resolve(__dirname, "../../..");
+    const dotPath = resolve(root, "pipelines/illumination-to-implementation.dot");
+    const dotDir = resolve(root, "pipelines");
+    const dot = readFileSync(dotPath, "utf-8");
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dotDir);
+    const errors = diags.filter(d => d.severity === "error");
+    expect(errors).toEqual([]);
+  });
+
+  it("emits required_caller_vars info banner listing project, illuminations_dir, etc.", () => {
+    // assertion on info-level diagnostic
+  });
+
+  it("does NOT emit branch_incomplete_input for $refinements (covered by default_refinements=)", () => {
+    // assertion
+  });
+
+  it("retry loop on implement does NOT trip flow rules", () => {
+    // The implement → implement cycle. Back-edge is ignored by the analyzer.
+    // assertion
+  });
+});
+```
+
+- [ ] **Step 2 — 5: TDD cycle.** If the live pipeline fails any rule, that's a real bug to address before locking the test.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git commit -m "test(pipeline): full-topology validation of illumination-to-implementation.dot"
+```
+
+### Task 2.13: Chunk-2 review checkpoint
+
+- [ ] **Step 1: Verify the success criteria for the chunk**
+
+Check that:
+1. `produces_redundant_with_outputs` errors on subset/superset/disjoint, not just exact match (Task 2.1)
+2. `resolveAgent("verifier", { bundledDir })` end-to-end test in place (Task 2.2)
+3. `AgentConfig.inputs?: string[]` carries through frontmatter → registry → AgentConfig (Tasks 2.3, 2.4)
+4. `flow-analyzer.ts` exports `computeVarsInScope` with correct intersection-at-converging-branches semantics (Task 2.5)
+5. `missing_input_producer` rule is in place; `debugProducedKeys` hack is removed (Task 2.6)
+6. `branch_incomplete_input`, `input_type_mismatch`, `orphan_output`, `required_caller_vars` rules are in place (Tasks 2.7 — 2.10)
+7. `verifier.md` declares `inputs:`; pipeline validates green (Task 2.11)
+8. Full-topology test against `illumination-to-implementation.dot` is green (Task 2.12)
+
+- [ ] **Step 2: Run the full test suite**
+
+```bash
+npm run test
+```
+
+Expected: all green.
+
+- [ ] **Step 3: Hand off chunk to plan-document-reviewer for review.**
+
+- [ ] **Step 4: Tag the chunk in git**
+
+```bash
+git tag chunk-2-inputs-flow-validator
+```
+
+**Surprises to capture in Chunk-2 memory file** (mirror Chunk 1's pattern):
+- Whether `condition="key=value"` parsing in `graph.ts` exposes the LHS/RHS in a structured form (Task 2.8 prereq).
+- Whether the CLI's `pipeline validate` command currently prints info-level diagnostics (Task 2.10 prereq).
+- Whether any other bundled agent (besides verifier) has `outputs:` and would now trip the broadened `produces_redundant_with_outputs` rule.
 
 ---
 
