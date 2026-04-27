@@ -1,7 +1,9 @@
 ---
 date: 2026-04-13
-status: open
+status: archived
 description: ralph pipeline create teaches DOT syntax to the authoring agent but never tells it to read the target project first — producing generic pipelines that reference placeholder paths instead of real agents, real specs, and real conventions already present in the consumer project.
+archived_at: 2026-04-26
+reason: Steps 3 and 5 already shipped: Graph.inputs and three-tier pipeline-resolver fallback exist
 ---
 
 ## Core Idea
