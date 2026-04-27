@@ -6,7 +6,8 @@ import { parseFrontmatter } from "../lib/frontmatter.js";
 import { validateAgentConfig } from "../lib/agent.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const AGENT_PATH = resolve(__dirname, "../agents/janitor.md");
+// Per-folder layout (Chunk 4): janitor.md lives alongside janitor/pipeline.dot.
+const AGENT_PATH = resolve(__dirname, "../../../pipelines/janitor/janitor.md");
 
 describe("janitor.md — frontmatter contract", () => {
   const raw = readFileSync(AGENT_PATH, "utf-8");

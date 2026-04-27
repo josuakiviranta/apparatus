@@ -190,7 +190,7 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
     // Derive produces from agent file's outputs block when dotDir is available
     if (node.agent && dotDir) {
       try {
-        const agentConfig = resolveAgent(node.agent as string, { projectDir: dotDir });
+        const agentConfig = resolveAgent(node.agent as string, { projectDir: dotDir, allowBundledFallback: false });
         if (agentConfig.outputs) {
           for (const key of Object.keys(agentConfig.outputs)) {
             produced.add(key);
@@ -506,7 +506,7 @@ function checkInputTypeMismatch(
 function tryResolveAgent(node: Node, dotDir: string | undefined): AgentConfig | undefined {
   if (!node.agent) return undefined;
   try {
-    return resolveAgent(node.agent as string, { projectDir: dotDir });
+    return resolveAgent(node.agent as string, { projectDir: dotDir, allowBundledFallback: false });
   } catch {
     return undefined;
   }

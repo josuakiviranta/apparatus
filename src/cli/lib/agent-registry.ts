@@ -16,6 +16,12 @@ export interface RegistryOptions {
   bundledDir?: string;
   /** Optional project-local agents dir, searched before userDir/bundledDir. */
   projectDir?: string;
+  /**
+   * When false, skips the bundled-agents fallback (and the copy-on-read into
+   * userDir). Pipeline runtime passes false so a missing per-folder agent
+   * errors out instead of silently using `src/cli/agents/`. Default: true.
+   */
+  allowBundledFallback?: boolean;
 }
 
 export interface AgentInfo {
@@ -56,11 +62,13 @@ export function resolveAgent(
     return parseAgentFile(readFileSync(userPath, "utf-8"));
   }
 
-  const bundledPath = join(bundledDir, `${name}.md`);
-  if (existsSync(bundledPath)) {
-    mkdirSync(userDir, { recursive: true });
-    copyFileSync(bundledPath, userPath);
-    return parseAgentFile(readFileSync(bundledPath, "utf-8"));
+  if (opts?.allowBundledFallback !== false) {
+    const bundledPath = join(bundledDir, `${name}.md`);
+    if (existsSync(bundledPath)) {
+      mkdirSync(userDir, { recursive: true });
+      copyFileSync(bundledPath, userPath);
+      return parseAgentFile(readFileSync(bundledPath, "utf-8"));
+    }
   }
 
   throw new Error(`Unknown agent: "${name}"`);

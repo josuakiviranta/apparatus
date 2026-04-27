@@ -128,7 +128,10 @@ describe("AgentHandler", () => {
     );
 
     expect(outcome.status).toBe("success");
-    expect(mockResolve).toHaveBeenCalledWith("implement", expect.objectContaining({ projectDir: undefined }));
+    expect(mockResolve).toHaveBeenCalledWith(
+      "implement",
+      expect.objectContaining({ allowBundledFallback: false }),
+    );
   });
 
   it("returns fail when agent resolution fails", async () => {
