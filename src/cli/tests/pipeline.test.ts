@@ -43,9 +43,6 @@ vi.mock("../lib/assets.js", () => ({
   getBundledPipelinePath: vi.fn((name: string) => `/fake/pipelines/${name}.dot`),
   resolveBundledTemplate: vi.fn((name: string) => `/fake/templates/${name}/pipeline.dot`),
 }));
-vi.mock("../lib/pipeline-create-prompt.js", () => ({
-  composeCreatePrompt: vi.fn().mockReturnValue("# Test prompt"),
-}));
 vi.mock("../lib/stream-formatter.js", () => ({
   streamEvents: vi.fn(async function* () {}),
   parseStreamJsonEvents: vi.fn(async function* () {}),

@@ -28,10 +28,6 @@ export function getMeditateCreatePromptPath(): string {
   return getAssetPath(join("prompts", "PROMPT_meditate_create.md"));
 }
 
-export function getPipelineCreatePromptPath(): string {
-  return getAssetPath(join("prompts", "PROMPT_pipeline_create.md"));
-}
-
 export function getBundledAgentsDir(): string {
   return getAssetPath("agents");
 }
