@@ -1763,17 +1763,19 @@ CLI print loop patched in `src/cli/commands/pipeline.ts:215,219` — info diagno
 
 Commit: `b7e5692`. All 1176 tests pass; typecheck clean.
 
-### Task 2.11: Migrate `verifier.md` to declare `inputs:`
+### Task 2.11: Migrate `verifier.md` to declare `inputs:` — SHIPPED 2026-04-27
 
 Now that all five rules are in place, migrate the verifier. Per `pipelines/illumination-to-implementation.dot:10`, the verifier's prompt references `$refinements`, `$illuminations_dir`, `$illumination_path`, `$run_id`. Declare these.
 
-- [ ] **Step 1: Inspect current frontmatter**
+- [x] **Step 1: Inspect current frontmatter**
 
 ```bash
 sed -n '1,25p' src/cli/agents/verifier.md
 ```
 
-- [ ] **Step 2: Add `inputs:` block**
+Confirmed: frontmatter had `name`, `description`, `model`, `permissionMode`, `tools`, `mcp`, `outputs` — no `inputs:` block.
+
+- [x] **Step 2: Add `inputs:` block**
 
 Modify `src/cli/agents/verifier.md` frontmatter — between `mcp:` and `outputs:`:
 
@@ -1785,28 +1787,25 @@ inputs:
   - run_id
 ```
 
-- [ ] **Step 3: Run `pipeline validate` against the modified pipeline**
+- [x] **Step 3: Run `pipeline validate` against the modified pipeline**
 
 ```bash
 npm run build
 node dist/cli/index.js pipeline validate pipelines/illumination-to-implementation.dot
 ```
 
-Expected: validates green. The `inputs:` declaration is satisfied because:
-- `illuminations_dir` is in the digraph's `inputs="project, illuminations_dir, ..."` (caller-supplied).
-- `illumination_path` and `refinements` have `default_*=` on the verifier node.
-- `run_id` is in `RESERVED_VARS`.
+Result: `✔ Pipeline valid (18 nodes, 27 edges)` — zero errors. Pre-existing `variable_coverage` warnings present (unrelated to this task). No `inputs_undeclared` errors for verifier node.
 
-If any rule fires unexpectedly: that's a real flow error to address before committing — do NOT loosen the rule to silence it.
+- [ ] **Step 4: Live-run the migrated pipeline** (mirror Task 1.6 Step 7 — scratch project, ~30 second cap). SKIPPED — validate passed cleanly; live-run skipped per task instructions to avoid spawning external Claude sessions in sandbox.
 
-- [ ] **Step 4: Live-run the migrated pipeline** (mirror Task 1.6 Step 7 — scratch project, ~30 second cap).
-
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/cli/agents/verifier.md
 git commit -m "feat(verifier): declare inputs: in frontmatter (D5 migration)"
 ```
+
+Commit: `534b1ea`.
 
 ### Task 2.12: Test against `illumination-to-implementation.dot`'s full topology
 
