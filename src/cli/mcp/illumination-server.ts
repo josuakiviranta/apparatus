@@ -235,7 +235,7 @@ export function markArchived(
   updatedFm += `\narchived_at: ${today}`;
   updatedFm += `\narchive_reason: ${reason}`;
 
-  const archiveDir = join(illumDir, "archive");
+  const archiveDir = join(projectRoot, "meditations", "archived-illuminations");
   mkdirSync(archiveDir, { recursive: true });
 
   const archivePath = join(archiveDir, filename);
@@ -260,7 +260,7 @@ export function markArchived(
     filename,
     previous_status: currentStatus,
     new_status: "archived",
-    archive_path: join("meditations", "illuminations", "archive", filename),
+    archive_path: join("meditations", "archived-illuminations", filename),
   };
 }
 

@@ -945,16 +945,16 @@ describe("markArchived", () => {
     if (result.success) {
       expect(result.previous_status).toBe("open");
       expect(result.new_status).toBe("archived");
-      expect(result.archive_path).toContain("archive/T2000-open.md");
+      expect(result.archive_path).toContain("archived-illuminations/T2000-open.md");
     }
 
     // File moved to archive
     expect(existsSync(join(tmpDir, "meditations", "illuminations", "T2000-open.md"))).toBe(false);
-    expect(existsSync(join(tmpDir, "meditations", "illuminations", "archive", "T2000-open.md"))).toBe(true);
+    expect(existsSync(join(tmpDir, "meditations", "archived-illuminations", "T2000-open.md"))).toBe(true);
 
     // Frontmatter updated
     const written = readFileSync(
-      join(tmpDir, "meditations", "illuminations", "archive", "T2000-open.md"),
+      join(tmpDir, "meditations", "archived-illuminations", "T2000-open.md"),
       "utf-8"
     );
     expect(written).toMatch(/status: archived/);
@@ -1024,11 +1024,11 @@ describe("markArchived", () => {
       "Body."
     );
 
-    expect(existsSync(join(tmpDir, "meditations", "illuminations", "archive"))).toBe(false);
+    expect(existsSync(join(tmpDir, "meditations", "archived-illuminations"))).toBe(false);
 
     markArchived(tmpDir, "T2400-new-archive.md", "Testing archive creation");
 
-    expect(existsSync(join(tmpDir, "meditations", "illuminations", "archive"))).toBe(true);
+    expect(existsSync(join(tmpDir, "meditations", "archived-illuminations"))).toBe(true);
   });
 
   it("preserves body content unchanged", () => {
@@ -1042,7 +1042,7 @@ describe("markArchived", () => {
     markArchived(tmpDir, "T2500-preserve.md", "Done");
 
     const written = readFileSync(
-      join(tmpDir, "meditations", "illuminations", "archive", "T2500-preserve.md"),
+      join(tmpDir, "meditations", "archived-illuminations", "T2500-preserve.md"),
       "utf-8"
     );
     expect(written).toContain(body);
@@ -1063,10 +1063,10 @@ describe("markArchived", () => {
     expect(calls[0]).toContain("git -C");
     expect(calls[0]).toContain("add");
     expect(calls[0]).toContain("T2600-commit-archive.md");
-    expect(calls[0]).not.toContain("archive/T2600-commit-archive.md");
+    expect(calls[0]).not.toContain("archived-illuminations/T2600-commit-archive.md");
     expect(calls[1]).toContain("git -C");
     expect(calls[1]).toContain("add");
-    expect(calls[1]).toContain("archive/T2600-commit-archive.md");
+    expect(calls[1]).toContain("archived-illuminations/T2600-commit-archive.md");
     expect(calls[2]).toContain("commit");
     expect(calls[2]).toContain("meditate: archive T2600-commit-archive.md");
   });
@@ -1084,7 +1084,7 @@ describe("markArchived", () => {
     const result = markArchived(tmpDir, "T2700-archive-fail-open.md", "Reason");
     expect(result.success).toBe(true);
     // File still moved to archive even when git fails
-    expect(existsSync(join(tmpDir, "meditations", "illuminations", "archive", "T2700-archive-fail-open.md"))).toBe(true);
+    expect(existsSync(join(tmpDir, "meditations", "archived-illuminations", "T2700-archive-fail-open.md"))).toBe(true);
   });
 });
 
