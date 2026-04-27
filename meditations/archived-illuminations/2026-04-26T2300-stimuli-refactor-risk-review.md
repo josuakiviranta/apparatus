@@ -2,6 +2,9 @@
 source: review
 date: 2026-04-26
 description: Risk and UX review of the meditations/stimuli/ refactor plan
+status: archived
+archived_at: 2026-04-27
+reason: Stimuli refactor recommendations already shipped in v0.1.39 - all four files updated
 ---
 
 # Stimuli Refactor — Risk & UX Review
