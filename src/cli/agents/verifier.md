@@ -16,6 +16,11 @@ mcp:
     args:
       - "{{ILLUMINATION_SERVER_PATH}}"
       - "{{PROJECT_ROOT}}"
+inputs:
+  - illuminations_dir
+  - illumination_path
+  - refinements
+  - run_id
 outputs:
   preferred_label: {enum: ["true", "false", empty]}
   illumination_path: string
