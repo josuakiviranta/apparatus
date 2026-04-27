@@ -3428,7 +3428,9 @@ Also cleaned: `getPipelineCreatePromptPath` in `assets.ts` (orphaned) + stale `v
 
 ---
 
-### Sub-chunk 6f: docs + folder cleanup
+### Sub-chunk 6f: docs + folder cleanup — SHIPPED 2026-04-28
+
+**Commits:** `1440a4f` (6f.1) → `55f7a16` (6f.2) → `9cbe729` (6f.3) → `5d25680` (6f.4) → `cc6b872` (6g code-review fixups: stale AGENTS.md + README.md refs).
 
 #### Task 6f.1: Delete `src/cli/prompts/`
 
@@ -3493,14 +3495,14 @@ Also cleaned: `getPipelineCreatePromptPath` in `assets.ts` (orphaned) + stale `v
 
 ---
 
-### Sub-chunk 6g: Chunk-6 review checkpoint
+### Sub-chunk 6g: Chunk-6 review checkpoint — SHIPPED 2026-04-28
 
-- [ ] **Step 1**: full test sweep — `npx vitest run` and `npx tsc --noEmit`.
-- [ ] **Step 2**: build + smoke — `npm run build`, then `node dist/cli/index.js pipeline validate dist/templates/<name>/pipeline.dot` for each of the new templates (`plan`, `meditate`, `meditate-create`, `new`, `pipeline-refine`). Each should report `✔ Pipeline valid`; tolerate `orphan_output` warnings on agents whose value is a side-effect.
-- [ ] **Step 3**: dispatch `superpowers:code-reviewer` against the chunk's commits + spec D8.
-- [ ] **Step 4**: address feedback in-chunk.
-- [ ] **Step 5**: tag `chunk-6-command-templates` + bump `package.json` patch version, then `git push --follow-tags` (matches Task 5.8 procedure — tag must be visible on origin before memory-writer dispatch).
-- [ ] **Step 6**: dispatch `memory-writer` with the chunk's session transcript per the standard procedure (Plan §"Post-execution memory capture").
+- [x] **Step 1**: full test sweep — `npx vitest run` (1222/1222 green) and `npx tsc --noEmit` (clean).
+- [x] **Step 2**: build + smoke — `npm run build` succeeded; all 5 D8 templates (`plan`, `meditate`, `meditate-create`, `new`, `pipeline-refine`) report `✔ Pipeline valid` with expected `required_caller_vars` info notes.
+- [x] **Step 3**: dispatch `superpowers:code-reviewer` against the chunk's commits + spec D8 → APPROVED_WITH_ISSUES (3 doc nits).
+- [x] **Step 4**: address feedback in-chunk → `cc6b872` fixes AGENTS.md:26,28 + README.md:77.
+- [x] **Step 5**: tag `chunk-6-command-templates` + bump `package.json` patch version (0.1.60 → 0.1.61), then `git push --follow-tags`.
+- [x] **Step 6**: dispatch `memory-writer` with the chunk's session transcript per the standard procedure (Plan §"Post-execution memory capture").
 
 ---
 
