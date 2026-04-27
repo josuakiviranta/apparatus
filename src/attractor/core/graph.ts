@@ -378,7 +378,7 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
           severity: "warning",
           message:
             `Inline script in tool_command= is fragile under DOT quoting. ` +
-            `Move to pipelines/scripts/<name>.<ext> and use script_file=.`,
+            `Move to <pipeline-folder>/<name>.<ext> and use script_file=.`,
           location: node.sourceLocation,
         });
       }
