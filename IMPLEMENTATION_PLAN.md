@@ -54,7 +54,7 @@ The two MCP mutations that physically move the file. `markImplemented` is the la
 - Modify: `src/cli/mcp/illumination-server.ts:196-265`
 - Test: `src/cli/tests/illumination-server.test.ts:917-945` (and ~10 nearby tests with `archive/` path assertions)
 
-- [ ] **Step 1: Read all markArchived tests, list every assertion that hardcodes `archive/`**
+- [x] **Step 1: Read all markArchived tests, list every assertion that hardcodes `archive/`**
 
 ```bash
 grep -n "archive/" src/cli/tests/illumination-server.test.ts
@@ -62,7 +62,7 @@ grep -n "archive/" src/cli/tests/illumination-server.test.ts
 
 Expected: hits at lines 930, 935, 939, ~1009, ~1027, ~1048, ~1051, ~1069. All inside `describe("markArchived"...)`.
 
-- [ ] **Step 2: Bulk-replace `"archive/"` → `"archived-illuminations/"` and `"meditations", "illuminations", "archive"` → `"meditations", "archived-illuminations"` inside the `markArchived` describe block**
+- [x] **Step 2: Bulk-replace `"archive/"` → `"archived-illuminations/"` and `"meditations", "illuminations", "archive"` → `"meditations", "archived-illuminations"` inside the `markArchived` describe block**
 
 Manual edit (do not global-replace — only inside that describe block):
 
@@ -86,12 +86,12 @@ existsSync(join(tmpDir, "meditations", "archived-illuminations", "T2000-open.md"
 
 Same for `readFileSync` calls in the same describe.
 
-- [ ] **Step 3: Run tests, verify failure**
+- [x] **Step 3: Run tests, verify failure**
 
 Run: `npx vitest run src/cli/tests/illumination-server.test.ts -t "markArchived"`
 Expected: most tests FAIL — implementation still writes to old `archive/` subdir.
 
-- [ ] **Step 4: Update `markArchived` implementation**
+- [x] **Step 4: Update `markArchived` implementation**
 
 In `src/cli/mcp/illumination-server.ts:238-241`, replace:
 
@@ -117,17 +117,19 @@ Then update the return at line 263:
     archive_path: join("meditations", "archived-illuminations", filename),
 ```
 
-- [ ] **Step 5: Run tests, verify pass**
+- [x] **Step 5: Run tests, verify pass**
 
 Run: `npx vitest run src/cli/tests/illumination-server.test.ts -t "markArchived"`
 Expected: all PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit** — shipped as `d5beda8`
 
 ```bash
 git add src/cli/mcp/illumination-server.ts src/cli/tests/illumination-server.test.ts
 git commit -m "feat(illumination-server): markArchived writes to meditations/archived-illuminations/"
 ```
+
+**Reviewer follow-up:** `mark_archived` tool description string at `illumination-server.ts:702` still said `archive/ subdirectory`. Patched in commit `1bfbed7` (deferred from Task 2.3 since the description claim must match the now-shipped behavior).
 
 ---
 
@@ -137,7 +139,7 @@ git commit -m "feat(illumination-server): markArchived writes to meditations/arc
 - Modify: `src/cli/mcp/illumination-server.ts:66-131`
 - Test: `src/cli/tests/illumination-server.test.ts:617+` (the `markImplemented` describe block)
 
-- [ ] **Step 1a: Add three new failing tests asserting move + new_path + commit**
+- [x] **Step 1a: Add three new failing tests asserting move + new_path + commit**
 
 In the `markImplemented` describe block, append:
 
@@ -194,7 +196,7 @@ it("auto-commits move with implement message", () => {
 });
 ```
 
-- [ ] **Step 1b: Sweep pre-existing tests for stale "file stays" assertions**
+- [x] **Step 1b: Sweep pre-existing tests for stale "file stays" assertions**
 
 ```bash
 grep -n 'existsSync(join(.*"meditations".*"illuminations".*' src/cli/tests/illumination-server.test.ts
@@ -202,12 +204,12 @@ grep -n 'existsSync(join(.*"meditations".*"illuminations".*' src/cli/tests/illum
 
 For each hit inside the `describe("markImplemented"...)` block (roughly lines 634–733), update assertions of the form `existsSync(...) === true` (file stays in illuminations/) to `existsSync(...) === false` (file gone) plus a paired `existsSync(<implemented-illuminations path>) === true`.
 
-- [ ] **Step 2: Run tests, verify failures**
+- [x] **Step 2: Run tests, verify failures**
 
 Run: `npx vitest run src/cli/tests/illumination-server.test.ts -t "markImplemented"`
 Expected: 3 new tests FAIL plus any pre-existing "stays in place" tests now FAIL.
 
-- [ ] **Step 3: Update `markImplemented` implementation**
+- [x] **Step 3: Update `markImplemented` implementation**
 
 In `src/cli/mcp/illumination-server.ts:66-131`, replace the function body with:
 
@@ -282,12 +284,12 @@ export function markImplemented(
 }
 ```
 
-- [ ] **Step 4: Run all markImplemented tests, verify pass**
+- [x] **Step 4: Run all markImplemented tests, verify pass**
 
 Run: `npx vitest run src/cli/tests/illumination-server.test.ts -t "markImplemented"`
 Expected: all PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit** — shipped as `27b5bab`. 128 tests pass; tsc clean.
 
 ```bash
 git add src/cli/mcp/illumination-server.ts src/cli/tests/illumination-server.test.ts
@@ -301,7 +303,7 @@ git commit -m "feat(illumination-server): markImplemented physically moves file"
 **Files:**
 - Modify: `src/cli/mcp/illumination-server.ts:~549, ~657, ~671` (find by `server.tool(`)
 
-- [ ] **Step 1: Locate the three tool descriptions**
+- [x] **Step 1: Locate the three tool descriptions**
 
 ```bash
 grep -n "server.tool" src/cli/mcp/illumination-server.ts
@@ -309,7 +311,7 @@ grep -n "server.tool" src/cli/mcp/illumination-server.ts
 
 Expected: hits for `write_illumination`, `list_illuminations`, `mark_implemented`, `mark_dispatched`, `mark_archived`.
 
-- [ ] **Step 2: Update `write_illumination` description**
+- [x] **Step 2: Update `write_illumination` description**
 
 Find the description string mentioning `meditations/illuminations/`. Replace with one that explicitly notes the layout:
 
@@ -319,7 +321,7 @@ Find the description string mentioning `meditations/illuminations/`. Replace wit
 "meditations/archived-illuminations/ or meditations/implemented-illuminations/ respectively."
 ```
 
-- [ ] **Step 3: Update `mark_implemented` description**
+- [x] **Step 3: Update `mark_implemented` description**
 
 The current description: `"Mark an illumination as implemented. Valid from status open or dispatched."`. Replace with:
 
@@ -329,21 +331,16 @@ The current description: `"Mark an illumination as implemented. Valid from statu
 "Returns new_path pointing to the new location."
 ```
 
-- [ ] **Step 4: Update `mark_archived` description analogously**
+- [x] **Step 4: Update `mark_archived` description analogously** — already shipped in commit `1bfbed7` as a Task 2.1 reviewer follow-up.
 
 Mention the move target `meditations/archived-illuminations/` and that `archive_path` reflects the new location.
 
-- [ ] **Step 5: Run all illumination-server tests**
+- [x] **Step 5: Run all illumination-server tests** — 128 pass.
 
 Run: `npx vitest run src/cli/tests/illumination-server.test.ts`
 Expected: all PASS (description strings shouldn't be tested by exact match; if they are, update the assertion).
 
-- [ ] **Step 6: Commit**
-
-```bash
-git add src/cli/mcp/illumination-server.ts
-git commit -m "docs(illumination-server): update tool descriptions for new dir layout"
-```
+- [x] **Step 6: Commit** — shipped as `71da769` (write_illumination + mark_implemented descriptions). mark_archived already in `1bfbed7`.
 
 ---
 
@@ -352,21 +349,21 @@ git commit -m "docs(illumination-server): update tool descriptions for new dir l
 **Files:**
 - Modify: `specs/mcp-illumination.md` (lines 29, 38, 86 + return-shape tables)
 
-- [ ] **Step 1: Read the file to find the exact lines and context**
+- [x] **Step 1: Read the file to find the exact lines and context**
 
 ```bash
 sed -n '25,50p;80,100p' specs/mcp-illumination.md
 ```
 
-- [ ] **Step 2: Update line ~29 (write_illumination path)**
+- [x] **Step 2: Update line ~29 (write_illumination path)**
 
 Keep the path as-is (`meditations/illuminations/<filename>`) — `write_illumination` does NOT change. Add a note: *"After lifecycle transitions, files may be moved by `mark_implemented` or `mark_archived` to sibling dirs (see those tool sections)."*
 
-- [ ] **Step 3: Update line ~38 (list_illuminations reads-from)**
+- [x] **Step 3: Update line ~38 (list_illuminations reads-from)**
 
 Replace the single-dir line with the routing table from the design spec §`listIlluminations`.
 
-- [ ] **Step 4: Update line ~86 (mark_implemented modifies-target)**
+- [x] **Step 4: Update line ~86 (mark_implemented modifies-target)**
 
 Replace the existing modifies-frontmatter-only description with:
 
@@ -377,16 +374,24 @@ Replace the existing modifies-frontmatter-only description with:
 - **Returns** `{ success, filename, previous_status, new_status, new_path }`
 ```
 
-- [ ] **Step 5: Add analogous update for `mark_archived` section**
+- [x] **Step 5: Add analogous update for `mark_archived` section**
 
 Find the `mark_archived` section and add the move target + `archive_path` field reference, replacing any mention of `archive/` subdir.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit** — shipped as `8efc831`.
 
-```bash
-git add specs/mcp-illumination.md
-git commit -m "docs(mcp): update illumination contract for status-routed dirs"
-```
+---
+
+## Chunk 2 status: ✅ DONE 2026-04-27
+
+| Task | Commit |
+|---|---|
+| 2.1 markArchived swap target dir | `d5beda8` (+ `1bfbed7` description) |
+| 2.2 markImplemented physically moves file | `27b5bab` |
+| 2.3 Tool description strings | `71da769` (+ `1bfbed7`) |
+| 2.4 specs/mcp-illumination.md updates | `8efc831` |
+
+128 illumination-server tests pass. `tsc --noEmit` clean. Pre-existing `server.tool` deprecation warnings on lines 565–732 are unrelated to this work.
 
 ---
 
