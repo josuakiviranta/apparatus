@@ -6,7 +6,7 @@ digraph conditional_smoke {
   // Agent node produces structured output with a "result" field
   classify [
     agent="task",
-    json_schema_file="schemas/conditional-result.json",
+    json_schema_file="conditional-result.json",
     prompt="You are a classifier. Return JSON with exactly: { \"result\": \"pass\" }. Do NOT use any tools."
   ]
 
