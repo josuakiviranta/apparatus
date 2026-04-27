@@ -3368,7 +3368,9 @@ Under the template model, all three become `--var`-injected strings. The agent b
 
 ---
 
-### Sub-chunk 6e: Task 5.6 deferred dead-code deletions
+### Sub-chunk 6e: Task 5.6 deferred dead-code deletions — SHIPPED 2026-04-28
+
+**Status:** Tasks 6e.1 (`a74a841`) + 6e.2 (`40084c4`) shipped. 1224 vitest tests green; typecheck clean.
 
 **Why now:** with refine and create both retired, the four targets queued by Chunk 5's plan (Task 5.6) have zero callers. Confirm via grep, then delete.
 
@@ -3380,9 +3382,11 @@ Under the template model, all three become `--var`-injected strings. The agent b
 
 **Decision recorded here (defer-or-migrate for `ralph agent create`):** Delete it. With per-pipeline-folder agents (Chunk 4) and the `pipeline create` template scaffolding agents inline as needed, a standalone `ralph agent create` command no longer carries its weight. If a user wants to author agents, they edit `<pipeline>/<agent>.md` by hand — same UX as authoring `pipeline.dot`. If we ever need a guided flow again, it gets reborn as `templates/agent-create/` in a future chunk.
 
-#### Task 6e.1: Delete `composeCreatePrompt` + `PROMPT_pipeline_create.md`
+#### Task 6e.1: Delete `composeCreatePrompt` + `PROMPT_pipeline_create.md` — SHIPPED `a74a841`
 
-- [ ] **Step 1: confirm zero callers**
+Also cleaned: `getPipelineCreatePromptPath` in `assets.ts` (orphaned) + stale `vi.mock("../lib/pipeline-create-prompt.js", ...)` blocks in `pipeline-headless.test.ts`, `pipeline-refine-tip.test.ts`, `pipeline.test.ts`.
+
+- [x] **Step 1: confirm zero callers**
 
   ```sh
   git grep -n composeCreatePrompt src/
@@ -3392,7 +3396,7 @@ Under the template model, all three become `--var`-injected strings. The agent b
 
   All three should return zero hits.
 
-- [ ] **Step 2: delete**
+- [x] **Step 2: delete**
 
   ```sh
   rm src/cli/lib/pipeline-create-prompt.ts
@@ -3400,33 +3404,25 @@ Under the template model, all three become `--var`-injected strings. The agent b
   rm -rf src/cli/tests/pipeline-create-prompt.test.ts  # if exists
   ```
 
-- [ ] **Step 3: typecheck + tests**
+- [x] **Step 3: typecheck + tests**
 
-- [ ] **Step 4: commit**
+- [x] **Step 4: commit**
 
   `chore(pipeline): drop dead composeCreatePrompt + PROMPT_pipeline_create.md (D8 chunk-6e, 5.6 deferred)`
 
-#### Task 6e.2: Delete `agentCreateAction` + `ralph agent create` wiring
+#### Task 6e.2: Delete `agentCreateAction` + `ralph agent create` wiring — SHIPPED `40084c4`
 
-- [ ] **Step 1 (red): remove the test for `agentCreateAction`**
+- [x] **Step 1 (red): remove the test for `agentCreateAction`** — no-op; pre-deletion grep returned no test references.
 
-  Delete `src/cli/tests/agent-create.test.ts` (or whichever file holds those tests; locate via `git grep -l agentCreateAction src/cli/tests/`).
+- [x] **Step 2: remove the command wiring** — also dropped `agentCreateAction` from the `program.ts` import.
 
-- [ ] **Step 2: remove the command wiring**
+- [x] **Step 3: remove `agentCreateAction` from `src/cli/commands/agent.ts`** — kept the file (still exports `agentListAction`, `agentShowAction`); dropped the unused `Agent` import.
 
-  In `src/cli/program.ts`, delete the `agent.command("create").action(...)` block (lines around 291 — confirm exact span at edit time).
+- [x] **Step 4: delete `src/cli/agents/agent-creator.md`**
 
-- [ ] **Step 3: remove `agentCreateAction` from `src/cli/commands/agent.ts`**
+- [x] **Step 5: typecheck + full test run.** — 1224/1224 green.
 
-  If `src/cli/commands/agent.ts` only contained `agentCreateAction` and now becomes empty, delete the file. If it has other actions, leave the file and just drop the export.
-
-- [ ] **Step 4: delete `src/cli/agents/agent-creator.md`**
-
-  Confirm via `git grep -n agent-creator src/` first.
-
-- [ ] **Step 5: typecheck + full test run.**
-
-- [ ] **Step 6: commit**
+- [x] **Step 6: commit**
 
   `chore(agents): drop ralph agent create + agent-creator.md (D8 chunk-6e, 5.6 deferred)`
 
