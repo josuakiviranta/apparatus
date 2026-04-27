@@ -1,7 +1,9 @@
 ---
 date: 2026-04-26
-status: open
+status: archived
 description: T0900's mark_plan_implemented was added to the memory_writer rubric at step 7, but the node prompt's competing 6-step inline procedure terminates at "Return structured JSON" before step 7 ever fires — making the shipped plan-closure inert, and the missing mark_implemented for the illumination side means both closures require one atomic three-change diff to land.
+archived_at: 2026-04-27
+reason: Shadow procedure already removed and mark_implemented already wired in tools and rubric
 ---
 
 ## Core Idea
