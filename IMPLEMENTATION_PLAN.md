@@ -2754,28 +2754,752 @@ No code changes in this task. Resume with Task 5.7.
 
 ---
 
-## Chunk 6: command-to-pipeline conversions (D8) — outline
+## Chunk 6: command-to-pipeline conversions (D8)
 
-**Purpose:** Convert the remaining workflow commands (`plan`, `meditate`, `new`, `pipeline refine`) into thin shims that run bundled templates. Delete the last of `src/cli/agents/` and the entire `src/cli/prompts/` folder.
+**Purpose:** Convert the remaining workflow commands (`plan`, `meditate`, `meditate-create`, `new`, `pipeline refine`) into thin shims that run bundled templates. Drop the deferred Task 5.6 dead code (`composeCreatePrompt`, `PROMPT_pipeline_create.md`, `pipeline-create-prompt.ts`, `agentCreateAction`). Delete `src/cli/agents/` (or reduce it to whatever smoke-only agents remain after Chunk 4) and the entire `src/cli/prompts/` folder.
 
-**High-level shape:**
-- One sub-chunk per command:
-  - 6a. `plan` — single-node interactive template; `plan.md` moves into `templates/plan/`.
-  - 6b. `meditate` — single-node interactive template; `meditate.md` + `meditate-create.md` move into `templates/meditate/` and `templates/meditate-create/`. `--steer <text>` becomes `--var steer=...`.
-  - 6c. `new` — kickoff template; `PROMPT_kickoff.md` becomes the body of `templates/new/scaffolder.md`. May be 2 nodes (init + interactive refinement).
-  - 6d. `pipeline refine` — interactive template that injects the current pipeline's graph + recent traces.
-- Each sub-chunk:
-  1. Create `src/cli/templates/<command>/`.
-  2. Move agent files in.
-  3. Convert `src/cli/commands/<command>.ts` to thin shim.
-  4. Update tests.
-  5. Smoke-test the command end-to-end.
-- After all sub-chunks: delete `src/cli/prompts/` entirely; assert `src/cli/agents/` is empty (or only contains agents shared by smoke tests, which moved to `pipelines/smoke/` in Chunk 4).
-- Update `README.md` to reflect the new architecture.
-- Update `specs/architecture.md`, `specs/commands.md`.
-- Chunk-6 review checkpoint.
+**Pattern (from Chunk 5 — apply uniformly):**
+
+Every shim follows:
+
+```ts
+export async function <name>Command(args, opts = {}): Promise<void> {
+  // 1. preflight (validation, side-effects that MUST run before Claude — see per-sub-chunk notes)
+  const dotFile = resolveBundledTemplate("<template-name>");
+  return self.pipelineRunCommand(dotFile, {
+    project,
+    variables: { /* caller-vars declared on the digraph's `inputs="..."` */ },
+  });
+}
+```
+
+**Pattern rules (locked in during Chunk 5 — do NOT re-derive):**
+
+1. `PipelineRunOptions.variables` (NOT `vars`). The plan-author tripped on this in §5.5.
+2. Use `import * as self from "./<file>.js"` so `self.pipelineRunCommand(...)` is spy-able under ESM. Pre-existing in `pipeline.ts:25`; new shim files must add it.
+3. Caller-required variables go on the **digraph** (`digraph foo { inputs="a, b" }`). Agent frontmatter `inputs:` is the agent's view of context keys (different concept). Validator rejects per-node `inputs="..."` on most node shapes.
+4. Per-folder layout: `src/cli/templates/<name>/pipeline.dot` + co-located `<agent>.md` files + optional `README.md`.
+5. Shim test pattern: `vi.spyOn(pipelineMod, "pipelineRunCommand").mockImplementation(...)`; assert `dotFile.endsWith("<name>/pipeline.dot")` + the variables object. Don't reassert pipelineRunCommand's own behavior.
+6. Templates-validate test pattern: extend `src/cli/tests/templates-validate.test.ts` per template. Assert `errors=[]`; tolerate `orphan_output` and `required_caller_vars` info-level diagnostics.
+7. Side-effects that must precede Claude (PID locks, `git init`, `mkdir`) stay in the shim's preflight block — they are not Claude's job. The shim is "thin" but not "zero." Document the exception inline.
 
 **Dependencies:** Chunk 5 (template infra must exist).
+
+**Sub-chunk roadmap:**
+
+| Sub-chunk | Target | Side-effects in preflight | New template path |
+|-----------|--------|---------------------------|-------------------|
+| 6a | `plan` | none (pure session) | `templates/plan/` |
+| 6b | `meditate` + `meditate-create` | PID lock + dir creation + gitignore append (meditate only) | `templates/meditate/` + `templates/meditate-create/` |
+| 6c | `new` | `scaffoldProject` + `git init` | `templates/new/` |
+| 6d | `pipeline refine` | dotPath existence check + previous-graph parse + post-validate | `templates/pipeline-refine/` |
+| 6e | Task 5.6 deferred dead code | n/a | n/a (deletions only) |
+| 6f | docs + folder cleanup | n/a | n/a (deletions + doc edits) |
+| 6g | Chunk-6 review checkpoint | n/a | n/a |
+
+---
+
+### Sub-chunk 6a: `plan` → `templates/plan/`
+
+**Files:**
+- Create: `src/cli/templates/plan/pipeline.dot`
+- Create: `src/cli/templates/plan/plan.md` (port from `src/cli/agents/plan.md`)
+- Modify: `src/cli/commands/plan.ts` (full rewrite to shim shape)
+- Modify: `src/cli/tests/templates-validate.test.ts` (add `plan` template assertion)
+- Create: `src/cli/tests/plan.test.ts` (new shim-shape test — no test exists today)
+- Delete: `src/cli/agents/plan.md`
+
+#### Task 6a.1: Create `src/cli/templates/plan/`
+
+- [ ] **Step 1 (red): extend `templates-validate.test.ts` for `plan`**
+
+  ```ts
+  it("plan has no errors", () => {
+    const diags = loadAndValidate("plan");
+    const errors = diags.filter(d => d.severity === "error");
+    expect(errors).toEqual([]);
+  });
+  ```
+
+  Run → fails (template directory missing).
+
+- [ ] **Step 2 (green): create the files**
+
+  `src/cli/templates/plan/pipeline.dot`:
+  ```dot
+  digraph plan {
+    start [shape=Mdiamond];
+    end   [shape=Msquare];
+
+    plan [shape=box, agent="plan", interactive=true];
+
+    start -> plan -> end;
+  }
+  ```
+
+  `src/cli/templates/plan/plan.md`: copy current body of `src/cli/agents/plan.md` verbatim into the body. Frontmatter required:
+
+  ```markdown
+  ---
+  description: Interactive brainstorming + planning session. Studies specs/* and src/* in parallel, then invokes the brainstorming skill to draft a plan with the user.
+  model: opus
+  permissionMode: dangerouslySkipPermissions
+  interactive: true
+  tools: []
+  mcp: []
+  ---
+  Study specs/*.md and src/* in parallel using subagents to understand the project. Then invoke the Skill tool with skill name "superpowers:brainstorming".
+  ```
+
+  Re-run vitest `templates-validate.test.ts` → green.
+
+- [ ] **Step 3: commit**
+
+  `feat(templates): plan single-node interactive template (D8 chunk-6a)`
+
+#### Task 6a.2: Convert `planCommand` to thin shim
+
+- [ ] **Step 1 (red): create `src/cli/tests/plan.test.ts`**
+
+  ```ts
+  import { describe, it, expect, vi } from "vitest";
+  import * as pipelineMod from "../commands/pipeline.js";
+  import { planCommand } from "../commands/plan.js";
+
+  describe("planCommand (shim)", () => {
+    it("delegates to pipelineRunCommand with the bundled plan template + project var", async () => {
+      const calls: Array<{ dotFile: string; opts: any }> = [];
+      vi.spyOn(pipelineMod, "pipelineRunCommand").mockImplementation(async (dotFile, opts) => {
+        calls.push({ dotFile, opts });
+      });
+      await planCommand("/tmp/some-project");
+      expect(calls).toHaveLength(1);
+      expect(calls[0].dotFile.endsWith("plan/pipeline.dot")).toBe(true);
+      expect(calls[0].opts.project).toBe("/tmp/some-project");
+    });
+  });
+  ```
+
+  Run → fails (current `planCommand` does its own two-phase Claude session, never touches `pipelineRunCommand`).
+
+- [ ] **Step 2 (green): rewrite `planCommand`**
+
+  Replace `src/cli/commands/plan.ts` body in full:
+
+  ```ts
+  import { existsSync } from "fs";
+  import { resolve } from "path";
+  import * as output from "../lib/output.js";
+  import { resolveBundledTemplate } from "../lib/assets.js";
+  import * as self from "../commands/pipeline.js";
+
+  export async function planCommand(projectFolder: string): Promise<void> {
+    const absPath = resolve(projectFolder);
+    if (!existsSync(absPath)) {
+      await output.error(`Error: project folder not found: ${absPath}`);
+      process.exit(1);
+    }
+    const dotFile = resolveBundledTemplate("plan");
+    return self.pipelineRunCommand(dotFile, { project: absPath });
+  }
+  ```
+
+  Drop imports of `Agent`, `resolveAgent`, `streamEvents`, `spawnSync`, the `buildTracePath` helper, the manual `which claude` block, the header emission, and the two-phase resume — all are now `pipelineRunCommand`'s job.
+
+  Re-run shim test → green.
+
+- [ ] **Step 3: typecheck + full test run**
+
+  - `npx tsc --noEmit` → clean.
+  - `npx vitest run` → all suites green.
+
+- [ ] **Step 4: commit**
+
+  `refactor(plan): convert command to thin shim over plan template (D8 chunk-6a)`
+
+#### Task 6a.3: Delete `src/cli/agents/plan.md`
+
+- [ ] **Step 1: confirm no other caller**
+
+  ```sh
+  git grep -n 'resolveAgent("plan")' src/
+  git grep -n 'agents/plan.md' src/
+  ```
+
+  Both should return zero hits after 6a.2 lands.
+
+- [ ] **Step 2: delete + commit**
+
+  ```sh
+  rm src/cli/agents/plan.md
+  git add -A && git commit -m "chore(agents): remove plan.md (replaced by templates/plan/plan.md, D8 chunk-6a)"
+  ```
+
+  Run `npx vitest run` once more to confirm nothing import-resolved against the deleted path.
+
+---
+
+### Sub-chunk 6b: `meditate` + `meditate-create` → templates
+
+**Why two templates in one sub-chunk:** they share concerns (meditation-folder hygiene, agent vocabulary) and the conversion patterns are nearly identical; bundling avoids two review cycles for very similar diffs.
+
+**Files:**
+- Create: `src/cli/templates/meditate/{pipeline.dot,meditate.md}`
+- Create: `src/cli/templates/meditate-create/{pipeline.dot,meditate-create.md}`
+- Modify: `src/cli/commands/meditate.ts` (preserve PID lock + dir + gitignore preflight; swap session)
+- Modify: `src/cli/commands/meditate-create.ts` (full rewrite to shim shape)
+- Modify: `src/cli/program.ts` (replace `--steer <text>` with `--var steer=...` UX — see Task 6b.5)
+- Modify: `src/cli/tests/templates-validate.test.ts`
+- Modify: `src/cli/tests/meditate.test.ts`, `src/cli/tests/meditate-create.test.ts`, `src/cli/tests/pipeline-smoke-meditate-steer-folder.test.ts`
+- Delete: `src/cli/agents/meditate.md`, `src/cli/agents/meditate-create.md`
+
+#### Task 6b.1: Create `src/cli/templates/meditate/`
+
+- [ ] **Step 1 (red): templates-validate test for `meditate`**
+
+  ```ts
+  it("meditate has no errors", () => {
+    const diags = loadAndValidate("meditate");
+    const errors = diags.filter(d => d.severity === "error");
+    expect(errors).toEqual([]);
+  });
+  ```
+
+- [ ] **Step 2 (green): create files**
+
+  `src/cli/templates/meditate/pipeline.dot`:
+  ```dot
+  digraph meditate {
+    inputs="steer"
+
+    start [shape=Mdiamond];
+    end   [shape=Msquare];
+
+    meditate [shape=box, agent="meditate", interactive=true,
+              prompt="$steer"];
+
+    start -> meditate -> end;
+  }
+  ```
+
+  Note: `$steer` is the body the existing `--steer` flag injected as the first user turn. The `inputs="steer"` digraph-level declaration tells the validator this is a caller-supplied var; the `prompt="$steer"` substitution wires it into the interactive session.
+
+  `src/cli/templates/meditate/meditate.md`: port `src/cli/agents/meditate.md` verbatim with frontmatter declaring `interactive: true` and (if the existing agent declares `tools:` / `mcp:`) preserve those exactly.
+
+  Re-run vitest → green.
+
+- [ ] **Step 3: commit**
+
+  `feat(templates): meditate single-node interactive template with steer var (D8 chunk-6b)`
+
+#### Task 6b.2: Create `src/cli/templates/meditate-create/`
+
+- [ ] **Step 1 (red): templates-validate test for `meditate-create`**
+
+  Same shape as 6b.1.
+
+- [ ] **Step 2 (green): create files**
+
+  `src/cli/templates/meditate-create/pipeline.dot`:
+  ```dot
+  digraph meditate_create {
+    start [shape=Mdiamond];
+    end   [shape=Msquare];
+
+    create [shape=box, agent="meditate-create", interactive=true];
+
+    start -> create -> end;
+  }
+  ```
+
+  `src/cli/templates/meditate-create/meditate-create.md`: port `src/cli/agents/meditate-create.md` verbatim with frontmatter `interactive: true`.
+
+  Re-run vitest → green.
+
+- [ ] **Step 3: commit**
+
+  `feat(templates): meditate-create single-node interactive template (D8 chunk-6b)`
+
+#### Task 6b.3: Convert `meditateCommand` to thin shim
+
+- [ ] **Step 1 (red): replace test in `src/cli/tests/meditate.test.ts`**
+
+  Add a shim-shape test alongside the existing PID-lock / dir-creation / gitignore tests (those preflight invariants stay; only the session-launch path changes):
+
+  ```ts
+  describe("meditateCommand (shim)", () => {
+    it("delegates to pipelineRunCommand with the bundled meditate template + steer variable", async () => {
+      const calls: Array<{ dotFile: string; opts: any }> = [];
+      vi.spyOn(pipelineMod, "pipelineRunCommand").mockImplementation(async (dotFile, opts) => {
+        calls.push({ dotFile, opts });
+      });
+      await meditateCommand("/tmp/proj", { steer: "focus on auth flow" });
+      expect(calls).toHaveLength(1);
+      expect(calls[0].dotFile.endsWith("meditate/pipeline.dot")).toBe(true);
+      expect(calls[0].opts.project).toBe("/tmp/proj");
+      expect(calls[0].opts.variables.steer).toBe("focus on auth flow");
+    });
+  });
+  ```
+
+  Drop the existing tests that asserted `runMeditationSession` was called with a specific second argument — `runMeditationSession` no longer exists after this task. Keep PID/dir/gitignore tests; those preflight steps remain.
+
+  Run → fails.
+
+- [ ] **Step 2 (green): rewrite `meditateCommand`**
+
+  Replace the body:
+
+  ```ts
+  import { resolve } from "path";
+  import * as output from "../lib/output.js";
+  import { resolveBundledTemplate } from "../lib/assets.js";
+  import * as self from "../commands/pipeline.js";
+  // … keep existing PID + dirs + gitignore helpers, they remain ralph's responsibility …
+
+  export async function meditateCommand(
+    projectFolder: string,
+    opts: { steer?: string } = {},
+  ): Promise<void> {
+    const absPath = resolve(projectFolder);
+    // preflight: project existence, PID lock, meditation dirs, gitignore append (existing helpers)
+    ensureMeditationDirs(absPath);
+    appendMeditateGitignore(absPath);
+    if (!writePid(absPath)) {
+      await output.error(`Another meditate session is running (pid ${readPid(absPath)}).`);
+      process.exit(1);
+    }
+    try {
+      const dotFile = resolveBundledTemplate("meditate");
+      return await self.pipelineRunCommand(dotFile, {
+        project: absPath,
+        variables: { steer: opts.steer ?? "" },
+      });
+    } finally {
+      removePid(absPath);
+    }
+  }
+  ```
+
+  Delete `runMeditationSession` (now lives in the agent body + pipelineRunCommand). Drop unused imports.
+
+  Re-run tests → green.
+
+- [ ] **Step 3: commit**
+
+  `refactor(meditate): convert command to thin shim over meditate template (D8 chunk-6b)`
+
+#### Task 6b.4: Convert `meditateCreateCommand` to thin shim
+
+- [ ] **Step 1 (red): rewrite `src/cli/tests/meditate-create.test.ts`** as the shim-shape test (same shape as 6a.2).
+
+- [ ] **Step 2 (green): rewrite `meditateCreateCommand`** — same shape as `planCommand`'s 6a.2 result, no `--steer` and no preflight side-effects.
+
+- [ ] **Step 3: commit**
+
+  `refactor(meditate-create): convert command to thin shim over meditate-create template (D8 chunk-6b)`
+
+#### Task 6b.5: Replace `--steer <text>` with `--var steer=...`
+
+**Why:** `--steer` was a one-off flag tying meditate to a hard-coded substitution. Now that the template declares `inputs="steer"`, the canonical `--var key=value` UX (already the standard for `pipeline run`) covers the same case for free.
+
+- [ ] **Step 1 (red): test the wiring**
+
+  In `src/cli/tests/program.test.ts` (or the closest commander wiring test — find via `git grep "med\.command" src/cli/tests/`), add:
+
+  ```ts
+  it("ralph meditate forwards --var steer=... to pipelineRunCommand", async () => {
+    /* spy on pipelineRunCommand, invoke `program.parseAsync(["node","ralph","meditate","/tmp/proj","--var","steer=hello"])`,
+       assert opts.variables.steer === "hello". */
+  });
+  ```
+
+  Run → fails.
+
+- [ ] **Step 2 (green): update commander wiring**
+
+  In `src/cli/program.ts`, replace the meditate subcommand's `--steer <text>` option with the standard `--var key=value` collector (mirror the syntax `pipeline run` uses). The `meditateCommand` signature changes from `opts: { steer?: string }` to `opts: { variables?: Record<string,string> }`; the shim reads `opts.variables?.steer`.
+
+  Update the smoke test `src/cli/tests/pipeline-smoke-meditate-steer-folder.test.ts` to invoke `--var steer=...` instead of `--steer ...`.
+
+  Re-run tests → green.
+
+- [ ] **Step 3: docs**
+
+  - `specs/meditate.md`: replace any `--steer <text>` example with `--var steer=...`.
+  - `README.md`: same.
+
+- [ ] **Step 4: commit**
+
+  `refactor(meditate): replace --steer flag with --var steer=... (D8 chunk-6b)`
+
+#### Task 6b.6: Delete `src/cli/agents/meditate.md` and `meditate-create.md`
+
+- [ ] **Step 1: confirm no other caller** via `git grep -n 'resolveAgent("meditate' src/`.
+- [ ] **Step 2: delete + commit**: `chore(agents): remove meditate / meditate-create (D8 chunk-6b)`.
+
+---
+
+### Sub-chunk 6c: `new` → `templates/new/`
+
+**Preflight that stays in shim:** `scaffoldProject` (creates dirs + empty files + `.gitignore`) and `git init -b main`. Both must run before any Claude session because the kickoff agent expects the directory to exist as a git repo. The shim is "thin but not zero" here by design — Claude can technically write files but not run `git init`.
+
+**Files:**
+- Create: `src/cli/templates/new/{pipeline.dot,scaffolder.md}`
+- Modify: `src/cli/commands/new.ts` (keep `scaffoldProject` + `git init` preflight; swap session)
+- Modify: `src/cli/tests/new.test.ts`
+- Modify: `src/cli/tests/templates-validate.test.ts`
+- Delete: `src/cli/prompts/PROMPT_kickoff.md`
+- Modify: `src/cli/lib/assets.ts` — remove `getKickoffPromptPath` if unused after 6c.2 (verify with grep).
+
+#### Task 6c.1: Create `src/cli/templates/new/`
+
+- [ ] **Step 1 (red): templates-validate test** — same shape as 6a.1.
+
+- [ ] **Step 2 (green): create files**
+
+  `src/cli/templates/new/pipeline.dot`:
+  ```dot
+  digraph new_project {
+    inputs="project_name"
+
+    start [shape=Mdiamond];
+    end   [shape=Msquare];
+
+    kickoff [shape=box, agent="scaffolder", interactive=true,
+             prompt="You are initializing project \"$project_name\". Follow the scaffolder agent's instructions."];
+
+    start -> kickoff -> end;
+  }
+  ```
+
+  `src/cli/templates/new/scaffolder.md`: port the body of `src/cli/prompts/PROMPT_kickoff.md` verbatim plus the `BRAINSTORM_TRIGGER` block from `src/cli/commands/new.ts:8-10` (currently appended at runtime). Substitute `{{PROJECT_NAME}}` placeholder usage in the source markdown with `$project_name` to match runtime `--var` substitution. Frontmatter:
+
+  ```markdown
+  ---
+  description: Initializes a new ralph project. Asks the user about the project, then writes README.md and specs/README.md with no code.
+  interactive: true
+  inputs:
+    - project_name
+  ---
+  ```
+
+  Re-run vitest → green.
+
+- [ ] **Step 3: commit**
+
+  `feat(templates): new single-node kickoff template (D8 chunk-6c)`
+
+#### Task 6c.2: Convert `newCommand` to thin shim
+
+- [ ] **Step 1 (red): rewrite tests in `src/cli/tests/new.test.ts`**
+
+  Keep `scaffoldProject` and `buildKickoffPrompt` tests — both helpers stay (the second is reused as the `BRAINSTORM_TRIGGER` substitution helper if we keep it; otherwise delete the test alongside the helper). Add the shim-shape test asserting `pipelineRunCommand` is called with the `new` template + `project_name` variable + the freshly-scaffolded path.
+
+- [ ] **Step 2 (green): rewrite `newCommand`**
+
+  ```ts
+  export async function newCommand(projectName: string): Promise<void> {
+    const targetPath = resolve(process.cwd(), projectName);
+    if (existsSync(targetPath)) {
+      await output.error(`Error: directory already exists: ${targetPath}`);
+      process.exit(1);
+    }
+    await output.step(`Creating project: ${projectName}`);
+    scaffoldProject(targetPath, projectName);
+    await output.step("Initializing git repository...");
+    const gitResult = spawnSync("git", ["init", "-b", "main"], {
+      cwd: targetPath, stdio: "inherit", encoding: "utf8",
+    });
+    if (gitResult.status !== 0) {
+      await output.error("Error: git init failed");
+      process.exit(1);
+    }
+    const dotFile = resolveBundledTemplate("new");
+    return self.pipelineRunCommand(dotFile, {
+      project: targetPath,
+      variables: { project_name: projectName },
+    });
+  }
+  ```
+
+  Drop: `getKickoffPromptPath`, `buildKickoffPrompt` (now unused — the substitution happens via runtime `$project_name` in the agent body), `BRAINSTORM_TRIGGER` constant, `streamEvents` import, the manual `child = spawn(...)` block, `buildTracePath`, `readFileSync` of the prompt template.
+
+  Re-run tests → green.
+
+- [ ] **Step 3: typecheck + full test run**
+
+  Confirm `getKickoffPromptPath` is unreferenced (`git grep -n getKickoffPromptPath src/`); if so, delete the helper from `assets.ts` in this task. Also remove any `getKickoffPromptPath` assertions in `src/cli/tests/assets.test.ts` (or the closest assets-test file) so the suite stays green.
+
+- [ ] **Step 4: commit**
+
+  `refactor(new): convert command to thin shim over new template (D8 chunk-6c)`
+
+#### Task 6c.3: Delete `src/cli/prompts/PROMPT_kickoff.md`
+
+- [ ] **Step 1: confirm no caller** via `git grep -n PROMPT_kickoff src/`.
+- [ ] **Step 2: delete + commit**: `chore(prompts): remove PROMPT_kickoff.md (now templates/new/scaffolder.md, D8 chunk-6c)`.
+
+---
+
+### Sub-chunk 6d: `pipeline refine` → `templates/pipeline-refine/`
+
+**Preflight that stays in shim:** dotPath existence check (refine refuses to run on a non-existent pipeline) and `parseDot` of the previous-graph snapshot (used by the post-validate diff). Post-step also stays: after the Claude session ends, run `pipelineValidateCommand(dotPath, { previousGraph })`.
+
+**The hard part:** today's `pipelineRefineCommand` injects:
+- The current pipeline's `.dot` content (read via `readFileSync`).
+- The recent-runs trace digest block (`listRecentTraces` + `digestTraceFile`).
+- The base prompt from `composeCreatePrompt(project)` (a Chunk-5 holdover the agent body now subsumes).
+
+Under the template model, all three become `--var`-injected strings. The agent body (`refiner.md`) does the framing.
+
+**Files:**
+- Create: `src/cli/templates/pipeline-refine/{pipeline.dot,refiner.md}`
+- Modify: `src/cli/commands/pipeline.ts` — `pipelineRefineCommand` rewrite + drop `composeCreatePrompt` + `runTwoPhaseClaudeSession` imports if no other caller remains (verify; expected: refine was the last consumer outside `pipelineCreateCommand`'s pre-shim form, which is already gone)
+- Modify: `src/cli/tests/pipeline-refine-tip.test.ts`
+- Modify: `src/cli/tests/templates-validate.test.ts`
+
+#### Task 6d.1: Create `src/cli/templates/pipeline-refine/`
+
+- [ ] **Step 1 (red): templates-validate test** — same shape.
+
+- [ ] **Step 2 (green): create files**
+
+  `src/cli/templates/pipeline-refine/pipeline.dot`:
+  ```dot
+  digraph pipeline_refine {
+    inputs="pipeline_name, dot_path, current_dot, trace_digest"
+
+    start [shape=Mdiamond];
+    end   [shape=Msquare];
+
+    refine [shape=box, agent="refiner", interactive=true];
+
+    start -> refine -> end;
+  }
+  ```
+
+  `src/cli/templates/pipeline-refine/refiner.md`: agent body teaches the user to inspect the existing graph (`$current_dot`), read the recent traces (`$trace_digest`), discuss desired changes, edit `$dot_path` in-place, then run `ralph pipeline validate $dot_path`. Port the framing block currently composed at `src/cli/commands/pipeline.ts:961-967` into the agent body verbatim, with the variables substituted. Frontmatter:
+
+  ```markdown
+  ---
+  description: Refines an existing ralph pipeline. Inspects the current `.dot` graph + recent run traces, proposes targeted edits with the user, and writes the updated graph back.
+  interactive: true
+  inputs:
+    - pipeline_name
+    - dot_path
+    - current_dot
+    - trace_digest
+  ---
+  ```
+
+  Re-run vitest → green.
+
+- [ ] **Step 3: commit**
+
+  `feat(templates): pipeline-refine template + refiner agent (D8 chunk-6d)`
+
+#### Task 6d.2: Convert `pipelineRefineCommand` to thin shim
+
+- [ ] **Step 1 (red): rewrite the test**
+
+  In `src/cli/tests/pipeline-refine-tip.test.ts`, keep the validation-failure-tip assertions. Add a shim-shape test that mocks `pipelineRunCommand` and asserts the right `variables` (`pipeline_name`, `dot_path`, `current_dot`, `trace_digest`) are forwarded.
+
+  Run → fails.
+
+- [ ] **Step 2 (green): rewrite `pipelineRefineCommand`**
+
+  ```ts
+  export async function pipelineRefineCommand(name: string, opts: PipelineRefineOptions = {}): Promise<void> {
+    const project = resolve(opts.project ?? process.cwd());
+    const pipelinesDir = getPipelinesDir(project);
+    const dotPath = join(pipelinesDir, `${name}.dot`);
+    try { resolvePipelineArg(name, project); }
+    catch (err) { await output.error((err as Error).message); process.exit(1); }
+    if (!existsSync(dotPath)) {
+      await output.error(`Pipeline not found: ${dotPath}\nUse 'ralph pipeline create ${name}' to create it.`);
+      process.exit(1);
+    }
+    const existingContent = readFileSync(dotPath, "utf8");
+    let previousGraph: Graph | undefined;
+    try { previousGraph = parseDot(existingContent); } catch { /* unparsable — skip diff */ }
+
+    let traceDigest = "";
+    if (opts.traces !== false) {
+      const tracePaths = listRecentTraces(name, REFINE_TRACE_COUNT, { tracesRoot: opts.tracesRoot });
+      if (tracePaths.length > 0) {
+        traceDigest = tracePaths.map(p => digestTraceFile(p)).join("\n\n");
+      }
+    }
+
+    const dotFile = resolveBundledTemplate("pipeline-refine");
+    await self.pipelineRunCommand(dotFile, {
+      project,
+      variables: {
+        pipeline_name: name,
+        dot_path: dotPath,
+        current_dot: existingContent,
+        trace_digest: traceDigest,
+      },
+    });
+
+    if (!existsSync(dotPath)) {
+      await output.warn(`Session ended but ${dotPath} was removed.`);
+      process.exit(1);
+    }
+    await output.step("Validating pipeline...");
+    const validateExit = await pipelineValidateCommand(dotPath, { previousGraph });
+    process.exit(validateExit);
+  }
+  ```
+
+  Drop imports: `composeCreatePrompt`, `runTwoPhaseClaudeSession`, `spawnSync`. The `which claude` block goes; `pipelineRunCommand` already does the same check.
+
+  Re-run tests → green.
+
+- [ ] **Step 3: typecheck + full test run.**
+
+- [ ] **Step 4: commit**
+
+  `refactor(pipeline-refine): convert command to thin shim over pipeline-refine template (D8 chunk-6d)`
+
+---
+
+### Sub-chunk 6e: Task 5.6 deferred dead-code deletions
+
+**Why now:** with refine and create both retired, the four targets queued by Chunk 5's plan (Task 5.6) have zero callers. Confirm via grep, then delete.
+
+**Targets (per `2026-04-27-chunk-5-shipped.md`):**
+- `src/cli/lib/pipeline-create-prompt.ts` (`composeCreatePrompt`) — last caller was `pipelineRefineCommand`, gone after 6d.
+- `src/cli/prompts/PROMPT_pipeline_create.md` — content lives in `templates/pipeline-create/scaffolder.md`.
+- `src/cli/agents/agent-creator.md` — last caller was `agentCreateAction`, gone after 6e.2.
+- `agentCreateAction` in `src/cli/commands/agent.ts` + its program.ts wiring (`agent.create` subcommand at `src/cli/program.ts:291`).
+
+**Decision recorded here (defer-or-migrate for `ralph agent create`):** Delete it. With per-pipeline-folder agents (Chunk 4) and the `pipeline create` template scaffolding agents inline as needed, a standalone `ralph agent create` command no longer carries its weight. If a user wants to author agents, they edit `<pipeline>/<agent>.md` by hand — same UX as authoring `pipeline.dot`. If we ever need a guided flow again, it gets reborn as `templates/agent-create/` in a future chunk.
+
+#### Task 6e.1: Delete `composeCreatePrompt` + `PROMPT_pipeline_create.md`
+
+- [ ] **Step 1: confirm zero callers**
+
+  ```sh
+  git grep -n composeCreatePrompt src/
+  git grep -n PROMPT_pipeline_create src/
+  git grep -n pipeline-create-prompt src/
+  ```
+
+  All three should return zero hits.
+
+- [ ] **Step 2: delete**
+
+  ```sh
+  rm src/cli/lib/pipeline-create-prompt.ts
+  rm src/cli/prompts/PROMPT_pipeline_create.md
+  rm -rf src/cli/tests/pipeline-create-prompt.test.ts  # if exists
+  ```
+
+- [ ] **Step 3: typecheck + tests**
+
+- [ ] **Step 4: commit**
+
+  `chore(pipeline): drop dead composeCreatePrompt + PROMPT_pipeline_create.md (D8 chunk-6e, 5.6 deferred)`
+
+#### Task 6e.2: Delete `agentCreateAction` + `ralph agent create` wiring
+
+- [ ] **Step 1 (red): remove the test for `agentCreateAction`**
+
+  Delete `src/cli/tests/agent-create.test.ts` (or whichever file holds those tests; locate via `git grep -l agentCreateAction src/cli/tests/`).
+
+- [ ] **Step 2: remove the command wiring**
+
+  In `src/cli/program.ts`, delete the `agent.command("create").action(...)` block (lines around 291 — confirm exact span at edit time).
+
+- [ ] **Step 3: remove `agentCreateAction` from `src/cli/commands/agent.ts`**
+
+  If `src/cli/commands/agent.ts` only contained `agentCreateAction` and now becomes empty, delete the file. If it has other actions, leave the file and just drop the export.
+
+- [ ] **Step 4: delete `src/cli/agents/agent-creator.md`**
+
+  Confirm via `git grep -n agent-creator src/` first.
+
+- [ ] **Step 5: typecheck + full test run.**
+
+- [ ] **Step 6: commit**
+
+  `chore(agents): drop ralph agent create + agent-creator.md (D8 chunk-6e, 5.6 deferred)`
+
+---
+
+### Sub-chunk 6f: docs + folder cleanup
+
+#### Task 6f.1: Delete `src/cli/prompts/`
+
+- [ ] **Step 1: confirm empty**
+
+  ```sh
+  ls src/cli/prompts/
+  git grep -n 'src/cli/prompts' src/ tsup.config.ts
+  ```
+
+  Both should show only meta-files (or no files, only README) and zero source references.
+
+- [ ] **Step 2: delete the folder**
+
+  ```sh
+  rm -rf src/cli/prompts
+  ```
+
+  If `tsup.config.ts` contained any prompt-copy step, drop it too. (Chunk 5 already scoped its copy to `templates/`; a stale `prompts/` copy line might still be present.)
+
+- [ ] **Step 3: tests + commit**
+
+  `chore(prompts): remove src/cli/prompts/ entirely (D8 chunk-6f)`
+
+#### Task 6f.2: Audit + reduce `src/cli/agents/`
+
+- [ ] **Step 1: list survivors**
+
+  ```sh
+  ls src/cli/agents/
+  ```
+
+  Expected: empty, or only agents shared by Chunk-4-migrated smoke tests under `pipelines/smoke/` (those should already have moved). For each survivor, locate its caller via `git grep`.
+
+- [ ] **Step 2: migrate or delete**
+
+  - If a survivor is referenced only by a smoke pipeline that already lives under `pipelines/smoke/<name>/`, move the agent file into that pipeline's folder.
+  - If a survivor has no callers, delete it.
+  - If a survivor is referenced by code that should be retired (post-Chunk-6 audit), open a follow-up task in IMPLEMENTATION_PLAN.md and either move or delete the agent.
+
+- [ ] **Step 3: tests + commit**
+
+  `chore(agents): empty src/cli/agents/ — all migrated to per-pipeline folders or templates (D8 chunk-6f)`
+
+#### Task 6f.3: Update README.md
+
+- [ ] **Step 1**: rewrite the "Commands" section to describe `plan`, `meditate`, `meditate-create`, `new`, `pipeline refine` as bundled-template-backed pipelines. Replace any `--steer` example with `--var steer=...`.
+
+- [ ] **Step 2**: in the architecture overview paragraph, replace any reference to `src/cli/agents/` or `src/cli/prompts/` with `src/cli/templates/<name>/`.
+
+- [ ] **Step 3**: commit `docs(readme): update commands + architecture for D8 (chunk-6f)`.
+
+#### Task 6f.4: Update `specs/architecture.md` and `specs/commands.md`
+
+- [ ] **Step 1**: in `specs/architecture.md`, replace the agent/prompt resolution diagram with the new template-resolution flow (`resolveBundledTemplate(name)` → `pipelineRunCommand`).
+
+- [ ] **Step 2**: in `specs/commands.md`, regenerate the per-command sections for `plan`, `meditate`, `meditate-create`, `new`, `pipeline refine` to reflect they are template-backed; document the `--var` UX for meditate's steer.
+
+- [ ] **Step 3**: commit `docs(specs): align architecture + commands with D8 templates (chunk-6f)`.
+
+---
+
+### Sub-chunk 6g: Chunk-6 review checkpoint
+
+- [ ] **Step 1**: full test sweep — `npx vitest run` and `npx tsc --noEmit`.
+- [ ] **Step 2**: build + smoke — `npm run build`, then `node dist/cli/index.js pipeline validate dist/templates/<name>/pipeline.dot` for each of the new templates (`plan`, `meditate`, `meditate-create`, `new`, `pipeline-refine`). Each should report `✔ Pipeline valid`; tolerate `orphan_output` warnings on agents whose value is a side-effect.
+- [ ] **Step 3**: dispatch `superpowers:code-reviewer` against the chunk's commits + spec D8.
+- [ ] **Step 4**: address feedback in-chunk.
+- [ ] **Step 5**: tag `chunk-6-command-templates` + bump `package.json` patch version, then `git push --follow-tags` (matches Task 5.8 procedure — tag must be visible on origin before memory-writer dispatch).
+- [ ] **Step 6**: dispatch `memory-writer` with the chunk's session transcript per the standard procedure (Plan §"Post-execution memory capture").
 
 ---
 
