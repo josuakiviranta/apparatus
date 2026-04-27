@@ -1,5 +1,6 @@
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
+import { existsSync } from "fs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -37,6 +38,22 @@ export function getPipelineCreatePromptPath(): string {
 
 export function getBundledAgentsDir(): string {
   return getAssetPath("agents");
+}
+
+export function getBundledTemplatesDir(): string {
+  return getAssetPath("templates");
+}
+
+export function resolveBundledTemplate(name: string): string {
+  const dir = getBundledTemplatesDir();
+  const path = join(dir, name, "pipeline.dot");
+  if (!existsSync(path)) {
+    throw new Error(
+      `Bundled template not found: "${name}" (expected ${path}). ` +
+        `Available templates ship under src/cli/templates/.`,
+    );
+  }
+  return path;
 }
 
 export function getBundledPipelinePath(name: string): string {
