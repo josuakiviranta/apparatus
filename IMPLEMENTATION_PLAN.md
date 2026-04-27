@@ -562,12 +562,11 @@ expect(typeof parsed.archive_path).toBe("string");
 
 ---
 
-### Task 3.2: Fix `illumination-to-implementation.dot:10` glob
+### Task 3.2: Fix `illumination-to-implementation.dot:10` glob — ✅ DONE 2026-04-27
 
-**Files:**
-- Modify: `pipelines/illumination-to-implementation.dot:10`
+Shipped as `217ea24`. Verifier prompt now opens with `mcp__illumination__list_illuminations(status: open)` + refinement-aware re-entry guidance; dropped `*.md` glob and `Use $illuminations_dir as the input directory`. `pipeline validate` clean (17 nodes, 26 edges, no warnings).
 
-- [ ] **Step 1: Read the current verifier node**
+- [x] **Step 1: Read the current verifier node**
 
 ```bash
 sed -n '8,14p' pipelines/illumination-to-implementation.dot
@@ -575,7 +574,7 @@ sed -n '8,14p' pipelines/illumination-to-implementation.dot
 
 Expected: a prompt mentioning `glob` and `$illuminations_dir/illuminations/*.md`.
 
-- [ ] **Step 2: Replace the glob with `list_illuminations(status: open)`**
+- [x] **Step 2: Replace the glob with `list_illuminations(status: open)`**
 
 Find the `verifier` node at line 10. Replace its prompt verb. Specifically: change `"... Run glob on $illuminations_dir/illuminations/*.md ..."` (or whatever the current wording is) to mirror `pipelines/illumination-to-plan.dot:8`:
 
@@ -585,68 +584,36 @@ Find the `verifier` node at line 10. Replace its prompt verb. Specifically: chan
 
 (Copy the exact prompt shape from `illumination-to-plan.dot:8` so the two pipelines stay symmetric.)
 
-- [ ] **Step 3: Validate the pipeline**
+- [x] **Step 3: Validate the pipeline** — clean.
 
-Run: `node dist/cli/index.js pipeline validate pipelines/illumination-to-implementation.dot`
-(Or `tsx src/cli/index.ts pipeline validate ...` in dev.)
-Expected: no errors, no `portability_heuristic` warnings about the new prompt.
-
-- [ ] **Step 4: Commit**
-
-```bash
-git add pipelines/illumination-to-implementation.dot
-git commit -m "fix(pipeline): illumination-to-implementation verifier uses list_illuminations not glob"
-```
+- [x] **Step 4: Commit** — shipped as `217ea24`.
 
 ---
 
-### Task 3.3: Drop hardcoded path in `verifier.md:44`
+### Task 3.3: Drop hardcoded path in `verifier.md:44` — ✅ DONE 2026-04-27
 
-**Files:**
-- Modify: `src/cli/agents/verifier.md`
+Shipped as `ac8a6c9`. Procedure step 3 now explicitly routes the read through `mcp__illumination__read_file` with bare filename so the MCP server resolves the lifecycle directory.
 
-- [ ] **Step 1: Read line 44 and surrounding context**
-
-```bash
-sed -n '38,52p' src/cli/agents/verifier.md
-```
-
-- [ ] **Step 2: Replace any literal `meditations/illuminations/<filename>` reconstruction with consumption of the path from `list_illuminations`**
-
-The fix: the verifier rubric should state that the full path is whatever `list_illuminations` returned, and the agent must read by that returned filename without prepending a hardcoded directory. Concretely, edit the rubric body so any phrase like "construct path as `meditations/illuminations/<filename>`" becomes "use the filename returned by `list_illuminations` and call `read_file` with just the filename — the MCP server resolves the directory."
-
-If `list_illuminations` returns only filenames today (it does — see `parseIlluminationDescription`), the agent's `read_file` call must be path-relative and the MCP server's `read_file` must already resolve under the project root (it does — `assertWithinRoot` line 267). No code change in the MCP needed.
-
-- [ ] **Step 3: Commit**
-
-```bash
-git add src/cli/agents/verifier.md
-git commit -m "docs(verifier): drop hardcoded illumination path reconstruction"
-```
+**Design tension noted during implementation:** The plan's wording suggested dropping the entire `meditations/illuminations/<filename>` construction, but downstream pipeline nodes (`mark_archived` script, `mark_dispatched` script, `explainer`, `chat_session`) consume `$illumination_path` as a relative file path. The Task 3.1 script in particular derives `meditationsDir` via `path.dirname(path.dirname(...))`. Dropping the path construction would have broken those nodes. Resolution: keep the produced-field path construction (which is correct for `status: open` files), but route the agent's READ through MCP. That gives the future-proofing the plan wanted without breaking the downstream contract.
 
 ---
 
-### Task 3.4: Doc-comment update in `memory-writer.md:122`
+### Task 3.4: Doc-comment update in `memory-writer.md:122` — ✅ DONE 2026-04-27
 
-**Files:**
-- Modify: `src/cli/agents/memory-writer.md:~122`
+Shipped as `ab1991f`. Step 7b now mentions the read-then-move semantics and the `new_path` field.
 
-- [ ] **Step 1: Read line 122 context**
+---
 
-```bash
-sed -n '118,128p' src/cli/agents/memory-writer.md
-```
+## Chunk 3 status: ✅ DONE 2026-04-27
 
-- [ ] **Step 2: Update the comment to mention the post-move location**
+| Task | Commit |
+|---|---|
+| 3.1 mark-archived.mjs moves + commits | `020cd39` (+ `1ac9f2f` follow-ups) |
+| 3.2 illumination-to-implementation.dot uses list_illuminations | `217ea24` |
+| 3.3 verifier.md routes read through MCP | `ac8a6c9` |
+| 3.4 memory-writer.md doc-comment update | `ab1991f` |
 
-Change wording like *"`mark_implemented` resolves file under `meditations/illuminations/`"* to *"`mark_implemented` reads from `meditations/illuminations/` and moves the file to `meditations/implemented-illuminations/` (returned as `new_path` in the response)."*
-
-- [ ] **Step 3: Commit**
-
-```bash
-git add src/cli/agents/memory-writer.md
-git commit -m "docs(memory-writer): note mark_implemented file move"
-```
+Full vitest suite (1153 tests across 96 files) passes. `pipeline validate` clean for `illumination-to-implementation.dot` (17 nodes, 26 edges, no warnings). Chunk 4 (one-shot backfill + supersede tag + final smoke) reserved for a future session per the loop runbook.
 
 ---
 
