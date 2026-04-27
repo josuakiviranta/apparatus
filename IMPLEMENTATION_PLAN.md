@@ -1083,63 +1083,21 @@ git commit -m "feat(validator): escalate produces_redundant_with_outputs to erro
 
 **Step 8 (added in code review): Whitespace-only produces= early-skip** — `produces=" , , "` (only commas/whitespace) used to fire the rule misleadingly because the outer guard checks `trim().length > 0` (the trimmed `","` is length 1). Added `if (onNode.length === 0) return;` after split/filter, plus a regression test in `graph-produces-redundant-broad.test.ts`. Commit: `fix(validator): produces_redundant_with_outputs ignores whitespace-only produces=` (`20ffb79`).
 
-### Task 2.2: Add `resolveAgent` bundled-registry test for verifier (carry-over)
+### Task 2.2: Add `resolveAgent` bundled-registry test for verifier (carry-over) — SHIPPED
 
 The Chunk-1 migration test reads `src/cli/agents/verifier.md` directly. A future bundled-vs-user-dir behavioral change (e.g. Chunk 4's per-pipeline-folder lookup) could regress the registry path silently. Lock the contract with a unit test.
 
-- [ ] **Step 1: Read the registry signature**
+**Plan deviation (intentional):** The original snippet only overrode `bundledDir`. On any developer machine where `~/.ralph/agents/verifier.md` is older than the Chunk-1 bundled copy (i.e. lacks `outputs:`), the registry's `userDir → bundledDir` fall-through returns the stale user copy and the test fails on `config.outputs` being undefined. Solution: also override `userDir` to a fresh `mkdtempSync` path so the registry deterministically falls through to `bundledDir`. Cleaned up via `try/finally rmSync`. This is *more* correct than the plan-as-written — the test no longer depends on developer-machine state.
 
-```bash
-sed -n '40,67p' src/cli/lib/agent-registry.ts
-```
+**Bonus finding (not blocking):** Existing `~/.ralph/agents/verifier.md` copies in the wild are stale because Chunk-1 only updated the bundled file; the registry never re-syncs once user has a copy (lines 54-57 short-circuit). If users hit "verifier returns no JSON", they need to delete the user copy to let the registry re-copy from bundled. Worth flagging in the Chunk-2 review checkpoint or the post-merge migration note. Not a blocker for this task.
 
-Expected: `resolveAgent(name, opts)` searches `projectDir → userDir → bundledDir`. The `bundledDir` option overrides `getBundledAgentsDir()`.
+- [x] **Step 1: Read the registry signature** — confirmed `resolveAgent(name, opts)` searches `projectDir → userDir → bundledDir`; bundled fallback `mkdirSync(userDir, recursive)` + `copyFileSync(bundled→user)` runs as a side effect when user copy is absent.
 
-- [ ] **Step 2: Write failing test**
+- [x] **Step 2: Write failing test** — created `src/attractor/tests/agent-registry-bundled.test.ts` with hermetic `userDir` override (`mkdtempSync`/`rmSync` cleanup). First-run state: red (config.outputs undefined when user copy was stale, before the userDir override was added). After deviation: green.
 
-Create `src/attractor/tests/agent-registry-bundled.test.ts`:
+- [x] **Step 3: Run test to verify it passes** — `npx vitest run src/attractor/tests/agent-registry-bundled.test.ts` → 1 passed. Full suite: 1136 passed; `npx tsc --noEmit` clean.
 
-```typescript
-import { describe, it, expect } from "vitest";
-import { resolveAgent } from "../../cli/lib/agent-registry.js";
-import { resolve } from "path";
-
-describe("resolveAgent — verifier via bundledDir", () => {
-  it("loads outputs from bundled verifier.md (registry path, not direct read)", () => {
-    const bundledDir = resolve(__dirname, "../../cli/agents");
-    const config = resolveAgent("verifier", { bundledDir });
-    expect(config.name).toBe("verifier");
-    expect(config.outputs).toBeDefined();
-    expect(Object.keys(config.outputs!)).toEqual(
-      expect.arrayContaining([
-        "preferred_label",
-        "illumination_path",
-        "summary",
-        "explanation",
-        "archive_reason_short",
-      ]),
-    );
-    expect(config.jsonSchema).toBeDefined();
-    const schema = JSON.parse(config.jsonSchema!);
-    expect(schema.required).toContain("preferred_label");
-  });
-});
-```
-
-- [ ] **Step 3: Run test to verify it passes (this is a regression-lock test)**
-
-```bash
-npx vitest run src/attractor/tests/agent-registry-bundled.test.ts
-```
-
-Expected: PASS. If it fails, the bundled-path lookup is broken — root-cause before proceeding.
-
-- [ ] **Step 4: Commit**
-
-```bash
-git add src/attractor/tests/agent-registry-bundled.test.ts
-git commit -m "test(agent-registry): lock bundled resolveAgent path for verifier"
-```
+- [x] **Step 4: Commit** — pending in current session (next).
 
 ### Task 2.3: `inputs:` parses through frontmatter → AgentConfig
 
