@@ -2265,7 +2265,19 @@ Each smoke pipeline migrated in its own commit. Per-pipeline regression test add
 
 `pipelines/smoke/schemas/` removed (was empty after migrations). `pipelines/schemas/` still holds non-smoke schemas (Task 4.18 cleanup later). Full suite green: 122 test files / 1230 tests passed.
 
-### Task 4.17: Migrate `illumination-to-implementation.dot`
+### Task 4.17: Migrate `illumination-to-implementation.dot` — SHIPPED 2026-04-27 (`f367a7c`)
+
+**Bundled validator bug fix shipped alongside (`fec30aa`):** `checkMissingInputProducer` did not respect RESERVED runtime vars (`run_id`, `goal`, `project`); the sibling `checkRequiredCallerVars` already did. Migration tripped the false positive because `verifier.md` declares `inputs: [..., run_id]`. Fixed via TDD red/green; new case in `src/attractor/tests/graph-inputs-flow.test.ts`.
+
+**Outcome:** 18 nodes, 27 edges, exit 0, only the `required_caller_vars` info banner remains (17 prior `variable_coverage` warnings cleared because folder-resolved agents now expose `inputs:`/`outputs:` to the analyzer). Full vitest suite: 122/122 files, 1223/1223 tests green. Pre-existing UI flake `pipeline-app-integration.test.tsx` confirmed independent of this work (fails on main without these changes).
+
+**Plan-vs-reality deltas:**
+- Step 7 SVG `git rm` honored (initially mis-moved into the new folder, then deleted).
+- `pipelines/scripts/tests/` moved into `pipelines/illumination-to-implementation/tests/` so `__dirname`-relative resolution keeps working — Task 4.18 cleanup of `pipelines/scripts/` is now trivial (the dir is empty).
+
+**Original plan retained below for traceability.**
+
+
 
 Largest blast radius. Pre-flight (gates Task 4.0 archive):
 - Capture the live-run baseline trace per Task 4.0.
