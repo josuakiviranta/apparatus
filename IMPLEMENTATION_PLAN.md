@@ -1287,7 +1287,7 @@ Create `src/attractor/core/flow-analyzer.ts`. The analyzer walks the DAG and com
 2. For each node in topo order: `varsInScope[node] = ⋂(varsInScope[pred] ∪ produces[pred])` over all `pred` that have an edge to `node`. (Intersection across predecessors — pessimistic, models "every path must produce".) For nodes with `default_<key>=`, the key is added to the in-scope set unconditionally.
 3. Cycles (retry loops): break by treating back-edges as "no contribution" on the first pass. (D5 doesn't require fixed-point iteration; the validator can warn if a back-edge node introduces a key its forward-path predecessors don't.)
 
-- [ ] **Step 1: Write failing tests with synthetic graph fixtures**
+- [x] **Step 1: Write failing tests with synthetic graph fixtures**
 
 Create `src/attractor/tests/flow-analyzer.test.ts`:
 
@@ -1399,7 +1399,7 @@ describe("computeVarsInScope", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 ```bash
 npx vitest run src/attractor/tests/flow-analyzer.test.ts
@@ -1407,7 +1407,7 @@ npx vitest run src/attractor/tests/flow-analyzer.test.ts
 
 Expected: FAIL — module does not exist.
 
-- [ ] **Step 3: Implement `flow-analyzer.ts`**
+- [x] **Step 3: Implement `flow-analyzer.ts`**
 
 Create `src/attractor/core/flow-analyzer.ts`:
 
@@ -1514,7 +1514,7 @@ export function computeVarsInScope(
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 ```bash
 npx vitest run src/attractor/tests/flow-analyzer.test.ts
@@ -1522,7 +1522,7 @@ npx vitest run src/attractor/tests/flow-analyzer.test.ts
 
 Expected: PASS for all 5 tests. The key form for default-attributes (snake_case `default_foo` vs camelCase `defaultFoo`) must match how `parseDot` actually exposes them — verify via the existing `Node` type before locking the test.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/attractor/core/flow-analyzer.ts src/attractor/tests/flow-analyzer.test.ts
