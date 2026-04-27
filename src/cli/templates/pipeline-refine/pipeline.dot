@@ -1,0 +1,10 @@
+digraph pipeline_refine {
+  inputs="pipeline_name, dot_path, current_dot, trace_digest"
+
+  start [shape=Mdiamond];
+  end   [shape=Msquare];
+
+  refine [shape=box, agent="refiner", interactive=true];
+
+  start -> refine -> end;
+}
