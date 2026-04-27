@@ -1054,6 +1054,41 @@ export async function pipelineShowCommand(
     return 1;
   }
 
-  // Validation gate and rendering are added in later chunks.
+  let src: string;
+  try { src = readFileSync(absPath, "utf8"); }
+  catch { await output.error(`Cannot read file: ${absPath}`); return 1; }
+
+  const relPath = relative(process.cwd(), absPath) || absPath;
+  function formatDiag(d: Diagnostic): string {
+    const loc = d.location ? `${relPath}:${d.location.line}:${d.location.column} ` : "";
+    const hint = d.hint ? `\n${indentHint(d.hint)}` : "";
+    const frame = d.location ? `\n${indentHint(renderCodeFrame(src, d.location, { context: 2, color: false }))}` : "";
+    return `${loc}[${d.rule}] ${d.message}${hint}${frame}`;
+  }
+
+  let graph: Graph;
+  try { graph = parseDot(src); }
+  catch (e) {
+    if (e instanceof DotSyntaxError) {
+      const diag: Diagnostic = {
+        rule: "syntax",
+        severity: "error",
+        message: e.message,
+        location: e.location,
+      };
+      await output.error(formatDiag(diag));
+      return 1;
+    }
+    throw e;
+  }
+
+  const diags = validateGraph(graph, dirname(absPath));
+  const errors = diags.filter(d => d.severity === "error");
+  for (const w of diags.filter(d => d.severity === "warning")) await output.warn(formatDiag(w));
+  for (const e of errors) await output.error(formatDiag(e));
+  if (errors.length > 0) return 1;
+
+  // Renderer is wired in Chunk 3. For now, treat a valid graph as success
+  // without writing anything.
   return 0;
 }

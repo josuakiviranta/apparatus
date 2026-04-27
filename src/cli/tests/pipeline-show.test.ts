@@ -32,4 +32,29 @@ describe("pipelineShowCommand", () => {
     expect(errorMsg).toMatch(/Dot file not found/);
     expect(readdirSync(dir).filter(f => f.endsWith(".svg"))).toEqual([]);
   });
+
+  it("returns 1 with a [syntax] diagnostic and writes no SVG when DOT is malformed", async () => {
+    const dotFile = join(dir, "broken.dot");
+    // Truncated arrow — the AST parser in `parseDotV2` raises DotSyntaxError.
+    const { writeFileSync } = await import("fs");
+    writeFileSync(dotFile, `digraph g {\n  start [shape=Mdiamond]\n  start -> \n}`);
+    const code = await pipelineShowCommand(dotFile);
+    expect(code).toBe(1);
+    const errorCalls = (out.error as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+    const combined = errorCalls.map(c => c[0] as string).join("\n");
+    expect(combined).toContain("[syntax]");
+    expect(readdirSync(dir).filter(f => f.endsWith(".svg"))).toEqual([]);
+  });
+
+  it("returns 1 with file:line:col diagnostic and writes no SVG when validation fails", async () => {
+    const dotFile = join(dir, "missing-exit.dot");
+    const { writeFileSync } = await import("fs");
+    // Missing exit (Msquare) — validateGraph emits a `terminal_node` error.
+    writeFileSync(dotFile, `digraph g {\n  start [shape=Mdiamond]\n}`);
+    const code = await pipelineShowCommand(dotFile);
+    expect(code).toBe(1);
+    const errorCalls = (out.error as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+    expect(errorCalls.length).toBeGreaterThan(0);
+    expect(readdirSync(dir).filter(f => f.endsWith(".svg"))).toEqual([]);
+  });
 });
