@@ -136,3 +136,33 @@ describe("validateAgentConfig — outputs", () => {
     expect(config.outputs).toEqual({ foo: "string" });
   });
 });
+
+import { writeFileSync, mkdirSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
+import { resolveAgent } from "../lib/agent-registry.js";
+
+describe("resolveAgent — outputs end-to-end", () => {
+  it("loads outputs from frontmatter and exposes them on AgentConfig", () => {
+    const dir = join(tmpdir(), `resolve-outputs-${Date.now()}`);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "demo-agent.md"), `---
+name: demo-agent
+description: demo
+outputs:
+  foo: string
+  status: {enum: [ok, fail]}
+---
+prompt body
+`);
+
+    const config = resolveAgent("demo-agent", { projectDir: dir });
+
+    expect(config.outputs).toEqual({
+      foo: "string",
+      status: { enum: ["ok", "fail"] },
+    });
+    expect(config.jsonSchema).toBeDefined();
+    expect(JSON.parse(config.jsonSchema!).required).toEqual(["foo", "status"]);
+  });
+});
