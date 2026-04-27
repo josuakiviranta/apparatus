@@ -51,7 +51,7 @@ export const ToolNodeSchema = BaseNodeSchema.extend({
 
 export const GateNodeSchema = BaseNodeSchema.extend({
   shape: z.literal("hexagon").describe("Must be the literal \"hexagon\" for gate nodes."),
-  label: z.string().min(1).describe("Required question or choice label shown to the user."),
+  label: z.string().min(1).optional().describe("Inline question/choice label shown to the user. Omit when using a sibling <id>.md file instead."),
 }).strict();
 
 export const GateMdFrontmatterSchema = z.object({
