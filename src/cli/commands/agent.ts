@@ -1,5 +1,5 @@
 import { resolveAgent, listAgents, type RegistryOptions, type AgentInfo } from "../lib/agent-registry.js";
-import { Agent, type AgentConfig } from "../lib/agent.js";
+import { type AgentConfig } from "../lib/agent.js";
 import * as output from "../lib/output.js";
 
 export async function agentListAction(opts?: RegistryOptions): Promise<AgentInfo[]> {
@@ -57,33 +57,4 @@ export async function agentShowAction(
 
   await output.info(display);
   return config;
-}
-
-export async function agentCreateAction(): Promise<void> {
-  const creatorConfig = resolveAgent("agent-creator");
-  const agent = new Agent(creatorConfig);
-
-  await output.step("Launching agent designer...");
-
-  let sessionId: string | null = null;
-  await agent.run({
-    cwd: process.cwd(),
-    onSessionId: (id) => {
-      sessionId = id;
-    },
-  });
-
-  if (!sessionId) {
-    await output.error("Failed to capture session. Please try again.");
-    process.exit(1);
-  }
-
-  await output.step("Launching interactive session...");
-  const resumeResult = await agent.run({
-    cwd: process.cwd(),
-    resume: sessionId,
-    interactive: true,
-  });
-
-  process.exit(resumeResult.exitCode);
 }

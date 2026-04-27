@@ -15,7 +15,7 @@ import {
   pipelineShowCommand,
 } from "./commands/pipeline";
 import { collectKV } from "./lib/collect-kv.js";
-import { agentListAction, agentShowAction, agentCreateAction } from "./commands/agent";
+import { agentListAction, agentShowAction } from "./commands/agent";
 
 export function createProgram(): Command {
   const program = new Command();
@@ -283,13 +283,6 @@ file:line:col diagnostics and writes nothing.
     .description("Show details of a specific agent")
     .action(async (name: string) => {
       await agentShowAction(name);
-    });
-
-  agent
-    .command("create")
-    .description("Interactively create a new agent definition")
-    .action(async () => {
-      await agentCreateAction();
     });
 
   registerHeartbeatCommand(program);
