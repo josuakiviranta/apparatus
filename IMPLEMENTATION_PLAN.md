@@ -2171,39 +2171,147 @@ inputs:
 
 ---
 
-## Chunk 4: per-pipeline folder migration (D1, D4) — outline
-
-**Carry-over from Chunk 1 review (gating prerequisite):**
-- **Live-run smoke of at least one migrated agent before Chunk 4 ships.** Each Chunk-4 agent migration adds another untested production path on top of the schema-equivalence test from Chunk 1. Add a capped live run (or `pipeline trace` replay) on `illumination-to-implementation.dot` as Task 4.0 — without it, a regression in the verifier's runtime structured-output path could go undetected until a real meditation cycle hits it.
+## Chunk 4: per-pipeline folder migration (D1, D4)
 
 **Purpose:** Move every project pipeline into its own folder. Relocate agents from `src/cli/agents/` into the pipeline folders that use them. Delete `pipelines/scripts/` and `pipelines/schemas/`.
 
-**High-level shape:**
-- Per-pipeline migration steps (one task per pipeline):
-  1. Create the new folder.
-  2. Move `<name>.dot` → `<name>/pipeline.dot`.
-  3. Copy used agents from `src/cli/agents/<agent>.md` into the folder. Shared agents (`task`, `chat`, `tmux-tester`, `verifier`, etc.) are duplicated into every consuming pipeline folder per Decision 4 (no fallback, full self-containment). After all migrations, `src/cli/agents/` is empty (or only retains the agents Chunks 5-6 will move into templates).
-  4. Move used scripts from `pipelines/scripts/<name>.mjs` into the folder; update `script_file=` paths in `.dot` to be folder-relative.
-  5. Move used schemas from `pipelines/schemas/<name>.json` into the folder (or, if the agent already migrated to `outputs:` frontmatter in Chunks 1-3, delete the now-orphaned schema). Update `json_schema_file=` paths to be folder-relative; the `../schemas/...` reference in `smoke/tmux-tester.dot` dies as part of this step.
-  6. Run `pipeline validate` and `pipeline run` against scratch.
+**Pre-existing-pipeline inventory note:** an earlier draft of this chunk listed `poc-implement`, `gate-test`, and `illumination-to-plan` as pipelines to migrate. None of those exist in the current `pipelines/` tree — they were artifacts of a stale inventory. The list below was re-verified against the working tree before plan acceptance.
 
-- **Project pipelines to migrate (real workflows, 2):**
-  - `pipelines/illumination-to-implementation.dot` → `pipelines/illumination-to-implementation/`
-  - `pipelines/janitor.dot` → `pipelines/janitor/`
-
-- **Smoke pipelines to migrate (test fixtures, 14):** all `pipelines/smoke/*.dot` move to `pipelines/smoke/<name>/pipeline.dot` for uniformity (Decision 1: per-pipeline folder = SSoT, no exceptions for test fixtures):
-  - `agent-implement`, `agent-json-vars`, `chat-end-to-end`, `chat-only`, `conditional`, `gate`, `json-schema-stream`, `meditate-steer`, `missing-caller-var`, `static-multi-node`, `store`, `tmux-tester`, `tool`, `tool-runtime-vars`
-  - Each smoke is small (1-3 nodes) so the resulting folder typically holds `pipeline.dot` + 1-2 `.md`/`.mjs` files. Acceptable folder bloat for uniform structure.
-
-- After all 16 migrations: delete `pipelines/scripts/`, `pipelines/schemas/`, and any remaining unused `src/cli/agents/*.md` (the rest go into templates in Chunks 5-6).
-- Lookup change in `src/cli/lib/agent-registry.ts` (Task 4.last): pipeline folder is the only resolution path; bundled fallback for project pipelines is removed (still kept for templates, see Chunk 5).
-- Chunk-4 review checkpoint.
-
-**Pre-existing-pipeline inventory note:** an earlier draft of this chunk listed `poc-implement`, `gate-test`, and `illumination-to-plan` as pipelines to migrate. None of those exist in the current `pipelines/` tree — they were artifacts of a stale inventory. The list above was re-verified against the working tree before plan acceptance.
+**Pre-existing infra (already supports per-folder lookup, verified during Chunk-4 expansion):**
+- `engine.ts` already passes `dotDir = dirname(absPath)` into `validateGraph` and the runtime context.
+- `graph.ts:193,509` already passes `{projectDir: dotDir}` into `resolveAgent`, so a `<name>.md` sitting next to `pipeline.dot` is found before the bundled `src/cli/agents/<name>.md`.
+- `script_file=` paths already resolve relative to `dotDir` (see `script_file_exists` rule in `graph.ts:341`).
+- `json_schema_file=` paths likewise resolve relative to the agent or `dotDir` once `outputs:` frontmatter took over (Chunks 1-2).
+- The single missing piece is `resolvePipelineArg` in `src/cli/lib/pipeline-resolver.ts`: it currently only returns `pipelines/<name>.dot`. Task 4.1 extends it to prefer `pipelines/<name>/pipeline.dot` when that folder exists.
 
 **Dependencies:** Chunks 1, 2, 3 (every node must self-describe before moving its file).
 
 **Risk note:** This chunk has the largest blast radius. Each pipeline migrates as its own commit so a regression is bisectable.
+
+**Per-pipeline migration recipe (used by Tasks 4.2 — 4.17):**
+1. Create `pipelines/<name>/` (smoke pipelines: `pipelines/smoke/<name>/`).
+2. `git mv pipelines/<name>.dot pipelines/<name>/pipeline.dot`.
+3. Copy each `agent="<x>"` referenced in the .dot from `src/cli/agents/<x>.md` into the folder. Per Decision 4 (full self-containment) the bundled originals stay in place during Chunk 4 — fallback removal is Task 4.19.
+4. If the .dot references `script_file="scripts/<f>.mjs"`: `git mv pipelines/scripts/<f>.mjs pipelines/<name>/<f>.mjs` and rewrite the `script_file=` value to the folder-relative form.
+5. If the .dot references `json_schema_file="schemas/<f>.json"` AND the consuming agent has not yet migrated to `outputs:` frontmatter: `git mv pipelines/schemas/<f>.json pipelines/<name>/<f>.json` and rewrite the path. (Once an agent has `outputs:`, drop the `json_schema_file=` attribute entirely — Chunk-1/2 already exposed the conflict diagnostic.)
+6. Run `npx ralph pipeline validate <name>` and confirm zero errors / no new warnings.
+7. Commit as `refactor(pipelines): migrate <name> to per-folder layout (D1 chunk-4)`.
+
+---
+
+### Task 4.0: Capped live-run smoke baseline of `illumination-to-implementation` — DEFERRED
+
+Gating prerequisite from Chunk 1 review. Required only before Task 4.17 (illumination-to-implementation migration), not before Tasks 4.1 — 4.16. Capture either a real `ralph pipeline run illumination-to-implementation` trace or replay `pipeline trace` on the latest stored run; archive as `tmp/chunk-4-baseline.jsonl` and diff against post-migration trace. Re-runs across this chunk: not required, since each per-pipeline migration is independently bisectable via its own commit.
+
+### Task 4.1: `resolvePipelineArg` prefers `<name>/pipeline.dot` over flat `<name>.dot`
+
+**Why:** Task 4.2 onward will move every `.dot` into a sibling folder; without this resolution change the bare-name shorthand `ralph pipeline run janitor` breaks the moment the file moves.
+
+**RED step (one subagent):**
+- Add `src/cli/tests/pipeline-resolver-folder.test.ts` (or extend `pipeline-resolver.test.ts`) with three cases that fail today:
+  1. Folder-form wins: when `<project>/pipelines/<name>/pipeline.dot` exists, `resolvePipelineArg("<name>", project)` returns that absolute path.
+  2. Folder-form preferred over flat-form: when BOTH `<project>/pipelines/<name>/pipeline.dot` AND `<project>/pipelines/<name>.dot` exist, the folder-form path is returned (Decision 1: folder = SSoT).
+  3. Flat-form still wins for back-compat when only `<project>/pipelines/<name>.dot` exists (carry-over of existing behavior).
+- Use `tmpdir`/`mkdirSync` setup the same way `pipeline-resolver.test.ts` already does.
+- Run `npx vitest run src/cli/tests/pipeline-resolver-folder.test.ts` and confirm cases (1) and (2) fail. Commit RED separately is OPTIONAL; we'll squash with GREEN.
+
+**GREEN step (one subagent):**
+- Edit `src/cli/lib/pipeline-resolver.ts`. Inside `resolvePipelineArg`, before the existing flat-file probe at the project layer, add:
+  ```typescript
+  const folderPath = join(getPipelinesDir(project), arg, "pipeline.dot");
+  if (existsSync(folderPath)) return folderPath;
+  ```
+  (Same insertion at the user-home layer.)
+- Run `npx vitest run src/cli/tests/pipeline-resolver-folder.test.ts` and `npx vitest run src/cli/tests/pipeline-resolver.test.ts` — all green.
+- Run full suite `npx vitest run` — confirm no regressions.
+- Commit `feat(pipeline-resolver): support <name>/pipeline.dot folder layout (D1 chunk-4)`.
+
+### Task 4.2: Migrate `janitor.dot` to `pipelines/janitor/`
+
+**Why this pipeline first:** janitor uses exactly one agent (`janitor`), zero `script_file=`, zero `json_schema_file=` references. Smallest possible blast radius — proves the recipe works before the larger migrations land.
+
+**Steps (one subagent):**
+1. `mkdir -p pipelines/janitor`.
+2. `git mv pipelines/janitor.dot pipelines/janitor/pipeline.dot`.
+3. `cp src/cli/agents/janitor.md pipelines/janitor/janitor.md` (do NOT delete the bundled copy yet — Task 4.19 handles that after fallback removal).
+4. Add a regression test `src/cli/tests/pipeline-janitor-folder.test.ts`:
+   - `resolvePipelineArg("janitor", "<repo-root>")` returns the absolute path of `pipelines/janitor/pipeline.dot`.
+   - `validateGraph(loadDot("pipelines/janitor/pipeline.dot"), dirname(...))` returns no error-level diagnostics (warnings tolerated).
+5. Run `npx ralph pipeline validate janitor` from the repo root → expect exit 0.
+6. Run `npx vitest run` — full suite green.
+7. `git rm pipelines/janitor.svg` (stale SVG — `pipeline show` regenerates on demand).
+8. Commit `refactor(pipelines): migrate janitor to per-folder layout (D1 chunk-4)`.
+
+### Tasks 4.3 — 4.16: Migrate the 14 smoke pipelines
+
+Each smoke pipeline is its own task; each is one commit. Recipe = the per-pipeline migration recipe above. Order is alphabetical for predictability:
+
+| # | Pipeline | Agents to copy in | Scripts | Schemas |
+|---|---|---|---|---|
+| 4.3 | `agent-implement` | `task` | — | — |
+| 4.4 | `agent-json-vars` | `task` | — | `agent-json-vars.json` (folder-local; or drop if agent migrates `outputs:`) |
+| 4.5 | `chat-end-to-end` | `task`, `chat` | — | `summary.json` |
+| 4.6 | `chat-only` | `chat` | — | — |
+| 4.7 | `conditional` | `task` | — | `conditional-result.json` |
+| 4.8 | `gate` | `task` (+ gate `.md` file resolution stays via dotDir) | — | — |
+| 4.9 | `json-schema-stream` | `task` | — | `file-list.json` |
+| 4.10 | `meditate-steer` | (no `agent=` references; meditate-steer relies on built-ins) | — | — |
+| 4.11 | `missing-caller-var` | (designed-to-fail fixture, agents may be missing) | — | — |
+| 4.12 | `static-multi-node` | `task` | — | — |
+| 4.13 | `store` | (no `agent=` references) | — | — |
+| 4.14 | `tmux-tester` | `tmux-tester` (the agent), `task` | — | `meditate-observe.json` (currently `../schemas/...` — the kludge dies) |
+| 4.15 | `tool` | (tool node, no agent) | — | — |
+| 4.16 | `tool-runtime-vars` | (tool node, no agent) | — | — |
+
+Per task: run `npx ralph pipeline validate smoke/<name>` and the targeted smoke test (e.g. `npx vitest run src/cli/tests/smoke.test.ts -t '<name>'`) before committing.
+
+After Tasks 4.3 — 4.16: `pipelines/smoke/schemas/` should be empty (all migrated or dropped); `git rm -r pipelines/smoke/schemas/`. Reflect in test assertions if any test references `smoke/schemas/`.
+
+### Task 4.17: Migrate `illumination-to-implementation.dot`
+
+Largest blast radius. Pre-flight (gates Task 4.0 archive):
+- Capture the live-run baseline trace per Task 4.0.
+- Inventory every `agent=` (verifier, change-explainer, chat-refiner, chat-summarizer→task, design-writer, plan-writer, memory-reflector, memory-writer, task) and every `script_file=` (`scripts/mark-archived.mjs`, `scripts/mark-dispatched.mjs`).
+
+Steps (one subagent):
+1. `mkdir -p pipelines/illumination-to-implementation`.
+2. `git mv pipelines/illumination-to-implementation.dot pipelines/illumination-to-implementation/pipeline.dot`.
+3. Copy every used agent into the folder.
+4. `git mv pipelines/scripts/mark-archived.mjs pipelines/illumination-to-implementation/mark-archived.mjs` and `mark-dispatched.mjs`. Update `script_file=` paths to folder-relative.
+5. For each remaining `json_schema_file=` reference: if the agent has `outputs:` (Chunk 1-2), delete the attribute. Otherwise migrate the schema into the folder.
+6. Move the gate `.md` files (`approval_gate.md`, `review_gate.md`, `remove_gate.md`, `tmux_confirm_gate.md`) from `pipelines/` into the new folder if and only if they are referenced ONLY by this pipeline. (Chunk 3 left them at `pipelines/<gate>.md`; the runtime resolves them relative to `dotDir`.)
+7. `git rm pipelines/illumination-to-implementation.svg`.
+8. Run `npx ralph pipeline validate illumination-to-implementation`. Run the live-run replay against the baseline trace from Task 4.0 — confirm structurally equivalent output (same node order, same produced keys).
+9. Commit `refactor(pipelines): migrate illumination-to-implementation to per-folder layout (D1 chunk-4)`.
+
+### Task 4.18: Delete now-empty `pipelines/scripts/` and `pipelines/schemas/`
+
+After Tasks 4.2 — 4.17 every script and schema has either been moved into a pipeline folder or deleted because its consuming agent now self-describes via `outputs:`. Verify the leftovers are empty (or only contain test-only files unrelated to pipelines), then:
+- `git rm -r pipelines/scripts/` (move `pipelines/scripts/tests/` into wherever the consuming agents live, or delete if obsolete).
+- `git rm -r pipelines/schemas/`.
+- Update any test that hard-codes `pipelines/schemas/` or `pipelines/scripts/`.
+- Run `npx vitest run` — full suite green.
+- Commit `chore(pipelines): remove unused pipelines/scripts and pipelines/schemas (D1 chunk-4)`.
+
+### Task 4.19: Remove bundled fallback for project pipelines in `agent-registry.ts`
+
+Per Decision 4 (full self-containment, no fallback) for project pipelines. Templates (Chunk 5) keep their bundled lookup, so the change is scoped:
+- Add an `allowBundledFallback?: boolean` flag to `RegistryOptions` (default `true` to preserve current callers).
+- The pipeline runtime calls `resolveAgent(name, { projectDir: dotDir, allowBundledFallback: false })` so that a missing per-folder `<agent>.md` errors out instead of silently falling back to `src/cli/agents/`.
+- Adjust template / `pipeline create` callers (Chunk 5) to keep the fallback.
+- Update tests:
+  - `src/attractor/tests/agent-registry-inputs.test.ts` adds a "no-fallback errors" case.
+  - Existing tests that depend on fallback get the explicit `allowBundledFallback: true` option.
+- After this lands, every previously-bundled `src/cli/agents/<x>.md` that was copied into a pipeline folder during Tasks 4.2 — 4.17 can be safely deleted (`git rm src/cli/agents/<x>.md`). Leave the agents that templates / Chunks 5-6 still need.
+- Commit `refactor(agent-registry): drop bundled fallback for pipeline runtime (D4 chunk-4)`.
+
+### Task 4.20: Chunk-4 review checkpoint
+
+- Dispatch `superpowers:code-reviewer` against the chunk-4 commit range with the spec at `docs/superpowers/specs/2026-04-27-pipeline-folder-architecture-redesign.md` (or successor) and this plan section.
+- Address feedback in-chunk; re-dispatch if needed.
+- Tag `chunk-4-per-pipeline-folders` for bisectable history.
+- Dispatch `memory-writer` per the Post-execution memory capture procedure at the bottom of this plan.
+- Expand Chunk 5 outline into full TDD steps (this happens in the session after the chunk lands).
 
 ---
 

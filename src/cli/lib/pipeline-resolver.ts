@@ -25,14 +25,22 @@ export function resolvePipelineArg(arg: string, project: string): string {
     );
   }
 
-  // 1. Project-local
+  // 1. Project-local — folder-form (Decision 1: per-pipeline folder = SSoT)
+  const projectFolderPath = join(getPipelinesDir(project), arg, "pipeline.dot");
+  if (existsSync(projectFolderPath)) return projectFolderPath;
+
+  // 2. Project-local — flat-form (back-compat until Chunk 4 finishes migrating every pipeline)
   const projectPath = join(getPipelinesDir(project), `${arg}.dot`);
   if (existsSync(projectPath)) return projectPath;
 
-  // 2. User home
+  // 3. User home — folder-form
+  const userFolderPath = join(homedir(), ".ralph", "pipelines", arg, "pipeline.dot");
+  if (existsSync(userFolderPath)) return userFolderPath;
+
+  // 4. User home — flat-form
   const userPath = join(homedir(), ".ralph", "pipelines", `${arg}.dot`);
   if (existsSync(userPath)) return userPath;
 
-  // 3. Bundled
+  // 5. Bundled
   return getBundledPipelinePath(arg);
 }

@@ -81,6 +81,49 @@ describe("resolvePipelineArg bundled fallback", () => {
   });
 });
 
+describe("resolvePipelineArg folder-form lookup (Chunk 4: per-pipeline folder)", () => {
+  beforeEach(() => mockExists.mockReturnValue(false));
+
+  it("returns <project>/pipelines/<name>/pipeline.dot when folder-form exists and flat-form does not", () => {
+    const folderPath = join("/my-app", "pipelines", "janitor", "pipeline.dot");
+    mockExists.mockImplementation((p: unknown) =>
+      typeof p === "string" && p === folderPath
+    );
+    expect(resolvePipelineArg("janitor", "/my-app")).toBe(folderPath);
+  });
+
+  it("prefers folder-form over flat-form when BOTH exist (folder = SSoT, Decision 1)", () => {
+    const folderPath = join("/my-app", "pipelines", "janitor", "pipeline.dot");
+    const flatPath = join("/my-app", "pipelines", "janitor.dot");
+    mockExists.mockImplementation((p: unknown) =>
+      typeof p === "string" && (p === folderPath || p === flatPath)
+    );
+    expect(resolvePipelineArg("janitor", "/my-app")).toBe(folderPath);
+  });
+
+  it("falls through to flat-form when only the flat <name>.dot exists (back-compat)", () => {
+    const flatPath = join("/my-app", "pipelines", "legacy.dot");
+    mockExists.mockImplementation((p: unknown) =>
+      typeof p === "string" && p === flatPath
+    );
+    expect(resolvePipelineArg("legacy", "/my-app")).toBe(flatPath);
+  });
+
+  it("checks folder-form at the user-home layer too", () => {
+    const userFolderPath = join(
+      process.env.HOME || "",
+      ".ralph",
+      "pipelines",
+      "janitor",
+      "pipeline.dot",
+    );
+    mockExists.mockImplementation((p: unknown) =>
+      typeof p === "string" && p === userFolderPath
+    );
+    expect(resolvePipelineArg("janitor", "/my-app")).toBe(userFolderPath);
+  });
+});
+
 describe("getPipelinesDir", () => {
   it("returns pipelines subfolder of project", () => {
     expect(getPipelinesDir("/my-app")).toBe(join("/my-app", "pipelines"));
