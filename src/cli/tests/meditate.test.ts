@@ -14,39 +14,7 @@ vi.mock("../lib/output.js", () => ({
   stream: vi.fn(async () => {}),
 }));
 
-// Capture RunOptions passed to agent.run()
-let lastRunOptions: import("../lib/agent.js").RunOptions | undefined;
-const mockAgentRun = vi.fn(async (opts: import("../lib/agent.js").RunOptions) => {
-  lastRunOptions = opts;
-  return { exitCode: 0, sessionId: null, stdout: null };
-});
-
-vi.mock("../lib/agent.js", () => ({
-  Agent: vi.fn().mockImplementation(() => ({
-    run: mockAgentRun,
-    kill: vi.fn(),
-  })),
-  validateAgentConfig: vi.fn((c) => c),
-  MCP_CONFIG_GLOB: ".mcp-*-*.json",
-}));
-
-vi.mock("../lib/agent-registry.js", () => ({
-  resolveAgent: vi.fn(() => ({
-    name: "meditate",
-    description: "test",
-    model: "opus",
-    permissionMode: "dangerouslySkipPermissions",
-    tools: [],
-    mcp: [],
-    prompt: "system prompt",
-  })),
-}));
-
-vi.mock("../lib/assets.js", () => ({
-  getIlluminationServerPath: vi.fn(() => "/fake/server.js"),
-  getMetaMeditationsDir: vi.fn(() => "/fake/meditations"),
-}));
-
+import * as pipelineMod from "../commands/pipeline.js";
 import {
   pidPath,
   writePid,
@@ -55,7 +23,6 @@ import {
   isPidAlive,
   ensureMeditationDirs,
   appendMeditateGitignore,
-  runMeditationSession,
   meditateCommand,
 } from "../commands/meditate";
 
@@ -67,6 +34,7 @@ beforeEach(() => {
 
 afterEach(() => {
   rmSync(tmpDir, { recursive: true, force: true });
+  vi.restoreAllMocks();
 });
 
 describe("ensureMeditationDirs", () => {
@@ -160,12 +128,11 @@ describe("isPidAlive", () => {
   });
 });
 
-describe("meditate agent tool whitelist", () => {
+describe("meditate template agent tool whitelist", () => {
+  const templatePath = join(__dirname, "..", "templates", "meditate", "meditate.md");
+
   it("includes list_illuminations in the tools list", () => {
-    const agentMd = readFileSync(
-      join(__dirname, "..", "agents", "meditate.md"),
-      "utf-8",
-    );
+    const agentMd = readFileSync(templatePath, "utf-8");
     const toolsMatch = agentMd.match(/^tools:\n((?:\s+-\s+.+\n)+)/m);
     expect(toolsMatch).not.toBeNull();
     const tools = toolsMatch![1]
@@ -176,10 +143,7 @@ describe("meditate agent tool whitelist", () => {
   });
 
   it("whitelists exactly the 7 reflective-only tools", () => {
-    const agentMd = readFileSync(
-      join(__dirname, "..", "agents", "meditate.md"),
-      "utf-8",
-    );
+    const agentMd = readFileSync(templatePath, "utf-8");
     const toolsMatch = agentMd.match(/^tools:\n((?:\s+-\s+.+\n)+)/m);
     expect(toolsMatch).not.toBeNull();
     const tools = toolsMatch![1]
@@ -203,10 +167,7 @@ describe("meditate agent tool whitelist", () => {
   });
 
   it("does not whitelist any lifecycle (state-mutating) tools", () => {
-    const agentMd = readFileSync(
-      join(__dirname, "..", "agents", "meditate.md"),
-      "utf-8",
-    );
+    const agentMd = readFileSync(templatePath, "utf-8");
     const toolsMatch = agentMd.match(/^tools:\n((?:\s+-\s+.+\n)+)/m);
     expect(toolsMatch).not.toBeNull();
     const tools = toolsMatch![1]
@@ -227,10 +188,7 @@ describe("meditate agent tool whitelist", () => {
   });
 
   it("body does not reference any removed lifecycle tool name", () => {
-    const agentMd = readFileSync(
-      join(__dirname, "..", "agents", "meditate.md"),
-      "utf-8",
-    );
+    const agentMd = readFileSync(templatePath, "utf-8");
     const frontmatterMatch = agentMd.match(/^---\n[\s\S]+?\n---\n/);
     expect(frontmatterMatch).not.toBeNull();
     const body = agentMd.slice(frontmatterMatch![0].length);
@@ -248,62 +206,63 @@ describe("meditate agent tool whitelist", () => {
   });
 });
 
-describe("runMeditationSession steer", () => {
-  beforeEach(() => {
-    lastRunOptions = undefined;
-    mockAgentRun.mockClear();
+describe("meditateCommand (shim)", () => {
+  it("delegates to pipelineRunCommand with the bundled meditate template + steer variable", async () => {
+    const calls: Array<{ dotFile: string; opts: any }> = [];
+    vi.spyOn(pipelineMod, "pipelineRunCommand").mockImplementation(async (dotFile, opts) => {
+      calls.push({ dotFile, opts });
+    });
+    await meditateCommand(tmpDir, { steer: "focus on auth flow" });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].dotFile.endsWith("meditate/pipeline.dot")).toBe(true);
+    expect(calls[0].opts.project).toBe(tmpDir);
+    expect(calls[0].opts.variables.steer).toBe("focus on auth flow");
   });
 
-  it("passes message to agent.run() when steer is provided", async () => {
-    await runMeditationSession(tmpDir, "focus on auth");
-    expect(lastRunOptions?.message).toBe("focus on auth");
-  });
-
-  it("does not set message when steer is omitted", async () => {
-    await runMeditationSession(tmpDir);
-    expect(lastRunOptions?.message).toBeUndefined();
-  });
-});
-
-describe("meditateCommand --steer passthrough", () => {
-  beforeEach(() => {
-    lastRunOptions = undefined;
-    mockAgentRun.mockClear();
-  });
-
-  it("passes steer to runMeditationSession when provided", async () => {
-    await meditateCommand(tmpDir, { steer: "focus on auth" });
-    expect(lastRunOptions?.message).toBe("focus on auth");
-  });
-
-  it("does not set message when steer is omitted", async () => {
+  it("passes empty steer string when --steer is omitted", async () => {
+    const calls: Array<{ dotFile: string; opts: any }> = [];
+    vi.spyOn(pipelineMod, "pipelineRunCommand").mockImplementation(async (dotFile, opts) => {
+      calls.push({ dotFile, opts });
+    });
     await meditateCommand(tmpDir);
-    expect(lastRunOptions?.message).toBeUndefined();
+    expect(calls).toHaveLength(1);
+    expect(calls[0].opts.variables.steer).toBe("");
+  });
+
+  it("runs preflight: ensureMeditationDirs + appendMeditateGitignore before pipeline", async () => {
+    vi.spyOn(pipelineMod, "pipelineRunCommand").mockImplementation(async () => {});
+    await meditateCommand(tmpDir);
+    expect(existsSync(join(tmpDir, "meditations", "illuminations"))).toBe(true);
+    expect(existsSync(join(tmpDir, ".gitignore"))).toBe(true);
+  });
+
+  it("removes PID file after pipeline completes", async () => {
+    vi.spyOn(pipelineMod, "pipelineRunCommand").mockImplementation(async () => {});
+    await meditateCommand(tmpDir);
+    expect(existsSync(pidPath(tmpDir))).toBe(false);
   });
 });
 
-describe("meditate agent prompt body — exploration scope", () => {
+describe("meditate template agent prompt body — exploration scope", () => {
   it("exploration step weights specs/ and src/ folders", () => {
     const agentMd = readFileSync(
-      join(__dirname, "..", "agents", "meditate.md"),
+      join(__dirname, "..", "templates", "meditate", "meditate.md"),
       "utf-8",
     );
     const frontmatterMatch = agentMd.match(/^---\n[\s\S]+?\n---\n/);
     expect(frontmatterMatch).not.toBeNull();
     const body = agentMd.slice(frontmatterMatch![0].length);
 
-    // The exploration step (numbered "3." in the body) must call out the
-    // weighted focus on specs/*.md and src/. Both anchors must be present.
     expect(body).toMatch(/specs\/\*?\*?\/?\*?\.?md|specs\//);
     expect(body).toContain("src/");
     expect(body.toLowerCase()).toContain("weighted focus");
   });
 });
 
-describe("meditate agent prompt body — reflection brief", () => {
+describe("meditate template agent prompt body — reflection brief", () => {
   it("reflection step asks for architect-mode lenses", () => {
     const agentMd = readFileSync(
-      join(__dirname, "..", "agents", "meditate.md"),
+      join(__dirname, "..", "templates", "meditate", "meditate.md"),
       "utf-8",
     );
     const frontmatterMatch = agentMd.match(/^---\n[\s\S]+?\n---\n/);
@@ -316,4 +275,3 @@ describe("meditate agent prompt body — reflection brief", () => {
     expect(body).toContain("abstraction");
   });
 });
-
