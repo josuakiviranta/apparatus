@@ -421,21 +421,29 @@ function checkAgentOutputsConflict(
     });
   }
 
-  // produces_redundant_with_outputs — produces= key set mirrors agent outputs keys exactly
+  // produces_redundant_with_outputs — outputs: is SSoT; any produces= on an
+  // outputs-bearing node is redundant or divergent. Escalated to error per D2.
   if (typeof node.produces === "string" && node.produces.trim().length > 0) {
-    const declared = Object.keys(agentConfig.outputs);
+    const declared = new Set(Object.keys(agentConfig.outputs));
     const onNode = node.produces.split(/\s*,\s*/).map(s => s.trim()).filter(Boolean);
-    const sameSet =
-      declared.length === onNode.length &&
-      declared.every(k => onNode.includes(k));
-    if (sameSet) {
-      diags.push({
-        rule: "produces_redundant_with_outputs",
-        severity: "warning",
-        message: `produces= on this node is redundant; derived from agent "${node.agent}"'s outputs: keys.`,
-        location: node.sourceLocation,
-      });
+    const extra = onNode.filter(k => !declared.has(k));
+    const missing = [...declared].filter(k => !onNode.includes(k));
+    let detail: string;
+    if (extra.length === 0 && missing.length === 0) {
+      detail = `keys are identical to outputs: — drop produces= entirely.`;
+    } else if (extra.length > 0 && missing.length === 0) {
+      detail = `produces= adds keys the agent does not output: ${extra.join(", ")}.`;
+    } else if (missing.length > 0 && extra.length === 0) {
+      detail = `produces= only declares [${onNode.join(", ")}] but agent outputs [${[...declared].join(", ")}]; missing: ${missing.join(", ")}.`;
+    } else {
+      detail = `produces= diverges from outputs: extra=[${extra.join(", ")}], missing=[${missing.join(", ")}].`;
     }
+    diags.push({
+      rule: "produces_redundant_with_outputs",
+      severity: "error",
+      message: `Agent "${node.agent}" declares outputs: in frontmatter (the SSoT). ${detail} Remove produces= from this node.`,
+      location: node.sourceLocation,
+    });
   }
 }
 

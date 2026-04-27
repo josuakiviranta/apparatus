@@ -29,7 +29,7 @@ prompt body
     )).toBe(true);
   });
 
-  it("emits produces_redundant_with_outputs as warning when redeclared", () => {
+  it("emits produces_redundant_with_outputs as error when redeclared", () => {
     const dir = join(tmpdir(), `produces-redundant-${Date.now()}`);
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, "verifier.md"), `---
@@ -50,7 +50,7 @@ prompt
     const diags = validateGraph(graph, dir);
 
     expect(diags.some(d =>
-      d.rule === "produces_redundant_with_outputs" && d.severity === "warning"
+      d.rule === "produces_redundant_with_outputs" && d.severity === "error"
     )).toBe(true);
   });
 
