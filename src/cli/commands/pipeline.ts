@@ -23,6 +23,7 @@ import { composeCreatePrompt } from "../lib/pipeline-create-prompt.js";
 import { runTwoPhaseClaudeSession } from "../lib/session.js";
 import * as output from "../lib/output.js";
 import { renderCodeFrame } from "../lib/code-frame.js";
+import { formatPipelineDiag } from "../lib/pipeline-diag-format.js";
 import type { Diagnostic } from "../../attractor/types.js";
 import { DotSyntaxError } from "../../attractor/core/dot-syntax.js";
 import { renderPipelineApp } from "../components/PipelineApp.js";
@@ -169,9 +170,6 @@ export function diffEdgeLabels(prev: Graph, curr: Graph): EdgeDiagnostic[] {
   return out;
 }
 
-function indentHint(hint: string): string {
-  return hint.split("\n").map(line => `  ${line}`).join("\n");
-}
 
 function labelIsReferenced(g: Graph, label: string): boolean {
   if (!label) return false;
@@ -196,12 +194,7 @@ export async function pipelineValidateCommand(dotFile: string, opts: PipelineVal
   catch { await output.error(`Cannot read file: ${absPath}`); return 1; }
 
   const relPath = relative(process.cwd(), absPath) || absPath;
-  function formatDiag(d: Diagnostic): string {
-    const loc = d.location ? `${relPath}:${d.location.line}:${d.location.column} ` : "";
-    const hint = d.hint ? `\n${indentHint(d.hint)}` : "";
-    const frame = d.location ? `\n${indentHint(renderCodeFrame(src, d.location, { context: 2, color: false }))}` : "";
-    return `${loc}[${d.rule}] ${d.message}${hint}${frame}`;
-  }
+  const formatDiag = (d: Diagnostic) => formatPipelineDiag(d, src, relPath);
 
   let graph: Graph;
   try { graph = parseDot(src); }
@@ -1065,12 +1058,7 @@ export async function pipelineShowCommand(
   catch { await output.error(`Cannot read file: ${absPath}`); return 1; }
 
   const relPath = relative(process.cwd(), absPath) || absPath;
-  function formatDiag(d: Diagnostic): string {
-    const loc = d.location ? `${relPath}:${d.location.line}:${d.location.column} ` : "";
-    const hint = d.hint ? `\n${indentHint(d.hint)}` : "";
-    const frame = d.location ? `\n${indentHint(renderCodeFrame(src, d.location, { context: 2, color: false }))}` : "";
-    return `${loc}[${d.rule}] ${d.message}${hint}${frame}`;
-  }
+  const formatDiag = (d: Diagnostic) => formatPipelineDiag(d, src, relPath);
 
   let graph: Graph;
   try { graph = parseDot(src); }
