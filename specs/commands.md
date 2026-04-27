@@ -36,10 +36,8 @@ Scaffolds a new project and launches a kickoff session.
 2. Creates directory scaffold:
    - `specs/`
    - `src/`
-   - `scenario-tests/`
-   - `scenario-runs/`
    - Empty files: `README.md`, `AGENTS.md`, `IMPLEMENTATION_PLAN.md`
-   - `.gitignore` with `IMPLEMENTATION_PLAN.md`, `scenario-runs/`
+   - `.gitignore` with `IMPLEMENTATION_PLAN.md`
 3. Runs `git init -b main`
 4. Two-phase kickoff session using bundled `PROMPT_kickoff.md`:
    - Phase 1: Non-interactive — substitutes `{{PROJECT_NAME}}`, Claude writes `README.md` + `specs/README.md`
@@ -69,21 +67,6 @@ Creates a new meditation script via a non-interactive Claude session.
 2. No PID lock file, no permission restrictions
 3. Result is stored in the project's meditation directory
 
-## `ralph run-scenarios <project-folder> [--all]`
-
-Discovers and runs scenario tests.
-
-**Options:**
-- `--all` — skip interactive selection, run every discovered scenario
-
-**Behavior:**
-1. Discovers scenario scripts in `<project-folder>/scenario-tests/*.md`
-2. Without `--all`: presents interactive multi-select for which scenarios to run
-3. With `--all`: runs every discovered scenario
-4. Each scenario runs as an isolated non-interactive Claude session with a templated prompt
-5. Timestamped results written to `<project-folder>/scenario-runs/`
-6. Claude interprets the output and writes an actionable report
-
 ## `ralph heartbeat` (subcommands)
 
 Schedules recurring tasks via the background daemon. Communicates via RPC (no direct Claude invocation).
@@ -95,10 +78,6 @@ Registers a recurring meditation task to run every `<n>` minutes. The daemon aut
 ### `ralph heartbeat implement <folder> --every <n>`
 
 Registers a recurring implement loop to run every `<n>` minutes.
-
-### `ralph heartbeat run-scenarios <folder> --every <n>`
-
-Registers recurring scenario tests to run every `<n>` minutes.
 
 ### `ralph heartbeat pipeline <dotfile> --every <n> [--project <folder>]`
 
@@ -235,10 +214,9 @@ After each loop iteration, `implement.ts` pushes changes:
 
 | Condition | Command | Behavior |
 |-----------|---------|----------|
-| Project folder missing | `implement`, `meditate`, `run-scenarios` | Exit with error |
+| Project folder missing | `implement`, `meditate` | Exit with error |
 | Project folder already exists | `new` | Warn and exit |
 | `claude` not in PATH | `implement` (via loop) | Throws error |
 | Claude exits non-zero | `implement` (via loop) | `log.warn()`, loop continues |
 | `git push` fails twice | `implement` (via loop) | `log.warn()`, loop continues |
-| No scenarios found | `run-scenarios` | Exit with message |
 | Daemon not running | `heartbeat` subcommands | Auto-starts daemon |

@@ -54,11 +54,6 @@ ralph heartbeat pipeline pipelines/janitor.dot --project . --every 720
 The janitor is read-only on code; it only writes new illuminations and flips lifecycle frontmatter. See `docs/superpowers/specs/2026-04-25-janitor-agent-design.md` for the full design.
 
 ```bash
-ralph run-scenarios <project-folder> [--all]
-```
-Discovers `scenario-tests/*.md` files and runs them with Claude, writing reports to `scenario-runs/`. Without `--all`, presents an interactive selection menu.
-
-```bash
 ralph pipeline run <pipeline.dot> [--var <key=value>...] [--resume]
 ```
 Execute a `.dot` pipeline file. Use `--var` (repeatable) to pass caller variables:
@@ -130,7 +125,6 @@ Press `Ctrl+C`. Ralph cleanly terminates its own claude subprocess without affec
 | `specs/` | Behavioral specs per subsystem (current, authoritative) |
 | `docs/` | Harness docs + `superpowers/specs/` (design history, not authoritative specs) |
 | `pipelines/` | `.dot` pipeline definitions + JSON schemas; `smoke/` for smoke tests |
-| `scenario-tests/` | Shell-based end-to-end scenario tests per command |
 | `meditations/` | Curated lenses in `stimuli/` + three illumination status dirs: `illuminations/` (open + dispatched), `archived-illuminations/`, `implemented-illuminations/` |
 | `memory/` | Session memory written by Claude agents across conversations |
 

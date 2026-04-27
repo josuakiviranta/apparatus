@@ -10,7 +10,6 @@
 - Tests: `npx vitest run`
 - Typecheck: `npx tsc --noEmit`
 - Smoke test: `npx vitest run src/cli/tests/smoke.test.ts` (requires `npm run build` first)
-- Scenario tests: `bash scenario-tests/test-meditate-session.sh` or `ralph run-scenarios . --all`
 
 ## Operational Notes
 
@@ -23,7 +22,7 @@
 ### Codebase Patterns
 
 - CLI entry: `src/cli/index.ts` → commander setup
-- Commands: `src/cli/commands/{plan,implement,new,meditate,meditate-create,run-scenarios,agent,pipeline}.ts`
+- Commands: `src/cli/commands/{plan,implement,new,meditate,meditate-create,agent,pipeline}.ts`
 - Lib: `src/cli/lib/{agent,agent-registry,assets,frontmatter,output,prompts,stream-formatter}.ts`
 - Tests: `src/cli/tests/*.test.ts` (vitest)
 - Bundled prompts: `src/cli/prompts/PROMPT_{plan,build,kickoff}.md`

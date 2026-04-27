@@ -4,11 +4,11 @@ Read this document at the start of any debugging session that needs to observe r
 
 ## When to use this
 
-Use this harness when debugging ralph's Ink TUI — pipeline display, ChatUI overlay, meditate session, implement loop output, run-scenarios progress — and you need to *observe* what the UI actually does (not what the code says it should do).
+Use this harness when debugging ralph's Ink TUI — pipeline display, ChatUI overlay, meditate session, implement loop output — and you need to *observe* what the UI actually does (not what the code says it should do).
 
 Not for:
 
-- **Automated regression tests.** See `src/cli/tests/scenarios/` and the existing `run-scenarios` command.
+- **Automated regression tests.** See `src/cli/tests/` and `npx vitest run` for the test suite.
 - **User-facing demos.** This is a dev-time debugging tool.
 - **Driving commands that do not spawn a TUI.** For non-TUI commands, just run them in your current shell.
 

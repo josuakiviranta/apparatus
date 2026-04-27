@@ -8,7 +8,7 @@ Source of truth for implementation: `src/attractor/`. This spec documents behavi
 
 A pipeline is a directed graph of typed nodes, authored as a Graphviz `.dot` file and executed by `runPipeline()` in `src/attractor/core/engine.ts`. The engine walks the graph from a single `start` node to a single `exit` node, dispatching each node to a type-specific handler, carrying a mutable `context` object between nodes, and emitting structured events to a JSONL tracer.
 
-Pipelines are the preferred extension surface for new ralph behaviours. Both `ralph implement` and `ralph run-scenarios` can be invoked through pipelines; custom workflows live in `pipelines/*.dot` within a project.
+Pipelines are the preferred extension surface for new ralph behaviours. `ralph implement` itself is implemented as a pipeline; custom workflows live in `pipelines/*.dot` within a project.
 
 ## Commands
 
@@ -117,7 +117,6 @@ All handlers live in `src/attractor/handlers/`. `runPipeline` dispatches via the
 | `parallel.fan_in` | tripleoctagon | `parallel.ts` (`FanInHandler`) | Reads `parallel.results`; rolls up to `success` / `partial_success` / `fail` |
 | `store` | cylinder | `store.ts` | Writes context values to persistent storage |
 | `ralph.meditate` | octagon | `ralph-meditate.ts` | Invokes the meditate command as a pipeline step |
-| `ralph.run-scenarios` | square | `ralph-scenarios.ts` | Invokes run-scenarios as a pipeline step |
 | `stack.manager_loop` | house | `manager-loop.ts` | **Not yet implemented** — reserved for hierarchical sub-pipeline composition |
 
 Adding a new node type requires: a handler module, registration in `buildHandlerMap()` in the engine, a zod schema in `core/schemas.ts`, and the corresponding row in this table.

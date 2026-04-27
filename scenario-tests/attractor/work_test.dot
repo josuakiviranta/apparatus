@@ -1,7 +1,0 @@
-digraph work_test {
-  goal="Add a comment to README"
-  start   [shape=Mdiamond]
-  write   [shape=box, prompt="Append this exact line to the end of README.md: attractor-test-comment", max_iterations=2]
-  done    [shape=Msquare]
-  start -> write -> done
-}

@@ -51,7 +51,6 @@ If the pipeline takes no caller inputs, omit the attribute. The runtime fails fa
 | `parallelogram` | tool | Runs an external shell command |
 | `circle` | ralph.implement | Invokes `ralph implement` on the project |
 | `octagon` | ralph.meditate | Invokes `ralph meditate` on the project |
-| `square` | ralph.run-scenarios | Invokes `ralph run-scenarios` on the project |
 
 > **Not yet implemented:** `component` (parallel fan-out), `tripleoctagon` (parallel fan-in), and `house` (stack.manager_loop) shapes exist in the grammar but are not supported by the engine. Do **not** use them — the validator will reject them.
 
@@ -137,15 +136,15 @@ exit code. Non-zero exit fails the node and halts the pipeline (or triggers
 
 ```dot
 digraph review_pipeline {
-  goal="Run scenarios, meditate on results, then approve or fix"
+  goal="Lint, meditate on results, then approve or fix"
   inputs="review_agent"
 
   // Entry and exit (required in every pipeline)
   start  [shape=Mdiamond]
   done   [shape=Msquare]
 
-  // Run scenario tests on the project — goal_gate ensures this always completes
-  scenarios [shape=square, label="Run scenarios", goal_gate=true]
+  // Lint the project — goal_gate ensures this always completes
+  lint [shape=box, prompt="Run linting", max_iterations=1, goal_gate=true]
 
   // Meditation session — Claude reviews results and writes insights
   meditate [shape=octagon, label="Review insights"]
@@ -160,12 +159,12 @@ digraph review_pipeline {
   fix [shape=box, prompt="Apply the fixes recommended in the latest meditation illumination.", max_iterations=3]
 
   // Wire it up
-  start     -> scenarios
-  scenarios -> meditate
-  meditate  -> check
-  check     -> fix    [condition="result=fail"]
-  check     -> review [condition="result=success"]
-  review    -> done
+  start    -> lint
+  lint     -> meditate
+  meditate -> check
+  check    -> fix    [condition="result=fail"]
+  check    -> review [condition="result=success"]
+  review   -> done
 
   // After fix, loop back to re-run the whole pipeline with preserved context
   fix -> start [loop_restart=true]

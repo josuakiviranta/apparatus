@@ -19,13 +19,6 @@ Registers a recurring implement task. The daemon runs `ralph implement <project-
 - `--every <n>` is **required**
 - Task ID format: `implement:<basename-of-folder>`
 
-### `ralph heartbeat run-scenarios <project-folder> --every <n>`
-
-Registers a recurring scenario-test task. The daemon runs `ralph run-scenarios <project-folder>` every `<n>` minutes.
-
-- `--every <n>` is **required**
-- Task ID format: `run-scenarios:<basename-of-folder>`
-
 ### `ralph heartbeat pipeline <dotfile> --every <n> [--project <folder>]`
 
 Registers a recurring pipeline task. The daemon runs `ralph pipeline run <dotfile> [--project <folder>]` every `<n>` minutes.

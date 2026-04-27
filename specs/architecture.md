@@ -25,7 +25,6 @@ ralph-cli/
 │   │   │   ├── new.ts                  # ralph new
 │   │   │   ├── meditate.ts             # ralph meditate
 │   │   │   ├── meditate-create.ts      # ralph meditate create
-│   │   │   ├── run-scenarios.ts        # ralph run-scenarios
 │   │   │   ├── agent.ts                # ralph agent (list, show, create)
 │   │   │   ├── pipeline.ts             # ralph pipeline (run, list, create)
 │   │   │   └── heartbeat.ts            # ralph heartbeat (subcommands)
@@ -63,7 +62,7 @@ ralph-cli/
 │   │   │   ├── meditate-create.md
 │   │   │   ├── chat.md
 │   │   │   └── agent-creator.md
-│   │   └── prompts/                     # bundled session prompts (kickoff, meditation, scenario, etc.)
+│   │   └── prompts/                     # bundled session prompts (kickoff, meditation, etc.)
 │   ├── attractor/                       # Pipeline execution engine
 │   │   ├── types.ts                    # Pipeline type definitions
 │   │   ├── checkpoint.ts              # Pipeline checkpoint/resume support
@@ -78,7 +77,6 @@ ralph-cli/
 │   │   │   ├── manager-loop.ts        # Manager loop iteration handler
 │   │   │   ├── parallel.ts            # Parallel node execution handler
 │   │   │   ├── ralph-meditate.ts      # Ralph meditate integration handler
-│   │   │   ├── ralph-scenarios.ts     # Ralph scenarios integration handler
 │   │   │   ├── start-exit.ts          # Start/exit node handlers
 │   │   │   ├── store.ts              # Store node handler (state persistence)
 │   │   │   ├── tool.ts               # Generic tool handler

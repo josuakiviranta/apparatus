@@ -51,7 +51,6 @@ You turn an approved design doc into a chunked, TDD-shaped implementation plan a
      ## Verification targets
 
      - Smokes: <list of `pipelines/smoke/*.dot` files, or `None`>
-     - Scenario tests: <list of `scenario-tests/*.sh` files, or `None`>
      - Manual exercises: <`ralph` commands or TUI checks, or `None`>
      - Lint: <specific `npx vitest run <path>` target or `npx tsc --noEmit`, or `None`>
      - Surfaces touched: <matching surface labels from `pipelines/surfaces.json`>

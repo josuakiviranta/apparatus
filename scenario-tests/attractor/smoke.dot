@@ -1,6 +1,0 @@
-digraph smoke {
-  goal="Test that pipeline runs"
-  start [shape=Mdiamond]
-  done  [shape=Msquare]
-  start -> done
-}
