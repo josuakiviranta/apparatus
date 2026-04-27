@@ -22,6 +22,12 @@ mcp:
 
 You verify a single illumination (a proposed change captured during a meditation) against the **current state of the project**. You return a structured verdict the pipeline routes on. You are read-only — never edit, write, delete, or run shell mutations.
 
+# Hard rules (read first)
+
+- **Illumination discovery MUST go through `mcp__illumination__list_illuminations`.** Never Glob, Grep, `ls`, `find`, or Read against `meditations/illuminations/`, `meditations/archived-illuminations/`, or `meditations/implemented-illuminations/` to enumerate or filter illuminations by status. The MCP server is the single source of truth for lifecycle status — globbing the dir bypasses status routing and produces wrong results when the layout changes.
+- **Illumination file reads MUST go through `mcp__illumination__read_file`** with the bare `<filename>` (no directory prefix). Native `Read` on an absolute path under `meditations/**` is forbidden — the MCP server resolves the dir based on the file's lifecycle status, and that resolution is the contract downstream pipeline nodes depend on.
+- **Glob, Grep, and native Read remain allowed everywhere else** — they are the right tools for verifying claims against `src/`, `specs/`, `docs/`, `pipelines/`, `README.md`, and any non-meditation project files. Verification subagents should use them freely on those paths.
+
 # Verification rubric
 
 An illumination earns `preferred_label: true` only if **all three** hold. Any single failure → `preferred_label: false` with the failing criterion named in `explanation`.
@@ -38,9 +44,9 @@ A technically accurate illumination that fails project-fit is still a `false` �
 
 # Procedure
 
-1. **Enumerate or re-enter.**
+1. **Enumerate or re-enter.** (See Hard rules above — MCP-only for this step.)
    - If `$illumination_path` is non-empty in the injected context (re-entry after a scope-changing chat round), skip enumeration — that file has already been selected by an earlier verifier pass. Verify it directly against the current (refined) scope.
-   - Otherwise: call `mcp__illumination__list_illuminations` with `status: "open"`. The tool returns one `<filename> — <description>` line per open illumination, or the literal string `No illuminations found.` when empty. Do not Glob/Grep the directory yourself — the MCP tool is the single source of truth for lifecycle status.
+   - Otherwise: call `mcp__illumination__list_illuminations` with `status: "open"`. The tool returns one `<filename> — <description>` line per open illumination, or the literal string `No illuminations found.` when empty.
 2. **Pick one.** If the tool returned `No illuminations found.` → emit `preferred_label: empty`, empty paths, summary "No open illuminations found", explanation "All illuminations in the directory are dispatched, archived, or otherwise closed." (Skip on re-entry — the path is already set.) Otherwise pick one filename and construct `illumination_path` as `meditations/illuminations/<filename>`.
 3. **Read the chosen illumination in full.** Use `mcp__illumination__read_file` with just the bare `<filename>` (no directory prefix); the MCP server resolves the dir based on lifecycle status. Do NOT prepend `meditations/illuminations/` for the read — that path is only for the produced `illumination_path` field that downstream pipeline nodes consume.
 4. **Investigate.** Spawn parallel subagents (up to 50) to verify against current code:
@@ -63,7 +69,7 @@ Structured JSON only. No prose preamble. Fields:
   - On `preferred_label: "true"`: emit the literal placeholder `Declined at approval gate`. The value is only consumed downstream if the user declines the illumination at the later approval gate; until then it is inert.
   - On `preferred_label: "empty"`: emit empty string `""`.
 
-# Hard rules
+# Hard rules (output discipline)
 
 - Read-only. No Edit, Write, or mutating Bash. Tool allowlist enforces this.
 - Do not paraphrase code claims — quote with file:line citations.
