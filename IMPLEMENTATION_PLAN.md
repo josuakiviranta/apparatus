@@ -2698,29 +2698,18 @@ Implemented per Decision 4. Surprises:
 
   `refactor(pipeline-create): convert command to thin shim over pipeline-create template (D7 chunk-5)`
 
-### Task 5.6: Delete dead code paths
+### Task 5.6: Delete dead code paths — DEFERRED to Chunk 6 (2026-04-27)
 
-**Why:** Prevent the old wiring from rotting in the tree. Once the shim works end-to-end, every path it bypassed is dead.
+**Why deferred:** Plan-author's deletion list assumed all callers of the four targets were the `pipelineCreateCommand` path. Audit on 2026-04-27 (during Chunk-5 execution) found two surviving callers outside that path:
 
-- [ ] **Step 1: delete files**
+- `src/cli/commands/pipeline.ts:942` — `pipelineRefineCommand` still calls `composeCreatePrompt(project)` and reads `PROMPT_pipeline_create.md` as the refine session's base prompt. Refine becomes a pipeline in Chunk 6 sub-chunk 6d.
+- `src/cli/commands/agent.ts:63` — `agentCreateAction` (the `ralph agent create` command) calls `resolveAgent("agent-creator")`. Unrelated to pipeline scaffolding; whether to retire it is a separate decision.
 
-  - `src/cli/prompts/PROMPT_pipeline_create.md`
-  - `src/cli/agents/agent-creator.md`
-  - `src/cli/lib/pipeline-create-prompt.ts`
-  - `src/cli/tests/compose-create-prompt.test.ts`
+**What to do here:** keep the four files alive through Chunk 5. Schedule deletions in Chunk 6:
+- 6d (`pipeline refine` → template) deletes `PROMPT_pipeline_create.md`, `pipeline-create-prompt.ts`, `compose-create-prompt.test.ts`, `pipeline-create-prompt.test.ts`, and the `getPipelineCreatePromptPath` export.
+- A new 6e: decide whether `ralph agent create` migrates to a template. If yes, `agent-creator.md` retires there; otherwise stays.
 
-- [ ] **Step 2: drop the now-unused `getPipelineCreatePromptPath()` from `src/cli/lib/assets.ts`**
-
-  Search for callers first: `grep -rn 'getPipelineCreatePromptPath' src/`. Should yield zero hits after Task 5.5. If it does, remove the export.
-
-- [ ] **Step 3: full test run + typecheck**
-
-  - `npx vitest run` → still green.
-  - `npx tsc --noEmit` → clean.
-
-- [ ] **Step 4: commit**
-
-  `chore(pipeline-create): drop PROMPT_pipeline_create + agent-creator + composeCreatePrompt (D7 chunk-5)`
+No code changes in this task. Resume with Task 5.7.
 
 ### Task 5.7: End-to-end smoke (`ralph pipeline create` against a temp project)
 
