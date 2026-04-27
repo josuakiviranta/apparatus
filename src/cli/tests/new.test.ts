@@ -1,8 +1,21 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtempSync, rmSync, existsSync, readFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { scaffoldProject, buildKickoffPrompt } from "../commands/new";
+
+vi.mock("../lib/output.js", () => ({
+  header: vi.fn(async () => {}),
+  step: vi.fn(async () => {}),
+  info: vi.fn(async () => {}),
+  warn: vi.fn(async () => {}),
+  error: vi.fn(async () => {}),
+  success: vi.fn(async () => {}),
+  spinner: vi.fn(async (_label: string, fn: () => Promise<unknown>) => fn()),
+  stream: vi.fn(async () => {}),
+}));
+
+import * as pipelineMod from "../commands/pipeline.js";
+import { scaffoldProject, newCommand } from "../commands/new";
 
 let tmpDir: string;
 
@@ -12,6 +25,7 @@ beforeEach(() => {
 
 afterEach(() => {
   rmSync(tmpDir, { recursive: true, force: true });
+  vi.restoreAllMocks();
 });
 
 describe("scaffoldProject", () => {
@@ -32,7 +46,6 @@ describe("scaffoldProject", () => {
   it("creates src/ directory (language-agnostic, no subdirs)", () => {
     scaffoldProject(tmpDir, "my-project");
     expect(existsSync(join(tmpDir, "src"))).toBe(true);
-    // No TS-specific subdirs
     expect(existsSync(join(tmpDir, "src", "tests"))).toBe(false);
   });
 
@@ -72,23 +85,26 @@ describe("scaffoldProject", () => {
   });
 });
 
-const BRAINSTORM_TRIGGER = `Study specs/*.md and src/* in parallel using subagents to understand the project. Then invoke the Skill tool with skill name "superpowers:brainstorming".`;
-
-describe("buildKickoffPrompt", () => {
-  it("substitutes {{PROJECT_NAME}} with the given name", () => {
-    const template = 'Hello "{{PROJECT_NAME}}", welcome to {{PROJECT_NAME}}!';
-    const result = buildKickoffPrompt(template, "my-app");
-    expect(result).toBe(`Hello "my-app", welcome to my-app!\n\n${BRAINSTORM_TRIGGER}`);
+describe("newCommand (shim)", () => {
+  it("delegates to pipelineRunCommand with the bundled new template + project_name variable", async () => {
+    const calls: Array<{ dotFile: string; opts: any }> = [];
+    vi.spyOn(pipelineMod, "pipelineRunCommand").mockImplementation(async (dotFile, opts) => {
+      calls.push({ dotFile, opts });
+    });
+    const projectArg = join(tmpDir, `proj-${Math.random().toString(36).slice(2, 8)}`);
+    await newCommand(projectArg);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].dotFile.endsWith("new/pipeline.dot")).toBe(true);
+    expect(calls[0].opts.project).toBe(projectArg);
+    expect(calls[0].opts.variables.project_name).toBe(projectArg);
   });
 
-  it("appends brainstorm trigger even with no placeholder", () => {
-    const template = "No placeholder here.";
-    const result = buildKickoffPrompt(template, "my-app");
-    expect(result).toBe(`No placeholder here.\n\n${BRAINSTORM_TRIGGER}`);
-  });
-
-  it("ends with the brainstorm trigger", () => {
-    const result = buildKickoffPrompt("Some kickoff content.", "my-app");
-    expect(result).toContain('invoke the Skill tool with skill name "superpowers:brainstorming"');
+  it("scaffolds project files before invoking the pipeline", async () => {
+    vi.spyOn(pipelineMod, "pipelineRunCommand").mockImplementation(async () => {});
+    const projectArg = join(tmpDir, `proj-${Math.random().toString(36).slice(2, 8)}`);
+    await newCommand(projectArg);
+    expect(existsSync(join(projectArg, "AGENTS.md"))).toBe(true);
+    expect(existsSync(join(projectArg, "specs"))).toBe(true);
+    expect(existsSync(join(projectArg, ".git"))).toBe(true);
   });
 });

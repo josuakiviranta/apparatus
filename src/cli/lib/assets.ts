@@ -20,10 +20,6 @@ export function getAssetPath(filename: string): string {
   return join(base, filename);
 }
 
-export function getKickoffPromptPath(): string {
-  return getAssetPath(join("prompts", "PROMPT_kickoff.md"));
-}
-
 export function getMeditationPromptPath(): string {
   return getAssetPath(join("prompts", "PROMPT_meditation.md"));
 }

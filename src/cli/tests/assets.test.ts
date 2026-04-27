@@ -1,13 +1,8 @@
 import { existsSync, readdirSync } from "fs";
 import { describe, it, expect } from "vitest";
-import { getAssetPath, getKickoffPromptPath, getMeditationPromptPath, getIlluminationServerPath, getMetaMeditationsDir, getMeditateCreatePromptPath } from "../lib/assets";
+import { getAssetPath, getMeditationPromptPath, getIlluminationServerPath, getMetaMeditationsDir, getMeditateCreatePromptPath } from "../lib/assets";
 
 describe("assets", () => {
-  it("getKickoffPromptPath returns a path ending in PROMPT_kickoff.md", () => {
-    const p = getKickoffPromptPath();
-    expect(p).toMatch(/PROMPT_kickoff\.md$/);
-  });
-
   it("getMeditationPromptPath returns a path ending in PROMPT_meditation.md", () => {
     const p = getMeditationPromptPath();
     expect(p).toMatch(/PROMPT_meditation\.md$/);
