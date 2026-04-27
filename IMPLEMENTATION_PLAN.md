@@ -1747,19 +1747,13 @@ Implementation: added module-level `parseConditionClauses` helper to `src/attrac
 git commit -m "feat(validator): input_type_mismatch rule (enum value check)"
 ```
 
-### Task 2.9: Validator rule `orphan_output` (warning)
+### Task 2.9: Validator rule `orphan_output` (warning) — SHIPPED 2026-04-27
 
-When an agent's `outputs:` includes a key that no downstream node consumes (via `inputs:` or `condition=`), emit a warning. Catches stale schema entries.
+When an agent's `outputs:` includes a key that no downstream node consumes (via `inputs:`, `condition=`, or `$key` references in prompts/labels), emit a `warning`-severity diagnostic. Catches stale schema entries.
 
-- [ ] **Step 1 — 6: Standard TDD cycle.**
+Implementation lives in `checkOrphanOutput` (`src/attractor/core/graph.ts`), wired inside the existing `if (dotDir)` block alongside `checkMissingInputProducer` / `checkInputTypeMismatch`. Tests: `src/attractor/tests/graph-orphan-output.test.ts` (7 cases — orphan detection, all 3 consumption channels, multi-output partial-orphan, no-dotDir skip).
 
-Implementation: collect all consumed keys (downstream `inputs:` declarations + `condition="key=val"` references + `$key` references in prompts/labels). For each `outputs[key]` not in the consumed set, emit `orphan_output` warning.
-
-- [ ] **Step 7: Commit**
-
-```bash
-git commit -m "feat(validator): orphan_output warning"
-```
+Verified clean on `pipelines/illumination-to-implementation.dot` — no orphan warnings emitted on the live graph.
 
 ### Task 2.10: Validator rule `required_caller_vars` (info-level banner)
 

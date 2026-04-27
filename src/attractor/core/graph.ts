@@ -393,9 +393,61 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
   if (dotDir) {
     checkMissingInputProducer(graph, nodeProduces, dotDir, diags);
     checkInputTypeMismatch(graph, dotDir, diags);
+    checkOrphanOutput(graph, dotDir, diags);
   }
 
   return diags;
+}
+
+function checkOrphanOutput(
+  graph: Graph,
+  dotDir: string,
+  diags: Diagnostic[],
+): void {
+  // Build the set of keys consumed anywhere in the graph: downstream agent
+  // inputs:, edge condition= clauses, and $key references in prompts/labels.
+  const consumed = new Set<string>();
+
+  for (const node of graph.nodes.values()) {
+    if (!node.agent) continue;
+    const cfg = tryResolveAgent(node, dotDir);
+    if (!cfg?.inputs) continue;
+    for (const k of cfg.inputs) consumed.add(k);
+  }
+
+  for (const edge of graph.edges) {
+    if (!edge.condition) continue;
+    const clauses = parseConditionClauses(String(edge.condition));
+    for (const clause of clauses) consumed.add(clause.key);
+  }
+
+  const VAR_RE_LOCAL = /\$([a-zA-Z_][\w.]*)/g;
+  for (const node of graph.nodes.values()) {
+    const fields = [node.prompt, node.toolCommand, node.label, node.scriptArgs]
+      .filter((f): f is string => typeof f === "string");
+    for (const field of fields) {
+      let m: RegExpExecArray | null;
+      const re = new RegExp(VAR_RE_LOCAL.source, VAR_RE_LOCAL.flags);
+      while ((m = re.exec(field)) !== null) {
+        consumed.add(m[1].replace(/\.+$/, ""));
+      }
+    }
+  }
+
+  for (const [id, node] of graph.nodes) {
+    if (!node.agent) continue;
+    const cfg = tryResolveAgent(node, dotDir);
+    if (!cfg?.outputs) continue;
+    for (const key of Object.keys(cfg.outputs)) {
+      if (consumed.has(key)) continue;
+      diags.push({
+        rule: "orphan_output",
+        severity: "warning",
+        message: `Agent "${node.agent}" at node "${id}" declares output "${key}" but no downstream node consumes it (no agent input, condition=, or $${key} reference). Drop "${key}" from outputs: or wire it into a consumer.`,
+        location: node.sourceLocation,
+      });
+    }
+  }
 }
 
 function checkInputTypeMismatch(
