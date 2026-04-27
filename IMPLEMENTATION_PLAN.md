@@ -918,7 +918,7 @@ Check that:
 
 D2 says: when an agent declares `outputs:`, the agent file is the SSoT. Any `produces=` on the calling node is redundant — and worse, divergent (subset / superset / disjoint) `produces=` silently drops or invents keys. Today's `sameSet` check only catches the harmless exact-match case. Escalate to **error** for any presence.
 
-- [ ] **Step 1: Read the current rule**
+- [x] **Step 1: Read the current rule**
 
 ```bash
 sed -n '424,440p' src/attractor/core/graph.ts
@@ -926,7 +926,7 @@ sed -n '424,440p' src/attractor/core/graph.ts
 
 Expected: the existing `if (typeof node.produces === "string" && node.produces.trim().length > 0)` block, with the `sameSet` filter at `:428-431`.
 
-- [ ] **Step 2: Write failing tests for subset / superset / disjoint cases**
+- [x] **Step 2: Write failing tests for subset / superset / disjoint cases**
 
 Create `src/attractor/tests/graph-produces-redundant-broad.test.ts`:
 
@@ -1019,7 +1019,7 @@ body
 });
 ```
 
-- [ ] **Step 3: Run test to verify it fails**
+- [x] **Step 3: Run test to verify it fails**
 
 ```bash
 npx vitest run src/attractor/tests/graph-produces-redundant-broad.test.ts
@@ -1027,7 +1027,7 @@ npx vitest run src/attractor/tests/graph-produces-redundant-broad.test.ts
 
 Expected: FAIL — exact-match still emits warning (not error); subset/superset/disjoint emit nothing.
 
-- [ ] **Step 4: Broaden the rule**
+- [x] **Step 4: Broaden the rule**
 
 In `src/attractor/core/graph.ts:424-440`, replace the rule body:
 
@@ -1058,7 +1058,7 @@ if (typeof node.produces === "string" && node.produces.trim().length > 0) {
 }
 ```
 
-- [ ] **Step 5: Run test to verify it passes**
+- [x] **Step 5: Run test to verify it passes**
 
 ```bash
 npx vitest run src/attractor/tests/graph-produces-redundant-broad.test.ts
@@ -1066,7 +1066,7 @@ npx vitest run src/attractor/tests/graph-produces-redundant-broad.test.ts
 
 Expected: PASS for all 5 tests.
 
-- [ ] **Step 6: Run the full validator test suite to confirm no regression**
+- [x] **Step 6: Run the full validator test suite to confirm no regression**
 
 ```bash
 npx vitest run src/attractor/tests/graph
@@ -1074,12 +1074,14 @@ npx vitest run src/attractor/tests/graph
 
 Expected: all green. The Chunk-1 `graph-outputs-conflict.test.ts` test that asserts `severity === "warning"` for the exact-match case will need to be updated to `severity === "error"` — fix it in the same commit.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/attractor/core/graph.ts src/attractor/tests/graph-produces-redundant-broad.test.ts src/attractor/tests/graph-outputs-conflict.test.ts
 git commit -m "feat(validator): escalate produces_redundant_with_outputs to error and broaden coverage"
 ```
+
+**Step 8 (added in code review): Whitespace-only produces= early-skip** — `produces=" , , "` (only commas/whitespace) used to fire the rule misleadingly because the outer guard checks `trim().length > 0` (the trimmed `","` is length 1). Added `if (onNode.length === 0) return;` after split/filter, plus a regression test in `graph-produces-redundant-broad.test.ts`. Commit: `fix(validator): produces_redundant_with_outputs ignores whitespace-only produces=` (`20ffb79`).
 
 ### Task 2.2: Add `resolveAgent` bundled-registry test for verifier (carry-over)
 
