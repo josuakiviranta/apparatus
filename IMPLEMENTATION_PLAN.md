@@ -2294,26 +2294,20 @@ Steps (one subagent):
 8. Run `npx ralph pipeline validate illumination-to-implementation`. Run the live-run replay against the baseline trace from Task 4.0 — confirm structurally equivalent output (same node order, same produced keys).
 9. Commit `refactor(pipelines): migrate illumination-to-implementation to per-folder layout (D1 chunk-4)`.
 
-### Task 4.18: Delete now-empty `pipelines/scripts/` and `pipelines/schemas/`
+### Task 4.18: Delete now-empty `pipelines/scripts/` and `pipelines/schemas/` — SHIPPED 2026-04-27 (`8445012`)
 
-After Tasks 4.2 — 4.17 every script and schema has either been moved into a pipeline folder or deleted because its consuming agent now self-describes via `outputs:`. Verify the leftovers are empty (or only contain test-only files unrelated to pipelines), then:
-- `git rm -r pipelines/scripts/` (move `pipelines/scripts/tests/` into wherever the consuming agents live, or delete if obsolete).
-- `git rm -r pipelines/schemas/`.
-- Update any test that hard-codes `pipelines/schemas/` or `pipelines/scripts/`.
-- Run `npx vitest run` — full suite green.
-- Commit `chore(pipelines): remove unused pipelines/scripts and pipelines/schemas (D1 chunk-4)`.
+`pipelines/scripts/` was already gone (deleted earlier in chunk-4). `pipelines/schemas/` had only a stale `structured-output-test.json` with no live refs. Removed alongside the description-shape lint test (`pipeline-schema-descriptions.test.ts` + its `__fixtures__/schemas/` fixtures) — that lint now lives on agent `outputs:` frontmatter via `agent-outputs-frontmatter.test.ts`. Updated the `inline_script_smell` rule message in `graph.ts` to point at `<pipeline-folder>/<name>.<ext>` instead of the deleted `pipelines/scripts/`.
 
-### Task 4.19: Remove bundled fallback for project pipelines in `agent-registry.ts`
+### Task 4.19: Remove bundled fallback for project pipelines in `agent-registry.ts` — SHIPPED 2026-04-27 (`c8c1255`)
 
-Per Decision 4 (full self-containment, no fallback) for project pipelines. Templates (Chunk 5) keep their bundled lookup, so the change is scoped:
-- Add an `allowBundledFallback?: boolean` flag to `RegistryOptions` (default `true` to preserve current callers).
-- The pipeline runtime calls `resolveAgent(name, { projectDir: dotDir, allowBundledFallback: false })` so that a missing per-folder `<agent>.md` errors out instead of silently falling back to `src/cli/agents/`.
-- Adjust template / `pipeline create` callers (Chunk 5) to keep the fallback.
-- Update tests:
-  - `src/attractor/tests/agent-registry-inputs.test.ts` adds a "no-fallback errors" case.
-  - Existing tests that depend on fallback get the explicit `allowBundledFallback: true` option.
-- After this lands, every previously-bundled `src/cli/agents/<x>.md` that was copied into a pipeline folder during Tasks 4.2 — 4.17 can be safely deleted (`git rm src/cli/agents/<x>.md`). Leave the agents that templates / Chunks 5-6 still need.
-- Commit `refactor(agent-registry): drop bundled fallback for pipeline runtime (D4 chunk-4)`.
+Implemented per Decision 4. Surprises:
+
+- **`agent-handler.ts` was looking at the wrong dir.** Pre-fix, the runtime resolved agents at `<projectDir>/.ralph/agents/<name>.md`. Post-fix, it resolves at `meta.dotDir` (the per-folder pipeline directory), matching the validator. The old `<projectDir>/.ralph/agents/` path is gone for the runtime; users override per-folder agents via `~/.ralph/agents/`.
+- **Verifier kept bundled.** `agent-registry-bundled.test.ts` is the canonical proof that bundled lookup still works for templates (Chunks 5-6). It needs an outputs-bearing agent — verifier is the only kept one. Plan said "can be safely deleted"; we kept it intentionally.
+- **Tests touched:** `agent-handler.test.ts` (no-fallback assertion replaces stale `projectDir: undefined`), `agent-registry-inputs.test.ts` (red/green new no-fallback + project-local-still-resolves cases), `janitor-agent.test.ts` (re-pointed `AGENT_PATH` at the per-folder copy).
+- **Bundled deletes** (11 files): change-explainer, chat-refiner, chat, design-writer, implement, janitor, memory-reflector, memory-writer, plan-writer, task, tmux-tester. **Kept** (7 files): agent-creator, chat-summarizer, meditate, meditate-create, meditate-observer, plan, verifier.
+
+**Spec drift to address later:** `specs/architecture.md:112` still describes the old "project-local `.ralph/agents/` → user → bundled" precedence. Update during Chunk 5/6 or a separate spec-sync pass.
 
 ### Task 4.20: Chunk-4 review checkpoint
 

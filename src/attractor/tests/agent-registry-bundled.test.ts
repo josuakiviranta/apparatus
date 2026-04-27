@@ -5,6 +5,9 @@ import { mkdtempSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 
+// verifier.md is the only kept-bundled agent with outputs: frontmatter, which
+// is why this invariant test pins on it. If verifier moves out of bundled in a
+// future chunk, re-point at whichever kept agent gains an outputs: block.
 describe("resolveAgent — verifier via bundledDir", () => {
   it("loads outputs from bundled verifier.md (registry path, not direct read)", () => {
     const bundledDir = resolve(__dirname, "../../cli/agents");
