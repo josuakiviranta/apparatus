@@ -3432,7 +3432,7 @@ Also cleaned: `getPipelineCreatePromptPath` in `assets.ts` (orphaned) + stale `v
 
 #### Task 6f.1: Delete `src/cli/prompts/`
 
-- [ ] **Step 1: confirm empty**
+- [x] **Step 1: confirm empty**
 
   ```sh
   ls src/cli/prompts/
@@ -3441,7 +3441,7 @@ Also cleaned: `getPipelineCreatePromptPath` in `assets.ts` (orphaned) + stale `v
 
   Both should show only meta-files (or no files, only README) and zero source references.
 
-- [ ] **Step 2: delete the folder**
+- [x] **Step 2: delete the folder**
 
   ```sh
   rm -rf src/cli/prompts
@@ -3449,7 +3449,7 @@ Also cleaned: `getPipelineCreatePromptPath` in `assets.ts` (orphaned) + stale `v
 
   If `tsup.config.ts` contained any prompt-copy step, drop it too. (Chunk 5 already scoped its copy to `templates/`; a stale `prompts/` copy line might still be present.)
 
-- [ ] **Step 3: tests + commit**
+- [x] **Step 3: tests + commit**
 
   `chore(prompts): remove src/cli/prompts/ entirely (D8 chunk-6f)`
 

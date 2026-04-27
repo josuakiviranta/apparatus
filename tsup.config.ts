@@ -16,11 +16,6 @@ export default defineConfig({
     js: "#!/usr/bin/env node",
   },
   async onSuccess() {
-    // Copy bundled assets to dist/
-    mkdirSync("dist/prompts", { recursive: true });
-    for (const file of readdirSync("src/cli/prompts")) {
-      copyFileSync(`src/cli/prompts/${file}`, `dist/prompts/${file}`);
-    }
     // Copy agent definition files
     mkdirSync("dist/agents", { recursive: true });
     for (const file of readdirSync("src/cli/agents")) {

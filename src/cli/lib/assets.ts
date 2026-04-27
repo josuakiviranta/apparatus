@@ -14,18 +14,10 @@ function isProduction(): boolean {
 }
 
 export function getAssetPath(filename: string): string {
-  // prod: dist/cli/ → up one → dist/ (where prompts/ live)
-  // dev:  src/cli/lib/ → up one → src/cli/ (where prompts/ live in dev)
+  // prod: dist/cli/ → up one → dist/ (where templates/, agents/, pipelines/ live)
+  // dev:  src/cli/lib/ → up one → src/cli/ (where templates/, agents/, pipelines/ live in dev)
   const base = join(__dirname, "..");
   return join(base, filename);
-}
-
-export function getMeditationPromptPath(): string {
-  return getAssetPath(join("prompts", "PROMPT_meditation.md"));
-}
-
-export function getMeditateCreatePromptPath(): string {
-  return getAssetPath(join("prompts", "PROMPT_meditate_create.md"));
 }
 
 export function getBundledAgentsDir(): string {
