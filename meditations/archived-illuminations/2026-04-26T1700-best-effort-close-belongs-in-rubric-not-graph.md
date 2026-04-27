@@ -1,7 +1,9 @@
 ---
 date: 2026-04-26
-status: open
+status: archived
 description: mark_dispatched (mandatory open) belongs as a structural tool node; mark_plan_implemented (best-effort close) belongs as a rubric step — reliability requirement, not position in the open/close pair, determines enforcement layer, which explains why T1600's fix is correct and T1400's tool-node proposal would create an irreconcilable conflict.
+archived_at: 2026-04-27
+reason: Inline shadow procedure already removed from memory_writer prompt
 ---
 
 ## Core Idea
