@@ -1,5 +1,16 @@
 import { defineConfig } from "tsup";
-import { copyFileSync, mkdirSync, readdirSync } from "fs";
+import { copyFileSync, mkdirSync, readdirSync, statSync } from "fs";
+import { join } from "path";
+
+function copyDirRecursive(src: string, dst: string) {
+  mkdirSync(dst, { recursive: true });
+  for (const entry of readdirSync(src)) {
+    const s = join(src, entry);
+    const d = join(dst, entry);
+    if (statSync(s).isDirectory()) copyDirRecursive(s, d);
+    else copyFileSync(s, d);
+  }
+}
 
 export default defineConfig({
   entry: [
@@ -31,6 +42,8 @@ export default defineConfig({
     for (const file of readdirSync("src/cli/pipelines")) {
       copyFileSync(`src/cli/pipelines/${file}`, `dist/pipelines/${file}`);
     }
+    // Copy bundled templates (per-folder layout, recurse into subdirs).
+    copyDirRecursive("src/cli/templates", "dist/templates");
     console.log("Assets copied to dist/");
   },
 });
