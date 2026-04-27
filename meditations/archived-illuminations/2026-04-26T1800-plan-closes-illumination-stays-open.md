@@ -1,7 +1,9 @@
 ---
 date: 2026-04-26
-status: open
+status: archived
 description: T1600+T1700 fix lands plan closure in the rubric but leaves the illumination dispatched forever — mark_implemented is absent from both the rubric procedure and the tools whitelist, so the open-close pair is half-designed even after the shadow-procedure fix ships.
+archived_at: 2026-04-27
+reason: memory-writer.md already lists mark_implemented and step 7b closes illumination best-effort
 ---
 
 ## Core Idea
