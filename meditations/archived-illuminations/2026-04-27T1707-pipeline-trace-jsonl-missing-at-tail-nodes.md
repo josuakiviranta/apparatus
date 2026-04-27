@@ -1,7 +1,9 @@
 ---
 date: 2026-04-27
-status: open
+status: archived
 description: Tail nodes (memory-writer, memory-reflector) cannot find ~/.ralph/runs/<run_id>/pipeline.jsonl — either trace is being deleted/never-written, or path convention drifted; either way tail-node evidence reconstruction silently degrades.
+archived_at: 2026-04-27
+reason: Trace persists - real bug is runId slice mismatch plus unresolved projectKey literal in prompt
 ---
 
 ## Core Idea
