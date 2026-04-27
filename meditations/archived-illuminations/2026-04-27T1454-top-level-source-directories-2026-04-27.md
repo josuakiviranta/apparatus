@@ -1,7 +1,9 @@
 ---
 date: 2026-04-27
-status: open
+status: archived
 description: Snapshot of the top-level directories in ralph-cli as of 2026-04-27, for orientation in future sessions.
+archived_at: 2026-04-27
+reason: Inventory snapshot only, no actionable change to triage and duplicates two earlier open illuminations
 ---
 
 ## Core Idea
