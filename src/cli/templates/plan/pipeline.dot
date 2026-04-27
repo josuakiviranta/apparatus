@@ -1,0 +1,8 @@
+digraph plan {
+  start [shape=Mdiamond];
+  end   [shape=Msquare];
+
+  plan [shape=box, agent="plan", interactive=true];
+
+  start -> plan -> end;
+}

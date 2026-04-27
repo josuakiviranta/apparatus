@@ -24,6 +24,12 @@ describe("bundled templates: validateGraph", () => {
     const errors = diags.filter(d => d.severity === "error");
     expect(errors).toEqual([]);
   });
+
+  it("plan has no errors", () => {
+    const diags = loadAndValidate("plan");
+    const errors = diags.filter(d => d.severity === "error");
+    expect(errors).toEqual([]);
+  });
 });
 
 describe("pipeline-create scaffolder agent", () => {
