@@ -399,13 +399,11 @@ Find the `mark_archived` section and add the move target + `archive_path` field 
 
 Pipeline-side parity with the MCP changes: the `mark-archived.mjs` script must also move and commit, and the verifier prompt in `illumination-to-implementation.dot` must stop globbing.
 
-### Task 3.1: `mark-archived.mjs` physically moves file + commits + emits archive_path
+### Task 3.1: `mark-archived.mjs` physically moves file + commits + emits archive_path — ✅ DONE 2026-04-27
 
-**Files:**
-- Modify: `pipelines/scripts/mark-archived.mjs`
-- Test: `pipelines/scripts/tests/mark-archived.test.ts` (or whatever the existing test file is — check `pipelines/scripts/tests/`)
+Shipped as `020cd39` (core change) + `1ac9f2f` (review follow-ups: pin re-archive-different-reason idempotency test + narrow `git add` scope to the two affected paths). 11/11 mark-archived tests + 1153/1153 full suite pass.
 
-- [ ] **Step 1: Find existing tests for the script**
+- [x] **Step 1: Find existing tests for the script**
 
 ```bash
 ls pipelines/scripts/tests/ 2>/dev/null && grep -ln "mark-archived" pipelines/scripts/tests/
@@ -413,7 +411,7 @@ ls pipelines/scripts/tests/ 2>/dev/null && grep -ln "mark-archived" pipelines/sc
 
 Expected: existing test file. If absent, create `pipelines/scripts/tests/mark-archived.test.mjs` based on the pattern of any other test under that dir.
 
-- [ ] **Step 2: Add failing test asserting move + commit + archive_path output**
+- [x] **Step 2: Add failing test asserting move + commit + archive_path output**
 
 ```js
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
@@ -458,12 +456,12 @@ describe("mark-archived.mjs (file move semantics)", () => {
 });
 ```
 
-- [ ] **Step 3: Run test, verify failure**
+- [x] **Step 3: Run test, verify failure**
 
 Run: `npx vitest run pipelines/scripts/tests/mark-archived.test.mjs`
 Expected: FAIL — script doesn't move or commit.
 
-- [ ] **Step 4: Update `pipelines/scripts/mark-archived.mjs`**
+- [x] **Step 4: Update `pipelines/scripts/mark-archived.mjs`**
 
 Replace the entire current file body with the version below. Note: the script resolves `illuminationPath` to absolute up-front so all subsequent `dirname` calls and the `git -C` invocation work whether the pipeline passed a relative or absolute path.
 
@@ -545,7 +543,9 @@ const archivePathRel = path.relative(projectRoot, targetPath);
 console.log(JSON.stringify({ marked_archived: illuminationPath, archive_path: archivePathRel }));
 ```
 
-- [ ] **Step 4b: Update existing idempotent test for new shape**
+- [x] **Step 4b: Update existing idempotent test for new shape**
+
+Beyond the planned shape change, the implementation also dropped the prior strict-equality check on idempotent reason: the original script returned exit 1 if already archived with a different reason; the new script silently re-archives (returns `archive_path` + `idempotent: true`). The corresponding "fails with exit 1 when already archived with a different reason" test was deleted; commit `1ac9f2f` adds a replacement test pinning the new no-op contract.
 
 The pre-existing test at `pipelines/scripts/tests/mark-archived.test.mjs:127-138` asserts the idempotent JSON shape `{ marked_archived, idempotent: true }`. The new script adds `archive_path` to that shape, so the existing assertion at line 137 will fail. Update the assertion:
 
@@ -556,17 +556,9 @@ expect(typeof parsed.archive_path).toBe("string");
 
 (`toMatchObject` instead of `toEqual` lets the extra field through.)
 
-- [ ] **Step 5: Run test, verify pass**
+- [x] **Step 5: Run test, verify pass** — 11/11 pass.
 
-Run: `npx vitest run pipelines/scripts/tests/mark-archived.test.mjs`
-Expected: PASS.
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add pipelines/scripts/mark-archived.mjs pipelines/scripts/tests/mark-archived.test.mjs
-git commit -m "feat(scripts): mark-archived.mjs moves + commits archived file"
-```
+- [x] **Step 6: Commit** — shipped as `020cd39` + `1ac9f2f`.
 
 ---
 
