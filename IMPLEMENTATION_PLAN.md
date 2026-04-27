@@ -3453,9 +3453,9 @@ Also cleaned: `getPipelineCreatePromptPath` in `assets.ts` (orphaned) + stale `v
 
   `chore(prompts): remove src/cli/prompts/ entirely (D8 chunk-6f)`
 
-#### Task 6f.2: Audit + reduce `src/cli/agents/`
+#### Task 6f.2: Audit + reduce `src/cli/agents/` — SHIPPED — verifier kept, see note below
 
-- [ ] **Step 1: list survivors**
+- [x] **Step 1: list survivors**
 
   ```sh
   ls src/cli/agents/
@@ -3463,15 +3463,17 @@ Also cleaned: `getPipelineCreatePromptPath` in `assets.ts` (orphaned) + stale `v
 
   Expected: empty, or only agents shared by Chunk-4-migrated smoke tests under `pipelines/smoke/` (those should already have moved). For each survivor, locate its caller via `git grep`.
 
-- [ ] **Step 2: migrate or delete**
+- [x] **Step 2: migrate or delete**
 
   - If a survivor is referenced only by a smoke pipeline that already lives under `pipelines/smoke/<name>/`, move the agent file into that pipeline's folder.
   - If a survivor has no callers, delete it.
   - If a survivor is referenced by code that should be retired (post-Chunk-6 audit), open a follow-up task in IMPLEMENTATION_PLAN.md and either move or delete the agent.
 
-- [ ] **Step 3: tests + commit**
+- [x] **Step 3: tests + commit**
 
-  `chore(agents): empty src/cli/agents/ — all migrated to per-pipeline folders or templates (D8 chunk-6f)`
+  `chore(agents): move chat-summarizer + meditate-observer to per-pipeline folders (D8 chunk-6f)`
+
+**Note (2026-04-28):** `chat-summarizer.md` moved to `pipelines/illumination-to-implementation/chat-summarizer.md`; `meditate-observer.md` moved to `pipelines/smoke/tmux-tester/meditate-observer.md`. `verifier.md` kept at `src/cli/agents/verifier.md` — pinned by `agent-outputs-frontmatter.test.ts` (hardcodes the bundled path) and used as the bundled fallback for `pipelines/illumination-to-implementation/`'s `verifier` agent name resolution via `allowBundledFallback=true` in `agent-registry.ts`. The pipeline folder's own `verifier` lookup shadows the bundled version during runs, but the bundled copy must remain so the test and fallback path stay valid.
 
 #### Task 6f.3: Update README.md
 

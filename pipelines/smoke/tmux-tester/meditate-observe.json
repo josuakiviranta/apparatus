@@ -11,7 +11,7 @@
     },
     "kid_summary": {
       "type": "string",
-      "description": "Plain-language summary of the illumination per agent rubric (src/cli/agents/meditate-observer.md)."
+      "description": "Plain-language summary of the illumination per agent rubric (pipelines/smoke/tmux-tester/meditate-observer.md)."
     },
     "observation_notes": {
       "type": "string",

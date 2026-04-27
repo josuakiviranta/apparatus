@@ -3,7 +3,7 @@
   "properties": {
     "refinements": {
       "type": "string",
-      "description": "Cumulative refinement log per agent rubric (src/cli/agents/chat-summarizer.md). Subsequent rounds APPEND; never drop prior entries."
+      "description": "Cumulative refinement log per agent rubric (pipelines/illumination-to-implementation/chat-summarizer.md). Subsequent rounds APPEND; never drop prior entries."
     },
     "scope_changed": {
       "type": "boolean",
