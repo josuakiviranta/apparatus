@@ -122,9 +122,10 @@ Agent management:
 
   med
     .argument("<project-folder>")
-    .option("--steer <text>", "initial steering message injected as first user turn")
-    .action(async (projectFolder: string, opts: { steer?: string }) => {
-      await meditateCommand(projectFolder, opts);
+    .option("--var <key=value>", "pass caller variable (repeatable, e.g. --var steer=...)", collectKV, {} as Record<string, string>)
+    .action(async (projectFolder: string, opts: Record<string, unknown>) => {
+      const variables = opts["var"] as Record<string, string> | undefined;
+      await meditateCommand(projectFolder, { variables });
     });
 
   med

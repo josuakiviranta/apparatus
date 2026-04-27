@@ -46,30 +46,30 @@ describe("RalphMeditateHandler", () => {
     expect(args).toContain("/my/project");
   });
 
-  it("forwards --steer flag when node has steer property", async () => {
+  it("forwards --var steer=... when node has steer property", async () => {
     mockSpawnSync.mockReturnValue({ status: 0 } as any);
     const h = new RalphMeditateHandler();
     const node: Node = { id: "med", steer: "focus on security" };
     await h.execute(node, baseCtx(), makeContext());
     const args = mockSpawnSync.mock.calls[0][1] as string[];
-    expect(args).toContain("--steer");
-    expect(args).toContain("focus on security");
+    expect(args).toContain("--var");
+    expect(args).toContain("steer=focus on security");
   });
 
-  it("omits --steer flag when node has no steer property", async () => {
+  it("omits --var when node has no steer property", async () => {
     mockSpawnSync.mockReturnValue({ status: 0 } as any);
     const h = new RalphMeditateHandler();
     await h.execute({ id: "med" }, baseCtx(), makeContext());
     const args = mockSpawnSync.mock.calls[0][1] as string[];
-    expect(args).not.toContain("--steer");
+    expect(args).not.toContain("--var");
   });
 
-  it("omits --steer flag when steer is not a string", async () => {
+  it("omits --var when steer is not a string", async () => {
     mockSpawnSync.mockReturnValue({ status: 0 } as any);
     const h = new RalphMeditateHandler();
     await h.execute({ id: "med", steer: 42 } as any, baseCtx(), makeContext());
     const args = mockSpawnSync.mock.calls[0][1] as string[];
-    expect(args).not.toContain("--steer");
+    expect(args).not.toContain("--var");
   });
 
   it("uses process.execPath and process.argv[1] for spawn", async () => {

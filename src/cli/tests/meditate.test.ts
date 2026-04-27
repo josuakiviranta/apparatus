@@ -212,14 +212,14 @@ describe("meditateCommand (shim)", () => {
     vi.spyOn(pipelineMod, "pipelineRunCommand").mockImplementation(async (dotFile, opts) => {
       calls.push({ dotFile, opts });
     });
-    await meditateCommand(tmpDir, { steer: "focus on auth flow" });
+    await meditateCommand(tmpDir, { variables: { steer: "focus on auth flow" } });
     expect(calls).toHaveLength(1);
     expect(calls[0].dotFile.endsWith("meditate/pipeline.dot")).toBe(true);
     expect(calls[0].opts.project).toBe(tmpDir);
     expect(calls[0].opts.variables.steer).toBe("focus on auth flow");
   });
 
-  it("passes empty steer string when --steer is omitted", async () => {
+  it("passes empty steer string when --var steer=... is omitted", async () => {
     const calls: Array<{ dotFile: string; opts: any }> = [];
     vi.spyOn(pipelineMod, "pipelineRunCommand").mockImplementation(async (dotFile, opts) => {
       calls.push({ dotFile, opts });

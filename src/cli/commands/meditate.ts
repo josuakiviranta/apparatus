@@ -57,7 +57,7 @@ export function appendMeditateGitignore(projectFolder: string): void {
 
 export async function meditateCommand(
   projectFolder: string,
-  opts: { steer?: string } = {},
+  opts: { variables?: Record<string, string> } = {},
 ): Promise<void> {
   const absPath = resolve(projectFolder);
   if (!existsSync(absPath)) {
@@ -76,7 +76,7 @@ export async function meditateCommand(
     const dotFile = resolveBundledTemplate("meditate");
     return await self.pipelineRunCommand(dotFile, {
       project: absPath,
-      variables: { steer: opts.steer ?? "" },
+      variables: { steer: opts.variables?.steer ?? "" },
     });
   } finally {
     removePid(absPath);

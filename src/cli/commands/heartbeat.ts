@@ -6,6 +6,7 @@ import { request, stream } from "../../lib/daemon-client";
 import { parseDot } from "../../attractor/core/graph.js";
 import type { Task } from "../../daemon/state";
 import * as output from "../lib/output.js";
+import { collectKV } from "../lib/collect-kv.js";
 
 /**
  * Validate that an argument resolves to an existing path of the expected kind.
@@ -93,20 +94,23 @@ Examples:
       if (isNaN(n) || n < 1) throw new Error("--every must be a positive integer");
       return n;
     })
-    .option("--steer <text>", "initial steering message for the session")
-    .action(async (folder: string, opts: { every: number; steer?: string }) => {
+    .option("--var <key=value>", "pass caller variable (repeatable, e.g. --var steer=...)", collectKV, {} as Record<string, string>)
+    .action(async (folder: string, opts: Record<string, unknown>) => {
+      const every = opts.every as number;
+      const variables = (opts["var"] as Record<string, string> | undefined) ?? {};
       const absPath = resolve(folder);
       validatePathArg(folder, absPath, "directory", "Project folder");
       try {
-        const taskArgs = opts.steer
-          ? [absPath, "--steer", opts.steer]
-          : [absPath];
+        const taskArgs: string[] = [absPath];
+        for (const [k, v] of Object.entries(variables)) {
+          taskArgs.push("--var", `${k}=${v}`);
+        }
         const res = await request("register_task", {
           command: "meditate",
           args: taskArgs,
-          interval: opts.every,
+          interval: every,
         });
-        await output.success(`Registered: ${res.taskId} (every ${opts.every} min)`);
+        await output.success(`Registered: ${res.taskId} (every ${every} min)`);
       } catch (err: any) {
         await output.error(`Error: ${err.message}`);
         process.exit(1);

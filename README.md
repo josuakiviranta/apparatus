@@ -41,9 +41,9 @@ ralph new <project-name>
 Scaffold a new ralph project in `./<project-name>/`. Creates `AGENTS.md`, `IMPLEMENTATION_PLAN.md`, `specs/`, and `src/tests/` directories, runs `git init -b main`, then launches an interactive Claude kickoff session to populate `README.md` and initial specs.
 
 ```bash
-ralph meditate <project-folder> [--steer <text>]
+ralph meditate <project-folder> [--var steer=<text>]
 ```
-Runs a meditate session against the project's meditations. `--steer` injects an initial steering message at session start.
+Runs a meditate session against the project's meditations. `--var steer=...` injects an initial steering message at session start.
 
 For unattended lifecycle reconciliation and doc-drift surfacing, schedule the bundled janitor pipeline:
 
