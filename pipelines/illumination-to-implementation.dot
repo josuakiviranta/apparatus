@@ -45,6 +45,8 @@ digraph illumination_to_implementation {
 
   memory_writer [agent="memory-writer", default_test_result="", default_test_summary="", json_schema_file="schemas/memory-writer.json", produces="memory_path", prompt="Close out the pipeline session.\n\nRun id: $run_id\nProject: $project\nPlan: $plan_path\nDesign doc: $design_doc_path\nIllumination: $illumination_path\nFinal test result (empty if tmux verification was skipped): $test_result\nFinal test summary: $test_summary\n\nFollow your agent-level procedure."]
 
+  memory_reflector [agent="memory-reflector", json_schema_file="schemas/memory-reflector.json", produces="illumination_path, reasoning", prompt="Reflect on this pipeline session and decide whether a new illumination is warranted.\n\nRun id: $run_id\nProject: $project\nMemory file: $memory_path\nDesign doc: $design_doc_path\nPlan: $plan_path\nOriginal illumination: $illumination_path\n\nFollow your agent-level procedure."]
+
   done [shape=Msquare]
 
   // ── Routing: Phase 1 ─────────────────────────────────────────────────────
@@ -90,5 +92,6 @@ digraph illumination_to_implementation {
   tmux_confirm_gate -> memory_writer [label="Commit"]
   tmux_confirm_gate -> tmux_tester [label="Retry"]
 
-  memory_writer -> done
+  memory_writer -> memory_reflector
+  memory_reflector -> done
 }
