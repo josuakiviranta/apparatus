@@ -878,6 +878,11 @@ Check that:
 
 ## Chunk 2: `inputs:` frontmatter + flow validator (D5) — outline
 
+**Carry-overs from Chunk 1 review (must address in Chunk 2):**
+- **Broaden `produces_redundant_with_outputs`:** today the diagnostic only fires on exact key-set match. D2 says ANY `produces=` on an outputs-bearing node is redundant. Update the rule so a subset / mismatch on a node that already has `outputs:` becomes either an error (preferred — the `outputs:` block is the SSoT) or a warning that names the divergent keys explicitly.
+- **Add `resolveAgent` registry-path test for verifier:** the migration test reads the bundled file directly. Add a unit test that exercises `resolveAgent("verifier", { bundledDir })` end-to-end so a future bundled-vs-user-dir behavioral change can't slip past.
+- **Consider startup warning** when `~/.ralph/agents/<name>.md` is older than `getBundledAgentsDir()/<name>.md` — a low-cost guard for users who haven't refreshed their cached agents post-migration. May defer to Chunk 4 (per-pipeline-folder lookup obsoletes the user-dir cache for project pipelines anyway).
+
 **Purpose:** Add per-node `inputs:` declaration and the static flow-analysis validator that catches missing producers, branch-incomplete inputs, type mismatches, orphan outputs, and required `--var` keys before any live run.
 
 **High-level shape:**
@@ -923,6 +928,9 @@ Check that:
 ---
 
 ## Chunk 4: per-pipeline folder migration (D1, D4) — outline
+
+**Carry-over from Chunk 1 review (gating prerequisite):**
+- **Live-run smoke of at least one migrated agent before Chunk 4 ships.** Each Chunk-4 agent migration adds another untested production path on top of the schema-equivalence test from Chunk 1. Add a capped live run (or `pipeline trace` replay) on `illumination-to-implementation.dot` as Task 4.0 — without it, a regression in the verifier's runtime structured-output path could go undetected until a real meditation cycle hits it.
 
 **Purpose:** Move every project pipeline into its own folder. Relocate agents from `src/cli/agents/` into the pipeline folders that use them. Delete `pipelines/scripts/` and `pipelines/schemas/`.
 
