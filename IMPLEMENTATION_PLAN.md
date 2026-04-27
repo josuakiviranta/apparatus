@@ -617,9 +617,27 @@ Full vitest suite (1153 tests across 96 files) passes. `pipeline validate` clean
 
 ---
 
-## Chunk 4: Backfill + cleanup
+## Chunk 4: Backfill + cleanup — ✅ DONE 2026-04-27
 
-The one-shot migration script + the supersede tag on the prior spec.
+One-shot migration ran clean. Disk + index now reflect the new layout end-to-end.
+
+| Task | Commit |
+|---|---|
+| 4.0 Pre-flight (commit dirty tree: spec + review + 2 archive flips + stimuli review) | `ea63f52`, `e934ab2` |
+| 4.1 Write migration script | `e5e38c9` |
+| 4.2 Run migration + commit backfill (37 file moves: 25 archived, 9 implemented, 3 superseded → archived) | `cb5f7a3` |
+| 4.3 Supersede header on prior spec | `c8b40ff` |
+| 4.4 Full-suite verification (1153/1153 pass, tsc clean, both illumination smoke pipelines validate) | — |
+| 4.5 Delete one-shot migration script | `21f782c` |
+
+**Migration summary (matched plan exactly):** open: 48, dispatched: 5, implemented: 9, archived: 25, superseded: 3, other: 0.
+
+**Final on-disk state:** 53 in `meditations/illuminations/` (47 open + 5 dispatched + 1 no-status), 28 in `meditations/archived-illuminations/`, 9 in `meditations/implemented-illuminations/`. No `^status: superseded` lines remain anywhere under `meditations/`.
+
+**Live-Claude smoke pipelines (`pipelines/smoke/meditate-steer.dot`, `pipelines/smoke/tmux-tester.dot`) deferred** — both validate clean structurally; the plan's own rationale notes these read from `meditations/illuminations/` for open files, which the migration left untouched. Running them under live Claude is out of scope for the verification step (cost) but they remain available for manual smoke if desired.
+
+<details>
+<summary>Original detailed task steps (preserved for history)</summary>
 
 ### Task 4.1: Write `scripts/migrate-illuminations-status-dirs.mjs`
 
@@ -862,6 +880,8 @@ git rm scripts/migrate-illuminations-status-dirs.mjs
 ```bash
 git commit -m "chore: remove one-shot migration script (backfill complete)"
 ```
+
+</details>
 
 ---
 
