@@ -93,7 +93,7 @@ export type Transform = (graph: Graph) => Graph;
 
 export interface Diagnostic {
   rule: string;
-  severity: "error" | "warning";
+  severity: "error" | "warning" | "info";
   message: string;
   /** Optional multi-line hint (allowed attrs, suggestions) rendered after the message. */
   hint?: string;

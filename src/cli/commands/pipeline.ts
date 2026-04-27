@@ -212,9 +212,11 @@ export async function pipelineValidateCommand(dotFile: string, opts: PipelineVal
     throw e;
   }
   const diags = validateGraph(graph, dirname(absPath));
+  const infos    = diags.filter(d => d.severity === "info");
   const errors   = diags.filter(d => d.severity === "error");
   const warnings = diags.filter(d => d.severity === "warning");
 
+  for (const i of infos)    await output.info(formatDiag(i));
   for (const w of warnings) await output.warn(formatDiag(w));
   for (const e of errors)   await output.error(formatDiag(e));
 

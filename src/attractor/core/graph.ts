@@ -396,6 +396,9 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
     checkOrphanOutput(graph, dotDir, diags);
   }
 
+  // required_caller_vars — info banner listing vars that must be supplied via --var
+  checkRequiredCallerVars(graph, nodeProduces, dotDir, diags);
+
   return diags;
 }
 
@@ -504,6 +507,48 @@ function tryResolveAgent(node: Node, dotDir: string | undefined): AgentConfig | 
   } catch {
     return undefined;
   }
+}
+
+function checkRequiredCallerVars(
+  graph: Graph,
+  nodeProduces: Map<string, Set<string>>,
+  dotDir: string | undefined,
+  diags: Diagnostic[],
+): void {
+  const RESERVED = new Set(["goal", "project", "run_id"]);
+
+  // Gather all vars produced internally (by any node)
+  const internallyProduced = new Set<string>();
+  for (const produced of nodeProduces.values()) {
+    for (const k of produced) internallyProduced.add(k);
+  }
+
+  // Candidate set: callerInputs declared on the digraph header
+  const required = new Set<string>();
+  for (const v of graph.inputs ?? []) {
+    if (!RESERVED.has(v) && !internallyProduced.has(v)) required.add(v);
+  }
+
+  // Also include vars consumed via agent inputs: that are not produced internally
+  if (dotDir) {
+    for (const node of graph.nodes.values()) {
+      if (!node.agent) continue;
+      const cfg = tryResolveAgent(node, dotDir);
+      if (!cfg?.inputs) continue;
+      for (const k of cfg.inputs) {
+        if (!RESERVED.has(k) && !internallyProduced.has(k)) required.add(k);
+      }
+    }
+  }
+
+  if (required.size === 0) return;
+
+  const keys = [...required].sort().join(", ");
+  diags.push({
+    rule: "required_caller_vars",
+    severity: "info",
+    message: `This pipeline requires the following --var keys at runtime: ${keys}`,
+  });
 }
 
 function checkMissingInputProducer(
