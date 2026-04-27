@@ -166,3 +166,37 @@ prompt body
     expect(JSON.parse(config.jsonSchema!).required).toEqual(["foo", "status"]);
   });
 });
+
+describe("verifier migration — preserves verifier.json contract", () => {
+  // Asserts the bundled verifier.md outputs: block produces a JSON Schema that
+  // satisfies the runtime contract previously held by pipelines/schemas/verifier.json:
+  // same required keys, same preferred_label enum members, all string-typed fields.
+  // Bypasses resolveAgent so a stale user-dir cache (~/.ralph/agents/verifier.md)
+  // can't mask an authoring slip in the bundled source file.
+  it("derives a jsonSchema with the same required keys and preferred_label enum", () => {
+    const { readFileSync } = require("fs");
+    const bundledPath = join(__dirname, "..", "agents", "verifier.md");
+    const { attributes, body } = parseFrontmatter(readFileSync(bundledPath, "utf-8"));
+    const config = validateAgentConfig({ ...attributes, prompt: body } as any);
+
+    expect(config.outputs).toBeDefined();
+    expect(config.jsonSchema).toBeDefined();
+    const schema = JSON.parse(config.jsonSchema!);
+
+    expect([...schema.required].sort()).toEqual([
+      "archive_reason_short",
+      "explanation",
+      "illumination_path",
+      "preferred_label",
+      "summary",
+    ]);
+    expect([...schema.properties.preferred_label.enum].sort()).toEqual([
+      "empty", "false", "true",
+    ]);
+    expect(schema.properties.illumination_path.type).toBe("string");
+    expect(schema.properties.summary.type).toBe("string");
+    expect(schema.properties.explanation.type).toBe("string");
+    expect(schema.properties.archive_reason_short.type).toBe("string");
+    expect(schema.additionalProperties).toBe(false);
+  });
+});

@@ -16,6 +16,12 @@ mcp:
     args:
       - "{{ILLUMINATION_SERVER_PATH}}"
       - "{{PROJECT_ROOT}}"
+outputs:
+  preferred_label: {enum: ["true", "false", empty]}
+  illumination_path: string
+  summary: string
+  explanation: string
+  archive_reason_short: {type: string, maxLength: 100}
 ---
 
 # Mission
