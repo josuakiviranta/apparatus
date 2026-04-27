@@ -51,6 +51,7 @@ Pipeline engine (DOT-graph workflows):
   ralph pipeline list --project my-app             List workflows in a project
   ralph pipeline validate workflow.dot             Check a pipeline file for errors
   ralph pipeline validate review --project my-app  Validate by workflow name
+  ralph pipeline show workflow.dot                 Render a pipeline as SVG next to the source
   ralph pipeline run workflow.dot                  Execute a pipeline
   ralph pipeline run review --project my-app       Run by workflow name
   ralph pipeline run workflow.dot --resume         Continue a pipeline after Ctrl-C or node failure
