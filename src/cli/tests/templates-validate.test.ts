@@ -36,6 +36,12 @@ describe("bundled templates: validateGraph", () => {
     const errors = diags.filter(d => d.severity === "error");
     expect(errors).toEqual([]);
   });
+
+  it("meditate-create has no errors", () => {
+    const diags = loadAndValidate("meditate-create");
+    const errors = diags.filter(d => d.severity === "error");
+    expect(errors).toEqual([]);
+  });
 });
 
 describe("pipeline-create scaffolder agent", () => {

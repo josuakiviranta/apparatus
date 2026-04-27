@@ -1,0 +1,8 @@
+digraph meditate_create {
+  start [shape=Mdiamond];
+  end   [shape=Msquare];
+
+  create [shape=box, agent="meditate-create", interactive=true];
+
+  start -> create -> end;
+}
