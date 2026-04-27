@@ -2203,7 +2203,7 @@ inputs:
 
 Gating prerequisite from Chunk 1 review. Required only before Task 4.17 (illumination-to-implementation migration), not before Tasks 4.1 — 4.16. Capture either a real `ralph pipeline run illumination-to-implementation` trace or replay `pipeline trace` on the latest stored run; archive as `tmp/chunk-4-baseline.jsonl` and diff against post-migration trace. Re-runs across this chunk: not required, since each per-pipeline migration is independently bisectable via its own commit.
 
-### Task 4.1: `resolvePipelineArg` prefers `<name>/pipeline.dot` over flat `<name>.dot`
+### Task 4.1: `resolvePipelineArg` prefers `<name>/pipeline.dot` over flat `<name>.dot` — SHIPPED 2026-04-27 (`bafaef8`)
 
 **Why:** Task 4.2 onward will move every `.dot` into a sibling folder; without this resolution change the bare-name shorthand `ralph pipeline run janitor` breaks the moment the file moves.
 
@@ -2226,7 +2226,7 @@ Gating prerequisite from Chunk 1 review. Required only before Task 4.17 (illumin
 - Run full suite `npx vitest run` — confirm no regressions.
 - Commit `feat(pipeline-resolver): support <name>/pipeline.dot folder layout (D1 chunk-4)`.
 
-### Task 4.2: Migrate `janitor.dot` to `pipelines/janitor/`
+### Task 4.2: Migrate `janitor.dot` to `pipelines/janitor/` — SHIPPED 2026-04-27
 
 **Why this pipeline first:** janitor uses exactly one agent (`janitor`), zero `script_file=`, zero `json_schema_file=` references. Smallest possible blast radius — proves the recipe works before the larger migrations land.
 
