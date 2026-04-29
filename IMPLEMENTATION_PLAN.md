@@ -1030,13 +1030,13 @@ Severity: error (under spec revision). Fires when `node.prompt` (steering) for a
 
 Severity: error. Fires when two declared inputs render to the same XML tag (e.g. consumer declares `inputs: [verifier.summary, verifier_summary]` — both render `<verifier_summary>`).
 
-- [ ] **Step 1: Write the failing test** — consumer with collision pair, expect error "renders as <verifier_summary>, which collides with bare input verifier_summary".
-- [ ] **Step 2: Run test, verify fail**
-- [ ] **Step 3: Implement rule**:
+- [x] **Step 1: Write the failing test** — consumer with collision pair, expect error "renders as <verifier_summary>, which collides with bare input verifier_summary".
+- [x] **Step 2: Run test, verify fail**
+- [x] **Step 3: Implement rule**:
   - For each consumer with `auto_inputs: true`, walk its `inputs:`, build map of `renderedTag → originalDecl`.
   - On duplicate tag, push error.
-- [ ] **Step 4: Run test, verify pass**
-- [ ] **Step 5: Commit**
+- [x] **Step 4: Run test, verify pass**
+- [x] **Step 5: Commit**
 
 ### Task 2.7: Update `missing_input_producer` to handle qualified keys
 

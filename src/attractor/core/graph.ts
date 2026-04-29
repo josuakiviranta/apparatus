@@ -432,6 +432,24 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
       }
 
       if (cfg.autoInputs === true && Array.isArray(cfg.inputs)) {
+        // rendered_tag_collision — detect two decls that map to the same XML tag
+        const seenTags = new Map<string, string>(); // renderedTag → first decl
+        for (const decl of cfg.inputs) {
+          let r;
+          try { r = resolveInputDecl(decl); } catch { continue; }
+          const prev = seenTags.get(r.renderedTag);
+          if (prev !== undefined) {
+            diags.push({
+              rule: "rendered_tag_collision",
+              severity: "error",
+              message: `Input "${prev}" and "${decl}" both render as <${r.renderedTag}> — rename one to avoid a silent XML block collision`,
+              location: node.sourceLocation,
+            });
+          } else {
+            seenTags.set(r.renderedTag, decl);
+          }
+        }
+
         for (const decl of cfg.inputs) {
           let resolved;
           try {

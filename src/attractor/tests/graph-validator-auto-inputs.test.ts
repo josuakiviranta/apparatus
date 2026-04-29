@@ -406,6 +406,147 @@ body`,
   });
 });
 
+describe("validator — rendered_tag_collision", () => {
+  it("errors when qualified + bare inputs resolve to the same rendered tag", () => {
+    const dir = join(tmpdir(), `rule-rtc-qb-${Date.now()}`);
+    setup(dir, {
+      "verifier.md": `---
+name: verifier
+description: x
+auto_inputs: true
+inputs: []
+outputs: { summary: string }
+---
+body`,
+      "consumer.md": `---
+name: consumer
+description: x
+auto_inputs: true
+inputs: [verifier.summary, verifier_summary]
+outputs: { result: string }
+---
+body`,
+    });
+    const dot = `digraph g {
+      inputs="verifier_summary"
+      start [shape=Mdiamond]
+      verifier [agent="verifier"]
+      consumer [agent="consumer"]
+      done [shape=Msquare]
+      start -> verifier -> consumer -> done
+    }`;
+    writeFileSync(join(dir, "p.dot"), dot);
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    const d = diags.find(d => d.rule === "rendered_tag_collision");
+    expect(d).toBeDefined();
+    expect(d!.severity).toBe("error");
+    expect(d!.message).toMatch(/verifier\.summary/);
+    expect(d!.message).toMatch(/verifier_summary/);
+    expect(d!.message).toMatch(/<verifier_summary>/);
+  });
+
+  it("errors on qualified-vs-qualified collision (a.b_c and a_b.c both → a_b_c)", () => {
+    const dir = join(tmpdir(), `rule-rtc-qq-${Date.now()}`);
+    setup(dir, {
+      "a_b.md": `---
+name: a_b
+description: x
+auto_inputs: true
+inputs: []
+outputs: { c: string }
+---
+body`,
+      "a.md": `---
+name: a
+description: x
+auto_inputs: true
+inputs: []
+outputs: { b_c: string }
+---
+body`,
+      "consumer.md": `---
+name: consumer
+description: x
+auto_inputs: true
+inputs: [a_b.c, a.b_c]
+outputs: { result: string }
+---
+body`,
+    });
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      a_b [agent="a_b"]
+      a [agent="a"]
+      consumer [agent="consumer"]
+      done [shape=Msquare]
+      start -> a_b -> consumer -> done
+      start -> a -> consumer
+    }`;
+    writeFileSync(join(dir, "p.dot"), dot);
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    const d = diags.find(d => d.rule === "rendered_tag_collision");
+    expect(d).toBeDefined();
+    expect(d!.severity).toBe("error");
+    expect(d!.message).toMatch(/a_b_c/);
+  });
+
+  it("does not fire when inputs have distinct rendered tags", () => {
+    const dir = join(tmpdir(), `rule-rtc-ok-${Date.now()}`);
+    setup(dir, {
+      "verifier.md": `---
+name: verifier
+description: x
+auto_inputs: true
+inputs: []
+outputs: { summary: string }
+---
+body`,
+      "consumer.md": `---
+name: consumer
+description: x
+auto_inputs: true
+inputs: [verifier.summary, project]
+outputs: { result: string }
+---
+body`,
+    });
+    const dot = `digraph g {
+      inputs="project"
+      start [shape=Mdiamond]
+      verifier [agent="verifier"]
+      consumer [agent="consumer"]
+      done [shape=Msquare]
+      start -> verifier -> consumer -> done
+    }`;
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    expect(diags.find(d => d.rule === "rendered_tag_collision")).toBeUndefined();
+  });
+
+  it("does not fire on legacy agents without auto_inputs", () => {
+    const dir = join(tmpdir(), `rule-rtc-legacy-${Date.now()}`);
+    setup(dir, {
+      "consumer.md": `---
+name: consumer
+description: x
+outputs: { result: string }
+---
+body`,
+    });
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      consumer [agent="consumer"]
+      done [shape=Msquare]
+      start -> consumer -> done
+    }`;
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    expect(diags.find(d => d.rule === "rendered_tag_collision")).toBeUndefined();
+  });
+});
+
 describe("validator — malformed input declarations", () => {
   // resolveInputDecl throws on multi-dot keys (e.g. "a.b.c") and empty strings.
   // validateGraph must NOT crash — it should absorb the throw and continue emitting
