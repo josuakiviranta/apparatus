@@ -13,6 +13,7 @@ describe("resolveAgent — inputs end-to-end", () => {
         `---
 name: demo-agent
 description: demo
+auto_inputs: true
 inputs:
   - illumination_path
   - run_id
@@ -60,6 +61,7 @@ prompt body
         `---
 name: demo
 description: demo
+auto_inputs: true
 ---
 body
 `,

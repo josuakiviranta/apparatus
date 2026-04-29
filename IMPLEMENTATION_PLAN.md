@@ -1742,10 +1742,10 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 ### Task 6.2: Drop legacy assembly path
 
-- [ ] **Step 1: Remove the `else` branch in `agent-handler.ts`** (the `expandVariables`-based legacy path).
-- [ ] **Step 2: Make `autoInputs` non-optional** (or treat its absence as an error during agent loading).
-- [ ] **Step 3: Run all tests** — `npx vitest run`. Expect every test green; if any tests asserted legacy behavior, update them.
-- [ ] **Step 4: Commit**
+- [x] **Step 1: Remove the `else` branch in `agent-handler.ts`** (the `expandVariables`-based legacy path). Collapsed the two `config.autoInputs === true` ternaries (metaPrefix → `node.id`, outKey → `${node.id}.${key}`) and dropped now-unused `expandVariables` + `extractDefaults` imports.
+- [x] **Step 2: Make `autoInputs` non-optional** — `AgentConfig.autoInputs` is now `true` (literal type). `validateAgentConfig` throws `Agent <name>: missing required 'auto_inputs: true' in frontmatter` when frontmatter is missing the flag. Bundled agents updated: `src/cli/agents/verifier.md`, `src/cli/templates/pipeline-create/scaffolder.md`. Pipeline-create template `pipeline.dot` cleared of leftover `$var` tokens (validator now rejects them on auto_inputs producers).
+- [x] **Step 3: Run all tests** — `npx vitest run` → 141 files, 1326 tests, all green. `npx tsc --noEmit` clean.
+- [x] **Step 4: Commit**
 
 ### Task 6.3: Drop the `auto_inputs` flag
 

@@ -4,6 +4,7 @@ description: Interactive pipeline scaffolder — helps the user design and write
 model: opus
 permissionMode: dangerouslySkipPermissions
 interactive: true
+auto_inputs: true
 inputs:
   - pipeline_name
   - pipelines_dir

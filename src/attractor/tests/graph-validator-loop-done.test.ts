@@ -11,6 +11,7 @@ describe("validator — loop_missing_done_field", () => {
     writeFileSync(join(dir, "looper.md"), `---
 name: looper
 description: a looping agent missing done
+auto_inputs: true
 loop: true
 outputs:
   result: string
@@ -42,6 +43,7 @@ Loop body.
     writeFileSync(join(dir, "looper.md"), `---
 name: looper
 description: a looping agent with wrong-typed done
+auto_inputs: true
 loop: true
 outputs:
   done: string
@@ -71,6 +73,7 @@ Loop body.
     writeFileSync(join(dir, "looper.md"), `---
 name: looper
 description: a looping agent with shorthand done
+auto_inputs: true
 loop: true
 outputs:
   done: boolean
@@ -100,6 +103,7 @@ Loop body.
     writeFileSync(join(dir, "looper.md"), `---
 name: looper
 description: a looping agent with long-form done
+auto_inputs: true
 loop: true
 outputs:
   done:
@@ -130,6 +134,7 @@ Loop body.
     writeFileSync(join(dir, "looper.md"), `---
 name: looper
 description: a looping agent with empty outputs
+auto_inputs: true
 loop: true
 outputs: {}
 ---
@@ -161,6 +166,7 @@ Loop body.
     writeFileSync(join(dir, "plain.md"), `---
 name: plain
 description: a non-looping agent
+auto_inputs: true
 outputs:
   result: string
 ---

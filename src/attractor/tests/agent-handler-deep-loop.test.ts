@@ -21,6 +21,7 @@ const loopBaseConfig = {
   tools: [] as string[],
   mcp: [] as any[],
   permissionMode: "dangerouslySkipPermissions",
+  autoInputs: true as const,
   loop: true,
   outputs: { done: "boolean" },
   jsonSchema: JSON.stringify({
@@ -67,8 +68,8 @@ describe("AgentHandler deep loop — done break", () => {
     );
     expect(mockAgentRun).toHaveBeenCalledTimes(3);
     expect(outcome.status).toBe("success");
-    expect(outcome.contextUpdates?.done).toBe("true");
-    expect(outcome.contextUpdates?.["agent.iterations"]).toBe("3");
+    expect(outcome.contextUpdates?.["deep.done"]).toBe("true");
+    expect(outcome.contextUpdates?.["deep.iterations"]).toBe("3");
   });
 
   it("runs to cap when done never emits true", async () => {
@@ -86,7 +87,7 @@ describe("AgentHandler deep loop — done break", () => {
     );
     expect(mockAgentRun).toHaveBeenCalledTimes(5);
     expect(outcome.status).toBe("success");
-    expect(outcome.contextUpdates?.done).toBe("false");
+    expect(outcome.contextUpdates?.["deep.done"]).toBe("false");
   });
 
   it("agent.success=true when loop terminates via done", async () => {
@@ -102,7 +103,7 @@ describe("AgentHandler deep loop — done break", () => {
       baseCtx(),
       makeContext(),
     );
-    expect(outcome.contextUpdates?.["agent.success"]).toBe("true");
+    expect(outcome.contextUpdates?.["deep.success"]).toBe("true");
   });
 });
 
@@ -142,7 +143,7 @@ describe("AgentHandler deep loop — crash mid-iteration", () => {
     );
     expect(outcome.status).toBe("fail");
     expect(mockAgentRun).toHaveBeenCalledTimes(2);
-    expect(outcome.contextUpdates?.["agent.success"]).toBe("false");
+    expect(outcome.contextUpdates?.["deep.success"]).toBe("false");
   });
 
   it("non-loop agent (loop:false) — single iteration crash still fails (regression)", async () => {
@@ -210,7 +211,7 @@ describe("AgentHandler deep loop — chunk-2 retry composition", () => {
     );
     expect(calls).toBe(2);
     expect(outcome.status).toBe("success");
-    expect(outcome.contextUpdates?.done).toBe("true");
+    expect(outcome.contextUpdates?.["deep.done"]).toBe("true");
   });
 
   it("retry exhaustion within iteration 1 aborts deep loop", async () => {
@@ -254,7 +255,7 @@ describe("AgentHandler deep loop — chunk-2 retry composition", () => {
       makeContext(),
     );
     expect(calls).toBe(3);
-    expect(outcome.contextUpdates?.["agent.iterations"]).toBe("2");
+    expect(outcome.contextUpdates?.["deep.iterations"]).toBe("2");
   });
 });
 

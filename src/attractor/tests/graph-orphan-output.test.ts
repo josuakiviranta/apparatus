@@ -18,6 +18,7 @@ describe("validator — orphan_output", () => {
       "producer.md": `---
 name: producer
 description: produces stale_key + active_key
+auto_inputs: true
 outputs:
   stale_key: string
   active_key: string
@@ -27,6 +28,7 @@ body
       "consumer.md": `---
 name: consumer
 description: consumes active_key
+auto_inputs: true
 inputs:
   - active_key
 ---
@@ -56,6 +58,7 @@ body
       "producer.md": `---
 name: producer
 description: produces summary
+auto_inputs: true
 outputs:
   summary: string
 ---
@@ -64,6 +67,7 @@ body
       "consumer.md": `---
 name: consumer
 description: consumes summary
+auto_inputs: true
 inputs:
   - summary
 ---
@@ -88,6 +92,7 @@ body
       "verifier.md": `---
 name: verifier
 description: verifier
+auto_inputs: true
 outputs:
   preferred_label:
     enum: ["true", "false"]
@@ -114,6 +119,7 @@ body
       "producer.md": `---
 name: producer
 description: produces summary
+auto_inputs: true
 outputs:
   summary: string
 ---
@@ -138,6 +144,7 @@ body
       "producer.md": `---
 name: producer
 description: produces topic
+auto_inputs: true
 outputs:
   topic: string
 ---
@@ -162,6 +169,7 @@ body
       "producer.md": `---
 name: producer
 description: produces a + b
+auto_inputs: true
 outputs:
   a: string
   b: string
@@ -171,6 +179,7 @@ body
       "consumer.md": `---
 name: consumer
 description: consumes a
+auto_inputs: true
 inputs:
   - a
 ---

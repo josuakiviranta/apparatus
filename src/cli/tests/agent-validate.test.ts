@@ -8,6 +8,7 @@ describe("validateAgentConfig — deep loop fields", () => {
       name: "x",
       description: "y",
       prompt: "z",
+      auto_inputs: true,
       loop: true,
     });
     expect(cfg.loop).toBe(true);
@@ -18,6 +19,7 @@ describe("validateAgentConfig — deep loop fields", () => {
       name: "x",
       description: "y",
       prompt: "z",
+      auto_inputs: true,
       loop: true,
       maxIterations: 25,
     });
@@ -29,6 +31,7 @@ describe("validateAgentConfig — deep loop fields", () => {
       name: "x",
       description: "y",
       prompt: "z",
+      auto_inputs: true,
     });
     expect(cfg.loop).toBeUndefined();
     expect(cfg.maxIterations).toBeUndefined();
@@ -66,6 +69,7 @@ describe("validateAgentConfig — deep loop fields", () => {
       name: "x",
       description: "y",
       prompt: "z",
+      auto_inputs: true,
       maxIterations: 0,
     });
     expect(cfg.maxIterations).toBe(0);
@@ -78,6 +82,7 @@ describe("parseAgentFile — deep loop fields round-trip", () => {
       "---",
       "name: looper",
       "description: x",
+      "auto_inputs: true",
       "loop: true",
       "maxIterations: 50",
       "outputs:",

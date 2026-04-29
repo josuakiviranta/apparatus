@@ -61,6 +61,7 @@ describe("validateAgentConfig — outputs", () => {
     const config = validateAgentConfig({
       name: "verifier",
       description: "Verifier agent",
+      auto_inputs: true,
       outputs: {
         preferred_label: { enum: ["true", "false", "empty"] },
         illumination_path: "string",
@@ -89,6 +90,7 @@ describe("validateAgentConfig — outputs", () => {
   it("normalizes shorthand strings to {type: ...} fragments", () => {
     const config = validateAgentConfig({
       name: "x", description: "x agent",
+      auto_inputs: true,
       outputs: { foo: "string", bar: "number", baz: "boolean" },
       prompt: "",
     } as any);
@@ -100,9 +102,9 @@ describe("validateAgentConfig — outputs", () => {
     });
   });
 
-  it("does not set outputs or jsonSchema when outputs absent (legacy agents)", () => {
+  it("does not set outputs or jsonSchema when outputs absent", () => {
     const config = validateAgentConfig({
-      name: "legacy", description: "legacy agent", prompt: "Body",
+      name: "x", description: "x agent", auto_inputs: true, prompt: "Body",
     } as any);
     expect(config.outputs).toBeUndefined();
     expect(config.jsonSchema).toBeUndefined();
@@ -111,6 +113,7 @@ describe("validateAgentConfig — outputs", () => {
   it("treats outputs with zero keys as empty schema (degenerate but valid)", () => {
     const config = validateAgentConfig({
       name: "x", description: "x agent",
+      auto_inputs: true,
       outputs: {},
       prompt: "",
     } as any);
@@ -128,6 +131,7 @@ describe("validateAgentConfig — outputs", () => {
     const explicit = '{"type":"object","properties":{},"required":[]}';
     const config = validateAgentConfig({
       name: "x", description: "x agent",
+      auto_inputs: true,
       jsonSchema: explicit,
       outputs: { foo: "string" },
       prompt: "",
@@ -149,6 +153,7 @@ describe("resolveAgent — outputs end-to-end", () => {
     writeFileSync(join(dir, "demo-agent.md"), `---
 name: demo-agent
 description: demo
+auto_inputs: true
 outputs:
   foo: string
   status: {enum: [ok, fail]}

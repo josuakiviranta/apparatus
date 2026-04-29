@@ -28,6 +28,7 @@ name: reviewer
 description: Reviews code
 model: sonnet
 permissionMode: dontAsk
+auto_inputs: true
 tools:
   - read_file
 ---
@@ -59,6 +60,7 @@ You are a reviewer.`;
     const minimalMd = `---
 name: minimal
 description: A minimal agent
+auto_inputs: true
 ---
 
 Do things.`;
@@ -73,11 +75,11 @@ Do things.`;
   it("lists agents from both directories", () => {
     writeFileSync(
       join(userDir, "custom.md"),
-      `---\nname: custom\ndescription: Custom agent\n---\nPrompt.`,
+      `---\nname: custom\ndescription: Custom agent\nauto_inputs: true\n---\nPrompt.`,
     );
     writeFileSync(
       join(bundledDir, "builtin.md"),
-      `---\nname: builtin\ndescription: Built-in agent\n---\nPrompt.`,
+      `---\nname: builtin\ndescription: Built-in agent\nauto_inputs: true\n---\nPrompt.`,
     );
     const agents = listAgents({ userDir, bundledDir });
     const names = agents.map((a) => a.name);
@@ -86,7 +88,7 @@ Do things.`;
   });
 
   it("user agent overrides bundled agent with same name", () => {
-    const userVersion = `---\nname: reviewer\ndescription: Custom reviewer\nmodel: opus\n---\nCustom prompt.`;
+    const userVersion = `---\nname: reviewer\ndescription: Custom reviewer\nmodel: opus\nauto_inputs: true\n---\nCustom prompt.`;
     writeFileSync(join(userDir, "reviewer.md"), userVersion);
     writeFileSync(join(bundledDir, "reviewer.md"), reviewerMd);
     const config = resolveAgent("reviewer", { userDir, bundledDir });
@@ -117,14 +119,15 @@ body`;
       expect(cfg.inputs).toEqual(["a", "b"]);
     });
 
-    it("defaults autoInputs to undefined when not declared", () => {
+    it("throws when auto_inputs: true is missing from frontmatter", () => {
       const md = `---
 name: foo
 description: x
 ---
 body`;
-      const cfg = parseAgentFile(md);
-      expect(cfg.autoInputs).toBeUndefined();
+      expect(() => parseAgentFile(md)).toThrow(
+        "Agent foo: missing required 'auto_inputs: true' in frontmatter",
+      );
     });
   });
 });

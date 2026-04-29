@@ -46,6 +46,7 @@ describe("AgentHandler", () => {
     tools: [] as string[],
     mcp: [] as any[],
     permissionMode: "dangerouslySkipPermissions",
+    autoInputs: true as const,
   };
 
   it("resolves agent by name and calls run", async () => {
@@ -60,9 +61,9 @@ describe("AgentHandler", () => {
     );
 
     expect(outcome.status).toBe("success");
-    expect(outcome.contextUpdates?.["agent.sessionId"]).toBe("s1");
-    expect(outcome.contextUpdates?.["agent.iterations"]).toBe("1");
-    expect(outcome.contextUpdates?.["agent.success"]).toBe("true");
+    expect(outcome.contextUpdates?.["work.sessionId"]).toBe("s1");
+    expect(outcome.contextUpdates?.["work.iterations"]).toBe("1");
+    expect(outcome.contextUpdates?.["work.success"]).toBe("true");
   });
 
   it("returns fail outcome on non-zero exit", async () => {
@@ -78,7 +79,7 @@ describe("AgentHandler", () => {
 
     expect(outcome.status).toBe("fail");
     expect(outcome.failureReason).toContain("exited with code 1");
-    expect(outcome.contextUpdates?.["agent.success"]).toBe("false");
+    expect(outcome.contextUpdates?.["work.success"]).toBe("false");
   });
 
   it("loops when node has maxIterations", async () => {
@@ -94,7 +95,7 @@ describe("AgentHandler", () => {
 
     expect(mockAgentRun).toHaveBeenCalledTimes(3);
     expect(outcome.status).toBe("success");
-    expect(outcome.contextUpdates?.["agent.iterations"]).toBe("3");
+    expect(outcome.contextUpdates?.["work.iterations"]).toBe("3");
   });
 
   it("exits loop on first non-zero exit during deep-loop multi-iteration", async () => {
@@ -416,8 +417,8 @@ describe("AgentHandler", () => {
     expect(mockRunInteractive).toHaveBeenCalled();
   });
 
-  it("expands $variable references in prompt from pipeline context at runtime", async () => {
-    mockResolve.mockReturnValue({ ...baseConfig });
+  it("delivers context values through Inputs block (auto_inputs path)", async () => {
+    mockResolve.mockReturnValue({ ...baseConfig, inputs: ["illumination_path", "summary"] });
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null });
 
     let capturedConfig: any = null;
@@ -430,15 +431,14 @@ describe("AgentHandler", () => {
     try {
       const ctx: PipelineContext = { values: { "illumination_path": "/meditations/foo.md", "summary": "a bug" } };
       await handler.execute(
-        makeNode({ prompt: "Check $illumination_path which has $summary" }),
+        makeNode({ prompt: "Check the illumination" }),
         ctx,
         makeContext({ logsRoot: logsDir }),
       );
 
       expect(capturedConfig.prompt).toContain("/meditations/foo.md");
       expect(capturedConfig.prompt).toContain("a bug");
-      expect(capturedConfig.prompt).not.toContain("$illumination_path");
-      expect(capturedConfig.prompt).not.toContain("$summary");
+      expect(capturedConfig.prompt).toContain("## Inputs");
     } finally {
       rmSync(logsDir, { recursive: true, force: true });
     }
@@ -493,9 +493,9 @@ describe("AgentHandler", () => {
       );
 
       expect(outcome.status).toBe("success");
-      expect(outcome.contextUpdates?.["verdict"]).toBe("true");
-      expect(outcome.contextUpdates?.["path"]).toBe("/foo.md");
-      expect(outcome.contextUpdates?.["agent.sessionId"]).toBe("s1");
+      expect(outcome.contextUpdates?.["work.verdict"]).toBe("true");
+      expect(outcome.contextUpdates?.["work.path"]).toBe("/foo.md");
+      expect(outcome.contextUpdates?.["work.sessionId"]).toBe("s1");
     } finally {
       rmSync(logsDir, { recursive: true, force: true });
     }
@@ -527,8 +527,8 @@ describe("AgentHandler", () => {
       );
 
       expect(outcome.status).toBe("success");
-      expect(outcome.contextUpdates?.["verdict"]).toBe("true");
-      expect(outcome.contextUpdates?.["path"]).toBe("/foo.md");
+      expect(outcome.contextUpdates?.["work.verdict"]).toBe("true");
+      expect(outcome.contextUpdates?.["work.path"]).toBe("/foo.md");
       // Should NOT have numeric keys from iterating the array
       expect(outcome.contextUpdates?.["0"]).toBeUndefined();
     } finally {
@@ -648,7 +648,7 @@ describe("AgentHandler", () => {
 
       expect(outcome.status).toBe("success");
       expect(outcome.preferredLabel).toBe("true");
-      expect(outcome.contextUpdates?.["summary"]).toBe("gap confirmed");
+      expect(outcome.contextUpdates?.["work.summary"]).toBe("gap confirmed");
     } finally {
       rmSync(logsDir, { recursive: true, force: true });
     }
@@ -682,7 +682,7 @@ describe("AgentHandler", () => {
 
       expect(outcome.status).toBe("success");
       expect(outcome.preferredLabel).toBe("false");
-      expect(outcome.contextUpdates?.["summary"]).toBe("stale");
+      expect(outcome.contextUpdates?.["work.summary"]).toBe("stale");
     } finally {
       rmSync(logsDir, { recursive: true, force: true });
     }
@@ -768,7 +768,7 @@ describe("AgentHandler", () => {
     expect(ends).toEqual([0, 1]);
   });
 
-  it("rubric $var stays literal while task $var expands", async () => {
+  it("rubric body and steering prompt are both rendered verbatim (no $var expansion)", async () => {
     const rubric = "Run id context: `$run_id` is injected at runtime.";
     mockResolve.mockReturnValue({ ...baseConfig, prompt: rubric });
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null });
@@ -782,25 +782,26 @@ describe("AgentHandler", () => {
     try {
       const ctx: PipelineContext = { values: { task_var: "EXPANDED_VALUE" } };
       await handler.execute(
-        makeNode({ id: "n1", shape: "box", agent: "var-rubric", prompt: "Node task references $task_var for expansion." }),
+        makeNode({ id: "n1", shape: "box", agent: "var-rubric", prompt: "Node task references $task_var literally." }),
         ctx,
         makeContext({ logsRoot: logsDir }),
       );
 
       const writtenPrompt = readFileSync(join(logsDir, "n1", "prompt.md"), "utf8");
-      // Rubric $run_id must remain literal (not expanded, not throw)
+      // Rubric $run_id stays literal in the agent body section
       expect(writtenPrompt).toContain("$run_id");
-      // Task $task_var must be expanded
-      expect(writtenPrompt).toContain("EXPANDED_VALUE");
-      // Task variable placeholder must not remain
-      expect(writtenPrompt).not.toContain("$task_var");
+      // Steering section contains verbatim node.prompt (not expanded)
+      const steeringIdx = writtenPrompt.indexOf("## Steering");
+      expect(steeringIdx).toBeGreaterThan(-1);
+      const steeringSection = writtenPrompt.slice(steeringIdx);
+      expect(steeringSection).toContain("$task_var");
     } finally {
       rmSync(logsDir, { recursive: true, force: true });
     }
   });
 
-  it("spider-case rubric still expands $vars when node has no task", async () => {
-    mockResolve.mockReturnValue({ ...baseConfig, prompt: "Spider instruction uses $spider_var." });
+  it("agent rubric body is delivered verbatim even when node has no steering prompt", async () => {
+    mockResolve.mockReturnValue({ ...baseConfig, prompt: "Spider instruction uses $spider_var literally." });
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null });
 
     const handler = new AgentHandler({
@@ -818,8 +819,8 @@ describe("AgentHandler", () => {
       );
 
       const writtenPrompt = readFileSync(join(logsDir, "n1", "prompt.md"), "utf8");
-      expect(writtenPrompt).toContain("SPIDER_VALUE");
-      expect(writtenPrompt).not.toContain("$spider_var");
+      // Rubric body stays literal — $spider_var appears verbatim
+      expect(writtenPrompt).toContain("$spider_var");
     } finally {
       rmSync(logsDir, { recursive: true, force: true });
     }

@@ -50,6 +50,7 @@ describe("AgentHandler – JSON constraint injection", () => {
     tools: [] as string[],
     mcp: [] as any[],
     permissionMode: "dangerouslySkipPermissions",
+    autoInputs: true as const,
   };
 
   it("prepends JSON constraint to prompt when jsonSchema is set", async () => {
@@ -199,8 +200,8 @@ describe("AgentHandler – JSON constraint injection", () => {
       );
 
       expect(outcome.status).toBe("success");
-      expect(outcome.contextUpdates?.verdict).toBe("pass");
-      expect(outcome.contextUpdates?.notes).toBe("all good");
+      expect(outcome.contextUpdates?.["work.verdict"]).toBe("pass");
+      expect(outcome.contextUpdates?.["work.notes"]).toBe("all good");
     } finally {
       rmSync(logsDir, { recursive: true, force: true });
     }
@@ -262,7 +263,7 @@ describe("AgentHandler – JSON constraint injection", () => {
       );
 
       expect(outcome.status).toBe("success");
-      expect(outcome.contextUpdates?.verdict).toBe("pass");
+      expect(outcome.contextUpdates?.["work.verdict"]).toBe("pass");
     } finally {
       rmSync(logsDir, { recursive: true, force: true });
     }

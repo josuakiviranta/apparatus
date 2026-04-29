@@ -15,6 +15,7 @@ name: verifier
 description: x
 model: opus
 permissionMode: default
+auto_inputs: true
 tools: []
 mcp: []
 inputs: [foo]

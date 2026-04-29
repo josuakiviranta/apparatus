@@ -59,26 +59,6 @@ body`,
     expect(diags.find(d => d.rule === "inputs_missing_frontmatter")).toBeUndefined();
   });
 
-  it("does not fire on legacy agents without auto_inputs", () => {
-    const dir = join(tmpdir(), `rule-imf-legacy-${Date.now()}`);
-    setup(dir, {
-      "a.md": `---
-name: a
-description: x
-outputs: { foo: string }
----
-body`,
-    });
-    const dot = `digraph g {
-      start [shape=Mdiamond]
-      n [agent="a"]
-      done [shape=Msquare]
-      start -> n -> done
-    }`;
-    const graph = parseDot(dot);
-    const diags = validateGraph(graph, dir);
-    expect(diags.find(d => d.rule === "inputs_missing_frontmatter")).toBeUndefined();
-  });
 });
 
 describe("validator — unknown_source_node", () => {
@@ -113,6 +93,7 @@ body`,
       "consumer.md": `---
 name: consumer
 description: x
+auto_inputs: true
 outputs: { foo: string }
 ---
 body`,
@@ -340,6 +321,7 @@ body`,
       "consumer.md": `---
 name: consumer
 description: x
+auto_inputs: true
 outputs: { foo: string }
 ---
 body`,
@@ -408,26 +390,6 @@ body`,
     expect(d!.message).toMatch(/auto_inputs/);
   });
 
-  it("does not fire on legacy agents without auto_inputs even if prompt has $var", () => {
-    const dir = join(tmpdir(), `rule-shvt-legacy-${Date.now()}`);
-    setup(dir, {
-      "x.md": `---
-name: x
-description: x
-outputs: { result: string }
----
-body`,
-    });
-    const dot = `digraph g {
-      start [shape=Mdiamond]
-      n [agent="x", prompt="hello $foo"]
-      done [shape=Msquare]
-      start -> n -> done
-    }`;
-    const graph = parseDot(dot);
-    const diags = validateGraph(graph, dir);
-    expect(diags.find(d => d.rule === "steering_has_var_token")).toBeUndefined();
-  });
 });
 
 describe("validator — rendered_tag_collision", () => {
@@ -555,6 +517,7 @@ body`,
       "consumer.md": `---
 name: consumer
 description: x
+auto_inputs: true
 outputs: { result: string }
 ---
 body`,

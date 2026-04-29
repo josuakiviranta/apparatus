@@ -11,6 +11,7 @@ describe("validator — derive produces from agent outputs", () => {
     writeFileSync(join(dir, "verifier.md"), `---
 name: verifier
 description: verifier
+auto_inputs: true
 outputs:
   preferred_label: {enum: ["true", "false"]}
   summary: string
@@ -20,6 +21,7 @@ body
     writeFileSync(join(dir, "consumer.md"), `---
 name: consumer
 description: consumes preferred_label
+auto_inputs: true
 inputs:
   - preferred_label
 ---
@@ -55,12 +57,14 @@ body
     writeFileSync(join(dir, "legacy.md"), `---
 name: legacy
 description: legacy
+auto_inputs: true
 ---
 body
 `);
     writeFileSync(join(dir, "consumer.md"), `---
 name: consumer
 description: consumes manual_key
+auto_inputs: true
 inputs:
   - manual_key
 ---

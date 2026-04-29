@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { mkdtempSync, existsSync, readFileSync } from "node:fs";
+import { mkdtempSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { AgentHandler } from "../handlers/agent-handler.js";
@@ -7,7 +7,7 @@ import { AgentHandler } from "../handlers/agent-handler.js";
 function makeAgent(responses: Array<{ raw: string; sessionId?: string }>) {
   let i = 0;
   return {
-    run: vi.fn(async () => {
+    run: vi.fn(async (_args: { resume?: string; message?: string }) => {
       const r = responses[Math.min(i, responses.length - 1)];
       i++;
       return {
@@ -34,6 +34,7 @@ function makeMeta(extra: Partial<any> = {}) {
 const config = (extras: any = {}) => ({
   name: "v", description: "d", model: "opus",
   permissionMode: "default", tools: [], mcp: [], prompt: "",
+  autoInputs: true as const,
   outputs: { foo: "string" },
   jsonSchema: '{"type":"object","properties":{"foo":{"type":"string"}},"required":["foo"],"additionalProperties":false}',
   ...extras,
@@ -56,10 +57,11 @@ describe("AgentHandler — validation retry loop", () => {
       meta as any,
     );
     expect(outcome.status).toBe("success");
-    expect(outcome.contextUpdates?.foo).toBe("bar");
+    expect(outcome.contextUpdates?.["v.foo"]).toBe("bar");
     expect(fakeAgent.run).toHaveBeenCalledTimes(2);
-    expect(fakeAgent.run.mock.calls[1][0]).toMatchObject({ resume: "s-1" });
-    expect(fakeAgent.run.mock.calls[1][0].message).toMatch(/schema validation/i);
+    const secondCall = fakeAgent.run.mock.calls.at(1)!;
+    expect(secondCall[0]).toMatchObject({ resume: "s-1" });
+    expect(secondCall[0].message).toMatch(/schema validation/i);
     expect(existsSync(join(meta.logsRoot, "v", "raw-attempt-1.txt"))).toBe(true);
     expect(existsSync(join(meta.logsRoot, "v", "raw-attempt-2.txt"))).toBe(true);
   });
@@ -80,7 +82,7 @@ describe("AgentHandler — validation retry loop", () => {
       meta as any,
     );
     expect(outcome.status).toBe("success");
-    expect(fakeAgent.run.mock.calls[1][0].message).toMatch(/no text content/i);
+    expect(fakeAgent.run.mock.calls.at(1)![0].message).toMatch(/no text content/i);
   });
 
   it("invalid 2 attempts → hard fail with attempts logged", async () => {
@@ -101,7 +103,7 @@ describe("AgentHandler — validation retry loop", () => {
     );
     expect(outcome.status).toBe("fail");
     expect(outcome.failureReason).toMatch(/output validation failed.*2 attempts/i);
-    expect(outcome.contextUpdates?.["agent.success"]).toBe("false");
+    expect(outcome.contextUpdates?.["v.success"]).toBe("false");
     expect(onValidationFailure).toHaveBeenCalledTimes(2);
     expect(existsSync(join(meta.logsRoot, "v", "raw-attempt-1.txt"))).toBe(true);
     expect(existsSync(join(meta.logsRoot, "v", "raw-attempt-2.txt"))).toBe(true);

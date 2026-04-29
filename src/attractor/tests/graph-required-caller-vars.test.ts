@@ -18,6 +18,7 @@ describe("validator — required_caller_vars", () => {
       "producer.md": `---
 name: producer
 description: produces foo
+auto_inputs: true
 outputs:
   foo: string
 ---
@@ -26,6 +27,7 @@ body
       "consumer.md": `---
 name: consumer
 description: consumes foo
+auto_inputs: true
 inputs:
   - foo
 ---
@@ -61,6 +63,7 @@ body
       "agent-a.md": `---
 name: agent-a
 description: no special inputs
+auto_inputs: true
 ---
 body
 `,
@@ -89,6 +92,7 @@ body
       "agent-a.md": `---
 name: agent-a
 description: uses reserved vars
+auto_inputs: true
 ---
 Use $run_id and $goal here.
 `,
@@ -112,6 +116,7 @@ Use $run_id and $goal here.
       "consumer.md": `---
 name: consumer
 description: needs external_key
+auto_inputs: true
 inputs:
   - external_key
 ---
@@ -138,6 +143,7 @@ body
       "producer.md": `---
 name: producer
 description: produces my_key
+auto_inputs: true
 outputs:
   my_key: string
 ---
@@ -146,6 +152,7 @@ body
       "consumer.md": `---
 name: consumer
 description: needs my_key
+auto_inputs: true
 inputs:
   - my_key
 ---

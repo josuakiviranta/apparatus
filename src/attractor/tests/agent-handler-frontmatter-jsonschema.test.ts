@@ -17,6 +17,7 @@ describe("AgentHandler — frontmatter outputs activates parse path", () => {
       resolveAgent: () => ({
         name: "a", description: "d", model: "opus",
         permissionMode: "default", tools: [], mcp: [], prompt: "",
+        autoInputs: true as const,
         outputs: { foo: "string" },
         jsonSchema: '{"type":"object","properties":{"foo":{"type":"string"}},"required":["foo"],"additionalProperties":false}',
       }) as any,
@@ -30,6 +31,6 @@ describe("AgentHandler — frontmatter outputs activates parse path", () => {
     };
     const outcome = await handler.execute(node, ctx, meta);
     expect(outcome.status).toBe("success");
-    expect(outcome.contextUpdates).toMatchObject({ foo: "bar" });
+    expect(outcome.contextUpdates).toMatchObject({ "n1.foo": "bar" });
   });
 });

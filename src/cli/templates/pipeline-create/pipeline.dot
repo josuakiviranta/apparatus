@@ -5,7 +5,7 @@ digraph pipeline_create {
   start [shape=Mdiamond]
   done  [shape=Msquare]
 
-  scaffolder [agent="scaffolder", interactive=true, prompt="Scaffold a new pipeline named $pipeline_name under $pipelines_dir."]
+  scaffolder [agent="scaffolder", interactive=true, prompt="Scaffold a new pipeline using the provided pipeline_name and pipelines_dir."]
 
   start -> scaffolder -> done
 }

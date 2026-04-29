@@ -29,15 +29,17 @@ describe("validateAgentConfig — inputs", () => {
   it("attaches inputs array to AgentConfig", () => {
     const config = validateAgentConfig({
       name: "x", description: "x agent",
+      auto_inputs: true,
       inputs: ["foo", "bar"],
       prompt: "",
     } as any);
     expect(config.inputs).toEqual(["foo", "bar"]);
   });
 
-  it("does not set inputs when absent (legacy agents)", () => {
+  it("does not set inputs when absent", () => {
     const config = validateAgentConfig({
-      name: "legacy", description: "legacy",
+      name: "x", description: "x agent",
+      auto_inputs: true,
       prompt: "",
     } as any);
     expect(config.inputs).toBeUndefined();
@@ -46,6 +48,7 @@ describe("validateAgentConfig — inputs", () => {
   it("treats empty inputs array as valid (zero-input agent)", () => {
     const config = validateAgentConfig({
       name: "x", description: "x agent",
+      auto_inputs: true,
       inputs: [],
       prompt: "",
     } as any);

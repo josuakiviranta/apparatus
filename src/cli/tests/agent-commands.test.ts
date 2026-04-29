@@ -10,7 +10,7 @@ describe("agent commands", () => {
     tempDir = mkdtempSync(join(tmpdir(), "ralph-agent-cmd-"));
     writeFileSync(
       join(tempDir, "reviewer.md"),
-      `---\nname: reviewer\ndescription: Reviews code\nmodel: sonnet\npermissionMode: dontAsk\ntools:\n  - read_file\n---\n\nYou are a reviewer.`,
+      `---\nname: reviewer\ndescription: Reviews code\nmodel: sonnet\npermissionMode: dontAsk\nauto_inputs: true\ntools:\n  - read_file\n---\n\nYou are a reviewer.`,
     );
   });
 

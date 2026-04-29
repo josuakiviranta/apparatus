@@ -50,6 +50,7 @@ function makeFakeAgent(
       tools: [],
       mcp: [],
       prompt: "",
+      autoInputs: true,
     } as AgentConfig,
     run: async () => ({ exitCode: 0, sessionId: null, stdout: null }),
     runInteractive: (opts: { session: Session; systemPrompt: string; cwd: string }) => {
@@ -225,14 +226,13 @@ describe("AgentHandler — interactive branch", () => {
 
     const tmp = mkdtempSync(join(tmpdir(), "ralph-handler-"));
     try {
-      const node: Node = { id: "chat", prompt: "talk about $topic", interactive: true };
+      const node: Node = { id: "chat", prompt: "talk about testing", interactive: true };
       const ctx: PipelineContext = { values: { topic: "testing" } };
       await handler.execute(node, ctx, baseMeta(tmp, tmp, makeInteractiveStub("user_end")));
 
       const promptPath = join(tmp, "chat", "prompt.md");
       const written = readFileSync(promptPath, "utf8");
       expect(written).toContain("talk about testing");
-      expect(written).not.toContain("$topic");
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }

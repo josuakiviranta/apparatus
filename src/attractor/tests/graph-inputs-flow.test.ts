@@ -11,6 +11,7 @@ describe("validator — missing_input_producer", () => {
     writeFileSync(join(dir, "consumer.md"), `---
 name: consumer
 description: needs foo
+auto_inputs: true
 inputs:
   - foo
 ---
@@ -38,6 +39,7 @@ body
     writeFileSync(join(dir, "producer.md"), `---
 name: producer
 description: produces foo
+auto_inputs: true
 outputs:
   foo: string
 ---
@@ -46,6 +48,7 @@ body
     writeFileSync(join(dir, "consumer.md"), `---
 name: consumer
 description: needs foo
+auto_inputs: true
 inputs:
   - foo
 ---
@@ -70,6 +73,7 @@ body
     writeFileSync(join(dir, "consumer.md"), `---
 name: consumer
 description: needs project
+auto_inputs: true
 inputs:
   - project
 ---
@@ -94,6 +98,7 @@ body
     writeFileSync(join(dir, "consumer.md"), `---
 name: consumer
 description: needs foo
+auto_inputs: true
 inputs:
   - foo
 ---
@@ -118,6 +123,7 @@ body
     writeFileSync(join(dir, "consumer.md"), `---
 name: consumer
 description: needs run_id (auto-injected by runtime)
+auto_inputs: true
 inputs:
   - run_id
   - goal
@@ -146,6 +152,7 @@ describe("validator — branch_incomplete_input", () => {
     writeFileSync(join(dir, "producer.md"), `---
 name: producer
 description: produces foo
+auto_inputs: true
 outputs:
   foo: string
 ---
@@ -154,12 +161,14 @@ body
     writeFileSync(join(dir, "passthrough.md"), `---
 name: passthrough
 description: does not produce foo
+auto_inputs: true
 ---
 body
 `);
     writeFileSync(join(dir, "consumer.md"), `---
 name: consumer
 description: needs foo
+auto_inputs: true
 inputs:
   - foo
 ---
@@ -196,6 +205,7 @@ body
     writeFileSync(join(dir, "producer.md"), `---
 name: producer
 description: produces foo
+auto_inputs: true
 outputs:
   foo: string
 ---
@@ -204,6 +214,7 @@ body
     writeFileSync(join(dir, "consumer.md"), `---
 name: consumer
 description: needs foo
+auto_inputs: true
 inputs:
   - foo
 ---
@@ -235,6 +246,7 @@ body
     writeFileSync(join(dir, "producer.md"), `---
 name: producer
 description: produces foo
+auto_inputs: true
 outputs:
   foo: string
 ---
@@ -243,12 +255,14 @@ body
     writeFileSync(join(dir, "passthrough.md"), `---
 name: passthrough
 description: does not produce foo
+auto_inputs: true
 ---
 body
 `);
     writeFileSync(join(dir, "consumer.md"), `---
 name: consumer
 description: needs foo
+auto_inputs: true
 inputs:
   - foo
 ---
@@ -280,6 +294,7 @@ body
     writeFileSync(join(dir, "consumer.md"), `---
 name: consumer
 description: needs foo
+auto_inputs: true
 inputs:
   - foo
 ---
@@ -306,6 +321,7 @@ describe("validator — input_type_mismatch", () => {
     writeFileSync(join(dir, "classifier.md"), `---
 name: classifier
 description: emits preferred_label
+auto_inputs: true
 outputs:
   preferred_label:
     enum:
@@ -318,6 +334,7 @@ body
     writeFileSync(join(dir, "next.md"), `---
 name: next
 description: downstream
+auto_inputs: true
 ---
 body
 `);
@@ -372,6 +389,7 @@ body
     writeFileSync(join(dir, "producer.md"), `---
 name: producer
 description: emits foo with no enum
+auto_inputs: true
 outputs:
   foo: string
 ---
@@ -380,6 +398,7 @@ body
     writeFileSync(join(dir, "next.md"), `---
 name: next
 description: downstream
+auto_inputs: true
 ---
 body
 `);
@@ -405,6 +424,7 @@ body
     writeFileSync(join(dir, "agent.md"), `---
 name: a
 description: anything
+auto_inputs: true
 ---
 body
 `);
@@ -430,6 +450,7 @@ body
     writeFileSync(join(dir, "classifier.md"), `---
 name: classifier
 description: emits two outputs
+auto_inputs: true
 outputs:
   preferred_label:
     enum:
@@ -445,6 +466,7 @@ body
     writeFileSync(join(dir, "next.md"), `---
 name: next
 description: downstream
+auto_inputs: true
 ---
 body
 `);

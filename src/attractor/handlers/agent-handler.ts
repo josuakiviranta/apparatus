@@ -7,7 +7,6 @@ import { Agent, type AgentConfig, type ChildHandle } from "../../cli/lib/agent.j
 import { resolveAgent as defaultResolveAgent } from "../../cli/lib/agent-registry.js";
 import { getIlluminationServerPath, getMetaMeditationsDir } from "../../cli/lib/assets.js";
 import { buildPreamble } from "../transforms/preamble.js";
-import { expandVariables, extractDefaults } from "../transforms/variable-expansion.js";
 import { renderInputsBlock } from "../transforms/inputs-renderer.js";
 import { outputsToZod } from "../../cli/lib/outputs-to-zod.js";
 import { buildCorrectiveMessage } from "../../cli/lib/corrective-message.js";
@@ -96,31 +95,15 @@ export class AgentHandler implements NodeHandler {
     const nodeDir = join(logsRoot, node.id);
     mkdirSync(nodeDir, { recursive: true });
     const agentInstructions = (config.prompt ?? "").trim();
-    const defaults = extractDefaults(node as unknown as Record<string, unknown>);
 
-    let assembledPrompt: string;
-    if (config.autoInputs === true) {
-      // Auto-inputs path: inject Inputs block from declared inputs, treat node.prompt as optional prose steering
-      const declaredInputs = (config.inputs as string[] | undefined) ?? [];
-      const nodeAttrs = node as unknown as Record<string, unknown>;
-      const inputsBlock = renderInputsBlock(declaredInputs, ctx.values, nodeAttrs);
-      const steeringRaw = (node.prompt ?? "").trim();
-      const steeringBlock = steeringRaw
-        ? `\n\n## Steering\n\n${steeringRaw}\n`
-        : "";
-      assembledPrompt = `${agentInstructions}\n\n---\n\n${inputsBlock}${steeringBlock}`;
-    } else {
-      // Legacy path: expand $variables in node task / rubric
-      const nodeTask = node.prompt ?? node.label;
-      // Expand ONLY the node task. Rubric bodies are authored manuals —
-      // their literal `$var` tokens (e.g. `$run_id` in tmux-tester.md as documentation)
-      // must not reach expandVariables or undefined ones throw.
-      // Spider case (no node task) keeps the old behavior: rubric IS the template, so expand it.
-      const expandedTask = nodeTask ? expandVariables(nodeTask, ctx.values, defaults) : undefined;
-      assembledPrompt = expandedTask
-        ? (agentInstructions ? `${agentInstructions}\n\n---\n\n${expandedTask}` : expandedTask)
-        : expandVariables(agentInstructions, ctx.values, defaults);
-    }
+    const declaredInputs = (config.inputs as string[] | undefined) ?? [];
+    const nodeAttrs = node as unknown as Record<string, unknown>;
+    const inputsBlock = renderInputsBlock(declaredInputs, ctx.values, nodeAttrs);
+    const steeringRaw = (node.prompt ?? "").trim();
+    const steeringBlock = steeringRaw
+      ? `\n\n## Steering\n\n${steeringRaw}\n`
+      : "";
+    const assembledPrompt = `${agentInstructions}\n\n---\n\n${inputsBlock}${steeringBlock}`;
 
     const fidelity = (node.fidelity as string | undefined) ?? "compact";
     const preamble = buildPreamble(
@@ -238,8 +221,7 @@ export class AgentHandler implements NodeHandler {
       !!config.outputs && Object.prototype.hasOwnProperty.call(config.outputs, "note");
     let prevNote = "";
 
-    // When auto_inputs is true, namespace meta keys under node.id; otherwise use legacy "agent" prefix.
-    const metaPrefix = config.autoInputs === true ? node.id : "agent";
+    const metaPrefix = node.id;
 
     for (let i = 0; i < maxIterations; i++) {
       if (signal?.aborted) break;
@@ -340,9 +322,7 @@ export class AgentHandler implements NodeHandler {
     let structuredUpdates: Record<string, unknown> = {};
     if (lastParsed) {
       for (const [key, value] of Object.entries(lastParsed)) {
-        // When auto_inputs is true metaPrefix === node.id, so namespace under node.id.key;
-        // otherwise metaPrefix === "agent" and legacy path keeps bare key.
-        const outKey = config.autoInputs === true ? `${metaPrefix}.${key}` : key;
+        const outKey = `${metaPrefix}.${key}`;
         structuredUpdates[outKey] = typeof value === "string" ? value : String(value);
       }
     }

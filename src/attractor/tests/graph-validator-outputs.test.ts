@@ -11,6 +11,7 @@ describe("validator — agent_missing_outputs + agent_outputs_empty", () => {
     writeFileSync(join(dir, "my-agent.md"), `---
 name: my-agent
 description: an agent without outputs
+auto_inputs: true
 ---
 Do something useful.
 `);
@@ -39,6 +40,7 @@ Do something useful.
     writeFileSync(join(dir, "my-agent.md"), `---
 name: my-agent
 description: an agent with empty outputs
+auto_inputs: true
 outputs: {}
 ---
 Do something.
@@ -65,6 +67,7 @@ Do something.
     writeFileSync(join(dir, "my-agent.md"), `---
 name: my-agent
 description: an agent with empty outputs
+auto_inputs: true
 outputs: {}
 ---
 Do something.
@@ -92,6 +95,7 @@ Do something.
     writeFileSync(join(dir, "chat-agent.md"), `---
 name: chat-agent
 description: an interactive agent without outputs
+auto_inputs: true
 ---
 Chat with the user.
 `);

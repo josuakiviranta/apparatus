@@ -112,42 +112,4 @@ You are v.`,
     expect(out.contextUpdates).not.toHaveProperty("result");
   });
 
-  it("legacy path unchanged when auto_inputs is absent", async () => {
-    const fakeAgent = {
-      run: vi.fn(async () => ({
-        exitCode: 0,
-        sessionId: "s1",
-        output: JSON.stringify({ result: "ok" }),
-      })),
-    };
-    const jsonSchema = JSON.stringify({ type: "object", properties: { result: { type: "string" } }, required: ["result"] });
-    const handler = new AgentHandler({
-      resolveAgent: () => ({
-        name: "v",
-        description: "t",
-        model: "opus",
-        permissionMode: "default",
-        tools: [],
-        mcp: [],
-        prompt: "# Mission",
-        jsonSchema,
-        outputs: { result: "string" },
-      }),
-      createAgent: () => fakeAgent as any,
-    });
-    const dotDir = mkdtempSync(join(tmpdir(), "legacy-"));
-    const node: Node = {
-      id: "v_node",
-      agent: "v",
-      label: "v_node",
-      prompt: "Hello $name",
-    } as any;
-    const ctx: PipelineContext = { values: { name: "world" } };
-    const out = await handler.execute(node, ctx, {
-      logsRoot: dotDir, cwd: dotDir, dotDir, completedNodes: [], nodeRetries: {},
-    } as any);
-    expect(out.status).toBe("success");
-    expect(out.contextUpdates).toHaveProperty("result", "ok");
-    expect(out.contextUpdates).not.toHaveProperty("v_node.result");
-  });
 });
