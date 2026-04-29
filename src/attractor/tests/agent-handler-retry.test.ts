@@ -100,7 +100,7 @@ describe("AgentHandler — validation retry loop", () => {
       meta as any,
     );
     expect(outcome.status).toBe("fail");
-    expect(outcome.failureReason).toMatch(/output validation failed after 2 attempts/i);
+    expect(outcome.failureReason).toMatch(/output validation failed.*2 attempts/i);
     expect(outcome.contextUpdates?.["agent.success"]).toBe("false");
     expect(onValidationFailure).toHaveBeenCalledTimes(2);
     expect(existsSync(join(meta.logsRoot, "v", "raw-attempt-1.txt"))).toBe(true);

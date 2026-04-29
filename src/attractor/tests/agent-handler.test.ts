@@ -97,12 +97,24 @@ describe("AgentHandler", () => {
     expect(outcome.contextUpdates?.["agent.iterations"]).toBe("3");
   });
 
-  it("does not fail on non-zero exit during multi-iteration loop", async () => {
-    mockResolve.mockReturnValue({ ...baseConfig });
+  it("exits loop on first non-zero exit during deep-loop multi-iteration", async () => {
+    mockResolve.mockReturnValue({
+      ...baseConfig,
+      loop: true,
+      outputs: { done: "boolean" },
+      jsonSchema: JSON.stringify({
+        type: "object",
+        properties: { done: { type: "boolean" } },
+        required: ["done"],
+        additionalProperties: false,
+      }),
+    });
     mockAgentRun
-      .mockResolvedValueOnce({ exitCode: 0, sessionId: "s1", stdout: null })
-      .mockResolvedValueOnce({ exitCode: 1, sessionId: null, stdout: null })
-      .mockResolvedValueOnce({ exitCode: 0, sessionId: "s2", stdout: null });
+      .mockResolvedValueOnce({ exitCode: 0, sessionId: "s1", stdout: null, output: JSON.stringify([
+        { type: "system", subtype: "init", session_id: "s1" },
+        { type: "result", subtype: "success", result: '{"done":false}' },
+      ]) })
+      .mockResolvedValueOnce({ exitCode: 1, sessionId: null, stdout: null });
 
     const handler = makeHandler();
     const outcome = await handler.execute(
@@ -111,8 +123,8 @@ describe("AgentHandler", () => {
       makeContext(),
     );
 
-    expect(outcome.status).toBe("success");
-    expect(mockAgentRun).toHaveBeenCalledTimes(3);
+    expect(outcome.status).toBe("fail");
+    expect(mockAgentRun).toHaveBeenCalledTimes(2);
   });
 
   it("falls back to 'implement' agent when node has no agent attribute", async () => {

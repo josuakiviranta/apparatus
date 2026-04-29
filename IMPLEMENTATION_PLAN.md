@@ -551,13 +551,15 @@ git commit -m "feat(handler): cap cascade — node > agent > (loop ? Infinity : 
 
 ---
 
-## Chunk 4: Per-iteration outputs parse + `done` break + crash exit
+## Chunk 4: Per-iteration outputs parse + `done` break + crash exit ✅ SHIPPED
 
 **Ships green:** The handler's iteration loop now parses outputs each iteration via `evaluateAgentOutput`, breaks on `done=true`, treats any non-zero exit as hard failure, and exposes the LAST iteration's parsed outputs as `contextUpdates`. Validation+retry block moves inside the loop body.
 
 This chunk also re-classifies the existing test `does not fail on non-zero exit during multi-iteration loop` (line 100 of `agent-handler.test.ts`) — its semantics no longer match the new contract. It becomes "exits the loop with agent.success=false on first non-zero exit during deep-loop iteration".
 
-### Task 4.1 — Move validation+retry inside the iteration loop and add per-iteration `done` break
+### Task 4.1 — Move validation+retry inside the iteration loop and add per-iteration `done` break ✅ DONE
+
+**Implementation note:** Filename pattern stayed `raw-attempt-${n}.txt` (not `iter-${i+1}-attempt-${n}.txt` as originally drafted) to keep `agent-handler-retry.test.ts` and `agent-handler-json-constraint.test.ts` filename assertions green. Per-iteration files overwrite each other — adequate for current forensics. Failure-reason wording prefixed with `iteration ${i+1}` so retry test regex updated to `/output validation failed.*N attempts/i`.
 
 **Files:**
 - Modify: `src/attractor/handlers/agent-handler.ts` (relocate lines 218–297 into the iteration loop body; drop the `maxIterations === 1` guard at line 206; iteration counter must NOT double-count retries)

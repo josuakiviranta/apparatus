@@ -3,7 +3,7 @@ import { join } from "path";
 import { randomUUID } from "crypto";
 import type { NodeHandler, HandlerExecutionContext } from "./registry.js";
 import type { Node, Outcome, PipelineContext, CheckpointState } from "../types.js";
-import { Agent, type AgentConfig, type RunResult, type ChildHandle } from "../../cli/lib/agent.js";
+import { Agent, type AgentConfig, type ChildHandle } from "../../cli/lib/agent.js";
 import { resolveAgent as defaultResolveAgent } from "../../cli/lib/agent-registry.js";
 import { getIlluminationServerPath, getMetaMeditationsDir } from "../../cli/lib/assets.js";
 import { buildPreamble } from "../transforms/preamble.js";
@@ -181,37 +181,36 @@ export class AgentHandler implements NodeHandler {
             ? (agentCap === 0 ? Infinity : agentCap)
             : (loopMode ? Infinity : 1));
 
-    let lastResult: RunResult | null = null;
     let lastSessionId: string | null = null;
     let iteration = 0;
+
+    let lastParsed: Record<string, unknown> | null = null;
+    let preferredLabel: string | undefined;
+
+    const zodSchema = (jsonSchema && config.outputs) ? outputsToZod(config.outputs) : null;
+
+    const overrideRetries = (node as Record<string, unknown>).outputValidationRetries;
+    const maxRetries =
+      typeof overrideRetries === "number" && overrideRetries >= 0
+        ? overrideRetries
+        : 1;
+
+    const writeRaw = (n: number, raw: string) =>
+      writeFileSync(join(nodeDir, `raw-attempt-${n}.txt`), raw ?? "");
 
     for (let i = 0; i < maxIterations; i++) {
       if (signal?.aborted) break;
 
-      // Iterations 1+: open a new TUI block (iteration 0's block opened by onNodeStart)
-      if (i > 0) {
-        meta.onIterationStart?.(node.id, i);
-      }
+      if (i > 0) meta.onIterationStart?.(node.id, i);
 
-      const result = await agent.run({
-        cwd,
-        signal,
-        variables: agentVariables,
-        onStdout,
+      let result = await agent.run({
+        cwd, signal, variables: agentVariables, onStdout,
       });
-
-      lastResult = result;
       iteration++;
       if (result.sessionId) lastSessionId = result.sessionId;
 
-      // More iterations will follow: close current TUI block
-      const willContinue = !signal?.aborted && i < maxIterations - 1;
-      if (willContinue) {
-        meta.onIterationEnd?.(node.id, i);
-      }
-
-      // Only fail-fast on non-zero exit for single-iteration nodes
-      if (result.exitCode !== 0 && maxIterations === 1) {
+      // D6: any non-zero exit during deep-loop iteration = hard failure.
+      if (result.exitCode !== 0) {
         return {
           status: "fail",
           failureReason: `Agent "${agentName}" exited with code ${result.exitCode}`,
@@ -221,86 +220,76 @@ export class AgentHandler implements NodeHandler {
           },
         };
       }
-    }
 
-    // Validation + retry loop.
-    // The first attempt already ran via the iteration loop above
-    // (lastResult/lastSessionId hold its result). When jsonSchema is set,
-    // validate and possibly retry by resuming the same Claude session.
-    let structuredUpdates: Record<string, unknown> = {};
-    let preferredLabel: string | undefined;
+      let parsed: Record<string, unknown> | undefined;
+      if (jsonSchema) {
+        writeRaw(1, result.output ?? "");
+        let attempt = 1;
+        let evaluation = evaluateAgentOutput(result.output ?? "", zodSchema);
 
-    if (jsonSchema) {
-      const zodSchema = config.outputs ? outputsToZod(config.outputs) : null;
+        while (!evaluation.ok && attempt <= maxRetries) {
+          meta.onValidationFailure?.({
+            attempt,
+            errors: evaluation.errors,
+            rawOutputPath: `${node.id}/raw-attempt-${attempt}.txt`,
+          });
+          if (!lastSessionId) {
+            return {
+              status: "fail",
+              failureReason:
+                `Output validation failed and cannot retry: agent did not report sessionId ` +
+                `(iter ${i + 1} attempt ${attempt}: ${evaluation.errors.map(e => `${e.path}: ${e.message}`).join("; ")})`,
+              contextUpdates: { "agent.iterations": String(iteration), "agent.success": "false" },
+            };
+          }
+          attempt += 1;
+          meta.onValidationRetryStart?.(node.id, attempt);
+          const corrective = buildCorrectiveMessage(evaluation.raw, evaluation.errors, jsonSchema);
+          const retryResult = await agent.run({
+            cwd, signal, variables: agentVariables, onStdout,
+            resume: lastSessionId, message: corrective,
+          });
+          result = retryResult;
+          if (retryResult.sessionId) lastSessionId = retryResult.sessionId;
+          // Retries are sub-attempts of this iteration; do NOT increment `iteration`.
 
-      const writeRaw = (n: number, raw: string) =>
-        writeFileSync(join(nodeDir, `raw-attempt-${n}.txt`), raw ?? "");
+          writeRaw(attempt, retryResult.output ?? "");
+          evaluation = evaluateAgentOutput(retryResult.output ?? "", zodSchema);
+        }
 
-      writeRaw(1, lastResult?.output ?? "");
-
-      const overrideRetries = (node as any).outputValidationRetries;
-      const maxRetries =
-        typeof overrideRetries === "number" && overrideRetries >= 0
-          ? overrideRetries
-          : 1;
-
-      let attempt = 1;
-      let evaluation = evaluateAgentOutput(lastResult?.output ?? "", zodSchema);
-
-      while (!evaluation.ok && attempt <= maxRetries) {
-        meta.onValidationFailure?.({
-          attempt,
-          errors: evaluation.errors,
-          rawOutputPath: `${node.id}/raw-attempt-${attempt}.txt`,
-        });
-
-        if (!lastSessionId) {
+        if (!evaluation.ok) {
+          meta.onValidationFailure?.({
+            attempt,
+            errors: evaluation.errors,
+            rawOutputPath: `${node.id}/raw-attempt-${attempt}.txt`,
+          });
           return {
             status: "fail",
             failureReason:
-              `Output validation failed and cannot retry: agent did not report sessionId ` +
-              `(attempt ${attempt}: ${evaluation.errors.map(e => `${e.path}: ${e.message}`).join("; ")})`,
+              `Output validation failed in iteration ${i + 1} after ${attempt} attempts: ` +
+              evaluation.errors.map(e => `${e.path}: ${e.message}`).join("; "),
             contextUpdates: { "agent.iterations": String(iteration), "agent.success": "false" },
           };
         }
 
-        attempt += 1;
-        meta.onValidationRetryStart?.(node.id, attempt);
-
-        const corrective = buildCorrectiveMessage(evaluation.raw, evaluation.errors, jsonSchema);
-
-        const retryResult = await agent.run({
-          cwd, signal, variables: agentVariables, onStdout,
-          resume: lastSessionId, message: corrective,
-        });
-        lastResult = retryResult;
-        if (retryResult.sessionId) lastSessionId = retryResult.sessionId;
-        iteration += 1;
-
-        writeRaw(attempt, retryResult.output ?? "");
-        evaluation = evaluateAgentOutput(retryResult.output ?? "", zodSchema);
+        parsed = evaluation.parsed as Record<string, unknown>;
+        lastParsed = parsed;
+        if (parsed.preferred_label != null) preferredLabel = String(parsed.preferred_label);
       }
 
-      if (!evaluation.ok) {
-        meta.onValidationFailure?.({
-          attempt,
-          errors: evaluation.errors,
-          rawOutputPath: `${node.id}/raw-attempt-${attempt}.txt`,
-        });
-        return {
-          status: "fail",
-          failureReason:
-            `Output validation failed after ${attempt} attempts: ` +
-            evaluation.errors.map(e => `${e.path}: ${e.message}`).join("; "),
-          contextUpdates: { "agent.iterations": String(iteration), "agent.success": "false" },
-        };
-      }
+      // Deep-loop break MUST be checked BEFORE onIterationEnd; if we break,
+      // we don't end-and-restart — the outer onNodeEnd closes the block.
+      const willBreak = parsed?.done === true;
+      if (willBreak) break;
 
-      for (const [key, value] of Object.entries(evaluation.parsed)) {
+      const willContinue = !signal?.aborted && i < maxIterations - 1;
+      if (willContinue) meta.onIterationEnd?.(node.id, i);
+    }
+
+    let structuredUpdates: Record<string, unknown> = {};
+    if (lastParsed) {
+      for (const [key, value] of Object.entries(lastParsed)) {
         structuredUpdates[key] = typeof value === "string" ? value : String(value);
-      }
-      if (evaluation.parsed.preferred_label != null) {
-        preferredLabel = String(evaluation.parsed.preferred_label);
       }
     }
 
