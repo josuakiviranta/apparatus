@@ -1783,7 +1783,7 @@ Now that every agent uses the new path, the flag is redundant.
 
 ### Task 6.6: Tag release
 
-- [ ] **Step 0: Confirm full test suite is green on main**
+- [x] **Step 0: Confirm full test suite is green on main**
 
 ```bash
 npm run build && npx vitest run
@@ -1791,12 +1791,14 @@ npm run build && npx vitest run
 
 Expected: every test passes. If any test is red, fix before tagging.
 
-- [ ] **Step 1: Bump version in `package.json`** to next minor (e.g. 0.2.0).
-- [ ] **Step 2: Update `CHANGELOG`** if maintained.
-- [ ] **Step 3: Commit + tag** — `chore(release): 0.2.0 — context-flow redesign complete`.
-- [ ] **Step 4: Backlink the release tag in the spec**
+- [x] **Step 1: Bump version in `package.json`** to next minor (e.g. 0.2.0).
+- [x] **Step 2: Update `CHANGELOG`** if maintained.
+- [x] **Step 3: Commit + tag** — `chore(release): 0.2.0 — context-flow redesign complete`.
+- [x] **Step 4: Backlink the release tag in the spec**
 
 Once the release tag is created, update `docs/superpowers/specs/2026-04-29-pipeline-context-flow-redesign.md` header — replace `Status: implemented` (set in Task 6.5 Step 4) with `Status: implemented in v0.2.0` and add a `Release-tag: v0.2.0` field. Provides forward traceability from the spec to the merged work.
+
+**Audit note (2026-04-30):** Shipped — version bumped to 0.2.0, tag v0.2.0 pushed; spec header updated to "implemented in v0.2.0" with Release-tag field.
 
 ### Task 6.7: Validator follow-up from Chunk 3 close (c2aec1e)
 

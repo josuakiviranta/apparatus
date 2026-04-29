@@ -1,6 +1,7 @@
 # Pipeline Context-Flow Redesign — Design
 
-**Status:** implemented
+**Status:** implemented in v0.2.0
+**Release-tag:** v0.2.0
 **Date:** 2026-04-29
 **Related:** `src/attractor/handlers/agent-handler.ts`, `src/attractor/transforms/variable-expansion.ts`, `src/attractor/core/graph.ts`, `src/attractor/core/schemas.ts`, `src/cli/lib/agent-registry.ts`, `src/cli/lib/frontmatter.ts`, `pipelines/illumination-to-implementation/`, `pipelines/janitor/`, `pipelines/smoke/*/`
 **Origin:** `/grill-me` session 2026-04-29 (architectural decisions captured below)
