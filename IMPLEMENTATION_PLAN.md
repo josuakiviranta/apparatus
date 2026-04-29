@@ -986,9 +986,9 @@ Severity: error. Fires when `inputs: [verifier.foo]` references a key that the s
 
 Severity: error. Fires when a bare (unqualified) input is neither in `graph.inputs` (caller `inputs="..."` graph attr) nor a known system var.
 
-- [ ] **Step 1: Write the failing test** — consumer declares `inputs: [unknown_var]` (bare); graph `inputs=` does not list it; not a system var.
-- [ ] **Step 2: Run test, verify fail**
-- [ ] **Step 3: Extract a shared SYSTEM_VARS constant + implement rule**:
+- [x] **Step 1: Write the failing test** — consumer declares `inputs: [unknown_var]` (bare); graph `inputs=` does not list it; not a system var.
+- [x] **Step 2: Run test, verify fail**
+- [x] **Step 3: Extract a shared SYSTEM_VARS constant + implement rule**:
 
   First, add a single source of truth for system-injected vars. Edit `src/attractor/handlers/agent-handler.ts` to extract the auto-inject keys to an exported constant:
 
@@ -1011,8 +1011,8 @@ Severity: error. Fires when a bare (unqualified) input is neither in `graph.inpu
   ```
 
   Note: `project` and `run_id` are NOT system-injected vars; they are caller conventions provided via `--var`. Pipelines that need them must declare them in the digraph's `inputs="..."` attribute. The rule will correctly flag a missing `--var project` declaration when a consumer references bare `project` and no `inputs="project"` is set on the digraph.
-- [ ] **Step 4: Run test, verify pass**
-- [ ] **Step 5: Commit**
+- [x] **Step 4: Run test, verify pass**
+- [x] **Step 5: Commit**
 
 ### Task 2.5: Rule `steering_has_var_token`
 

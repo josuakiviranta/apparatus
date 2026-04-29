@@ -13,6 +13,9 @@ import { computeVarsInScope, computeVarsInAnyScope } from "./flow-analyzer.js";
 import { parseConditionClauses } from "./conditions.js";
 import { resolveGate } from "../../cli/lib/gate-registry.js";
 import { resolveInputDecl } from "../transforms/inputs-resolver.js";
+import { SYSTEM_INJECTED_VARS } from "../handlers/agent-handler.js";
+
+const SYSTEM_VARS = new Set<string>(SYSTEM_INJECTED_VARS);
 
 export function parseDot(src: string): Graph {
   return parseDotV2(src);
@@ -424,7 +427,19 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
             // a dedicated rule can flag these without crashing the validator.
             continue;
           }
-          if (resolved.sourceNode === undefined) continue; // bare input — no source-node check needed
+          if (resolved.sourceNode === undefined) {
+            // bare_input_not_in_caller_inputs_or_system — bare input must be either declared
+            // in the digraph's inputs="..." attribute or be a system-injected var.
+            if (!callerInputs.has(resolved.localKey) && !SYSTEM_VARS.has(resolved.localKey)) {
+              diags.push({
+                rule: "bare_input_not_in_caller_inputs_or_system",
+                severity: "error",
+                message: `Agent "${node.agent}" requires bare input "${resolved.localKey}" but it is neither declared in the digraph's inputs="..." nor a system-injected var. Add it to inputs="..." on the digraph or qualify it as "<source_node>.${resolved.localKey}".`,
+                location: node.sourceLocation,
+              });
+            }
+            continue;
+          }
 
           if (!nodes.has(resolved.sourceNode)) {
             diags.push({

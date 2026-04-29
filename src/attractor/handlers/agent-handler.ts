@@ -14,6 +14,26 @@ import { buildCorrectiveMessage } from "../../cli/lib/corrective-message.js";
 import { evaluateAgentOutput } from "./evaluate-agent-output.js";
 import { Session, buildSessionDigest } from "../../cli/lib/session.js";
 
+/**
+ * Keys auto-injected into every agent's variables by the pipeline engine.
+ * This is the single source of truth used by both the runtime (buildSystemInjectedVars)
+ * and the graph validator (bare_input_not_in_caller_inputs_or_system rule).
+ */
+export const SYSTEM_INJECTED_VARS = [
+  "ILLUMINATION_SERVER_PATH",
+  "PROJECT_ROOT",
+  "META_MEDITATIONS_DIR",
+] as const;
+
+/** Build the system-injected variable record for a given project root. */
+function buildSystemInjectedVars(projectRoot: string): Record<(typeof SYSTEM_INJECTED_VARS)[number], string> {
+  return {
+    ILLUMINATION_SERVER_PATH: getIlluminationServerPath(),
+    PROJECT_ROOT: projectRoot,
+    META_MEDITATIONS_DIR: getMetaMeditationsDir(),
+  };
+}
+
 export interface AgentHandlerDeps {
   resolveAgent?: (name: string, opts?: import("../../cli/lib/agent-registry.js").RegistryOptions) => AgentConfig;
   createAgent?: (config: AgentConfig) => Agent;
@@ -63,9 +83,7 @@ export class AgentHandler implements NodeHandler {
     // {{PROJECT_ROOT}} / {{META_MEDITATIONS_DIR}} placeholders resolved without
     // every pipeline command re-declaring them. Caller-provided values win.
     const agentVariables: Record<string, unknown> = {
-      ILLUMINATION_SERVER_PATH: getIlluminationServerPath(),
-      PROJECT_ROOT: meta.projectDir ?? cwd,
-      META_MEDITATIONS_DIR: getMetaMeditationsDir(),
+      ...buildSystemInjectedVars(meta.projectDir ?? cwd),
       ...ctx.values,
     };
 

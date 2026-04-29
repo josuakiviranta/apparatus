@@ -259,6 +259,102 @@ body`,
   });
 });
 
+describe("validator — bare_input_not_in_caller_inputs_or_system", () => {
+  it("errors when bare input is not in graph inputs= and not a system var", () => {
+    const dir = join(tmpdir(), `rule-binis-${Date.now()}`);
+    setup(dir, {
+      "consumer.md": `---
+name: consumer
+description: x
+auto_inputs: true
+inputs: [unknown_var]
+outputs: { foo: string }
+---
+body`,
+    });
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      c [agent="consumer"]
+      done [shape=Msquare]
+      start -> c -> done
+    }`;
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    const d = diags.find(d => d.rule === "bare_input_not_in_caller_inputs_or_system");
+    expect(d).toBeDefined();
+    expect(d!.severity).toBe("error");
+    expect(d!.message).toMatch(/unknown_var/);
+  });
+
+  it("does not fire when bare input is declared in graph inputs=", () => {
+    const dir = join(tmpdir(), `rule-binis-ok-${Date.now()}`);
+    setup(dir, {
+      "consumer.md": `---
+name: consumer
+description: x
+auto_inputs: true
+inputs: [unknown_var]
+outputs: { foo: string }
+---
+body`,
+    });
+    const dot = `digraph g {
+      inputs="unknown_var"
+      start [shape=Mdiamond]
+      c [agent="consumer"]
+      done [shape=Msquare]
+      start -> c -> done
+    }`;
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    expect(diags.find(d => d.rule === "bare_input_not_in_caller_inputs_or_system")).toBeUndefined();
+  });
+
+  it("does not fire for system-injected vars (PROJECT_ROOT, ILLUMINATION_SERVER_PATH, META_MEDITATIONS_DIR)", () => {
+    const dir = join(tmpdir(), `rule-binis-sysvar-${Date.now()}`);
+    setup(dir, {
+      "consumer.md": `---
+name: consumer
+description: x
+auto_inputs: true
+inputs: [PROJECT_ROOT, ILLUMINATION_SERVER_PATH, META_MEDITATIONS_DIR]
+outputs: { foo: string }
+---
+body`,
+    });
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      c [agent="consumer"]
+      done [shape=Msquare]
+      start -> c -> done
+    }`;
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    expect(diags.find(d => d.rule === "bare_input_not_in_caller_inputs_or_system")).toBeUndefined();
+  });
+
+  it("does not fire on legacy agents without auto_inputs", () => {
+    const dir = join(tmpdir(), `rule-binis-legacy-${Date.now()}`);
+    setup(dir, {
+      "consumer.md": `---
+name: consumer
+description: x
+outputs: { foo: string }
+---
+body`,
+    });
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      c [agent="consumer"]
+      done [shape=Msquare]
+      start -> c -> done
+    }`;
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    expect(diags.find(d => d.rule === "bare_input_not_in_caller_inputs_or_system")).toBeUndefined();
+  });
+});
+
 describe("validator — malformed input declarations", () => {
   // resolveInputDecl throws on multi-dot keys (e.g. "a.b.c") and empty strings.
   // validateGraph must NOT crash — it should absorb the throw and continue emitting
