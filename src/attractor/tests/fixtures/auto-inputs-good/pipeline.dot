@@ -1,0 +1,10 @@
+digraph g {
+  inputs="project"
+  start [shape=Mdiamond]
+  producer [agent="producer"]
+  consumer [agent="consumer"]
+  with_default [agent="with-default", default_optional_thing=""]
+  empty [agent="empty"]
+  done [shape=Msquare]
+  start -> producer -> consumer -> with_default -> empty -> done
+}

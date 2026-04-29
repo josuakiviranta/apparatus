@@ -1069,16 +1069,16 @@ function isProducerOnEveryPath(graph: Graph, start: string, target: string, prod
 
 Build a small synthetic pipeline that exercises every new rule (all should pass), commit it as a test fixture. Ensures the rules don't false-positive on a well-formed pipeline.
 
-- [ ] **Step 1: Author fixture** — `src/attractor/tests/fixtures/auto-inputs-good/` with `pipeline.dot` + agent files covering each shape:
+- [x] **Step 1: Author fixture** — `src/attractor/tests/fixtures/auto-inputs-good/` with `pipeline.dot` + agent files covering each shape:
   - `producer.md` — `auto_inputs: true, inputs: [project], outputs: { result: string }`
   - `consumer.md` — `auto_inputs: true, inputs: [producer.result, project]` (qualified + bare mix)
   - `empty.md` — `auto_inputs: true, inputs: []` (canonical empty form)
   - `with-default.md` — `auto_inputs: true, inputs: [optional_thing]`; pipeline.dot puts `default_optional_thing=""` on its node
   - `pipeline.dot` wires them: start → producer → consumer → with-default → empty → done; declares `inputs="project"`.
 
-- [ ] **Step 2: Add test asserting `validateGraph` returns 0 errors**
-- [ ] **Step 3: Run, verify pass**
-- [ ] **Step 4: Commit**
+- [x] **Step 2: Add test asserting `validateGraph` returns 0 errors**
+- [x] **Step 3: Run, verify pass**
+- [x] **Step 4: Commit**
 
 ### Task 2.9 (advisory, optional): consider extracting validator pass to its own file
 

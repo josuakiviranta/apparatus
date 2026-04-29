@@ -461,8 +461,9 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
           }
           if (resolved.sourceNode === undefined) {
             // bare_input_not_in_caller_inputs_or_system — bare input must be either declared
-            // in the digraph's inputs="..." attribute or be a system-injected var.
-            if (!callerInputs.has(resolved.localKey) && !SYSTEM_VARS.has(resolved.localKey)) {
+            // in the digraph's inputs="..." attribute, be a system-injected var, or the
+            // consumer node declares a default_<localKey> attribute (optionality mechanism, spec D8).
+            if (!callerInputs.has(resolved.localKey) && !SYSTEM_VARS.has(resolved.localKey) && !hasDefault(node, resolved.localKey)) {
               diags.push({
                 rule: "bare_input_not_in_caller_inputs_or_system",
                 severity: "error",

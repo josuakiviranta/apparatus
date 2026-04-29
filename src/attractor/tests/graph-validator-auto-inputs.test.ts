@@ -353,6 +353,29 @@ body`,
     const diags = validateGraph(graph, dir);
     expect(diags.find(d => d.rule === "bare_input_not_in_caller_inputs_or_system")).toBeUndefined();
   });
+
+  it("does not fire when consumer has default_<localKey> for the bare input", () => {
+    const dir = join(tmpdir(), `rule-binis-default-${Date.now()}`);
+    setup(dir, {
+      "consumer.md": `---
+name: consumer
+description: x
+auto_inputs: true
+inputs: [optional_thing]
+outputs: { foo: string }
+---
+body`,
+    });
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      c [agent="consumer", default_optional_thing=""]
+      done [shape=Msquare]
+      start -> c -> done
+    }`;
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    expect(diags.find(d => d.rule === "bare_input_not_in_caller_inputs_or_system")).toBeUndefined();
+  });
 });
 
 describe("validator — steering_has_var_token", () => {
