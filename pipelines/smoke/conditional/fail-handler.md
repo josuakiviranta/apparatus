@@ -1,7 +1,6 @@
 ---
 name: fail-handler
 description: Smoke-test handler for the fail routing branch
-auto_inputs: true
 model: opus
 permissionMode: dangerouslySkipPermissions
 tools: []

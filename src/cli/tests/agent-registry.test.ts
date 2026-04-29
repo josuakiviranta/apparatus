@@ -105,29 +105,16 @@ Do things.`;
     expect(agentExists("nope", { userDir, bundledDir })).toBe(false);
   });
 
-  describe("parseAgentFile auto_inputs", () => {
-    it("parses auto_inputs from frontmatter", () => {
+  describe("parseAgentFile inputs", () => {
+    it("parses inputs from frontmatter", () => {
       const md = `---
 name: foo
 description: x
-auto_inputs: true
 inputs: [a, b]
 ---
 body`;
       const cfg = parseAgentFile(md);
-      expect(cfg.autoInputs).toBe(true);
       expect(cfg.inputs).toEqual(["a", "b"]);
-    });
-
-    it("throws when auto_inputs: true is missing from frontmatter", () => {
-      const md = `---
-name: foo
-description: x
----
-body`;
-      expect(() => parseAgentFile(md)).toThrow(
-        "Agent foo: missing required 'auto_inputs: true' in frontmatter",
-      );
     });
   });
 });

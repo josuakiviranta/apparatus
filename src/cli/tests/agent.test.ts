@@ -30,7 +30,6 @@ describe("validateAgentConfig", () => {
     tools: ["read_file"],
     mcp: [],
     prompt: "You are a reviewer.",
-    autoInputs: true,
   };
 
   it("accepts a valid config", () => {
@@ -63,7 +62,6 @@ describe("validateAgentConfig", () => {
       name: "test",
       description: "test agent",
       prompt: "Do things.",
-      autoInputs: true as const,
     };
     const result = validateAgentConfig(minimal);
     expect(result.model).toBe("opus");
@@ -82,7 +80,6 @@ describe("Agent.buildArgs", () => {
     tools: [],
     mcp: [],
     prompt: "You are a builder.",
-    autoInputs: true,
   };
 
   it("includes model and --dangerously-skip-permissions flag", () => {
@@ -167,7 +164,6 @@ describe("Agent.expandPrompt", () => {
     tools: [],
     mcp: [],
     prompt: "Hello {{NAME}}, you work on {{PROJECT}}.",
-    autoInputs: true,
   };
 
   it("replaces variables in prompt", () => {
@@ -200,7 +196,6 @@ describe("Agent MCP config lifecycle", () => {
       { name: "test-server", command: "node", args: ["server.js"] },
     ],
     prompt: "Do something.",
-    autoInputs: true,
   };
 
   const noMcpConfig: AgentConfig = {
@@ -329,7 +324,6 @@ describe("Agent.run readline completion", () => {
       mcp: [],
       prompt: "test prompt",
       jsonSchema: '{"type":"object"}',
-      autoInputs: true,
     };
 
     // Create a mock child process that emits lines then closes
@@ -398,7 +392,6 @@ describe("Agent.run abort signal", () => {
       tools: [],
       mcp: [],
       prompt: "hello",
-      autoInputs: true,
     });
 
     const runPromise = agent.run({ cwd: "/tmp", signal: ac.signal });

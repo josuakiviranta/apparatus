@@ -1,7 +1,6 @@
 ---
 name: node_c
 description: Smoke-test node C that outputs a fixed line
-auto_inputs: true
 model: haiku
 permissionMode: dangerouslySkipPermissions
 tools: []

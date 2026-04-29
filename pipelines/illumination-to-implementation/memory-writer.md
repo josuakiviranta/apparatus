@@ -1,7 +1,6 @@
 ---
 name: memory-writer
 description: Close out a pipeline session — distill the run (context + trace + observed struggles) into a concise memory file, commit all pending work, and push to origin
-auto_inputs: true
 model: opus
 permissionMode: dangerouslySkipPermissions
 tools:

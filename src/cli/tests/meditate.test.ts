@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtempSync, rmSync, existsSync, readFileSync } from "fs";
+import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 
@@ -240,6 +240,28 @@ describe("meditateCommand (shim)", () => {
     vi.spyOn(pipelineMod, "pipelineRunCommand").mockImplementation(async () => {});
     await meditateCommand(tmpDir);
     expect(existsSync(pidPath(tmpDir))).toBe(false);
+  });
+
+  it("reads <project>/VISION.md and passes it as the vision variable", async () => {
+    const visionContent = "# Project Vision\n\nNorth-star content for the meditate agent.";
+    writeFileSync(join(tmpDir, "VISION.md"), visionContent);
+    const calls: Array<{ dotFile: string; opts: any }> = [];
+    vi.spyOn(pipelineMod, "pipelineRunCommand").mockImplementation(async (dotFile, opts) => {
+      calls.push({ dotFile, opts });
+    });
+    await meditateCommand(tmpDir);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].opts.variables.vision).toBe(visionContent);
+  });
+
+  it("passes empty vision string when VISION.md is absent", async () => {
+    const calls: Array<{ dotFile: string; opts: any }> = [];
+    vi.spyOn(pipelineMod, "pipelineRunCommand").mockImplementation(async (dotFile, opts) => {
+      calls.push({ dotFile, opts });
+    });
+    await meditateCommand(tmpDir);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].opts.variables.vision).toBe("");
   });
 });
 

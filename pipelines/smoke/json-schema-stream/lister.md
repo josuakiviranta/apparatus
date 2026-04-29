@@ -1,7 +1,6 @@
 ---
 name: lister
 description: Lists files in src/cli/lib/ and returns a structured JSON array with name and description for each file
-auto_inputs: true
 model: haiku
 permissionMode: dangerouslySkipPermissions
 tools:

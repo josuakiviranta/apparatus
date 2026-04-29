@@ -16,7 +16,6 @@ mcp:
     args:
       - "{{ILLUMINATION_SERVER_PATH}}"
       - "{{PROJECT_ROOT}}"
-auto_inputs: true
 inputs:
   - illuminations_dir
   - illumination_path

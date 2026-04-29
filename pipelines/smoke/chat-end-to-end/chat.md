@@ -1,7 +1,6 @@
 ---
 name: chat
 description: Interactive chat agent that guides the user through a single learning capture conversation
-auto_inputs: true
 model: sonnet
 permissionMode: dangerouslySkipPermissions
 tools: []

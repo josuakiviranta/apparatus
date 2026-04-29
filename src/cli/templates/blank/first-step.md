@@ -1,6 +1,7 @@
 ---
 name: first-step
 description: Placeholder first step. Replace this with a real agent that does meaningful work.
+inputs: []
 outputs:
   result: string
 ---

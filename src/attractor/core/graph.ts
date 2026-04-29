@@ -409,16 +409,16 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
       if (!node.agent) continue;
       const cfg = tryResolveAgent(node, dotDir);
       if (!cfg) continue;
-      if (cfg.autoInputs === true && cfg.inputs === undefined) {
+      if (cfg.inputs === undefined) {
         diags.push({
           rule: "inputs_missing_frontmatter",
           severity: "error",
-          message: `Agent "${node.agent}" has auto_inputs: true but is missing required \`inputs:\` declaration. Use \`inputs: []\` if no inputs are needed.`,
+          message: `Agent "${node.agent}" is missing required \`inputs:\` declaration. Use \`inputs: []\` if no inputs are needed.`,
           location: node.sourceLocation,
         });
       }
-      // steering_has_var_token — auto_inputs steering must be pure prose (no $var tokens)
-      if (cfg.autoInputs === true && node.prompt) {
+      // steering_has_var_token — steering must be pure prose (no $var tokens)
+      if (node.prompt) {
         const steeringVarRe = new RegExp(VAR_RE.source, VAR_RE.flags);
         let m: RegExpExecArray | null;
         while ((m = steeringVarRe.exec(node.prompt)) !== null) {
@@ -431,7 +431,7 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
         }
       }
 
-      if (cfg.autoInputs === true && Array.isArray(cfg.inputs)) {
+      if (Array.isArray(cfg.inputs)) {
         // rendered_tag_collision — detect two decls that map to the same XML tag
         const seenTags = new Map<string, string>();
         for (const decl of cfg.inputs) {
@@ -781,32 +781,30 @@ function checkMissingInputProducer(
     for (const inputKey of agentConfig.inputs) {
       if (RESERVED.has(inputKey)) continue;
 
-      // For auto_inputs consumers, qualified inputs need per-path source-node reachability.
-      if (agentConfig.autoInputs === true) {
-        let resolved: ReturnType<typeof resolveInputDecl> | undefined;
-        try { resolved = resolveInputDecl(inputKey); } catch { continue; }
+      // Qualified inputs need per-path source-node reachability.
+      let resolved: ReturnType<typeof resolveInputDecl> | undefined;
+      try { resolved = resolveInputDecl(inputKey); } catch { continue; }
 
-        if (resolved.qualified && resolved.sourceNode) {
-          // Check for default fallback: default_<localKey>= on the consumer node
-          const fallbackAttrCamel = toCamel(resolved.fallbackAttr);
-          if (node[fallbackAttrCamel] !== undefined) continue;
+      if (resolved.qualified && resolved.sourceNode) {
+        // Check for default fallback: default_<localKey>= on the consumer node
+        const fallbackAttrCamel = toCamel(resolved.fallbackAttr);
+        if (node[fallbackAttrCamel] !== undefined) continue;
 
-          // Source node must exist in the graph (unknown_source_node rule handles the
-          // case where it doesn't — we skip here to avoid duplicate errors).
-          if (!graph.nodes.has(resolved.sourceNode)) continue;
+        // Source node must exist in the graph (unknown_source_node rule handles the
+        // case where it doesn't — we skip here to avoid duplicate errors).
+        if (!graph.nodes.has(resolved.sourceNode)) continue;
 
-          // Check that the source node is on every path from start to consumer.
-          if (startNodeId === undefined) continue;
-          if (!isProducerOnEveryPath(graph, startNodeId, id, resolved.sourceNode)) {
-            diags.push({
-              rule: "missing_input_producer",
-              severity: "error",
-              message: `Input "${inputKey}" declared by "${id}" has no producer on path start → … → ${id}. Node "${resolved.sourceNode}" must be on every path from start to "${id}".`,
-              location: node.sourceLocation,
-            });
-          }
-          continue; // handled — skip bare-key logic below
+        // Check that the source node is on every path from start to consumer.
+        if (startNodeId === undefined) continue;
+        if (!isProducerOnEveryPath(graph, startNodeId, id, resolved.sourceNode)) {
+          diags.push({
+            rule: "missing_input_producer",
+            severity: "error",
+            message: `Input "${inputKey}" declared by "${id}" has no producer on path start → … → ${id}. Node "${resolved.sourceNode}" must be on every path from start to "${id}".`,
+            location: node.sourceLocation,
+          });
         }
+        continue; // handled — skip bare-key logic below
       }
 
       // Bare-key path: existing behavior (unchanged)

@@ -21,7 +21,7 @@ const loopBaseConfig = {
   tools: [] as string[],
   mcp: [] as any[],
   permissionMode: "dangerouslySkipPermissions",
-  autoInputs: true as const,
+
   loop: true,
   outputs: { done: "boolean" },
   jsonSchema: JSON.stringify({

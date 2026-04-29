@@ -46,7 +46,6 @@ describe("AgentHandler", () => {
     tools: [] as string[],
     mcp: [] as any[],
     permissionMode: "dangerouslySkipPermissions",
-    autoInputs: true as const,
   };
 
   it("resolves agent by name and calls run", async () => {

@@ -56,7 +56,6 @@ export interface AgentConfig {
   jsonSchema?: string;
   outputs?: Record<string, JsonSchemaFragment>;
   inputs?: string[];
-  autoInputs: true;
   loop?: boolean;
   maxIterations?: number;
 }
@@ -477,11 +476,6 @@ export function validateAgentConfig(
     throw new Error("maxIterations must be a non-negative integer");
   }
 
-  const resolvedAutoInputs = config.autoInputs ?? config.auto_inputs;
-  if (resolvedAutoInputs !== true) {
-    throw new Error(`Agent ${config.name}: missing required 'auto_inputs: true' in frontmatter`);
-  }
-
   // Derive jsonSchema from outputs only when not explicitly provided. Explicit
   // jsonSchema wins (legacy agents that hand-author the schema string).
   const derivedJsonSchema = (config.outputs && !config.jsonSchema)
@@ -496,7 +490,6 @@ export function validateAgentConfig(
     tools: config.tools ?? DEFAULTS.tools!,
     mcp: config.mcp ?? DEFAULTS.mcp!,
     prompt: config.prompt,
-    autoInputs: true,
     ...(derivedJsonSchema !== undefined ? { jsonSchema: derivedJsonSchema } : {}),
     ...(config.outputs !== undefined ? { outputs: config.outputs } : {}),
     ...(config.inputs !== undefined ? { inputs: config.inputs } : {}),

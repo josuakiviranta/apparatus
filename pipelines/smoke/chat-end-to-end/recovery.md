@@ -1,7 +1,6 @@
 ---
 name: recovery
 description: Writes a one-line abort note when an interactive chat session was aborted early
-auto_inputs: true
 model: sonnet
 permissionMode: dangerouslySkipPermissions
 tools: []

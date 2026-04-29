@@ -1,7 +1,6 @@
 ---
 name: abort
 description: Smoke-test handler for the abort branch
-auto_inputs: true
 model: opus
 permissionMode: dangerouslySkipPermissions
 tools: []

@@ -1,7 +1,6 @@
 ---
 name: summarize
 description: Summarizes a completed chat session into a single sentence
-auto_inputs: true
 model: sonnet
 permissionMode: dangerouslySkipPermissions
 tools: []

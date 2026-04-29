@@ -3,7 +3,6 @@ name: tmux-tester
 description: Drive a tmux window to build, test, smoke, and fix the project in-session — loop test → fix → commit until the project is healthy, then report
 model: opus
 permissionMode: dangerouslySkipPermissions
-auto_inputs: true
 inputs:
   - run_id
   - project

@@ -50,7 +50,6 @@ describe("AgentHandler – JSON constraint injection", () => {
     tools: [] as string[],
     mcp: [] as any[],
     permissionMode: "dangerouslySkipPermissions",
-    autoInputs: true as const,
   };
 
   it("prepends JSON constraint to prompt when jsonSchema is set", async () => {

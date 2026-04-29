@@ -1,7 +1,6 @@
 ---
 name: verifier
 description: Read-only verification of illuminations against current code, specs, and project goals
-auto_inputs: true
 model: opus
 permissionMode: dangerouslySkipPermissions
 tools:

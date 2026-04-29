@@ -1,7 +1,6 @@
 ---
 name: chat-summarizer
 description: Merge a chat round into a cumulative refinements log with attribution
-auto_inputs: true
 inputs:
   - illuminations_dir
   - run_id

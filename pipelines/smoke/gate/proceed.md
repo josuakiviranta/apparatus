@@ -1,7 +1,6 @@
 ---
 name: proceed
 description: Smoke-test handler for the proceed branch
-auto_inputs: true
 model: opus
 permissionMode: dangerouslySkipPermissions
 tools: []

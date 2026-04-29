@@ -34,7 +34,7 @@ function makeMeta(extra: Partial<any> = {}) {
 const config = (extras: any = {}) => ({
   name: "v", description: "d", model: "opus",
   permissionMode: "default", tools: [], mcp: [], prompt: "",
-  autoInputs: true as const,
+
   outputs: { foo: "string" },
   jsonSchema: '{"type":"object","properties":{"foo":{"type":"string"}},"required":["foo"],"additionalProperties":false}',
   ...extras,

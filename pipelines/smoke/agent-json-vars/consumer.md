@@ -1,7 +1,6 @@
 ---
 name: consumer
 description: Smoke-test consumer that reads producer's JSON outputs via auto-injected Inputs block
-auto_inputs: true
 model: haiku
 permissionMode: dangerouslySkipPermissions
 tools: []

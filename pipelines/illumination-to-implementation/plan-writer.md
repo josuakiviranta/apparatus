@@ -1,7 +1,6 @@
 ---
 name: plan-writer
 description: Turn an approved design doc + refinements into a chunked TDD implementation plan, iterating with a general-purpose plan reviewer (using the writing-plans skill's prompt template) per chunk until both writer and reviewer agree each chunk is ready
-auto_inputs: true
 model: opus
 permissionMode: dangerouslySkipPermissions
 tools:

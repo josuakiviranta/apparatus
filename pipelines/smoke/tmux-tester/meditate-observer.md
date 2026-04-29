@@ -3,7 +3,6 @@ name: meditate-observer
 description: Drive 'ralph meditate' inside a tmux window, wait for it to finish, and produce the four-field summary (topic / illumination_path / kid_summary / observation_notes)
 model: opus
 permissionMode: dangerouslySkipPermissions
-auto_inputs: true
 inputs:
   - run_id
   - project

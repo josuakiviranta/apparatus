@@ -50,7 +50,6 @@ function makeFakeAgent(
       tools: [],
       mcp: [],
       prompt: "",
-      autoInputs: true,
     } as AgentConfig,
     run: async () => ({ exitCode: 0, sessionId: null, stdout: null }),
     runInteractive: (opts: { session: Session; systemPrompt: string; cwd: string }) => {

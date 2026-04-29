@@ -4,8 +4,14 @@ digraph janitor {
   inputs="project"
 
   start [shape=Mdiamond]
+
+  read_vision [type="tool",
+               cwd="$project",
+               script_file="read-vision.mjs",
+               produces_from_stdout=true]
+
   janitor [agent="janitor"]
   done [shape=Msquare]
 
-  start -> janitor -> done
+  start -> read_vision -> janitor -> done
 }

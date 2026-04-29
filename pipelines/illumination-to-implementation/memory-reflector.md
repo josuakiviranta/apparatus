@@ -1,7 +1,6 @@
 ---
 name: memory-reflector
 description: Reflect on a just-written session memory file and decide whether to surface one new illumination capturing what was learned during the run
-auto_inputs: true
 model: opus
 permissionMode: dontAsk
 tools:

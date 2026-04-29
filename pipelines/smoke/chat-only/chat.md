@@ -1,7 +1,6 @@
 ---
 name: chat
 description: Vanilla chat agent
-auto_inputs: true
 model: sonnet
 permissionMode: dangerouslySkipPermissions
 tools: []
