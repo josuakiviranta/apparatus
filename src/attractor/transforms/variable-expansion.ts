@@ -177,8 +177,17 @@ function collectAgentNoteSeed(node: Node, projectDir: string | undefined, out: S
   try { raw = readFileSync(path, "utf8"); } catch { return; }
   const { attributes } = parseFrontmatter(raw);
   const outputs = (attributes as Record<string, unknown>).outputs;
-  if (outputs && typeof outputs === "object" && Object.prototype.hasOwnProperty.call(outputs, "note")) {
-    out.add("prev_note");
+  if (outputs && typeof outputs === "object") {
+    // Add all declared outputs as produced vars so agent body refs to those vars
+    // are not flagged as unresolved when the agent both consumes and produces a var.
+    for (const key of Object.keys(outputs)) {
+      // "note" output is a special meditate-pattern key; its consumer name is "prev_note".
+      if (key === "note") {
+        out.add("prev_note");
+      } else {
+        out.add(key);
+      }
+    }
   }
 }
 

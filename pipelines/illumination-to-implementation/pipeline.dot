@@ -1,13 +1,13 @@
 digraph illumination_to_implementation {
   goal="Triage an illumination into an approved design doc, implementation plan, and committed code"
   headless_safe=false
-  inputs="project, illuminations_dir, specs_dir, plans_dir"
+  inputs="project, illuminations_dir, specs_dir, plans_dir, run_id, illumination_path"
 
   start [shape=Mdiamond]
 
   // ── Phase 1: Illumination triage (from illumination-to-plan) ──────────────
 
-  verifier [agent="verifier", default_refinements="", default_illumination_path="", prompt="Step 1: Call mcp__illumination__list_illuminations with status: open to get the list of open illuminations to consider. Step 2: If refinements are non-empty, re-verify the previously chosen illumination ($illumination_path) against the REFINED scope. Otherwise, pick ONE open illumination to verify against the current ralph-cli codebase.\n\nFollow your agent-level rubric (relevance + technical accuracy + project-fit / Feature-Creep) and procedure. Project root for README and specs lookup is the current working directory.\n\nRefinements (cumulative; empty on first pass):\n$chat_summarizer_refinements\n\nIf refinements are non-empty, this is a loop-back pass after a chat round — re-verify against the REFINED scope, not the original illumination text. Full chat record (read for full context if helpful): $illuminations_dir/.triage/$run_id/chat-notes.md\n\nReturn the structured verdict only — no prose preamble."]
+  verifier [agent="verifier", default_refinements="", default_illumination_path=""]
 
   remove_gate [shape=hexagon]
 
@@ -21,21 +21,21 @@ digraph illumination_to_implementation {
                    script_file="mark-dispatched.mjs",
                    script_args="$illumination_path $plan_path"]
 
-  explainer [agent="change-explainer", default_refinements="", prompt="Render a before/after explainer for the verified illumination.\n\nIllumination: $illumination_path\nVerifier summary: $summary\nVerifier explanation: $explanation\nRefinements (cumulative; empty on first pass):\n$refinements\n\nFollow your agent-level format and procedure. Use up to 10 subagents to pull verbatim evidence. Return only the structured JSON with the explainer_render field."]
+  explainer [agent="change-explainer", default_refinements=""]
 
   approval_gate [shape=hexagon, default_refinements=""]
 
-  chat_session [agent="chat-refiner", interactive=true, default_refinements="", prompt="Discuss the illumination with the user.\n\nIllumination: $illumination_path\nSummary: $summary\nVerifier explanation: $explanation\nPrior refinements (empty on first chat round):\n$refinements\n\nWrite agreed conclusions to: $illuminations_dir/.triage/$run_id/chat-notes.md\n\nFollow your agent-level format and append rule. Do NOT modify any other project files."]
+  chat_session [agent="chat-refiner", interactive=true, default_refinements=""]
 
-  chat_summarizer [agent="task", default_refinements="", prompt="Read $illuminations_dir/.triage/$run_id/chat-notes.md and the illumination at $illumination_path.\n\nOriginal summary: $summary\nOriginal explanation: $explanation\nPrior refinements (cumulative log from earlier rounds; empty on first round):\n$refinements\n\n## Required output\n\nEmit refinements as a CUMULATIVE markdown bullet log. Every bullet must include attribution so downstream agents (design_writer, plan_writer) can judge whether to honor the refinement and why. Per-bullet shape:\n\n- <refinement statement>\n  - Round: <N> (1 for first chat round, increment per re-entry)\n  - Topic raised by user: <what the user said, near-verbatim>\n  - Rationale: <user's stated reason>\n\nMERGE rules:\n- Re-emit every bullet from prior $refinements verbatim (do NOT drop or paraphrase prior entries)\n- Append new bullets from the latest chat-notes.md round below them\n- If the latest round CONTRADICTS a prior bullet, keep the prior bullet but add a new bullet noting the override and rationale (do not silently delete history)\n\nSet scope_changed=true only if the latest round materially altered scope (new files in/out, new behavior, removed behavior). Cosmetic clarifications do not flip the flag.\n\nDo NOT modify any project files."]
+  chat_summarizer [agent="chat-summarizer", default_refinements=""]
 
-  design_writer [agent="design-writer", default_refinements="No interactive refinements were requested.", prompt="Write a design doc for the approved illumination.\n\nIllumination: $illumination_path\nVerifier summary: $summary\nVerifier explanation: $explanation\nApproved explainer render:\n$explainer_render\nRefinements (cumulative log with per-bullet attribution):\n$refinements\n\nFollow your agent-level procedure: derive the design-doc filename from the illumination slug, invoke superpowers:brainstorming, write to $specs_dir/, then loop with the spec-document-reviewer subagent until you both agree the doc is ready (no iteration cap). Return the structured JSON with the design_doc_path field only."]
+  design_writer [agent="design-writer", default_refinements="No interactive refinements were requested."]
 
-  plan_writer [agent="plan-writer", "default_chat_summarizer.refinements"="No interactive refinements were requested.", prompt="Write a chunked TDD implementation plan for the approved design.\n\nDesign doc (primary source of truth): $design_writer_design_doc_path\nIllumination: $illumination_path\nRefinements (cumulative log with per-bullet attribution):\n$chat_summarizer_refinements\n\nFollow your agent-level procedure: derive the plan filename from the illumination slug, invoke superpowers:writing-plans, write to $plans_dir/, then loop per chunk with a plan reviewer (Task tool, subagent_type=general-purpose, prompt from superpowers:writing-plans/plan-document-reviewer-prompt.md) until you both agree each chunk is ready (no iteration cap). Return the structured JSON with the plan_path field only."]
+  plan_writer [agent="plan-writer", default_refinements="No interactive refinements were requested."]
 
   // ── Phase 2: Implementation ───────────────────────────────────────────────
 
-  implement [agent="implement", max_retries=1, prompt="Read the implementation plan at $plan_path.\n\nBefore writing any code, invoke the superpowers:subagent-driven-development skill to establish the dispatch framework. Invoke superpowers:test-driven-development per chunk for the red/green discipline.\n\nImplement the plan using subagent-driven red/green TDD:\n1. Read the plan carefully\n2. For each chunk: dispatch parallel subagents to write failing tests first, then implement to make them pass (one subagent per concern). Solo implementation by the main agent is forbidden — every code change must come from a dispatched subagent. Your role is orchestration: dispatch, review, integrate.\n3. Commit after each passing chunk\n\nDo NOT push — a separate pipeline node handles that.\nDo NOT modify files outside the scope of the plan."]
+  implement [agent="implement", max_retries=1]
 
   review_gate [shape=hexagon]
 
@@ -43,17 +43,17 @@ digraph illumination_to_implementation {
 
   tmux_confirm_gate [shape=hexagon]
 
-  memory_writer [agent="memory-writer", default_test_result="", default_test_summary="", prompt="Close out the pipeline session.\n\nRun id: $run_id\nProject: $project\nPlan: $plan_path\nDesign doc: $design_doc_path\nIllumination: $illumination_path\nFinal test result (empty if tmux verification was skipped): $test_result\nFinal test summary: $test_summary\n\nFollow your agent-level procedure."]
+  memory_writer [agent="memory-writer", default_test_result="", default_test_summary="", default_illumination_path=""]
 
-  memory_reflector [agent="memory-reflector", prompt="Reflect on this pipeline session and decide whether a new illumination is warranted.\n\nRun id: $run_id\nProject: $project\nMemory file: $memory_path\nDesign doc: $design_doc_path\nPlan: $plan_path\nOriginal illumination: $illumination_path\n\nFollow your agent-level procedure."]
+  memory_reflector [agent="memory-reflector", default_illumination_path=""]
 
   done [shape=Msquare]
 
   // ── Routing: Phase 1 ─────────────────────────────────────────────────────
   start -> verifier
-  verifier -> remove_gate      [condition="preferred_label=false"]
-  verifier -> explainer        [condition="preferred_label=true"]
-  verifier -> done             [condition="preferred_label=empty"]
+  verifier -> remove_gate      [condition="verifier.preferred_label=false"]
+  verifier -> explainer        [condition="verifier.preferred_label=true"]
+  verifier -> done             [condition="verifier.preferred_label=empty"]
 
   // False path
   remove_gate -> mark_archived  [label="Archive"]
@@ -72,8 +72,8 @@ digraph illumination_to_implementation {
   // Cosmetic refinements skip the expensive verifier re-pass and re-render the
   // explainer directly with the updated $refinements.
   chat_session -> chat_summarizer
-  chat_summarizer -> verifier  [condition="scope_changed=true"]
-  chat_summarizer -> explainer [condition="scope_changed=false"]
+  chat_summarizer -> verifier  [condition="chat_summarizer.scope_changed=true"]
+  chat_summarizer -> explainer [condition="chat_summarizer.scope_changed=false"]
 
   // Decline branch terminator
   mark_archived -> done
@@ -85,7 +85,7 @@ digraph illumination_to_implementation {
   // ── Routing: Phase 2 ─────────────────────────────────────────────────────
   mark_dispatched -> implement
 
-  implement -> implement           [condition="agent.success=false"]
+  implement -> implement           [condition="implement.success=false"]
   implement -> review_gate
   review_gate -> memory_writer     [label="Approve"]
   review_gate -> tmux_tester       [label="Tmux"]
