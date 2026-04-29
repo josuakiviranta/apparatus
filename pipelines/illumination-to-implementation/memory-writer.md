@@ -1,6 +1,7 @@
 ---
 name: memory-writer
 description: Close out a pipeline session — distill the run (context + trace + observed struggles) into a concise memory file, commit all pending work, and push to origin
+auto_inputs: true
 model: opus
 permissionMode: dangerouslySkipPermissions
 tools:
@@ -19,6 +20,14 @@ mcp:
       - "{{PROJECT_ROOT}}"
 outputs:
   memory_path: string
+inputs:
+  - run_id
+  - project
+  - plan_writer.plan_path
+  - design_writer.design_doc_path
+  - illumination_path
+  - tmux_tester.test_result
+  - tmux_tester.test_summary
 ---
 
 # Mission
@@ -31,10 +40,10 @@ Memory files are reference documents for future sessions. Keep them dense, scann
 
 - `$project` — repo root; cd here for git commit + push.
 - `$run_id` — pipeline run identifier. Trace and checkpoint share the directory `~/.ralph/<projectKey>/runs/$run_id/` (`pipeline.jsonl` + `checkpoint.json` side by side).
-- `$plan_path` — the implementation plan just executed (use its slug to name the memory file).
-- `$design_doc_path` — the design that drove the plan.
+- `$plan_writer.plan_path` — the implementation plan just executed (use its slug to name the memory file).
+- `$design_writer.design_doc_path` — the design that drove the plan.
 - `$illumination_path` — the originating illumination.
-- `$test_result` / `$test_summary` — empty if the session skipped tmux verification; otherwise the final outcome.
+- `$tmux_tester.test_result` / `$tmux_tester.test_summary` — empty if the session skipped tmux verification; otherwise the final outcome.
 
 # Procedure
 
@@ -50,7 +59,7 @@ Memory files are reference documents for future sessions. Keep them dense, scann
    If `pipeline.jsonl` is missing or empty, proceed with artifact-only evidence and note the gap in the `Learnings` section.
 
 3. **Read the relevant artifacts.**
-   - `$design_doc_path`, `$plan_path`, `$illumination_path` — durable outputs this session produced.
+   - `$design_writer.design_doc_path`, `$plan_writer.plan_path`, `$illumination_path` — durable outputs this session produced.
    - `git log --oneline -20` and `git log --name-status <first-session-commit>..HEAD` in `$project` — commits this session made and which files they touched.
 
 4. **Write the memory file.** Structure it so future readers can skim:
@@ -93,7 +102,7 @@ Memory files are reference documents for future sessions. Keep them dense, scann
 
    ## Final verification
    - test_result: <value>
-   - test_summary: <verbatim from $test_summary>
+   - test_summary: <verbatim from $tmux_tester.test_summary>
    ```
 
 5. **Commit any pending work.** Run in `$project`:
@@ -119,7 +128,7 @@ Memory files are reference documents for future sessions. Keep them dense, scann
 
 7. **Mark the lifecycle artifacts implemented (best-effort, both halves).** This step closes BOTH halves of the open/close pair that `mark_dispatched` opened upstream — the plan frontmatter AND the illumination frontmatter. Run them in this order:
 
-   **7a. Plan side.** If `$plan_path` is set and non-empty, call `mark_plan_implemented` with the basename of `$plan_path` (strip the directory portion — the tool resolves the file under `docs/superpowers/plans/`). On `success: true`, do nothing more — the tool auto-commits its own frontmatter rewrite. On `success: false` (orphan plan with no frontmatter, plan already `implemented`, plan file missing), append a single bullet to the memory file's `Learnings from the run` section quoting the `error` field verbatim, then continue. If `$plan_path` is empty or unset, skip 7a and append `- Plan lifecycle flip skipped: $plan_path was empty` to the memory file.
+   **7a. Plan side.** If `$plan_writer.plan_path` is set and non-empty, call `mark_plan_implemented` with the basename of `$plan_writer.plan_path` (strip the directory portion — the tool resolves the file under `docs/superpowers/plans/`). On `success: true`, do nothing more — the tool auto-commits its own frontmatter rewrite. On `success: false` (orphan plan with no frontmatter, plan already `implemented`, plan file missing), append a single bullet to the memory file's `Learnings from the run` section quoting the `error` field verbatim, then continue. If `$plan_writer.plan_path` is empty or unset, skip 7a and append `- Plan lifecycle flip skipped: $plan_writer.plan_path was empty` to the memory file.
 
    **7b. Illumination side.** If `$illumination_path` is set and non-empty, call `mark_implemented` with the basename of `$illumination_path` (strip the directory portion — the tool reads from `meditations/illuminations/` and physically moves the file to `meditations/implemented-illuminations/`, returning the new location as `new_path` in the response). On `success: true`, do nothing more — the tool auto-commits its own frontmatter rewrite and move. On `success: false` (already `implemented` / `archived`, no frontmatter, file missing), append a single bullet to the memory file's `Learnings from the run` section quoting the `error` field verbatim, then continue. If `$illumination_path` is empty or unset, skip 7b and append `- Illumination lifecycle flip skipped: $illumination_path was empty` to the memory file.
 
