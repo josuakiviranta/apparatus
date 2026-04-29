@@ -36,7 +36,6 @@ export interface Node {
   fallbackRetryTarget?: string;
   agent?: string;
   interactive?: boolean | string;
-  jsonSchemaFile?: string;
   class?: string;
   /** 1-based line in the source .dot file where this node was declared.
    * @deprecated Use sourceLocation.line */

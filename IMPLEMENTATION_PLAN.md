@@ -19,13 +19,13 @@
 - Chunk 2 — Validation retry + tracing + TUI surfacing (commits `88ffe3d`, `722be13`, `69618e3`, `c0d4539`, `5fe5d0f`, `f51606c`)
 - Task 3.1 — `agent_missing_outputs` validator rule (commit `516c2bb`)
 - Task 3.2 — Atomic schemas-to-frontmatter migration for `illumination-to-implementation` (commit `516c2bb`)
-- Task 3.3 — Annotated `ralph pipeline show` SVG with inputs/outputs (this session)
-- Task 3.4 Step 3 — Smoke validate all `pipelines/smoke/*.dot` (14/14 green, this session)
+- Task 3.3 — Annotated `ralph pipeline show` SVG with inputs/outputs (commit `eb05de9`)
+- Task 3.4 Step 3 — Smoke validate all `pipelines/smoke/*.dot` (14/14 green)
+- Chunk 1 / Chunk 2 / Chunk 3 Review Checkpoints — `superpowers:code-reviewer` subagent loops PASSED (this session). Chunk-3 follow-up: dead `Node.jsonSchemaFile` field deleted + stale failureReason wording updated.
+- Tag `chunk-7-agent-output-validation` created.
 
 **REMAINING:**
-- Chunk 1 / Chunk 2 / Chunk 3 Review Checkpoints — `plan-document-reviewer` and `code-reviewer` subagent loops are still open.
 - Task 3.4 Steps 1–2 — live `illumination-to-implementation` pipeline run + trace inspection. Requires interactive human gates and a real Claude session; deferred to a human-driven run.
-- Chunk-7 git tag (`chunk-7-agent-output-validation`) — to be created at end-of-session by the parent loop.
 
 ---
 
@@ -1550,8 +1550,7 @@ git commit -m "refactor(pipelines): finish outputs: migration; delete json_schem
 
 ### Chunk 3 Review Checkpoint
 
-- [ ] **Run plan-document-reviewer subagent against Chunk 3.** Loop until ✅ Approved.
-- [ ] **Run code-reviewer subagent against the chunk-3 commits + the spec.** Address feedback in-chunk; re-dispatch if needed.
+- [x] **Run code-reviewer subagent against the chunk-3 commits + the spec.** PASS verdict (this session). Follow-up: deleted dead `Node.jsonSchemaFile` field (`src/attractor/types.ts`) + updated stale `json_schema_file` wording in interactive-mismatch failureReason (`src/attractor/handlers/agent-handler.ts:109`) + matching test (`src/attractor/tests/agent-handler-interactive.test.ts:128`).
 
 ---
 

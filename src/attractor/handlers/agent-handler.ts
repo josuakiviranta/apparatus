@@ -106,7 +106,7 @@ export class AgentHandler implements NodeHandler {
       if (jsonSchema) {
         return {
           status: "fail",
-          failureReason: "interactive=true cannot be combined with json_schema_file: structured output is incompatible with live chat streaming",
+          failureReason: "interactive=true cannot be combined with outputs: structured output is incompatible with live chat streaming",
         };
       }
 

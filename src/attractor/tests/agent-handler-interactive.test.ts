@@ -125,7 +125,7 @@ describe("AgentHandler — interactive branch", () => {
       };
       const out = await handler.execute(node, baseCtx(), baseMeta(tmp, tmp));
       expect(out.status).toBe("fail");
-      expect(out.failureReason).toMatch(/interactive.*json_schema|json_schema.*interactive/i);
+      expect(out.failureReason).toMatch(/interactive.*outputs|outputs.*interactive/i);
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }
