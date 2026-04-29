@@ -466,6 +466,16 @@ export function validateAgentConfig(
   // Empty string is valid (procedure-less agents like `task`); only missing field is invalid.
   if (typeof config.prompt !== "string") throw new Error("prompt body is required");
 
+  if (config.loop !== undefined && typeof config.loop !== "boolean") {
+    throw new Error("loop must be a boolean");
+  }
+  if (config.maxIterations !== undefined &&
+      (typeof config.maxIterations !== "number" ||
+       !Number.isInteger(config.maxIterations) ||
+       config.maxIterations < 0)) {
+    throw new Error("maxIterations must be a non-negative integer");
+  }
+
   // Derive jsonSchema from outputs only when not explicitly provided. Explicit
   // jsonSchema wins (legacy agents that hand-author the schema string).
   const derivedJsonSchema = (config.outputs && !config.jsonSchema)
@@ -483,5 +493,7 @@ export function validateAgentConfig(
     ...(derivedJsonSchema !== undefined ? { jsonSchema: derivedJsonSchema } : {}),
     ...(config.outputs !== undefined ? { outputs: config.outputs } : {}),
     ...(config.inputs !== undefined ? { inputs: config.inputs } : {}),
+    ...(config.loop !== undefined ? { loop: config.loop } : {}),
+    ...(config.maxIterations !== undefined ? { maxIterations: config.maxIterations } : {}),
   };
 }
