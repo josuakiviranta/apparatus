@@ -39,7 +39,7 @@ digraph illumination_to_implementation {
 
   review_gate [shape=hexagon]
 
-  tmux_tester [agent="tmux-tester", prompt="Open (or reuse) a tmux window named `test-$run_id` in project $project, then drive it through build/test/smoke cycles. When a cycle surfaces a fixable issue, apply a red/green TDD fix in-session and commit it (no push — commit_push handles that). Repeat cycles until the project is healthy or remaining issues are beyond what you can fix this session.\n\nRun id to use for the window name and harness binding: $run_id\n\n## Smoke phase (this node)\n\nAfter Phase 1 (build + test) is GREEN, run every smoke pipeline unconditionally — no diff filtering, no skipping, cost is acceptable.\n\n1. If Phase 1 is RED, do NOT enter the smoke phase. Stay in the Fix loop until tests pass, then re-run Phase 1, then enter this phase.\n2. List every smoke in your shell (not the tmux window): `ls $project/pipelines/smoke/*.dot`.\n3. For each smoke, read its `.dot` header to extract required `--var` keys, then send into the window:\n   `ralph pipeline run pipelines/smoke/<name>.dot --var <required-vars>`\n4. After each run: `wait_stable 180000`, `capture`, read `current.txt`. Apply your agent-level observation criteria (crashes, exits ≠ 0, hangs, TUI glitches, copy regressions).\n5. Run all smokes every cycle. Do not skip. If a smoke is genuinely incompatible with this environment, run it anyway and let it fail — the failure is the data.\n\nFollow your agent-level procedure and harness helpers. Stop based on context, not a counter. Emit the structured JSON with test_result, test_summary, issues_found, and a scannable markdown test_render for the approval gate."]
+  tmux_tester [agent="tmux-tester", prompt="Open (or reuse) a tmux window named `test-$run_id` in project $project, then drive it through build/test/smoke cycles. When a cycle surfaces a fixable issue, apply a red/green TDD fix in-session and commit it (no push — commit_push handles that). Repeat cycles until the project is healthy or remaining issues are beyond what you can fix this session.\n\nRun id to use for the window name and harness binding: $run_id\n\n## Smoke phase (this node)\n\nAfter Phase 1 (build + test) is GREEN, run every smoke pipeline unconditionally — no diff filtering, no skipping, cost is acceptable.\n\n1. If Phase 1 is RED, do NOT enter the smoke phase. Stay in the Fix loop until tests pass, then re-run Phase 1, then enter this phase.\n2. List every smoke in your shell (not the tmux window): `ls $project/pipelines/smoke/*.dot`.\n3. For each smoke, read its `.dot` header to extract required `--var` keys, then send into the window:\n   `ralph pipeline run pipelines/smoke/<name>.dot --var <required-vars>`\n4. After each run: `wait_stable 180000`, `capture`, read `current.txt`. Apply your agent-level observation criteria (crashes, exits ≠ 0, hangs, TUI glitches, copy regressions).\n5. Run all smokes every cycle. Do not skip. If a smoke is genuinely incompatible with this environment, run it anyway and let it fail — the failure is the data.\n\nFollow your agent-level procedure and harness helpers. Stop based on context, not a counter. Emit the structured JSON with test_result, test_summary, and a scannable markdown test_render (its 'Remaining issues' section is the canonical list of unfixed issues — do not emit a separate issues_found field) for the approval gate."]
 
   tmux_confirm_gate [shape=hexagon]
 
@@ -69,8 +69,11 @@ digraph illumination_to_implementation {
   // Chat loop — re-render explainer with refinements before re-prompting at gate.
   // When the chat materially alters scope, loop back through verifier so $summary
   // and $explanation reflect the refined scope, not the original illumination pass.
+  // Cosmetic refinements skip the expensive verifier re-pass and re-render the
+  // explainer directly with the updated $refinements.
   chat_session -> chat_summarizer
-  chat_summarizer -> verifier
+  chat_summarizer -> verifier  [condition="scope_changed=true"]
+  chat_summarizer -> explainer [condition="scope_changed=false"]
 
   // Decline branch terminator
   mark_archived -> done

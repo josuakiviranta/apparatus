@@ -15,7 +15,6 @@ mcp: []
 outputs:
   test_result: {enum: [pass, fail]}
   test_summary: string
-  issues_found: {type: array, items: {type: string}}
   test_render: string
 ---
 
@@ -174,7 +173,7 @@ fi
 
 Idempotent by design: on a fresh run the window is created; on `--resume` after a crash mid-test, the existing window is reused so you drop back into the live context instead of spawning a duplicate. Do NOT open a new tmux **session** — work inside the one the pipeline already runs in.
 
-If `$SESSION` is empty (i.e. the pipeline is not running inside a tmux session), emit `test_result="fail"` with `issues_found=["tmux-tester node requires the pipeline to be running inside a tmux session; $SESSION was empty"]` and end. Do not attempt to start a detached tmux process — that sandbox is a user-environment concern.
+If `$SESSION` is empty (i.e. the pipeline is not running inside a tmux session), emit `test_result="fail"` with `test_render`'s "Remaining issues" section listing "tmux-tester node requires the pipeline to be running inside a tmux session; $SESSION was empty" and end. Do not attempt to start a detached tmux process — that sandbox is a user-environment concern.
 
 ## Phase 1 — Automated verification
 
@@ -215,7 +214,7 @@ Keep Phase 3 tight — max 2 commands, 60s each per cycle.
 
 For each issue surfaced by Phases 1–3 of the current cycle:
 
-1. **Reproduce.** Confirm the failure is deterministic — re-run the specific test, command, or smoke that surfaced it. If it was a flake, log it in `issues_found` and move on; do not chase flakes.
+1. **Reproduce.** Confirm the failure is deterministic — re-run the specific test, command, or smoke that surfaced it. If it was a flake, log it in `test_render`'s "Remaining issues" section and move on; do not chase flakes.
 2. **Write a failing test** that reproduces the specific failure (red). Place it in the appropriate test file — follow the project's existing test layout.
 3. **Implement the fix** to make the test pass (green). Keep the change minimal; do not refactor surrounding code.
 4. **Run the new test** in isolation first (`npm test <file>` or equivalent) to confirm green. Then re-run the full suite via the tmux window to check for regressions.
@@ -224,7 +223,7 @@ For each issue surfaced by Phases 1–3 of the current cycle:
 After applying all available fixes for this cycle, start a new cycle from Phase 1. The loop exits when:
 - All phases come up clean (no new issues surface), OR
 - You cannot reproduce the remaining issues, OR
-- A specific issue resists multiple diagnosis attempts and you judge it genuinely outside your ability to fix in this session. Leave it in `issues_found` with a clear description and end.
+- A specific issue resists multiple diagnosis attempts and you judge it genuinely outside your ability to fix in this session. Leave it in `test_render`'s "Remaining issues" section with a clear description and end.
 
 You decide when you're done. Context, not a counter.
 
@@ -232,12 +231,9 @@ You decide when you're done. Context, not a counter.
 
 Emit JSON matching the schema:
 
-- `test_result`: `"pass"` iff the final cycle's Phase 1 passed AND Phase 2 produced no crash/exit≠0 AND `issues_found` is empty. Otherwise `"fail"`.
+- `test_result`: `"pass"` iff the final cycle's Phase 1 passed AND Phase 2 produced no crash/exit≠0 AND no unfixed issues remain. Otherwise `"fail"`.
 - `test_summary`: 1–3 sentences. Cover: how many cycles ran, what was fixed along the way, the final state. Example: "Cycle 1: 4 failing tests + smoke crash on pipeline-list. Fixed null-guard in pipeline-list renderer (commit abc1234) and updated stream-formatter test expectation (commit def5678). Cycle 2 clean: 412 tests passed, 3 smoke pipelines reached exit nodes."
-- `issues_found`: array of short strings, one issue per **remaining, unfixed** entry. Empty array `[]` is the correct signal for "I fixed everything I found." Example unresolved entries:
-  - `"illumination-to-plan smoke: chat_refiner node hangs on input when $run_id contains hyphens — reproduced twice, root cause not found"`
-  - `"ralph pipeline trace: --full flag prints JSON with trailing NUL bytes, only on macOS Terminal.app"`
-- `test_render`: a self-contained markdown block the user reads verbatim at `tmux_confirm_gate` to decide **Commit** vs **Retry**. This mirrors how `change-explainer` renders `explainer_render` for `approval_gate`. Follow this exact structure:
+- `test_render`: a self-contained markdown block the user reads verbatim at `tmux_confirm_gate` to decide **Commit** vs **Retry**. This mirrors how `change-explainer` renders `explainer_render` for `approval_gate`. The "Remaining issues" section IS the canonical list of unfixed issues — do not emit a separate `issues_found` field. Follow this exact structure:
 
   ```markdown
   ## Verification: **PASS** | **FAIL**
@@ -259,7 +255,7 @@ Emit JSON matching the schema:
   - <issue 1 — command, surface, symptom>
   - <issue 2>
   ...
-  (or "No unfixed issues." when `issues_found` is empty.)
+  (or "No unfixed issues." when nothing remains.)
   ```
 
   Keep it dense and scannable. The gate shows it verbatim; the user decides in ~10 seconds of reading.
@@ -275,5 +271,5 @@ Be specific. "Something looked off" is not an issue; name the command, the surfa
 - **Do NOT spawn more tmux windows.** Reuse the one already opened by `launch_tmux`.
 - **Do NOT modify files outside the scope of what the current fix needs.** You are test-driven and minimal — no drive-by refactors.
 - **Reap every backgrounded bash before emitting Phase 4.** Run `jobs -p | xargs -r kill 2>/dev/null; wait 2>/dev/null` (or equivalent) at the top of Phase 4. Orphan background loops will stall the pipeline node for their full sleep budget — the engine cannot advance while your session has open background tasks.
-- **No fixed iteration cap.** Stop when the project is healthy or when remaining issues are beyond what you can fix this session. Report honestly in `issues_found`.
+- **No fixed iteration cap.** Stop when the project is healthy or when remaining issues are beyond what you can fix this session. Report honestly in `test_render`'s "Remaining issues" section.
 - Output MUST be valid JSON matching the schema. No markdown, no preamble, no trailing prose.
