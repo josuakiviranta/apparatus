@@ -1,6 +1,6 @@
 {
   "name": "ralph-cli",
-  "version": "0.1.61",
+  "version": "0.1.67",
   "description": "Agentic loop runner CLI for AI-assisted project development",
   "type": "module",
   "bin": {
