@@ -80,3 +80,30 @@ body`,
     expect(diags.find(d => d.rule === "inputs_missing_frontmatter")).toBeUndefined();
   });
 });
+
+describe("validator — unknown_source_node", () => {
+  it("errors when inputs reference a non-existent node", () => {
+    const dir = join(tmpdir(), `rule-usn-${Date.now()}`);
+    setup(dir, {
+      "consumer.md": `---
+name: consumer
+description: x
+auto_inputs: true
+inputs: [ghost.value]
+outputs: { foo: string }
+---
+body`,
+    });
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      c [agent="consumer"]
+      done [shape=Msquare]
+      start -> c -> done
+    }`;
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    const d = diags.find(d => d.rule === "unknown_source_node");
+    expect(d).toBeDefined();
+    expect(d!.message).toMatch(/source node "ghost"/);
+  });
+});

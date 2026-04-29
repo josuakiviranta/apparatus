@@ -12,6 +12,7 @@ import type { AgentConfig } from "../../cli/lib/agent.js";
 import { computeVarsInScope, computeVarsInAnyScope } from "./flow-analyzer.js";
 import { parseConditionClauses } from "./conditions.js";
 import { resolveGate } from "../../cli/lib/gate-registry.js";
+import { resolveInputDecl } from "../transforms/inputs-resolver.js";
 
 export function parseDot(src: string): Graph {
   return parseDotV2(src);
@@ -399,6 +400,7 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
   }
 
   // inputs_missing_frontmatter — auto_inputs: true requires explicit inputs: declaration
+  // unknown_source_node — qualified inputs must reference existing graph nodes
   if (dotDir) {
     for (const node of nodes.values()) {
       if (!node.agent) continue;
@@ -411,6 +413,19 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
           message: `Agent "${node.agent}" has auto_inputs: true but is missing required \`inputs:\` declaration. Use \`inputs: []\` if no inputs are needed.`,
           location: node.sourceLocation,
         });
+      }
+      if (cfg.autoInputs === true && Array.isArray(cfg.inputs)) {
+        for (const decl of cfg.inputs) {
+          const resolved = resolveInputDecl(decl);
+          if (resolved.sourceNode !== undefined && !nodes.has(resolved.sourceNode)) {
+            diags.push({
+              rule: "unknown_source_node",
+              severity: "error",
+              message: `Agent "${node.agent}" references source node "${resolved.sourceNode}" in inputs:, but no such node exists in the graph.`,
+              location: node.sourceLocation,
+            });
+          }
+        }
       }
     }
   }
