@@ -57,6 +57,24 @@ export class JsonlPipelineTracer implements PipelineTracer {
     });
   }
 
+  onValidationFailure({ nodeReceiveId, node, attempt, errors, rawOutputPath }: {
+    nodeReceiveId: string;
+    node: Node;
+    attempt: number;
+    errors: Array<{ path: string; message: string }>;
+    rawOutputPath: string;
+  }): void {
+    this.append({
+      kind: "validation-failure",
+      nodeReceiveId,
+      nodeId: node.id,
+      attempt,
+      errors,
+      rawOutputPath,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
   private append(event: object): void {
     appendFileSync(this.tracePath, JSON.stringify(event) + "\n");
   }

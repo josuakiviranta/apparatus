@@ -6,4 +6,11 @@ export interface PipelineTracer {
   onNodeStart(meta: { nodeReceiveId: string; node: Node; ctx: PipelineContext }): void;
   onNodeEnd(meta: { nodeReceiveId: string; node: Node; outcome: Outcome }): void;
   onPipelineEnd(meta: { runId: string; outcome: "success" | "failure" }): void;
+  onValidationFailure?(meta: {
+    nodeReceiveId: string;
+    node: Node;
+    attempt: number;
+    errors: Array<{ path: string; message: string }>;
+    rawOutputPath: string;
+  }): void;
 }

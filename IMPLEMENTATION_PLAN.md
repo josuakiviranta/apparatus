@@ -556,12 +556,12 @@ git commit -m "feat(corrective-message): deterministic builder for empty/invalid
 - Modify: `src/attractor/tracer/jsonl-pipeline-tracer.ts` (implementation — uses `private append(...)`, NOT `write`)
 - Test: `src/attractor/tests/pipeline-tracer-validation.test.ts` (NEW)
 
-- [ ] **Step 1: Read existing tracer files to confirm shape**
+- [x] **Step 1: Read existing tracer files to confirm shape**
 
 Run: `cat src/attractor/tracer/pipeline-tracer.ts src/attractor/tracer/jsonl-pipeline-tracer.ts`
 Confirm: methods are `onPipelineStart`, `onNodeStart`, `onNodeEnd`, `onPipelineEnd`. The serializer is `private append(event: object)` at the bottom of `jsonl-pipeline-tracer.ts`.
 
-- [ ] **Step 2: Write the failing tracer test**
+- [x] **Step 2: Write the failing tracer test**
 
 ```ts
 // src/attractor/tests/pipeline-tracer-validation.test.ts (NEW)
@@ -597,12 +597,12 @@ describe("JsonlPipelineTracer.onValidationFailure", () => {
 });
 ```
 
-- [ ] **Step 3: Run test to verify it fails**
+- [x] **Step 3: Run test to verify it fails**
 
 Run: `npx vitest run src/attractor/tests/pipeline-tracer-validation.test.ts`
 Expected: FAIL — method missing.
 
-- [ ] **Step 4: Add `onValidationFailure` to interface and implementation**
+- [x] **Step 4: Add `onValidationFailure` to interface and implementation**
 
 In `src/attractor/tracer/pipeline-tracer.ts` add to the `PipelineTracer` interface (after the existing `onPipelineEnd` line):
 
@@ -638,12 +638,12 @@ onValidationFailure({ nodeReceiveId, node, attempt, errors, rawOutputPath }: {
 }
 ```
 
-- [ ] **Step 5: Run test to verify it passes**
+- [x] **Step 5: Run test to verify it passes**
 
 Run: `npx vitest run src/attractor/tests/pipeline-tracer-validation.test.ts`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/attractor/tracer/pipeline-tracer.ts src/attractor/tracer/jsonl-pipeline-tracer.ts src/attractor/tests/pipeline-tracer-validation.test.ts
