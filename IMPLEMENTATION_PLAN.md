@@ -1611,7 +1611,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 - [x] 4. chat-only (commit 59e93d6)
 - [x] 5. conditional (commit 2aca955)
 - [x] 6. gate
-- [ ] 7. json-schema-stream
+- [x] 7. json-schema-stream (commit deb434e)
 - [ ] 8. meditate-steer
 - [ ] 9. missing-caller-var
 - [ ] 10. static-multi-node
