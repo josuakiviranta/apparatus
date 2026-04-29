@@ -355,6 +355,57 @@ body`,
   });
 });
 
+describe("validator — steering_has_var_token", () => {
+  it("errors when auto_inputs node steering prompt contains a $var token", () => {
+    const dir = join(tmpdir(), `rule-shvt-${Date.now()}`);
+    setup(dir, {
+      "x.md": `---
+name: x
+description: x
+auto_inputs: true
+inputs: []
+outputs: { result: string }
+---
+body`,
+    });
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      n [agent="x", prompt="hello $foo"]
+      done [shape=Msquare]
+      start -> n -> done
+    }`;
+    writeFileSync(join(dir, "p.dot"), dot);
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    const d = diags.find(d => d.rule === "steering_has_var_token");
+    expect(d).toBeDefined();
+    expect(d!.severity).toBe("error");
+    expect(d!.message).toMatch(/\$foo/);
+    expect(d!.message).toMatch(/auto_inputs/);
+  });
+
+  it("does not fire on legacy agents without auto_inputs even if prompt has $var", () => {
+    const dir = join(tmpdir(), `rule-shvt-legacy-${Date.now()}`);
+    setup(dir, {
+      "x.md": `---
+name: x
+description: x
+outputs: { result: string }
+---
+body`,
+    });
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      n [agent="x", prompt="hello $foo"]
+      done [shape=Msquare]
+      start -> n -> done
+    }`;
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    expect(diags.find(d => d.rule === "steering_has_var_token")).toBeUndefined();
+  });
+});
+
 describe("validator — malformed input declarations", () => {
   // resolveInputDecl throws on multi-dot keys (e.g. "a.b.c") and empty strings.
   // validateGraph must NOT crash — it should absorb the throw and continue emitting

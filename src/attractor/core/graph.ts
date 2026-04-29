@@ -417,6 +417,20 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
           location: node.sourceLocation,
         });
       }
+      // steering_has_var_token — auto_inputs steering must be pure prose (no $var tokens)
+      if (cfg.autoInputs === true && node.prompt) {
+        const steeringVarRe = new RegExp(VAR_RE.source, VAR_RE.flags);
+        let m: RegExpExecArray | null;
+        while ((m = steeringVarRe.exec(node.prompt)) !== null) {
+          diags.push({
+            rule: "steering_has_var_token",
+            severity: "error",
+            message: `steering text contains $${m[1]} — under auto_inputs, steering is pure prose`,
+            location: node.sourceLocation,
+          });
+        }
+      }
+
       if (cfg.autoInputs === true && Array.isArray(cfg.inputs)) {
         for (const decl of cfg.inputs) {
           let resolved;

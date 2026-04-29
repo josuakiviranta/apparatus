@@ -1018,13 +1018,13 @@ Severity: error. Fires when a bare (unqualified) input is neither in `graph.inpu
 
 Severity: error (under spec revision). Fires when `node.prompt` (steering) for an `auto_inputs: true` consumer contains a `$var` token.
 
-- [ ] **Step 1: Write the failing test** — pipeline.dot has `n [agent="x", prompt="hello $foo"]`; agent x has `auto_inputs: true`. Expect error "steering text contains $foo — under auto_inputs, steering is pure prose".
-- [ ] **Step 2: Run test, verify fail**
-- [ ] **Step 3: Implement rule**:
+- [x] **Step 1: Write the failing test** — pipeline.dot has `n [agent="x", prompt="hello $foo"]`; agent x has `auto_inputs: true`. Expect error "steering text contains $foo — under auto_inputs, steering is pure prose".
+- [x] **Step 2: Run test, verify fail**
+- [x] **Step 3: Implement rule**:
   - For each agent node with `auto_inputs: true` config, scan `node.prompt` (steering) for `$<name>` tokens (regex same as `VAR_RE` in `variable-expansion.ts`).
   - For each match, push error.
-- [ ] **Step 4: Run test, verify pass**
-- [ ] **Step 5: Commit**
+- [x] **Step 4: Run test, verify pass**
+- [x] **Step 5: Commit**
 
 ### Task 2.6: Rule `rendered_tag_collision`
 
