@@ -56,6 +56,8 @@ export interface AgentConfig {
   jsonSchema?: string;
   outputs?: Record<string, JsonSchemaFragment>;
   inputs?: string[];
+  loop?: boolean;
+  maxIterations?: number;
 }
 
 export interface RunOptions {
