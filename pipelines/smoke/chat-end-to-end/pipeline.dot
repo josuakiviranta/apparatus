@@ -3,18 +3,16 @@ digraph chat_end_to_end {
 
   chat [
     agent="chat",
-    interactive=true,
-    prompt="You are helping the user capture one thing they learned today. Ask them one question, acknowledge their answer, then tell them you will summarize it for them."
+    interactive=true
   ];
 
   summarize [
-    agent="chat",
-    prompt="Summarize this chat into a single sentence. Input:\n\n$chat.output"
+    agent="summarize"
   ];
 
   recovery [
-    agent="chat",
-    prompt="The interactive chat was aborted. Write a one-line note saying the user aborted early. Partial output (may be empty): $chat.output"
+    agent="recovery",
+    default_output=""
   ];
 
   done [shape=Msquare];
