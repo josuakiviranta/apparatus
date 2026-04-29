@@ -1441,20 +1441,20 @@ Fix:
 
 ---
 
-## Chunk 7: Documentation
+## Chunk 7: Documentation ✅ SHIPPED
 
 **Ships green:** README has a short authoring guide for deep-loop agents.
 
-### Task 7.1 — README "Deep loop nodes" section
+### Task 7.1 — README "Deep loop nodes" section ✅ DONE
 
 **Files:** `README.md`
 
-- [ ] **Step 1: Locate insertion point**
+- [x] **Step 1: Locate insertion point**
 
 Run: `grep -n "^## \|^### " README.md | head -40`
 Identify the heading after which the new section fits best (typically below "Pipeline tool nodes and `cwd=`" if it exists; otherwise above the bottom Specs links). Confirm the exact heading with the grep output before editing.
 
-- [ ] **Step 2: Insert section**
+- [x] **Step 2: Insert section**
 
 Add the following content at the chosen insertion point:
 
@@ -1514,11 +1514,11 @@ The validator rejects `loop: true` without `done: boolean` with error
 exits the loop with `agent.success=false`.
 ```
 
-- [ ] **Step 3: Verify markdown**
+- [x] **Step 3: Verify markdown**
 
 Eyeball or run a markdown linter if available.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add README.md
