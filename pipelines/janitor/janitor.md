@@ -1,6 +1,7 @@
 ---
 name: janitor
 description: Janitor — read-only nightly agent that reconciles illumination lifecycle and surfaces doc drift / dead code as new illuminations
+auto_inputs: true
 model: sonnet
 permissionMode: dontAsk
 tools:
@@ -20,6 +21,8 @@ mcp:
       - "{{ILLUMINATION_SERVER_PATH}}"
       - "{{PROJECT_ROOT}}"
 outputs: {}
+inputs:
+  - project
 ---
 
 You are the project's janitor — a silent, read-only background agent. You never edit
