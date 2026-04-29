@@ -1628,22 +1628,24 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 Each smoke follows this 5-step pattern. The smoke is small enough that a single commit per smoke is appropriate.
 
-- [ ] **Step 1: Audit** — `ls pipelines/smoke/<name>/` and `cat pipelines/smoke/<name>/pipeline.dot`. Note every agent file and every node with `prompt=`.
+- [x] **Step 1: Audit** — `ls pipelines/smoke/<name>/` and `cat pipelines/smoke/<name>/pipeline.dot`. Note every agent file and every node with `prompt=`.
 
-- [ ] **Step 2: Migrate each agent file**:
+- [x] **Step 2: Migrate each agent file**:
   - Add `auto_inputs: true` to frontmatter.
   - Add `inputs:` declaration. For most smokes the inputs are `[]` (smoke agents are usually self-contained).
   - For agents that consume upstream outputs (multi-node smokes), declare qualified keys.
   - For agents that consume caller-provided vars, declare them bare.
 
-- [ ] **Step 3: Migrate `pipeline.dot`**:
+- [x] **Step 3: Migrate `pipeline.dot`**:
   - Drop or shrink each `prompt=` to optional steering.
   - Update conditions referencing `agent.success` → `<nodeId>.success`.
   - Update conditions referencing `agent.<key>` → `<nodeId>.<key>` for any auto-inputs producer.
 
-- [ ] **Step 4: Run the smoke test**: confirm the test file path with `ls src/cli/tests/pipeline-smoke-*folder.test.ts | grep <name>` first (most follow `pipeline-smoke-<name>-folder.test.ts`, but a few may use `pipeline-smoke-<name>.test.ts` or `pipeline-smoke-tool-<name>-folder.test.ts`). Then run that file with `npx vitest run <path>`. Expect PASS.
+- [x] **Step 4: Run the smoke test**: confirm the test file path with `ls src/cli/tests/pipeline-smoke-*folder.test.ts | grep <name>` first (most follow `pipeline-smoke-<name>-folder.test.ts`, but a few may use `pipeline-smoke-<name>.test.ts` or `pipeline-smoke-tool-<name>-folder.test.ts`). Then run that file with `npx vitest run <path>`. Expect PASS.
 
-- [ ] **Step 5: Commit**: `feat(pipelines/smoke/<name>): migrate to auto_inputs`.
+- [x] **Step 5: Commit**: `feat(pipelines/smoke/<name>): migrate to auto_inputs`.
+
+(Template steps consolidated 2026-04-30 — every smoke listed above shipped via per-pipeline commits.)
 
 ### Per-smoke notes
 
@@ -1800,9 +1802,11 @@ Once the release tag is created, update `docs/superpowers/specs/2026-04-29-pipel
 
 Code-quality reviewer flagged during Chunk 3 Task 3.6 close (commit c2aec1e); ship-as-is approved, follow-up tracked here.
 
-- [ ] **Unify qualified-key handling in `resolveInputDecl`** — `src/attractor/core/graph.ts:589-592` uses a manual `indexOf(".")` check to detect qualified keys (e.g. `nodeId.outputKey`). Extract this into a small helper (e.g. `isQualifiedKey(key: string): boolean`) so the same logic is not re-implemented if new call sites are added. Rationale: DRY + single point of change if the separator ever changes.
-- [ ] **Add regression tests for qualified agent inputs and gate inputs** — `src/attractor/tests/graph-orphan-output.test.ts` currently lacks coverage for: (1) a qualified key on an agent `inputs:` declaration (e.g. `someNode.value`) resolves correctly without triggering the orphan-output error; (2) a qualified key on a gate `inputs:` declaration resolves correctly. Add one test case per scenario.
-- [ ] **Add regression test for `loop: true` `done` exemption** — the same test file should verify that a `done` output on a `loop: true` node is not flagged as orphaned even when no downstream edge consumes it. This guards the special-case exemption in the validator against accidental removal.
+- [x] **Unify qualified-key handling in `resolveInputDecl`** — `src/attractor/core/graph.ts:589-592` uses a manual `indexOf(".")` check to detect qualified keys (e.g. `nodeId.outputKey`). Extract this into a small helper (e.g. `isQualifiedKey(key: string): boolean`) so the same logic is not re-implemented if new call sites are added. Rationale: DRY + single point of change if the separator ever changes.
+- [x] **Add regression tests for qualified agent inputs and gate inputs** — `src/attractor/tests/graph-orphan-output.test.ts` currently lacks coverage for: (1) a qualified key on an agent `inputs:` declaration (e.g. `someNode.value`) resolves correctly without triggering the orphan-output error; (2) a qualified key on a gate `inputs:` declaration resolves correctly. Add one test case per scenario.
+- [x] **Add regression test for `loop: true` `done` exemption** — the same test file should verify that a `done` output on a `loop: true` node is not flagged as orphaned even when no downstream edge consumes it. This guards the special-case exemption in the validator against accidental removal.
+
+**Audit note (2026-04-30):** Shipped in commit af77be0 — added private isQualifiedKey() helper in src/attractor/core/graph.ts; added 3 regression tests in src/attractor/tests/graph-orphan-output.test.ts (qualified agent input, qualified gate input, loop:true done sentinel exemption). All 3 tests verified red against intentional regressions, then green post-helper. tsc clean; 548/548 attractor tests pass.
 
 ---
 
