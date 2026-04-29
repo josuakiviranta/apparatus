@@ -1603,6 +1603,23 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 13. tool
 14. tool-runtime-vars
 
+### Migration progress
+
+- [ ] 1. agent-implement (deferred to Chunk 6)
+- [x] 2. agent-json-vars (commits ed9baa3, 1644fd1)
+- [ ] 3. chat-end-to-end
+- [ ] 4. chat-only
+- [ ] 5. conditional
+- [ ] 6. gate
+- [ ] 7. json-schema-stream
+- [ ] 8. meditate-steer
+- [ ] 9. missing-caller-var
+- [ ] 10. static-multi-node
+- [ ] 11. store
+- [ ] 12. tmux-tester
+- [ ] 13. tool
+- [ ] 14. tool-runtime-vars
+
 ### Common per-smoke migration template
 
 Each smoke follows this 5-step pattern. The smoke is small enough that a single commit per smoke is appropriate.
@@ -1630,7 +1647,7 @@ These notes call out non-obvious deviations from the common template. Re-audit a
 
 **1. agent-implement** — uses `agent="task"` with inline prompt. **Deferred to Chunk 6.** Leaving this smoke on the legacy path during Chunks 1-5 means we keep at least one in-tree test exercising the legacy code. Chunk 6 Task 6.1 explicitly migrates this smoke alongside `task.md` before dropping the legacy code path. Until then, the smoke runs unchanged on the legacy code; no migration needed in Chunk 5.
 
-**2. agent-json-vars** — exercises JSON schema output validation. After migration, the smoke's expected output keys will be qualified (e.g. `producer.foo`). Update test assertions to match.
+**2. agent-json-vars** — exercises JSON schema output validation. After migration, the smoke's expected output keys will be qualified (e.g. `producer.foo`). Update test assertions to match. Migration deviation: producer split off into a dedicated `producer.md` (declares `outputs: { result, label }`); shared `task.md` retained for test-assertion compatibility but is now unreferenced. See commit `ed9baa3`.
 
 **3. chat-end-to-end / chat-only** — interactive chat pipelines. Verify session-digest writeback uses qualified meta keys (`<nodeId>.output`, `<nodeId>.success`, etc.) per Task 1.4 Step 4. Update any test asserting on `agent.output` or similar.
 
