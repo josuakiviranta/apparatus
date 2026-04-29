@@ -1793,6 +1793,14 @@ Expected: every test passes. If any test is red, fix before tagging.
 
 Once the release tag is created, update `docs/superpowers/specs/2026-04-29-pipeline-context-flow-redesign.md` header — replace `Status: implemented` (set in Task 6.5 Step 4) with `Status: implemented in v0.2.0` and add a `Release-tag: v0.2.0` field. Provides forward traceability from the spec to the merged work.
 
+### Task 6.7: Validator follow-up from Chunk 3 close (c2aec1e)
+
+Code-quality reviewer flagged during Chunk 3 Task 3.6 close (commit c2aec1e); ship-as-is approved, follow-up tracked here.
+
+- [ ] **Unify qualified-key handling in `resolveInputDecl`** — `src/attractor/core/graph.ts:589-592` uses a manual `indexOf(".")` check to detect qualified keys (e.g. `nodeId.outputKey`). Extract this into a small helper (e.g. `isQualifiedKey(key: string): boolean`) so the same logic is not re-implemented if new call sites are added. Rationale: DRY + single point of change if the separator ever changes.
+- [ ] **Add regression tests for qualified agent inputs and gate inputs** — `src/attractor/tests/graph-orphan-output.test.ts` currently lacks coverage for: (1) a qualified key on an agent `inputs:` declaration (e.g. `someNode.value`) resolves correctly without triggering the orphan-output error; (2) a qualified key on a gate `inputs:` declaration resolves correctly. Add one test case per scenario.
+- [ ] **Add regression test for `loop: true` `done` exemption** — the same test file should verify that a `done` output on a `loop: true` node is not flagged as orphaned even when no downstream edge consumes it. This guards the special-case exemption in the validator against accidental removal.
+
 ---
 
 ## Definition of done
