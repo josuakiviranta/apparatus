@@ -1,1116 +1,1018 @@
-# Agent Output Validation and Retry — Implementation Plan
+# Deep Loop Nodes Implementation Plan
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Finish wiring chunk-1's `outputs:` frontmatter into the runtime, add self-healing validation retry inside the agent handler, persist the failure trail in run dirs + JSONL trace, delete the legacy `json_schema_file=` attribute, and migrate the 7 remaining `.json` schema files into per-agent frontmatter.
+**Goal:** Add agent-driven self-termination for long-running pipeline loops. An agent declares `loop: true` + `done: boolean` in its frontmatter; the handler iterates with fresh contexts and breaks on the agent's `done=true` signal. Replaces manual Ctrl+C as the only termination for `ralph implement`.
 
-**Architecture:** Handler reads `config.jsonSchema` (already derived from `outputs:` per `agent.ts:464`) when `node.jsonSchemaFile` is absent. A new `outputs-to-zod.ts` helper builds a `z.ZodObject` from the frontmatter fragment. After every agent run, the handler `safeParse`s the output; on failure it persists the raw output, emits a JSONL `validation-failure` event, opens a TUI iteration block via the existing `onIterationStart` hook, then re-invokes the agent via `--resume <sessionId>` with a corrective user turn. Cap defaults to 1 retry; per-node override `output_validation_retries=N`. After cap exhaustion, the node fails with `agent.success=false` so the engine's existing retry idiom (`max_retries=N`, condition self-edges) can compose on top.
+**Architecture:** New `loop` and `maxIterations` fields on agent frontmatter (parsed in `validateAgentConfig`); cap cascade `node > agent > (loop ? Infinity : 1)`; handler restructures to parse outputs per iteration (reusing chunk-2's `evaluateAgentOutput`) and break on `done=true`; optional `note` field surfaces as `$prev_note` variable on next iteration via per-iteration variable bag rebuild; new validator rule `loop_missing_done_field`. Composes orthogonally with chunk-2's `--resume`-based validation retry — that loop nests inside each deep-loop iteration.
 
-**Tech Stack:** TypeScript, Node.js, vitest, zod (already in use in `src/attractor/core/schemas.ts`), `yaml` (already a dep), `@ts-graphviz/ast` (existing, used for SVG rendering).
+**Tech Stack:** TypeScript, vitest, zod (existing), `@ts-graphviz/ast` (existing).
 
-**Spec:** `docs/superpowers/specs/2026-04-29-agent-output-validation-and-retry.md`
+**Spec:** `docs/superpowers/specs/2026-04-29-deep-loop-nodes.md`
 
----
-
-## Current Status
-
-**DONE:**
-- Chunk 1 — Handler unification + zod builder + verifier prompt fix (commits `f9f36b2`, `560e528`, `908ebf5`)
-- Chunk 2 — Validation retry + tracing + TUI surfacing (commits `88ffe3d`, `722be13`, `69618e3`, `c0d4539`, `5fe5d0f`, `f51606c`)
-- Task 3.1 — `agent_missing_outputs` validator rule (commit `516c2bb`)
-- Task 3.2 — Atomic schemas-to-frontmatter migration for `illumination-to-implementation` (commit `516c2bb`)
-- Task 3.3 — Annotated `ralph pipeline show` SVG with inputs/outputs (commit `eb05de9`)
-- Task 3.4 Step 3 — Smoke validate all `pipelines/smoke/*.dot` (14/14 green)
-- Chunk 1 / Chunk 2 / Chunk 3 Review Checkpoints — `superpowers:code-reviewer` subagent loops PASSED (this session). Chunk-3 follow-up: dead `Node.jsonSchemaFile` field deleted + stale failureReason wording updated.
-- Tag `chunk-7-agent-output-validation` created.
-
-**REMAINING:**
-- Task 3.4 Steps 1–2 — live `illumination-to-implementation` pipeline run + trace inspection. Requires interactive human gates and a real Claude session; deferred to a human-driven run.
+**Pre-req (already shipped to main):**
+- `evaluateAgentOutput` at `src/attractor/handlers/evaluate-agent-output.ts` (chunk-2). Includes `normaliseRaw` so test fixtures can emit either NDJSON or `JSON.stringify([...])` arrays.
+- `outputs-to-zod.ts` accepts shorthand `boolean`/`string` and the long form `{type: "boolean"}`.
+- `validateAgentConfig` at `src/cli/lib/agent.ts:459` is the canonical agent-config gate; `parseAgentFile` (`src/cli/lib/agent-registry.ts:41`) defers to it via `{ ...attributes, prompt: body }`.
 
 ---
 
 ## File Structure
 
-| Area | File | What changes |
+| Area | File | Responsibility |
 |---|---|---|
-| Handler unification | `src/attractor/handlers/agent-handler.ts` | Use `config.jsonSchema` when `node.jsonSchemaFile` absent. Add validation+retry loop using the extracted `evaluate-agent-output` helper. Write `raw-attempt-N.txt` per attempt. Emit `onValidationFailure` callbacks. |
-| Output evaluator | `src/attractor/handlers/evaluate-agent-output.ts` (NEW) | `evaluateAgentOutput(raw, zodSchema) → {ok, parsed} | {ok:false, errors}`. Parses stream-json, extracts the result payload, runs zod safeParse. Pure helper, easily unit-testable. |
-| Agent SDK | `src/cli/lib/agent.ts` | Allow `-p` + stdin pipe on `isResume` runs so corrective message reaches a resumed session. |
-| Zod builder | `src/cli/lib/outputs-to-zod.ts` (NEW) | Convert `Record<string, JsonSchemaFragment>` → `z.ZodObject`. Strict accept-list: string/number/boolean/enum/array-of-primitives/nullable/maxLength/description. Throw on unsupported shapes. |
-| Corrective message | `src/cli/lib/corrective-message.ts` (NEW) | `buildCorrectiveMessage(rawOutput, errors, schemaJsonString) → string`. Two paths: empty-output, invalid-output. |
-| Tracer | `src/attractor/tracer/jsonl-pipeline-tracer.ts` | Add `onValidationFailure({nodeReceiveId, node, attempt, errors, rawOutputPath})` writing `validation-failure` events via `this.append`. |
-| Tracer interface | `src/attractor/tracer/pipeline-tracer.ts` | Add optional `onValidationFailure?` method matching the existing `on*` naming convention. |
-| Engine wiring | `src/attractor/core/engine.ts` | Add `onValidationRetryStart` to `EngineRunOptions`. In `meta` block, inject `onValidationFailure` (closes over `nodeReceiveId` + `node` and forwards to `traceWriter.onValidationFailure`) and `onValidationRetryStart`. |
-| Handler context | `src/attractor/handlers/registry.ts` | Add `onValidationFailure?: (...) => void` and `onValidationRetryStart?: (nodeId, attempt) => void` to `HandlerExecutionContext`. Engine injects `nodeReceiveId` so the handler does not need to know it. |
-| Pipeline command wiring | `src/cli/commands/pipeline.ts` | Provide `onValidationRetryStart` that emits a TUI iteration block via existing `emit({kind:"start"...})`. Extend `--node-receive` view to surface validation attempts inline (filtered by `nodeReceiveId`). |
-| Node schema | `src/attractor/core/schemas.ts` | Delete `jsonSchemaFile` field from `AgentNodeSchema`. Add `outputValidationRetries: z.coerce.number().int().nonnegative().optional()`. |
-| Validator | `src/attractor/core/graph.ts` | Add `agent_missing_outputs` rule (error) + `agent_outputs_empty` rule (warning) per spec D2. |
-| Pipeline show annotation | `src/cli/commands/pipeline.ts` (or sibling `pipeline-show.ts` if extracted) | Augment SVG render pass with declared inputs/outputs sublabels per agent node and edge labels for inferred data flow. |
-| Migration target | `pipelines/illumination-to-implementation/` | Fold 7 `.json` files into agent `.md` frontmatter; remove `json_schema_file=...` attributes from `pipeline.dot`; declare `outputs: {}` on `implement.md`; append prompt fix to `verifier.md`. |
-| Tests | `src/attractor/tests/agent-handler-validation.test.ts` (NEW), `src/attractor/tests/agent-handler-retry.test.ts` (NEW), `src/cli/tests/outputs-to-zod.test.ts` (NEW), `src/cli/tests/corrective-message.test.ts` (NEW), `src/attractor/tests/agent-handler-frontmatter-jsonschema.test.ts` (NEW), `src/attractor/tests/pipeline-tracer.test.ts` (extend), `src/attractor/tests/graph-validator.test.ts` (extend), `src/cli/tests/pipeline-trace-command.test.ts` (extend), `src/cli/tests/pipeline-show.test.ts` (extend) | New + extended tests per chunk. |
+| Agent config | `src/cli/lib/agent.ts` | Add `loop?: boolean` and `maxIterations?: number` to `AgentConfig` (lines 48–59) and propagate them through `validateAgentConfig` (lines 459–485) with runtime checks. |
+| Validator rule | `src/attractor/core/graph.ts` | Add `checkLoopRequiresDoneField` alongside `checkAgentMissingOutputs`; wire it into the dispatcher at lines 393–398. Modify `checkAgentMissingOutputs` so the `agent_outputs_empty` warning suppresses when `loop:true`. |
+| Variable preflight | `src/attractor/transforms/variable-expansion.ts` | When an agent in the graph declares `note: string` in `outputs:`, add `prev_note` to the **producers** set so it does not surface as an undeclared-var diagnostic. |
+| Handler | `src/attractor/handlers/agent-handler.ts` | (a) Replace lines 168–174 cap parse with cascade. (b) Move validation+retry block (lines 218–297) inside the iteration loop body. (c) Per-iteration: parse outputs via `evaluateAgentOutput`, read `done`, break on true. (d) Build per-iteration variable bag with `prev_note`. (e) Treat any non-zero exit during deep-loop iteration as hard failure (drop the `maxIterations === 1` guard at line 206). (f) Last iteration's parsed outputs feed `contextUpdates`. |
+| Implement agent | `pipelines/illumination-to-implementation/implement.md` | Add `loop: true` and `outputs: { done: boolean }`; update prompt to emit `done` after each iteration. |
+| Implement pipeline | `src/cli/pipelines/implement.dot` | Verify shape; no structural change required. |
+| Docs | `README.md` | New section: "Deep loop nodes — authoring guide." |
 
 ---
 
-## Chunk 1: Handler unification + zod builder + verifier prompt fix
+## Chunks
 
-**Ships green:** `outputs:`-only agents (no `json_schema_file=` on the node) now activate the structured-output parse path. Verifier-style failures from chunk-1 stop being silent. Verifier prompt one-liner reduces the empty-output trap.
+1. **Frontmatter parsing for `loop` and `maxIterations`** — extend `validateAgentConfig`; no runtime behavior change yet.
+2. **Validator rule `loop_missing_done_field`** — fail fast on misconfigured agents; suppress `agent_outputs_empty` warning when superseded.
+3. **Cap cascade in handler** — wire D3 resolution. `loop:false` regression suite untouched.
+4. **Per-iteration outputs parse + `done` break + crash exit** — the core handler restructure. Drops the `maxIterations === 1` crash guard; re-classifies the existing "does not fail on non-zero exit during multi-iteration loop" test.
+5. **`$prev_note` channel** — opt-in cross-iteration carry-over with preflight seeding.
+6. **Migration of `implement` agent** — apply the new contract; reconcile prompt body with the handler's `jsonWrappedPrompt` wrap.
+7. **Documentation** — README authoring guide.
 
-### Task 1.1 — Handler reads `config.jsonSchema` when `node.jsonSchemaFile` absent
-
-**Files:**
-- Test: `src/attractor/tests/agent-handler-frontmatter-jsonschema.test.ts` (NEW)
-- Modify: `src/attractor/handlers/agent-handler.ts:69-78`
-
-- [x] **Step 1: Write the failing test**
-
-```ts
-// src/attractor/tests/agent-handler-frontmatter-jsonschema.test.ts
-import { describe, it, expect, vi } from "vitest";
-import { AgentHandler } from "../handlers/agent-handler.js";
-
-describe("AgentHandler — frontmatter outputs activates parse path", () => {
-  it("uses config.jsonSchema when node has no json_schema_file", async () => {
-    const fakeAgent = {
-      run: vi.fn().mockResolvedValue({
-        exitCode: 0,
-        sessionId: "s-1",
-        output: JSON.stringify([
-          { type: "system", subtype: "init", session_id: "s-1" },
-          { type: "result", subtype: "success", result: '{"foo":"bar"}' },
-        ]),
-      }),
-    };
-    const handler = new AgentHandler({
-      resolveAgent: () => ({
-        name: "a", description: "d", model: "opus",
-        permissionMode: "default", tools: [], mcp: [], prompt: "",
-        outputs: { foo: "string" },
-        jsonSchema: '{"type":"object","properties":{"foo":{"type":"string"}},"required":["foo"],"additionalProperties":false}',
-      }) as any,
-      createAgent: () => fakeAgent as any,
-    });
-    const node: any = { id: "n1", agent: "a", prompt: "do it" };
-    const ctx: any = { values: {} };
-    const meta: any = {
-      logsRoot: "/tmp/test-runs", cwd: process.cwd(), dotDir: "/tmp",
-      completedNodes: [], nodeRetries: {},
-    };
-    const outcome = await handler.execute(node, ctx, meta);
-    expect(outcome.status).toBe("success");
-    expect(outcome.contextUpdates).toMatchObject({ foo: "bar" });
-  });
-});
-```
-
-- [x] **Step 2: Run test to verify it fails**
-
-Run: `npx vitest run src/attractor/tests/agent-handler-frontmatter-jsonschema.test.ts`
-Expected: FAIL — `contextUpdates` will not contain `foo` because handler skips parse path.
-
-- [x] **Step 3: Modify handler to fall back to `config.jsonSchema`**
-
-In `src/attractor/handlers/agent-handler.ts` replace the block at lines 69-78:
-
-```ts
-// Read JSON schema: prefer node.jsonSchemaFile (legacy, deleted in chunk 3),
-// fall back to config.jsonSchema derived from agent frontmatter outputs:.
-const jsonSchemaFile = node.jsonSchemaFile as string | undefined;
-let jsonSchema: string | undefined;
-if (jsonSchemaFile) {
-  try {
-    jsonSchema = readFileSync(resolve(dotDir, jsonSchemaFile), "utf8");
-  } catch (err) {
-    return { status: "fail", failureReason: `Failed to read json_schema_file "${jsonSchemaFile}": ${(err as Error).message}` };
-  }
-} else if (config.jsonSchema) {
-  jsonSchema = config.jsonSchema;
-}
-```
-
-- [x] **Step 4: Run test to verify it passes**
-
-Run: `npx vitest run src/attractor/tests/agent-handler-frontmatter-jsonschema.test.ts`
-Expected: PASS.
-
-- [x] **Step 5: Run full test suite to confirm no regressions**
-
-Run: `npm test`
-Expected: All tests pass.
-
-- [x] **Step 6: Commit**
-
-```bash
-git add src/attractor/handlers/agent-handler.ts src/attractor/tests/agent-handler-frontmatter-jsonschema.test.ts
-git commit -m "feat(handler): activate parse path from frontmatter outputs:"
-```
-
-### Task 1.2 — `outputs-to-zod.ts` strict accept-list helper
-
-**Files:**
-- Create: `src/cli/lib/outputs-to-zod.ts`
-- Test: `src/cli/tests/outputs-to-zod.test.ts` (NEW)
-
-- [x] **Step 1: Write the failing tests covering the strict accept-list**
-
-```ts
-// src/cli/tests/outputs-to-zod.test.ts
-import { describe, it, expect } from "vitest";
-import { outputsToZod } from "../lib/outputs-to-zod.js";
-
-describe("outputsToZod", () => {
-  it("shorthand string", () => {
-    const schema = outputsToZod({ foo: "string" });
-    expect(schema.safeParse({ foo: "x" }).success).toBe(true);
-    expect(schema.safeParse({ foo: 1 }).success).toBe(false);
-  });
-
-  it("shorthand number/boolean", () => {
-    const s = outputsToZod({ n: "number", b: "boolean" });
-    expect(s.safeParse({ n: 1, b: true }).success).toBe(true);
-    expect(s.safeParse({ n: "1", b: true }).success).toBe(false);
-  });
-
-  it("enum", () => {
-    const s = outputsToZod({ label: { enum: ["true", "false", "empty"] } });
-    expect(s.safeParse({ label: "true" }).success).toBe(true);
-    expect(s.safeParse({ label: "maybe" }).success).toBe(false);
-  });
-
-  it("array of primitives", () => {
-    const s = outputsToZod({ xs: { type: "array", items: "string" } });
-    expect(s.safeParse({ xs: ["a","b"] }).success).toBe(true);
-    expect(s.safeParse({ xs: [1] }).success).toBe(false);
-  });
-
-  it("nullable form ([type, null])", () => {
-    const s = outputsToZod({ p: { type: ["string", "null"] } });
-    expect(s.safeParse({ p: "x" }).success).toBe(true);
-    expect(s.safeParse({ p: null }).success).toBe(true);
-    expect(s.safeParse({ p: 1 }).success).toBe(false);
-  });
-
-  it("string maxLength", () => {
-    const s = outputsToZod({ short: { type: "string", maxLength: 5 } });
-    expect(s.safeParse({ short: "abcde" }).success).toBe(true);
-    expect(s.safeParse({ short: "abcdef" }).success).toBe(false);
-  });
-
-  it("description is passive (does not affect validation)", () => {
-    const s = outputsToZod({ foo: { type: "string", description: "anything" } });
-    expect(s.safeParse({ foo: "x" }).success).toBe(true);
-  });
-
-  it("all keys required by default (no optional support)", () => {
-    const s = outputsToZod({ foo: "string", bar: "string" });
-    expect(s.safeParse({ foo: "x" }).success).toBe(false);
-  });
-
-  it("rejects unsupported fragment shapes with a clear message", () => {
-    expect(() => outputsToZod({ foo: { type: "object", properties: {} } as any }))
-      .toThrow(/outputs\[foo\]: unsupported fragment shape/);
-    expect(() => outputsToZod({ foo: { type: "number", minimum: 0 } as any }))
-      .toThrow(/outputs\[foo\]: unsupported fragment shape/);
-  });
-});
-```
-
-- [x] **Step 2: Run tests to verify they fail**
-
-Run: `npx vitest run src/cli/tests/outputs-to-zod.test.ts`
-Expected: FAIL — module does not exist.
-
-- [x] **Step 3: Implement `outputs-to-zod.ts`**
-
-```ts
-// src/cli/lib/outputs-to-zod.ts
-import { z, type ZodObject, type ZodTypeAny } from "zod";
-import type { JsonSchemaFragment } from "./agent.js";
-
-const ALLOWED_KEYS_OBJECT = new Set(["type", "enum", "items", "maxLength", "description"]);
-
-function fragmentToZod(key: string, frag: JsonSchemaFragment): ZodTypeAny {
-  if (typeof frag === "string") {
-    switch (frag) {
-      case "string": return z.string();
-      case "number": return z.number();
-      case "boolean": return z.boolean();
-      default:
-        throw new Error(`outputs[${key}]: unsupported fragment shape (shorthand "${frag}"). Supported shorthands: string, number, boolean.`);
-    }
-  }
-  const obj = frag as Record<string, unknown>;
-  const unknownKeys = Object.keys(obj).filter(k => !ALLOWED_KEYS_OBJECT.has(k));
-  if (unknownKeys.length > 0) {
-    throw new Error(`outputs[${key}]: unsupported fragment shape (unknown keys: ${unknownKeys.join(", ")}). Supported: type (string|number|boolean|array), enum, items, maxLength, description, nullable form ([type, "null"]).`);
-  }
-  // enum
-  if (Array.isArray(obj.enum)) {
-    const values = obj.enum.map(String);
-    return z.enum(values as [string, ...string[]]);
-  }
-  // array
-  if (obj.type === "array") {
-    const items = obj.items;
-    if (typeof items !== "string") {
-      throw new Error(`outputs[${key}]: array requires items: <primitive type>`);
-    }
-    const inner = fragmentToZod(`${key}.items`, items as JsonSchemaFragment);
-    return z.array(inner);
-  }
-  // nullable ([type, "null"])
-  if (Array.isArray(obj.type) && obj.type.length === 2 && obj.type.includes("null")) {
-    const realType = obj.type.find(t => t !== "null") as string;
-    const inner = fragmentToZod(`${key}.nullable`, realType as JsonSchemaFragment);
-    return inner.nullable();
-  }
-  // string with maxLength
-  if (obj.type === "string") {
-    let s = z.string();
-    if (typeof obj.maxLength === "number") s = s.max(obj.maxLength);
-    return s;
-  }
-  if (obj.type === "number") return z.number();
-  if (obj.type === "boolean") return z.boolean();
-
-  throw new Error(`outputs[${key}]: unsupported fragment shape (type=${JSON.stringify(obj.type)}). Supported: type (string|number|boolean|array), enum, items, maxLength, description, nullable form ([type, "null"]).`);
-}
-
-export function outputsToZod(
-  outputs: Record<string, JsonSchemaFragment>,
-): ZodObject<Record<string, ZodTypeAny>> {
-  const shape: Record<string, ZodTypeAny> = {};
-  for (const [key, frag] of Object.entries(outputs)) {
-    shape[key] = fragmentToZod(key, frag);
-  }
-  return z.object(shape).strict();
-}
-```
-
-- [x] **Step 4: Run tests to verify they pass**
-
-Run: `npx vitest run src/cli/tests/outputs-to-zod.test.ts`
-Expected: PASS.
-
-- [x] **Step 5: Commit**
-
-```bash
-git add src/cli/lib/outputs-to-zod.ts src/cli/tests/outputs-to-zod.test.ts
-git commit -m "feat(outputs-to-zod): strict accept-list zod builder for outputs: frontmatter"
-```
-
-### Task 1.3 — Verifier prompt fix (cheap prevention)
-
-**Files:**
-- Modify: `pipelines/illumination-to-implementation/verifier.md` (Output section, ~line 70)
-
-- [x] **Step 1: Read verifier.md to confirm location**
-
-Run: `grep -n "# Output" pipelines/illumination-to-implementation/verifier.md`
-Expected: line ~70.
-
-- [x] **Step 2: Append the prevention line to the Output section**
-
-In `pipelines/illumination-to-implementation/verifier.md` `# Output` section, after the existing field bullets, add a final line:
-
-```
-- Emit JSON as your final TEXT response. Never inside a thinking block.
-```
-
-- [x] **Step 3: Validate the agent file still parses (re-run the existing test suite)**
-
-Run: `npx vitest run src/cli/tests/agent-registry.test.ts`
-Expected: PASS. (The agent-registry tests load real `.md` files via `parseAgentFile`; if the YAML in verifier.md is malformed, those tests will fail.)
-
-- [x] **Step 4: Commit**
-
-```bash
-git add pipelines/illumination-to-implementation/verifier.md
-git commit -m "fix(verifier): force final TEXT response (prevent thinking-block trap)"
-```
-
-### Chunk 1 Review Checkpoint
-
-- [x] **Run plan-document-reviewer subagent against Chunk 1.** If issues found → fix in Chunk 1 → re-dispatch. Loop until ✅ Approved.
-- [x] **Run code-reviewer subagent against the chunk-1 commits.** Address feedback in-chunk; re-dispatch if needed.
+Each chunk ships green and is independently committable.
 
 ---
 
-## Chunk 2: Validation + retry loop + observability
+## Chunk 1: Frontmatter parsing for `loop` and `maxIterations`
 
-**Ships green:** Empty/invalid agent output triggers a self-healing retry via `--resume <sessionId>`. Each attempt's raw output is persisted to disk and announced via JSONL `validation-failure` events. TUI renders retries as visible iteration blocks. `ralph pipeline trace --node-receive` surfaces validation attempts.
+**Ships green:** Agent files can declare `loop: true` and `maxIterations: N` in frontmatter; `validateAgentConfig` round-trips both fields. No behavioral change yet — handler ignores them.
 
-### Task 2.1 — `agent.ts` supports prompt on resume
+### Task 1.1 — Add fields to `AgentConfig`
 
 **Files:**
-- Modify: `src/cli/lib/agent.ts:208-255` (the `run` method's resume/stdin branches)
-- Test: extend or add `src/cli/tests/agent-resume.test.ts` (NEW)
+- Modify: `src/cli/lib/agent.ts:48-59`
 
-- [x] **Step 1: Write the failing test**
+- [x] **Step 1: Add fields to interface**
 
-```ts
-// src/cli/tests/agent-resume.test.ts
-import { describe, it, expect } from "vitest";
-import { Agent } from "../lib/agent.js";
-
-describe("Agent.run resume support", () => {
-  it("on resume, builds args with -p AND a session id", () => {
-    const a = new Agent({
-      name: "a", description: "d", model: "opus",
-      permissionMode: "default", tools: [], mcp: [], prompt: "system prompt",
-    } as any);
-    const args = a.buildArgs({ cwd: ".", resume: "sess-123" });
-    // Note: -p is added in run(); buildArgs covers --resume and --output-format
-    expect(args).toContain("--resume");
-    expect(args).toContain("sess-123");
-  });
-});
-```
-
-- [x] **Step 2: Run test to verify current state**
-
-Run: `npx vitest run src/cli/tests/agent-resume.test.ts`
-Expected: PASS — `buildArgs` already adds `--resume` (line 155-156). This test pins the contract.
-
-- [x] **Step 3: Modify `agent.ts:run()` to send `-p` and pipe `options.message` on resume**
-
-In `src/cli/lib/agent.ts`, replace lines 210-213:
+In `src/cli/lib/agent.ts:48–59`, append two optional fields:
 
 ```ts
-// Add -p for non-interactive runs (resume or fresh — corrective message
-// goes via stdin in both cases)
-if (!isInteractive) {
-  args.unshift("-p");
+export interface AgentConfig {
+  name: string;
+  description: string;
+  model: string;
+  permissionMode: string;
+  tools: string[];
+  mcp: McpServerConfig[];
+  prompt: string;
+  jsonSchema?: string;
+  outputs?: Record<string, JsonSchemaFragment>;
+  inputs?: string[];
+  loop?: boolean;
+  maxIterations?: number;
 }
 ```
 
-And replace lines 248-255:
+- [x] **Step 2: Verify the type compiles**
 
-```ts
-// Pipe content for non-interactive runs.
-// Resume: only the new user-turn (system prompt already in the resumed session).
-// Fresh: full system prompt, optionally followed by an initial message.
-if (!isInteractive && child.stdin) {
-  const stdinContent = isResume
-    ? (options.message ?? "")
-    : (options.message
-        ? `${expandedPrompt}\n\n${options.message}`
-        : expandedPrompt);
-  child.stdin.write(stdinContent);
-  child.stdin.end();
-}
-```
+Run: `npx tsc --noEmit`
+Expected: zero errors. (Just an interface widening; no callers need updating yet.)
 
-- [x] **Step 4: Add a behavioural test that resume + message reaches stdin**
-
-Append to `src/cli/tests/agent-resume.test.ts`:
-
-```ts
-import { spawn } from "node:child_process";
-import { vi } from "vitest";
-
-vi.mock("node:child_process", () => ({
-  spawn: vi.fn(),
-}));
-
-it("on resume with message, pipes only the message to stdin", async () => {
-  const writes: string[] = [];
-  const fakeChild: any = {
-    stdin: { write: (c: string) => writes.push(c), end: () => {}, destroyed: false },
-    stdout: null,
-    once: vi.fn(),
-    kill: vi.fn(),
-    pid: 1234,
-  };
-  (spawn as any).mockReturnValue(fakeChild);
-
-  const a = new Agent({
-    name: "a", description: "d", model: "opus",
-    permissionMode: "dangerouslySkipPermissions", tools: [], mcp: [], prompt: "system",
-  } as any);
-
-  // Fire-and-forget: we only care that stdin received the message before
-  // the (mocked) child loop completes. Use a short race.
-  void a.run({ cwd: ".", resume: "s-1", message: "fix your output" }).catch(() => {});
-  await new Promise(r => setTimeout(r, 10));
-
-  expect(writes).toContain("fix your output");
-  expect(writes.find(w => w.includes("system"))).toBeUndefined();
-});
-```
-
-- [x] **Step 5: Run tests to verify they pass**
-
-Run: `npx vitest run src/cli/tests/agent-resume.test.ts`
-Expected: PASS.
-
-- [x] **Step 6: Run full test suite to confirm no regressions**
-
-Run: `npm test`
-Expected: All tests pass.
-
-- [x] **Step 7: Commit**
+- [x] **Step 3: Commit** _(done: 9d4d0f9)_
 
 ```bash
-git add src/cli/lib/agent.ts src/cli/tests/agent-resume.test.ts
-git commit -m "feat(agent): pipe corrective message to stdin on --resume"
+git add src/cli/lib/agent.ts
+git commit -m "feat(agent-config): widen AgentConfig with loop and maxIterations"
 ```
 
-### Task 2.2 — `corrective-message.ts` builder
+### Task 1.2 — `validateAgentConfig` propagates the new fields
 
 **Files:**
-- Create: `src/cli/lib/corrective-message.ts`
-- Test: `src/cli/tests/corrective-message.test.ts` (NEW)
+- Modify: `src/cli/lib/agent.ts:459-485` (`validateAgentConfig`)
+- Test: `src/cli/tests/agent-validate.test.ts` (extend if exists; otherwise create)
 
-- [x] **Step 1: Write the failing tests**
+- [x] **Step 1: Locate existing tests**
+
+Run: `ls src/cli/tests/ | grep -i agent`
+Use the existing config/validate test file if present. Otherwise create `src/cli/tests/agent-validate.test.ts` with this header:
 
 ```ts
-// src/cli/tests/corrective-message.test.ts
 import { describe, it, expect } from "vitest";
-import { buildCorrectiveMessage } from "../lib/corrective-message.js";
-
-describe("buildCorrectiveMessage", () => {
-  const schema = '{"type":"object","properties":{"foo":{"type":"string"}},"required":["foo"]}';
-
-  it("empty output → no-text-content phrasing + thinking-block warning", () => {
-    const msg = buildCorrectiveMessage(
-      "",
-      [{ path: "(root)", message: "no text content in response" }],
-      schema,
-    );
-    expect(msg).toMatch(/no text content/i);
-    expect(msg).toMatch(/thinking block/i);
-    expect(msg).toContain(schema);
-  });
-
-  it("invalid output → lists errors + truncates raw to 500 chars", () => {
-    const raw = "x".repeat(1000);
-    const msg = buildCorrectiveMessage(
-      raw,
-      [{ path: "foo", message: "Expected string, received number" }],
-      schema,
-    );
-    expect(msg).toMatch(/foo/);
-    expect(msg).toMatch(/Expected string/);
-    expect(msg).not.toContain("x".repeat(1000));
-    expect(msg).toContain("x".repeat(500));
-  });
-});
+import { validateAgentConfig } from "../lib/agent.js";
 ```
 
-- [x] **Step 2: Run tests to verify they fail**
-
-Run: `npx vitest run src/cli/tests/corrective-message.test.ts`
-Expected: FAIL — module does not exist.
-
-- [x] **Step 3: Implement `corrective-message.ts`**
+- [x] **Step 2: Write failing tests**
 
 ```ts
-// src/cli/lib/corrective-message.ts
-const RAW_TRUNCATE = 500;
-
-export interface ValidationError {
-  path: string;
-  message: string;
-}
-
-export function buildCorrectiveMessage(
-  rawOutput: string,
-  errors: ValidationError[],
-  schemaJsonString: string,
-): string {
-  const trimmed = rawOutput.trim();
-  if (trimmed.length === 0) {
-    return [
-      "Your previous response had no text content — the response body was empty",
-      "(possibly because the JSON ended up inside a thinking block).",
-      "",
-      "Required output schema:",
-      schemaJsonString,
-      "",
-      "Re-emit your verdict NOW as a plain TEXT response. JSON only.",
-      "Do NOT place the JSON inside a thinking block — emit as text content.",
-    ].join("\n");
-  }
-  const truncated = rawOutput.length > RAW_TRUNCATE
-    ? rawOutput.slice(0, RAW_TRUNCATE) + "..."
-    : rawOutput;
-  const errorBullets = errors
-    .map(e => `  • ${e.path || "(root)"}: ${e.message}`)
-    .join("\n");
-  return [
-    "Your previous response failed schema validation:",
-    errorBullets,
-    "",
-    "Your previous raw response (first 500 chars):",
-    "<<<",
-    truncated,
-    ">>>",
-    "",
-    "Required output schema:",
-    schemaJsonString,
-    "",
-    "Re-emit valid JSON matching the schema. Plain TEXT response, no thinking block, no markdown fences.",
-  ].join("\n");
-}
-```
-
-- [x] **Step 4: Run tests to verify they pass**
-
-Run: `npx vitest run src/cli/tests/corrective-message.test.ts`
-Expected: PASS.
-
-- [x] **Step 5: Commit**
-
-```bash
-git add src/cli/lib/corrective-message.ts src/cli/tests/corrective-message.test.ts
-git commit -m "feat(corrective-message): deterministic builder for empty/invalid output retry"
-```
-
-### Task 2.3 — Tracer extension: `onValidationFailure`
-
-**Files:**
-- Modify: `src/attractor/tracer/pipeline-tracer.ts` (interface — existing methods are `onPipelineStart`/`onNodeStart`/`onNodeEnd`/`onPipelineEnd`; add `onValidationFailure?` matching that naming convention)
-- Modify: `src/attractor/tracer/jsonl-pipeline-tracer.ts` (implementation — uses `private append(...)`, NOT `write`)
-- Test: `src/attractor/tests/pipeline-tracer-validation.test.ts` (NEW)
-
-- [x] **Step 1: Read existing tracer files to confirm shape**
-
-Run: `cat src/attractor/tracer/pipeline-tracer.ts src/attractor/tracer/jsonl-pipeline-tracer.ts`
-Confirm: methods are `onPipelineStart`, `onNodeStart`, `onNodeEnd`, `onPipelineEnd`. The serializer is `private append(event: object)` at the bottom of `jsonl-pipeline-tracer.ts`.
-
-- [x] **Step 2: Write the failing tracer test**
-
-```ts
-// src/attractor/tests/pipeline-tracer-validation.test.ts (NEW)
-import { describe, it, expect } from "vitest";
-import { mkdtempSync, readFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { JsonlPipelineTracer } from "../tracer/jsonl-pipeline-tracer.js";
-
-describe("JsonlPipelineTracer.onValidationFailure", () => {
-  it("emits a validation-failure event line", () => {
-    const dir = mkdtempSync(join(tmpdir(), "tracer-"));
-    const path = join(dir, "pipeline.jsonl");
-    const t = new JsonlPipelineTracer(path);
-    const fakeNode = { id: "verifier" } as any;
-    t.onValidationFailure({
-      nodeReceiveId: "verifier-734e",
-      node: fakeNode,
-      attempt: 1,
-      errors: [{ path: "preferred_label", message: "Required" }],
-      rawOutputPath: "verifier/raw-attempt-1.txt",
+describe("validateAgentConfig — deep loop fields", () => {
+  it("propagates loop:true into the returned config", () => {
+    const cfg = validateAgentConfig({
+      name: "x",
+      description: "y",
+      prompt: "z",
+      loop: true,
     });
-    const lines = readFileSync(path, "utf8").trim().split("\n");
-    const evt = JSON.parse(lines[lines.length - 1]);
-    expect(evt.kind).toBe("validation-failure");
-    expect(evt.nodeReceiveId).toBe("verifier-734e");
-    expect(evt.nodeId).toBe("verifier");
-    expect(evt.attempt).toBe(1);
-    expect(evt.errors[0]).toMatchObject({ path: "preferred_label" });
-    expect(evt.rawOutputPath).toBe("verifier/raw-attempt-1.txt");
-    expect(typeof evt.timestamp).toBe("string");
+    expect(cfg.loop).toBe(true);
+  });
+
+  it("propagates maxIterations into the returned config", () => {
+    const cfg = validateAgentConfig({
+      name: "x",
+      description: "y",
+      prompt: "z",
+      loop: true,
+      maxIterations: 25,
+    });
+    expect(cfg.maxIterations).toBe(25);
+  });
+
+  it("omits both fields when not provided", () => {
+    const cfg = validateAgentConfig({
+      name: "x",
+      description: "y",
+      prompt: "z",
+    });
+    expect(cfg.loop).toBeUndefined();
+    expect(cfg.maxIterations).toBeUndefined();
+  });
+
+  it("rejects non-boolean loop", () => {
+    expect(() => validateAgentConfig({
+      name: "x",
+      description: "y",
+      prompt: "z",
+      loop: "yes" as any,
+    })).toThrow(/loop must be a boolean/i);
+  });
+
+  it("rejects non-integer maxIterations", () => {
+    expect(() => validateAgentConfig({
+      name: "x",
+      description: "y",
+      prompt: "z",
+      maxIterations: 1.5 as any,
+    })).toThrow(/maxIterations must be a non-negative integer/i);
+  });
+
+  it("rejects negative maxIterations", () => {
+    expect(() => validateAgentConfig({
+      name: "x",
+      description: "y",
+      prompt: "z",
+      maxIterations: -1 as any,
+    })).toThrow(/maxIterations must be a non-negative integer/i);
+  });
+
+  it("accepts maxIterations=0 (back-compat: maps to Infinity at runtime)", () => {
+    const cfg = validateAgentConfig({
+      name: "x",
+      description: "y",
+      prompt: "z",
+      maxIterations: 0,
+    });
+    expect(cfg.maxIterations).toBe(0);
   });
 });
 ```
 
-- [x] **Step 3: Run test to verify it fails**
+- [x] **Step 3: Run tests, expect failure**
 
-Run: `npx vitest run src/attractor/tests/pipeline-tracer-validation.test.ts`
-Expected: FAIL — method missing.
+Run: `npx vitest run src/cli/tests/agent-validate.test.ts -t "deep loop fields"`
+Expected: all FAIL — fields stripped by `validateAgentConfig`.
 
-- [x] **Step 4: Add `onValidationFailure` to interface and implementation**
+- [x] **Step 4: Implement**
 
-In `src/attractor/tracer/pipeline-tracer.ts` add to the `PipelineTracer` interface (after the existing `onPipelineEnd` line):
-
-```ts
-onValidationFailure?(meta: {
-  nodeReceiveId: string;
-  node: Node;
-  attempt: number;
-  errors: Array<{ path: string; message: string }>;
-  rawOutputPath: string;
-}): void;
-```
-
-In `src/attractor/tracer/jsonl-pipeline-tracer.ts` add the method following the same shape as `onNodeEnd` (uses `this.append`):
+Modify `src/cli/lib/agent.ts:459-485`. After the existing required-field checks, add runtime validation and propagate fields:
 
 ```ts
-onValidationFailure({ nodeReceiveId, node, attempt, errors, rawOutputPath }: {
-  nodeReceiveId: string;
-  node: Node;
-  attempt: number;
-  errors: Array<{ path: string; message: string }>;
-  rawOutputPath: string;
-}): void {
-  this.append({
-    kind: "validation-failure",
-    nodeReceiveId,
-    nodeId: node.id,
-    attempt,
-    errors,
-    rawOutputPath,
-    timestamp: new Date().toISOString(),
-  });
-}
-```
+export function validateAgentConfig(
+  config: Partial<AgentConfig> & { prompt?: string },
+): AgentConfig {
+  if (!config.name) throw new Error("name is required");
+  if (!config.description) throw new Error("description is required");
+  if (typeof config.prompt !== "string") throw new Error("prompt body is required");
 
-- [x] **Step 5: Run test to verify it passes**
-
-Run: `npx vitest run src/attractor/tests/pipeline-tracer-validation.test.ts`
-Expected: PASS.
-
-- [x] **Step 6: Commit**
-
-```bash
-git add src/attractor/tracer/pipeline-tracer.ts src/attractor/tracer/jsonl-pipeline-tracer.ts src/attractor/tests/pipeline-tracer-validation.test.ts
-git commit -m "feat(tracer): add onValidationFailure for retry observability"
-```
-
-### Task 2.4 — Extract `evaluate-agent-output.ts` helper
-
-The validation+retry loop in the next task is large enough that inlining the parse/validate logic in `agent-handler.ts` would push that file into hard-to-reason-about territory. Extract a focused helper first.
-
-**Files:**
-- Create: `src/attractor/handlers/evaluate-agent-output.ts`
-- Test: `src/attractor/tests/evaluate-agent-output.test.ts` (NEW)
-
-- [x] **Step 1: Write the failing tests**
-
-```ts
-// src/attractor/tests/evaluate-agent-output.test.ts
-import { describe, it, expect } from "vitest";
-import { z } from "zod";
-import { evaluateAgentOutput } from "../handlers/evaluate-agent-output.js";
-
-const zodSchema = z.object({ foo: z.string() }).strict();
-
-describe("evaluateAgentOutput", () => {
-  it("empty output → fail with 'no text content' error", () => {
-    const r = evaluateAgentOutput("", zodSchema);
-    expect(r.ok).toBe(false);
-    if (r.ok) return;
-    expect(r.errors[0]).toMatchObject({ path: "(root)" });
-    expect(r.errors[0].message).toMatch(/no text content/i);
-  });
-
-  it("stream-json with valid result → ok", () => {
-    const stream =
-      '{"type":"system","subtype":"init","session_id":"s"}\n' +
-      '{"type":"result","subtype":"success","result":"{\\"foo\\":\\"bar\\"}"}';
-    const r = evaluateAgentOutput(stream, zodSchema);
-    expect(r.ok).toBe(true);
-    if (!r.ok) return;
-    expect(r.parsed).toEqual({ foo: "bar" });
-  });
-
-  it("stream-json with structured_output payload → ok", () => {
-    const stream =
-      '{"type":"system","subtype":"init","session_id":"s"}\n' +
-      '{"type":"result","subtype":"success","structured_output":{"foo":"x"}}';
-    const r = evaluateAgentOutput(stream, zodSchema);
-    expect(r.ok).toBe(true);
-    if (!r.ok) return;
-    expect(r.parsed).toEqual({ foo: "x" });
-  });
-
-  it("schema mismatch → fail with zod path/message", () => {
-    const stream =
-      '{"type":"result","subtype":"success","result":"{\\"foo\\":1}"}';
-    const r = evaluateAgentOutput(stream, zodSchema);
-    expect(r.ok).toBe(false);
-    if (r.ok) return;
-    expect(r.errors[0].path).toBe("foo");
-    expect(r.errors[0].message).toMatch(/string/i);
-  });
-
-  it("unparseable JSON → fail", () => {
-    const r = evaluateAgentOutput("not json at all", zodSchema);
-    expect(r.ok).toBe(false);
-    if (r.ok) return;
-    expect(r.errors[0].message).toMatch(/JSON/i);
-  });
-
-  it("no zodSchema → ok when JSON parseable, no validation", () => {
-    const stream =
-      '{"type":"result","subtype":"success","result":"{\\"any\\":1}"}';
-    const r = evaluateAgentOutput(stream, null);
-    expect(r.ok).toBe(true);
-    if (!r.ok) return;
-    expect(r.parsed).toEqual({ any: 1 });
-  });
-});
-```
-
-- [x] **Step 2: Run tests to verify they fail**
-
-Run: `npx vitest run src/attractor/tests/evaluate-agent-output.test.ts`
-Expected: FAIL — module does not exist.
-
-- [x] **Step 3: Implement `evaluate-agent-output.ts`**
-
-```ts
-// src/attractor/handlers/evaluate-agent-output.ts
-import type { ZodObject, ZodTypeAny } from "zod";
-
-export interface ValidationError { path: string; message: string }
-
-export type EvaluationResult =
-  | { ok: true; parsed: Record<string, unknown>; raw: string }
-  | { ok: false; errors: ValidationError[]; raw: string };
-
-/**
- * Inspect a buffered agent stdout (stream-json) and return either the parsed
- * structured result or a list of validation errors.
- *
- * Empty input → single "no text content" error (the verifier-style trap).
- * Schema validation runs only when zodSchema is non-null.
- */
-export function evaluateAgentOutput(
-  raw: string,
-  zodSchema: ZodObject<Record<string, ZodTypeAny>> | null,
-): EvaluationResult {
-  if (!raw || raw.trim().length === 0) {
-    return {
-      ok: false,
-      raw: "",
-      errors: [{ path: "(root)", message: "no text content in response" }],
-    };
+  if (config.loop !== undefined && typeof config.loop !== "boolean") {
+    throw new Error("loop must be a boolean");
   }
-  const resultPayload = extractResultPayload(raw) ?? raw;
-  const jsonMatch = resultPayload.match(/\{"[\s\S]*\}/) ?? resultPayload.match(/\{[\s\S]*\}/);
-  const jsonStr = jsonMatch ? jsonMatch[0] : resultPayload;
-  let parsed: Record<string, unknown>;
-  try {
-    parsed = JSON.parse(jsonStr);
-  } catch (e) {
-    return {
-      ok: false,
-      raw,
-      errors: [{ path: "(root)", message: `JSON parse failed: ${(e as Error).message}` }],
-    };
+  if (config.maxIterations !== undefined &&
+      (typeof config.maxIterations !== "number" ||
+       !Number.isInteger(config.maxIterations) ||
+       config.maxIterations < 0)) {
+    throw new Error("maxIterations must be a non-negative integer");
   }
-  if (zodSchema) {
-    const result = zodSchema.safeParse(parsed);
-    if (!result.success) {
-      return {
-        ok: false,
-        raw,
-        errors: result.error.issues.map(i => ({
-          path: i.path.length === 0 ? "(root)" : i.path.join("."),
-          message: i.message,
-        })),
-      };
-    }
-    return { ok: true, parsed: result.data, raw };
-  }
-  return { ok: true, parsed, raw };
-}
 
-function extractResultPayload(raw: string): string | undefined {
-  let payload: string | undefined;
-  for (const line of raw.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed.startsWith("{")) continue;
-    let evt: Record<string, unknown>;
-    try { evt = JSON.parse(trimmed) as Record<string, unknown>; }
-    catch { continue; }
-    if (evt.type !== "result") continue;
-    if (evt.structured_output != null) {
-      payload = typeof evt.structured_output === "string"
-        ? evt.structured_output
-        : JSON.stringify(evt.structured_output);
-    } else if (evt.result != null && evt.result !== "") {
-      payload = typeof evt.result === "string"
-        ? evt.result
-        : JSON.stringify(evt.result);
-    }
-  }
-  return payload;
-}
-```
+  const derivedJsonSchema = (config.outputs && !config.jsonSchema)
+    ? deriveJsonSchemaString(config.outputs)
+    : config.jsonSchema;
 
-- [x] **Step 4: Run tests to verify they pass**
-
-Run: `npx vitest run src/attractor/tests/evaluate-agent-output.test.ts`
-Expected: PASS.
-
-- [x] **Step 5: Commit**
-
-```bash
-git add src/attractor/handlers/evaluate-agent-output.ts src/attractor/tests/evaluate-agent-output.test.ts
-git commit -m "feat(handlers): extract evaluate-agent-output helper for parse + zod validation"
-```
-
-### Task 2.5 — Handler validation + retry loop
-
-**Files:**
-- Modify: `src/attractor/handlers/agent-handler.ts` (replace existing parse block with attempt loop using the helper from 2.4)
-- Modify: `src/attractor/handlers/registry.ts` (extend `HandlerExecutionContext` with optional callbacks)
-- Modify: `src/attractor/core/schemas.ts:22` area (add `outputValidationRetries` field on `AgentNodeSchema`)
-- Test: `src/attractor/tests/agent-handler-retry.test.ts` (NEW)
-
-- [x] **Step 1: Add `outputValidationRetries` to `AgentNodeSchema`**
-
-In `src/attractor/core/schemas.ts` near the existing `maxRetries` field (line 22), add:
-
-```ts
-outputValidationRetries: z.coerce.number().int().nonnegative().optional()
-  .describe("Number of times to retry the agent on output validation failure (default 1)."),
-```
-
-- [x] **Step 2: Extend `HandlerExecutionContext`**
-
-In `src/attractor/handlers/registry.ts` add to the `HandlerExecutionContext` interface (callback names mirror the tracer's `on*` convention; the `nodeReceiveId` is injected by the engine wiring in Task 2.6, so the handler does not need to know it):
-
-```ts
-onValidationFailure?: (args: {
-  attempt: number;
-  errors: Array<{ path: string; message: string }>;
-  rawOutputPath: string;
-}) => void;
-onValidationRetryStart?: (nodeId: string, attempt: number) => void;
-```
-
-- [x] **Step 3: Write the failing handler-retry tests**
-
-```ts
-// src/attractor/tests/agent-handler-retry.test.ts
-import { describe, it, expect, vi } from "vitest";
-import { mkdtempSync, existsSync, readFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { AgentHandler } from "../handlers/agent-handler.js";
-
-function makeAgent(responses: Array<{ raw: string; sessionId?: string }>) {
-  let i = 0;
   return {
-    run: vi.fn(async () => {
-      const r = responses[Math.min(i, responses.length - 1)];
+    name: config.name,
+    description: config.description,
+    model: config.model ?? DEFAULTS.model!,
+    permissionMode: config.permissionMode ?? DEFAULTS.permissionMode!,
+    tools: config.tools ?? DEFAULTS.tools!,
+    mcp: config.mcp ?? DEFAULTS.mcp!,
+    prompt: config.prompt,
+    ...(derivedJsonSchema !== undefined ? { jsonSchema: derivedJsonSchema } : {}),
+    ...(config.outputs !== undefined ? { outputs: config.outputs } : {}),
+    ...(config.inputs !== undefined ? { inputs: config.inputs } : {}),
+    ...(config.loop !== undefined ? { loop: config.loop } : {}),
+    ...(config.maxIterations !== undefined ? { maxIterations: config.maxIterations } : {}),
+  };
+}
+```
+
+- [x] **Step 5: Run tests, expect pass**
+
+Run: `npx vitest run src/cli/tests/agent-validate.test.ts -t "deep loop fields"`
+Expected: all PASS.
+
+- [x] **Step 6: End-to-end via parseAgentFile**
+
+Add a sanity-check test in the same file (round-trip from frontmatter through `parseAgentFile`):
+
+```ts
+import { parseAgentFile } from "../lib/agent-registry.js";
+
+describe("parseAgentFile — deep loop fields round-trip", () => {
+  it("reads loop and maxIterations from frontmatter", () => {
+    const cfg = parseAgentFile([
+      "---",
+      "name: looper",
+      "description: x",
+      "loop: true",
+      "maxIterations: 50",
+      "outputs:",
+      "  done: boolean",
+      "---",
+      "Body.",
+    ].join("\n"));
+    expect(cfg.loop).toBe(true);
+    expect(cfg.maxIterations).toBe(50);
+    expect(cfg.outputs?.done).toBe("boolean");
+  });
+});
+```
+
+Run: `npx vitest run src/cli/tests/agent-validate.test.ts`
+Expected: all PASS.
+
+- [x] **Step 7: Commit** _(done: 293d759)_
+
+```bash
+git add src/cli/lib/agent.ts src/cli/tests/agent-validate.test.ts
+git commit -m "feat(validateAgentConfig): accept and propagate loop and maxIterations"
+```
+
+---
+
+## Chunk 2: Validator rule `loop_missing_done_field`
+
+**Ships green:** `pipeline validate` errors when an agent declares `loop: true` without a `done: boolean` field in `outputs:`. Empty-outputs case routes to the new error and suppresses the existing `agent_outputs_empty` warning.
+
+### Task 2.1 — Add `checkLoopRequiresDoneField` rule
+
+**Files:**
+- Modify: `src/attractor/core/graph.ts` (add function below `checkAgentMissingOutputs` at line 683; wire into dispatcher at lines 393–398; update `checkAgentMissingOutputs` empty-branch to skip when `loop:true`)
+- Test: locate the existing validator test file
+
+- [ ] **Step 1: Locate validator test conventions**
+
+Run: `grep -n "checkAgentMissingOutputs\|agent_missing_outputs" src/attractor/tests/*.test.ts`
+Identify the existing test file (e.g., `src/attractor/tests/graph-validator.test.ts` or `src/attractor/tests/graph.test.ts`). Read its imports — copy the same `parseDot` / graph-loading helper that existing rule tests use. Do NOT invent a `cli/lib/dot-parser.js` import.
+
+- [ ] **Step 2: Write failing tests**
+
+In the located validator test file, append a new describe block. Mimic the existing tests' setup pattern (tmp dir, write `.dot` + sibling `.md`, parse via the same helper, call `validate(graph, dotDir)`):
+
+```ts
+describe("validator — loop_missing_done_field", () => {
+  it("errors when loop:true agent has no done field in outputs", () => {
+    /* setup tmp dir, write looper.md with loop:true + outputs:{result:string} */
+    /* write pipeline.dot referencing agent="looper" */
+    /* parse + validate */
+    expect(diags.some(d => d.rule === "loop_missing_done_field")).toBe(true);
+  });
+
+  it("errors when loop:true agent has done with non-boolean type", () => {
+    /* outputs: { done: string } */
+    expect(diags.some(d => d.rule === "loop_missing_done_field")).toBe(true);
+  });
+
+  it("accepts loop:true with done:boolean shorthand", () => {
+    /* outputs: { done: boolean } */
+    expect(diags.some(d => d.rule === "loop_missing_done_field")).toBe(false);
+  });
+
+  it("accepts loop:true with done long form { type: boolean }", () => {
+    /* outputs: { done: { type: "boolean" } } */
+    expect(diags.some(d => d.rule === "loop_missing_done_field")).toBe(false);
+  });
+
+  it("loop:true + outputs:{} → loop_missing_done_field (suppresses agent_outputs_empty)", () => {
+    /* outputs: {} */
+    expect(diags.some(d => d.rule === "loop_missing_done_field")).toBe(true);
+    expect(diags.some(d => d.rule === "agent_outputs_empty")).toBe(false);
+  });
+
+  it("loop:false (default) does NOT trigger the rule", () => {
+    /* no loop attr, outputs: { result: string } */
+    expect(diags.some(d => d.rule === "loop_missing_done_field")).toBe(false);
+  });
+});
+```
+
+Replace the `/* setup */` comments with the actual fixtures (mirror surrounding `agent_missing_outputs` tests for the exact helper calls).
+
+- [ ] **Step 3: Run tests, expect failure**
+
+Run: `npx vitest run src/attractor/tests/graph*.test.ts -t "loop_missing_done_field"`
+Expected: all FAIL.
+
+- [ ] **Step 4: Implement `checkLoopRequiresDoneField`**
+
+In `src/attractor/core/graph.ts`, add below `checkAgentMissingOutputs` (after line 683):
+
+```ts
+function checkLoopRequiresDoneField(
+  node: Node,
+  dotDir: string,
+  diags: Diagnostic[],
+): void {
+  if (!node.agent) return;
+  if (node.interactive === true || node.interactive === "true") return;
+
+  const agentConfig = tryResolveAgent(node, dotDir);
+  if (!agentConfig) return;
+  if (agentConfig.loop !== true) return;
+
+  const outputs = agentConfig.outputs ?? {};
+  const doneShape = (outputs as Record<string, unknown>).done;
+  const ok =
+    doneShape === "boolean" ||
+    (typeof doneShape === "object" && doneShape !== null &&
+     (doneShape as { type?: string }).type === "boolean");
+
+  if (!ok) {
+    diags.push({
+      rule: "loop_missing_done_field",
+      severity: "error",
+      message: `Agent "${node.agent}" at node "${node.id}" declares loop:true but its outputs: lacks a done:boolean field. Add 'done: boolean' to the agent's outputs frontmatter.`,
+      location: node.sourceLocation,
+    });
+  }
+}
+```
+
+- [ ] **Step 5: Modify `checkAgentMissingOutputs` to suppress `agent_outputs_empty` when `loop:true`**
+
+In `src/attractor/core/graph.ts:675-682`, change the empty-outputs branch:
+
+```ts
+if (typeof agentConfig.outputs === "object" && Object.keys(agentConfig.outputs).length === 0) {
+  // When loop:true, loop_missing_done_field handles this case with a stronger error.
+  if (agentConfig.loop === true) return;
+  diags.push({
+    rule: "agent_outputs_empty",
+    severity: "warning",
+    message: `Agent "${node.agent}" at node "${node.id}" has outputs: {} with no keys. Declare at least one output key, or remove outputs: if this agent intentionally produces nothing.`,
+    location: node.sourceLocation,
+  });
+}
+```
+
+- [ ] **Step 6: Wire into the dispatcher at `graph.ts:393-398`**
+
+```ts
+if (dotDir) {
+  for (const node of nodes.values()) {
+    checkAgentMissingOutputs(node, dotDir, diags);
+    checkLoopRequiresDoneField(node, dotDir, diags);
+  }
+}
+```
+
+- [ ] **Step 7: Run tests, expect pass**
+
+Run: `npx vitest run src/attractor/tests/graph*.test.ts -t "loop_missing_done_field"`
+Expected: all PASS.
+
+- [ ] **Step 8: Run full validator test**
+
+Run: `npx vitest run src/attractor/tests/`
+Expected: all PASS.
+
+- [ ] **Step 9: Commit**
+
+```bash
+git add src/attractor/core/graph.ts src/attractor/tests/
+git commit -m "feat(validator): loop_missing_done_field rule + agent_outputs_empty suppression"
+```
+
+---
+
+## Chunk 3: Cap cascade in handler
+
+**Ships green:** Handler computes `final_cap` per the D3 cascade. Behavior unchanged for non-loop agents (default `1` preserved); for `loop:true` agents the default becomes `Infinity`. Per-iteration loop body untouched in this chunk; existing `maxIterations === 1` crash guard untouched (it moves in Chunk 4).
+
+### Task 3.1 — Cascade resolution
+
+**Files:**
+- Modify: `src/attractor/handlers/agent-handler.ts:168-174` (replace cap parse)
+- Test: extend `src/attractor/tests/agent-handler.test.ts` (uses existing helpers `mockResolve`, `mockAgentRun`, `makeNode`, `makeContext`, `baseCtx`, `baseConfig`, `makeHandler`)
+
+- [ ] **Step 1: Write failing tests**
+
+Append to `src/attractor/tests/agent-handler.test.ts` (inside the existing `describe("AgentHandler", …)` block):
+
+```ts
+describe("cap cascade", () => {
+  it("loop:true with no cap defaults to Infinity (loops until signal abort)", async () => {
+    mockResolve.mockReturnValue({ ...baseConfig, loop: true });
+
+    const controller = new AbortController();
+    let calls = 0;
+    mockAgentRun.mockImplementation(async () => {
+      calls++;
+      if (calls >= 4) controller.abort();
+      return { exitCode: 0, sessionId: `s${calls}`, stdout: null };
+    });
+
+    const handler = makeHandler();
+    await handler.execute(
+      makeNode(),
+      baseCtx(),
+      makeContext({ signal: controller.signal }),
+    );
+    expect(calls).toBe(4);
+  });
+
+  it("loop:false (default) caps at 1 iteration", async () => {
+    mockResolve.mockReturnValue({ ...baseConfig });
+    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: "s", stdout: null });
+
+    const handler = makeHandler();
+    await handler.execute(makeNode(), baseCtx(), makeContext());
+    expect(mockAgentRun).toHaveBeenCalledTimes(1);
+  });
+
+  it("node.maxIterations overrides agent.maxIterations", async () => {
+    mockResolve.mockReturnValue({ ...baseConfig, loop: true, maxIterations: 20 });
+    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: "s", stdout: null });
+
+    const handler = makeHandler();
+    await handler.execute(
+      makeNode({ maxIterations: 3 }),
+      baseCtx(),
+      makeContext(),
+    );
+    expect(mockAgentRun).toHaveBeenCalledTimes(3);
+  });
+
+  it("agent.maxIterations applies when node has none", async () => {
+    mockResolve.mockReturnValue({ ...baseConfig, loop: true, maxIterations: 2 });
+    mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: "s", stdout: null });
+
+    const handler = makeHandler();
+    await handler.execute(makeNode(), baseCtx(), makeContext());
+    expect(mockAgentRun).toHaveBeenCalledTimes(2);
+  });
+
+  it("max_iterations=0 maps to Infinity at node level (back-compat)", async () => {
+    mockResolve.mockReturnValue({ ...baseConfig, loop: true });
+
+    const controller = new AbortController();
+    let calls = 0;
+    mockAgentRun.mockImplementation(async () => {
+      calls++;
+      if (calls >= 3) controller.abort();
+      return { exitCode: 0, sessionId: `s${calls}`, stdout: null };
+    });
+
+    const handler = makeHandler();
+    await handler.execute(
+      makeNode({ maxIterations: 0 }),
+      baseCtx(),
+      makeContext({ signal: controller.signal }),
+    );
+    expect(calls).toBe(3);
+  });
+});
+```
+
+- [ ] **Step 2: Run tests, expect failure**
+
+Run: `npx vitest run src/attractor/tests/agent-handler.test.ts -t "cap cascade"`
+Expected: FAIL — current code reads only `node.maxIterations`.
+
+- [ ] **Step 3: Implement cascade**
+
+Replace `src/attractor/handlers/agent-handler.ts:168-174` with:
+
+```ts
+const nodeCapRaw = node.maxIterations;
+const nodeCapParsed = typeof nodeCapRaw === "string" ? parseInt(nodeCapRaw, 10)
+                    : typeof nodeCapRaw === "number"  ? nodeCapRaw
+                    : undefined;
+const nodeCapValid = nodeCapParsed != null && !isNaN(nodeCapParsed) && nodeCapParsed >= 0;
+
+const agentCap = config.maxIterations;
+const loopMode = config.loop === true;
+
+const maxIterations =
+  nodeCapValid
+    ? (nodeCapParsed === 0 ? Infinity : nodeCapParsed)
+    : (typeof agentCap === "number" && agentCap >= 0
+        ? (agentCap === 0 ? Infinity : agentCap)
+        : (loopMode ? Infinity : 1));
+```
+
+- [ ] **Step 4: Run tests, expect pass**
+
+Run: `npx vitest run src/attractor/tests/agent-handler.test.ts -t "cap cascade"`
+Expected: all PASS.
+
+- [ ] **Step 5: Run full handler test suite**
+
+Run: `npx vitest run src/attractor/tests/agent-handler.test.ts`
+Expected: all PASS — including pre-existing tests `loops when node has maxIterations`, `does not fail on non-zero exit during multi-iteration loop`, and `max_iterations=0 runs until signal aborted`.
+
+(These pass because: the cascade preserves `nodeCap=N` semantics when set; the existing crash guard at line 206 is still in place; the `0 → Infinity` idiom is preserved at the node level.)
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add src/attractor/handlers/agent-handler.ts src/attractor/tests/agent-handler.test.ts
+git commit -m "feat(handler): cap cascade — node > agent > (loop ? Infinity : 1)"
+```
+
+---
+
+## Chunk 4: Per-iteration outputs parse + `done` break + crash exit
+
+**Ships green:** The handler's iteration loop now parses outputs each iteration via `evaluateAgentOutput`, breaks on `done=true`, treats any non-zero exit as hard failure, and exposes the LAST iteration's parsed outputs as `contextUpdates`. Validation+retry block moves inside the loop body.
+
+This chunk also re-classifies the existing test `does not fail on non-zero exit during multi-iteration loop` (line 100 of `agent-handler.test.ts`) — its semantics no longer match the new contract. It becomes "exits the loop with agent.success=false on first non-zero exit during deep-loop iteration".
+
+### Task 4.1 — Move validation+retry inside the iteration loop and add per-iteration `done` break
+
+**Files:**
+- Modify: `src/attractor/handlers/agent-handler.ts` (relocate lines 218–297 into the iteration loop body; drop the `maxIterations === 1` guard at line 206; iteration counter must NOT double-count retries)
+- Modify: `src/attractor/tests/agent-handler.test.ts` (re-classify existing test)
+- Create: `src/attractor/tests/agent-handler-deep-loop.test.ts`
+
+- [ ] **Step 1: Verify the stream-output fixture format**
+
+Read `src/attractor/handlers/evaluate-agent-output.ts` (lines 27–84). Note: `normaliseRaw` accepts both NDJSON and `JSON.stringify([...])` shapes. Existing chunk-2 tests in `src/attractor/tests/agent-handler-validation.test.ts` use array-of-events fixtures. Use the same shape.
+
+Helper for new tests:
+
+```ts
+const streamJsonResult = (result: object): string => JSON.stringify([
+  { type: "system", subtype: "init", session_id: "s-1" },
+  { type: "result", subtype: "success", result: JSON.stringify(result) },
+]);
+```
+
+- [ ] **Step 2: Write failing tests in `src/attractor/tests/agent-handler-deep-loop.test.ts`**
+
+```ts
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { AgentHandler } from "../handlers/agent-handler.js";
+import type { HandlerExecutionContext } from "../handlers/registry.js";
+import type { Node, PipelineContext } from "../types.js";
+
+const baseCtx = (): PipelineContext => ({ values: {} });
+function makeContext(overrides: Partial<HandlerExecutionContext> = {}): HandlerExecutionContext {
+  return { logsRoot: "/tmp/logs", cwd: "/tmp/project", dotDir: "/tmp/project", outgoingLabels: [], completedNodes: [], nodeRetries: {}, ...overrides };
+}
+
+const streamJsonResult = (result: object): string => JSON.stringify([
+  { type: "system", subtype: "init", session_id: "s-1" },
+  { type: "result", subtype: "success", result: JSON.stringify(result) },
+]);
+
+const loopBaseConfig = {
+  name: "looper",
+  description: "x",
+  model: "opus",
+  prompt: "Do things",
+  tools: [] as string[],
+  mcp: [] as any[],
+  permissionMode: "dangerouslySkipPermissions",
+  loop: true,
+  outputs: { done: "boolean" },
+  jsonSchema: JSON.stringify({
+    type: "object",
+    properties: { done: { type: "boolean" } },
+    required: ["done"],
+    additionalProperties: false,
+  }),
+};
+
+describe("AgentHandler deep loop — done break", () => {
+  const mockResolve = vi.fn();
+  const mockAgentRun = vi.fn();
+
+  function makeHandler() {
+    return new AgentHandler({
+      resolveAgent: mockResolve,
+      createAgent: () => ({ run: mockAgentRun, kill: vi.fn(), config: {} } as any),
+    });
+  }
+
+  function makeNode(overrides: Partial<Node> = {}): Node {
+    return { id: "deep", shape: "box", label: "Deep work", agent: "looper", ...overrides } as Node;
+  }
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it("breaks on iteration 3 of cap=10 when done=true emitted", async () => {
+    mockResolve.mockReturnValue({ ...loopBaseConfig });
+    let i = 0;
+    mockAgentRun.mockImplementation(async () => {
       i++;
       return {
-        exitCode: 0,
-        sessionId: r.sessionId ?? "sess-1",
-        output: JSON.stringify([
-          { type: "system", subtype: "init", session_id: r.sessionId ?? "sess-1" },
-          { type: "result", subtype: "success", result: r.raw },
-        ]),
+        exitCode: 0, sessionId: `s${i}`, stdout: null,
+        output: streamJsonResult({ done: i >= 3 }),
       };
-    }),
-  };
-}
+    });
 
-function makeMeta(extra: Partial<any> = {}) {
-  const dir = mkdtempSync(join(tmpdir(), "handler-retry-"));
-  return {
-    logsRoot: dir, cwd: process.cwd(), dotDir: "/tmp",
-    completedNodes: [], nodeRetries: {},
-    ...extra,
-  };
-}
+    const handler = makeHandler();
+    const outcome = await handler.execute(
+      makeNode({ maxIterations: 10 }),
+      baseCtx(),
+      makeContext(),
+    );
+    expect(mockAgentRun).toHaveBeenCalledTimes(3);
+    expect(outcome.status).toBe("success");
+    expect(outcome.contextUpdates?.done).toBe("true");
+    expect(outcome.contextUpdates?.["agent.iterations"]).toBe("3");
+  });
 
-const config = (extras: any = {}) => ({
-  name: "v", description: "d", model: "opus",
-  permissionMode: "default", tools: [], mcp: [], prompt: "",
-  outputs: { foo: "string" },
-  jsonSchema: '{"type":"object","properties":{"foo":{"type":"string"}},"required":["foo"],"additionalProperties":false}',
-  ...extras,
+  it("runs to cap when done never emits true", async () => {
+    mockResolve.mockReturnValue({ ...loopBaseConfig });
+    mockAgentRun.mockResolvedValue({
+      exitCode: 0, sessionId: "s", stdout: null,
+      output: streamJsonResult({ done: false }),
+    });
+
+    const handler = makeHandler();
+    const outcome = await handler.execute(
+      makeNode({ maxIterations: 5 }),
+      baseCtx(),
+      makeContext(),
+    );
+    expect(mockAgentRun).toHaveBeenCalledTimes(5);
+    expect(outcome.status).toBe("success");
+    expect(outcome.contextUpdates?.done).toBe("false");
+  });
+
+  it("agent.success=true when loop terminates via done", async () => {
+    mockResolve.mockReturnValue({ ...loopBaseConfig });
+    mockAgentRun.mockResolvedValue({
+      exitCode: 0, sessionId: "s", stdout: null,
+      output: streamJsonResult({ done: true }),
+    });
+
+    const handler = makeHandler();
+    const outcome = await handler.execute(
+      makeNode({ maxIterations: 5 }),
+      baseCtx(),
+      makeContext(),
+    );
+    expect(outcome.contextUpdates?.["agent.success"]).toBe("true");
+  });
 });
 
-describe("AgentHandler — validation retry loop", () => {
-  it("invalid first attempt + valid retry → success on attempt 2", async () => {
-    const fakeAgent = makeAgent([
-      { raw: '{"wrong":"key"}', sessionId: "s-1" },
-      { raw: '{"foo":"bar"}', sessionId: "s-1" },
-    ]);
-    const handler = new AgentHandler({
-      resolveAgent: () => config() as any,
-      createAgent: () => fakeAgent as any,
-    });
-    const meta = makeMeta();
-    const outcome = await handler.execute(
-      { id: "v", agent: "v", prompt: "do" } as any,
-      { values: {} } as any,
-      meta as any,
-    );
-    expect(outcome.status).toBe("success");
-    expect(outcome.contextUpdates?.foo).toBe("bar");
-    expect(fakeAgent.run).toHaveBeenCalledTimes(2);
-    // Second call is the resume-with-message
-    expect(fakeAgent.run.mock.calls[1][0]).toMatchObject({ resume: "s-1" });
-    expect(fakeAgent.run.mock.calls[1][0].message).toMatch(/schema validation/i);
-    // Persist raw outputs
-    expect(existsSync(join(meta.logsRoot, "v", "raw-attempt-1.txt"))).toBe(true);
-    expect(existsSync(join(meta.logsRoot, "v", "raw-attempt-2.txt"))).toBe(true);
-  });
+describe("AgentHandler deep loop — crash mid-iteration", () => {
+  const mockResolve = vi.fn();
+  const mockAgentRun = vi.fn();
 
-  it("empty output → corrective uses no-text-content phrasing", async () => {
-    const fakeAgent = makeAgent([
-      { raw: "", sessionId: "s-2" },
-      { raw: '{"foo":"x"}', sessionId: "s-2" },
-    ]);
-    const handler = new AgentHandler({
-      resolveAgent: () => config() as any,
-      createAgent: () => fakeAgent as any,
+  function makeHandler() {
+    return new AgentHandler({
+      resolveAgent: mockResolve,
+      createAgent: () => ({ run: mockAgentRun, kill: vi.fn(), config: {} } as any),
     });
-    const meta = makeMeta();
-    const outcome = await handler.execute(
-      { id: "v", agent: "v", prompt: "do" } as any,
-      { values: {} } as any,
-      meta as any,
-    );
-    expect(outcome.status).toBe("success");
-    expect(fakeAgent.run.mock.calls[1][0].message).toMatch(/no text content/i);
-  });
+  }
+  function makeNode(overrides: Partial<Node> = {}): Node {
+    return { id: "deep", shape: "box", label: "x", agent: "looper", ...overrides } as Node;
+  }
 
-  it("invalid 2 attempts → hard fail with attempts logged", async () => {
-    const fakeAgent = makeAgent([
-      { raw: '{"wrong":"a"}', sessionId: "s-3" },
-      { raw: '{"wrong":"b"}', sessionId: "s-3" },
-    ]);
-    const onValidationFailure = vi.fn();
-    const handler = new AgentHandler({
-      resolveAgent: () => config() as any,
-      createAgent: () => fakeAgent as any,
+  beforeEach(() => vi.clearAllMocks());
+
+  it("exits loop with agent.success=false when iteration 2 crashes (deep-loop mode)", async () => {
+    mockResolve.mockReturnValue({ ...loopBaseConfig });
+    let i = 0;
+    mockAgentRun.mockImplementation(async () => {
+      i++;
+      if (i === 2) return { exitCode: 137, sessionId: "s2", stdout: null, output: "" };
+      return {
+        exitCode: 0, sessionId: `s${i}`, stdout: null,
+        output: streamJsonResult({ done: false }),
+      };
     });
-    const meta = makeMeta({ onValidationFailure });
+
+    const handler = makeHandler();
     const outcome = await handler.execute(
-      { id: "v", agent: "v", prompt: "do" } as any,
-      { values: {} } as any,
-      meta as any,
+      makeNode({ maxIterations: 5 }),
+      baseCtx(),
+      makeContext(),
     );
     expect(outcome.status).toBe("fail");
-    expect(outcome.failureReason).toMatch(/output validation failed after 2 attempts/i);
+    expect(mockAgentRun).toHaveBeenCalledTimes(2);
     expect(outcome.contextUpdates?.["agent.success"]).toBe("false");
-    expect(onValidationFailure).toHaveBeenCalledTimes(2);
-    expect(existsSync(join(meta.logsRoot, "v", "raw-attempt-1.txt"))).toBe(true);
-    expect(existsSync(join(meta.logsRoot, "v", "raw-attempt-2.txt"))).toBe(true);
   });
 
-  it("per-node output_validation_retries=0 → no retry (single attempt only)", async () => {
-    const fakeAgent = makeAgent([
-      { raw: '{"wrong":"a"}', sessionId: "s-4" },
-    ]);
-    const handler = new AgentHandler({
-      resolveAgent: () => config() as any,
-      createAgent: () => fakeAgent as any,
+  it("non-loop agent (loop:false) — single iteration crash still fails (regression)", async () => {
+    mockResolve.mockReturnValue({
+      ...loopBaseConfig,
+      loop: undefined,
+      outputs: undefined,
+      jsonSchema: undefined,
     });
+    mockAgentRun.mockResolvedValue({ exitCode: 1, sessionId: null, stdout: null });
+
+    const handler = makeHandler();
     const outcome = await handler.execute(
-      { id: "v", agent: "v", prompt: "do", outputValidationRetries: 0 } as any,
-      { values: {} } as any,
-      makeMeta() as any,
+      makeNode(),
+      baseCtx(),
+      makeContext(),
     );
     expect(outcome.status).toBe("fail");
-    expect(fakeAgent.run).toHaveBeenCalledTimes(1);
+    expect(mockAgentRun).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("AgentHandler deep loop — chunk-2 retry composition", () => {
+  const mockResolve = vi.fn();
+  const mockAgentRun = vi.fn();
+
+  function makeHandler() {
+    return new AgentHandler({
+      resolveAgent: mockResolve,
+      createAgent: () => ({ run: mockAgentRun, kill: vi.fn(), config: {} } as any),
+    });
+  }
+  function makeNode(overrides: Partial<Node> = {}): Node {
+    return { id: "deep", shape: "box", label: "x", agent: "looper", ...overrides } as Node;
+  }
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it("malformed done triggers chunk-2 retry within iteration; loop continues if retry succeeds", async () => {
+    mockResolve.mockReturnValue({ ...loopBaseConfig });
+    let calls = 0;
+    mockAgentRun.mockImplementation(async (opts: any) => {
+      calls++;
+      if (calls === 1) {
+        // First attempt: malformed done as string
+        return {
+          exitCode: 0, sessionId: "s1", stdout: null,
+          output: streamJsonResult({ done: "true" }),
+        };
+      }
+      if (calls === 2) {
+        // Retry within iteration 1 — must be --resume same session
+        expect(opts.resume).toBe("s1");
+        return {
+          exitCode: 0, sessionId: "s1", stdout: null,
+          output: streamJsonResult({ done: true }),
+        };
+      }
+      throw new Error("unexpected extra call");
+    });
+
+    const handler = makeHandler();
+    const outcome = await handler.execute(
+      makeNode({ maxIterations: 5, outputValidationRetries: 1 }),
+      baseCtx(),
+      makeContext(),
+    );
+    expect(calls).toBe(2);
+    expect(outcome.status).toBe("success");
+    expect(outcome.contextUpdates?.done).toBe("true");
+  });
+
+  it("retry exhaustion within iteration 1 aborts deep loop", async () => {
+    mockResolve.mockReturnValue({ ...loopBaseConfig });
+    mockAgentRun.mockResolvedValue({
+      exitCode: 0, sessionId: "s1", stdout: null,
+      output: streamJsonResult({ done: "true" }), // string — never validates
+    });
+
+    const handler = makeHandler();
+    const outcome = await handler.execute(
+      makeNode({ maxIterations: 5, outputValidationRetries: 1 }),
+      baseCtx(),
+      makeContext(),
+    );
+    expect(outcome.status).toBe("fail");
+    expect(mockAgentRun).toHaveBeenCalledTimes(2); // 1 initial + 1 retry; no iteration 2
+  });
+
+  it("agent.iterations reflects only outer iterations, not retry attempts", async () => {
+    mockResolve.mockReturnValue({ ...loopBaseConfig });
+    let calls = 0;
+    mockAgentRun.mockImplementation(async () => {
+      calls++;
+      // iteration 1: malformed → retry → valid done=false
+      // iteration 2: valid done=true → break
+      if (calls === 1) {
+        return { exitCode: 0, sessionId: "s1", stdout: null, output: streamJsonResult({ done: "no" }) };
+      }
+      if (calls === 2) {
+        return { exitCode: 0, sessionId: "s1", stdout: null, output: streamJsonResult({ done: false }) };
+      }
+      if (calls === 3) {
+        return { exitCode: 0, sessionId: "s2", stdout: null, output: streamJsonResult({ done: true }) };
+      }
+      throw new Error("unexpected");
+    });
+
+    const handler = makeHandler();
+    const outcome = await handler.execute(
+      makeNode({ maxIterations: 5, outputValidationRetries: 1 }),
+      baseCtx(),
+      makeContext(),
+    );
+    expect(calls).toBe(3);
+    // 2 outer iterations (retry counts as same iteration)
+    expect(outcome.contextUpdates?.["agent.iterations"]).toBe("2");
   });
 });
 ```
 
-- [x] **Step 4: Run tests to verify they fail**
+- [ ] **Step 3: Re-classify the existing test in `agent-handler.test.ts`**
 
-Run: `npx vitest run src/attractor/tests/agent-handler-retry.test.ts`
-Expected: FAIL — retry loop not implemented.
+Find the test at line 100: `does not fail on non-zero exit during multi-iteration loop`. This contradicts the new spec (D6 says any non-zero exit during deep-loop iteration is hard failure).
 
-- [x] **Step 5: Implement validation+retry loop in `agent-handler.ts`**
+The test currently uses `mockResolve.mockReturnValue({ ...baseConfig })` — i.e., `loop` undefined, so it's testing the OLD (non-loop) multi-iteration behavior. Multi-iteration without loop is no longer a normal path (the cap cascade defaults `loop:false` → 1 iteration).
 
-In `src/attractor/handlers/agent-handler.ts`:
-
-a) Add imports near the top:
+Decision: this test was always exercising an unusual configuration (`maxIterations: 3` on a non-loop agent). Repurpose it to exercise the new contract on a `loop:true` agent that crashes mid-loop:
 
 ```ts
-import { outputsToZod } from "../../cli/lib/outputs-to-zod.js";
-import { buildCorrectiveMessage } from "../../cli/lib/corrective-message.js";
-import { evaluateAgentOutput } from "./evaluate-agent-output.js";
+it("exits loop on first non-zero exit during deep-loop multi-iteration", async () => {
+  mockResolve.mockReturnValue({
+    ...baseConfig,
+    loop: true,
+    outputs: { done: "boolean" },
+    jsonSchema: JSON.stringify({
+      type: "object",
+      properties: { done: { type: "boolean" } },
+      required: ["done"],
+      additionalProperties: false,
+    }),
+  });
+  mockAgentRun
+    .mockResolvedValueOnce({ exitCode: 0, sessionId: "s1", stdout: null, output: JSON.stringify([
+      { type: "system", subtype: "init", session_id: "s1" },
+      { type: "result", subtype: "success", result: '{"done":false}' },
+    ]) })
+    .mockResolvedValueOnce({ exitCode: 1, sessionId: null, stdout: null });
+
+  const handler = makeHandler();
+  const outcome = await handler.execute(
+    makeNode({ maxIterations: 3 }),
+    baseCtx(),
+    makeContext(),
+  );
+
+  expect(outcome.status).toBe("fail");
+  expect(mockAgentRun).toHaveBeenCalledTimes(2);
+});
 ```
 
-b) **Remove** the existing `if (jsonSchema && !lastResult?.output)` early-return block (currently at `agent-handler.ts:228-238`) AND the existing structured-output parse `try`/`catch` (currently at `agent-handler.ts:240-297`). These are subsumed by the loop below.
+(Also delete the original assertion `outcome.status === "success"` and `times(3)` — those reflected the old behavior.)
 
-c) **Remove** the now-unused `parseStructuredOutput` import at the top of the file (the helper is replaced by `evaluateAgentOutput`).
+- [ ] **Step 4: Run tests, expect failure**
 
-d) Insert the validation+retry block in place of the deleted parse block:
+Run: `npx vitest run src/attractor/tests/agent-handler-deep-loop.test.ts src/attractor/tests/agent-handler.test.ts`
+Expected: deep-loop tests FAIL; old-handler tests on the renamed-test branch FAIL until the handler restructure lands.
+
+- [ ] **Step 5: Restructure the handler**
+
+In `src/attractor/handlers/agent-handler.ts`, the iteration loop body (currently lines 180–216) plus the validation+retry block (lines 218–297) become a single fused loop. Replace lines 176–308 with:
 
 ```ts
-// Validation + retry loop.
-// The first attempt already ran via the iteration loop above
-// (lastResult/lastSessionId hold its result). When jsonSchema is set,
-// validate and possibly retry by resuming the same Claude session.
-let structuredUpdates: Record<string, unknown> = {};
+let lastResult: RunResult | null = null;
+let lastSessionId: string | null = null;
+let iteration = 0;
+
+let lastParsed: Record<string, unknown> | null = null;
 let preferredLabel: string | undefined;
 
-if (jsonSchema) {
-  // Build zod from frontmatter outputs: when available; otherwise we have no
-  // typed schema and skip schema validation (still catches empty / unparseable
-  // output via the helper).
-  const zodSchema = config.outputs ? outputsToZod(config.outputs) : null;
+const zodSchema = (jsonSchema && config.outputs) ? outputsToZod(config.outputs) : null;
 
-  const writeRaw = (n: number, raw: string) =>
-    writeFileSync(join(nodeDir, `raw-attempt-${n}.txt`), raw ?? "");
+const overrideRetries = (node as Record<string, unknown>).outputValidationRetries;
+const maxRetries =
+  typeof overrideRetries === "number" && overrideRetries >= 0
+    ? overrideRetries
+    : 1;
 
-  writeRaw(1, lastResult?.output ?? "");
+for (let i = 0; i < maxIterations; i++) {
+  if (signal?.aborted) break;
 
-  const overrideRetries = (node as any).outputValidationRetries;
-  const maxRetries =
-    typeof overrideRetries === "number" && overrideRetries >= 0
-      ? overrideRetries
-      : 1;
+  if (i > 0) meta.onIterationStart?.(node.id, i);
 
-  let attempt = 1;
-  let evaluation = evaluateAgentOutput(lastResult?.output ?? "", zodSchema);
+  let result = await agent.run({
+    cwd, signal, variables: agentVariables, onStdout,
+  });
+  lastResult = result;
+  iteration++;
+  if (result.sessionId) lastSessionId = result.sessionId;
 
-  while (!evaluation.ok && attempt <= maxRetries) {
-    meta.onValidationFailure?.({
-      attempt,
-      errors: evaluation.errors,
-      rawOutputPath: `${node.id}/raw-attempt-${attempt}.txt`,
-    });
+  // D6: any non-zero exit during deep-loop iteration = hard failure.
+  if (result.exitCode !== 0) {
+    return {
+      status: "fail",
+      failureReason: `Agent "${agentName}" exited with code ${result.exitCode}`,
+      contextUpdates: {
+        "agent.iterations": String(iteration),
+        "agent.success": "false",
+      },
+    };
+  }
 
-    if (!lastSessionId) {
+  // Per-iteration validation + chunk-2 retry layer.
+  let parsed: Record<string, unknown> | undefined;
+  if (jsonSchema) {
+    const writeRaw = (n: number, raw: string) =>
+      writeFileSync(join(nodeDir, `iter-${i + 1}-attempt-${n}.txt`), raw ?? "");
+
+    writeRaw(1, result.output ?? "");
+    let attempt = 1;
+    let evaluation = evaluateAgentOutput(result.output ?? "", zodSchema);
+
+    while (!evaluation.ok && attempt <= maxRetries) {
+      meta.onValidationFailure?.({
+        attempt,
+        errors: evaluation.errors,
+        rawOutputPath: `${node.id}/iter-${i + 1}-attempt-${attempt}.txt`,
+      });
+      if (!lastSessionId) {
+        return {
+          status: "fail",
+          failureReason: `Output validation failed and cannot retry: agent did not report sessionId (iter ${i + 1} attempt ${attempt})`,
+          contextUpdates: { "agent.iterations": String(iteration), "agent.success": "false" },
+        };
+      }
+      attempt += 1;
+      meta.onValidationRetryStart?.(node.id, attempt);
+      const corrective = buildCorrectiveMessage(evaluation.raw, evaluation.errors, jsonSchema);
+      const retryResult = await agent.run({
+        cwd, signal, variables: agentVariables, onStdout,
+        resume: lastSessionId, message: corrective,
+      });
+      result = retryResult;
+      lastResult = retryResult;
+      if (retryResult.sessionId) lastSessionId = retryResult.sessionId;
+      // NOTE: do NOT increment `iteration` for retries (they're sub-attempts of this iteration).
+
+      writeRaw(attempt, retryResult.output ?? "");
+      evaluation = evaluateAgentOutput(retryResult.output ?? "", zodSchema);
+    }
+
+    if (!evaluation.ok) {
+      meta.onValidationFailure?.({
+        attempt,
+        errors: evaluation.errors,
+        rawOutputPath: `${node.id}/iter-${i + 1}-attempt-${attempt}.txt`,
+      });
       return {
         status: "fail",
-        failureReason:
-          `Output validation failed and cannot retry: agent did not report sessionId ` +
-          `(attempt ${attempt}: ${evaluation.errors.map(e => `${e.path}: ${e.message}`).join("; ")})`,
+        failureReason: `Output validation failed in iteration ${i + 1} after ${attempt} attempts: ` +
+          evaluation.errors.map(e => `${e.path}: ${e.message}`).join("; "),
         contextUpdates: { "agent.iterations": String(iteration), "agent.success": "false" },
       };
     }
 
-    attempt += 1;
-    meta.onValidationRetryStart?.(node.id, attempt);
-
-    const corrective = buildCorrectiveMessage(evaluation.raw, evaluation.errors, jsonSchema);
-
-    const retryResult = await agent.run({
-      cwd, signal, variables: agentVariables, onStdout,
-      resume: lastSessionId, message: corrective,
-    });
-    lastResult = retryResult;
-    if (retryResult.sessionId) lastSessionId = retryResult.sessionId;
-    iteration += 1;
-
-    writeRaw(attempt, retryResult.output ?? "");
-    evaluation = evaluateAgentOutput(retryResult.output ?? "", zodSchema);
+    parsed = evaluation.parsed as Record<string, unknown>;
+    lastParsed = parsed;
+    if (parsed.preferred_label != null) preferredLabel = String(parsed.preferred_label);
   }
 
-  if (!evaluation.ok) {
-    meta.onValidationFailure?.({
-      attempt,
-      errors: evaluation.errors,
-      rawOutputPath: `${node.id}/raw-attempt-${attempt}.txt`,
-    });
-    return {
-      status: "fail",
-      failureReason:
-        `Output validation failed after ${attempt} attempts: ` +
-        evaluation.errors.map(e => `${e.path}: ${e.message}`).join("; "),
-      contextUpdates: { "agent.iterations": String(iteration), "agent.success": "false" },
-    };
-  }
+  // Deep-loop break MUST be checked BEFORE onIterationEnd; if we break, we
+  // do not "end the iteration to start another one" — the outer onNodeEnd
+  // closes the block. (UI hook ordering matters.)
+  const willBreak = parsed?.done === true;
+  if (willBreak) break;
 
-  for (const [key, value] of Object.entries(evaluation.parsed)) {
+  const willContinue = !signal?.aborted && i < maxIterations - 1;
+  if (willContinue) meta.onIterationEnd?.(node.id, i);
+}
+
+// Defense in depth: a loop:true agent must produce parsed output to know if
+// done. If the validator was bypassed and we somehow have no schema, treat
+// the loop as a no-op success (preserves loop:false behavior; loop:true is
+// validator-guarded).
+let structuredUpdates: Record<string, unknown> = {};
+if (lastParsed) {
+  for (const [key, value] of Object.entries(lastParsed)) {
     structuredUpdates[key] = typeof value === "string" ? value : String(value);
-  }
-  if (evaluation.parsed.preferred_label != null) {
-    preferredLabel = String(evaluation.parsed.preferred_label);
   }
 }
 
@@ -1126,463 +1028,550 @@ return {
 };
 ```
 
-- [x] **Step 6: Run handler-retry tests**
+DELETE the now-orphaned old block at the bottom of `execute()` (was lines 218–308 in the pre-chunk version).
 
-Run: `npx vitest run src/attractor/tests/agent-handler-retry.test.ts`
-Expected: PASS.
+- [ ] **Step 6: Run deep-loop tests, expect pass**
 
-- [x] **Step 7: Run full test suite**
+Run: `npx vitest run src/attractor/tests/agent-handler-deep-loop.test.ts`
+Expected: all PASS.
 
-Run: `npm test`
-Expected: All tests pass.
+- [ ] **Step 7: Run full handler test**
 
-- [x] **Step 8: Commit**
+Run: `npx vitest run src/attractor/tests/agent-handler.test.ts src/attractor/tests/agent-handler-deep-loop.test.ts`
+Expected: all PASS — including the re-classified test.
+
+- [ ] **Step 8: Run chunk-2 regression suite**
+
+Run: `npx vitest run src/attractor/tests/agent-handler-validation.test.ts src/attractor/tests/agent-handler-retry.test.ts src/attractor/tests/agent-handler-frontmatter-jsonschema.test.ts`
+Expected: all PASS — these tests exercise single-iteration agents; they hit the new in-loop path with `i=0` and break out at the bottom (no `done` field in their schemas → `parsed.done !== true` → loop continues, but `maxIterations === 1` for non-loop → loop ends after one iteration).
+
+- [ ] **Step 9: Commit**
 
 ```bash
-git add src/attractor/handlers/agent-handler.ts src/attractor/handlers/registry.ts src/attractor/core/schemas.ts src/attractor/tests/agent-handler-retry.test.ts
-git commit -m "feat(handler): zod validation + smart retry via --resume on output failure"
+git add src/attractor/handlers/agent-handler.ts src/attractor/tests/agent-handler-deep-loop.test.ts src/attractor/tests/agent-handler.test.ts
+git commit -m "feat(handler): per-iteration outputs parse + done break + crash-as-failure"
 ```
 
-### Task 2.6 — Engine wiring + TUI retry block + trace command surfacing
+---
+
+## Chunk 5: `$prev_note` channel
+
+**Ships green:** When an agent declares `note: string` in `outputs:`, its emitted value carries forward as variable `prev_note` in the next iteration's prompt expansion. First iteration sees `$prev_note=""`. Preflight does not raise undeclared-variable errors for `prev_note` on such agents.
+
+The LAST iteration's `note` is intentionally discarded — only inter-iteration self-talk is supported. Persisting state at the end of the loop is the agent's job (filesystem, git).
+
+### Task 5.1 — Per-iteration variable bag rebuild
 
 **Files:**
-- Modify: `src/attractor/core/engine.ts` (engine constructs the per-node `meta` object at `engine.ts:222-235` — add `onValidationFailure` and `onValidationRetryStart` callbacks here, injecting the in-scope `nodeReceiveId`)
-- Modify: `src/attractor/core/engine.ts` `EngineRunOptions` interface (so `onIterationStart`-style callbacks have a sibling for retry events)
-- Modify: `src/cli/commands/pipeline.ts` (provide `onValidationRetryStart` that emits a TUI iteration block; extend `--node-receive` view to surface validation attempts)
-- Test: `src/cli/tests/pipeline-trace-command-validation.test.ts` (NEW)
+- Modify: `src/attractor/handlers/agent-handler.ts` (within the iteration loop body from Chunk 4; build a per-iteration variable bag with `prev_note`)
+- Test: extend `src/attractor/tests/agent-handler-deep-loop.test.ts`
 
-- [x] **Step 1: Locate the handler-context construction**
+- [ ] **Step 1: Write failing tests**
 
-Run: `grep -n "HandlerExecutionContext\|nodeReceiveId =" src/attractor/core/engine.ts`
-Confirm: `nodeReceiveId` is generated at `engine.ts:169`, the `meta: HandlerExecutionContext = {...}` is built at lines 222-235.
-
-- [x] **Step 2: In `engine.ts`, wire validation callbacks into `meta`**
-
-In `src/attractor/core/engine.ts` `EngineRunOptions` interface, add (next to the existing `onIterationStart`/`onIterationEnd` fields):
+Append to `src/attractor/tests/agent-handler-deep-loop.test.ts`:
 
 ```ts
-onValidationRetryStart?: (nodeId: string, attempt: number) => void;
-```
+const noteConfig = {
+  ...loopBaseConfig,
+  outputs: { done: "boolean", note: "string" },
+  jsonSchema: JSON.stringify({
+    type: "object",
+    properties: { done: { type: "boolean" }, note: { type: "string" } },
+    required: ["done", "note"],
+    additionalProperties: false,
+  }),
+};
 
-In the `meta` block at lines 222-235, append two callback fields after `onIterationEnd: opts.onIterationEnd,`:
-
-```ts
-onValidationFailure: (args) => {
-  opts.traceWriter?.onValidationFailure?.({
-    nodeReceiveId,
-    node,
-    attempt: args.attempt,
-    errors: args.errors,
-    rawOutputPath: args.rawOutputPath,
-  });
-},
-onValidationRetryStart: opts.onValidationRetryStart,
-```
-
-(`nodeReceiveId` and `node` are in scope here — they were declared at lines 169 and 167 respectively.)
-
-- [x] **Step 3: In `src/cli/commands/pipeline.ts`, register `onValidationRetryStart` callback in `engineOpts`**
-
-First locate the existing `onIterationStart` callback (line numbers drift):
-Run: `grep -n "onIterationStart:" src/cli/commands/pipeline.ts`
-
-After that callback's closing `},`, add:
-
-```ts
-onValidationRetryStart: (nodeId, attempt) => {
-  emit({
-    kind: "start",
-    nodeId,
-    label: `agent · validation retry ${attempt - 1}`,
-    blockKind: "agent",
-  });
-},
-```
-
-- [x] **Step 4: Extend `pipelineTraceCommand` `--node-receive` view to surface validation attempts**
-
-In `src/cli/commands/pipeline.ts` `pipelineTraceCommand`, inside the `if (opts.nodeReceive)` branch (currently at lines 819-857), after the context-snapshot block and before the `completed stages` line, insert:
-
-```ts
-const failures = lines.filter(l =>
-  l.kind === "validation-failure" && l.nodeReceiveId === opts.nodeReceive,
-);
-if (failures.length > 0) {
-  console.log(`\nvalidation attempts:`);
-  for (const f of failures as Array<Record<string, unknown>>) {
-    const errs = (f.errors as Array<{ path: string; message: string }>)
-      .map(e => `${e.path}: ${e.message}`)
-      .join(", ");
-    console.log(`  [${f.attempt}] ✗ failed — ${errs}`);
-    console.log(`      raw: ${f.rawOutputPath}`);
+describe("AgentHandler deep loop — \$prev_note carry-over", () => {
+  const mockResolve = vi.fn();
+  const mockAgentRun = vi.fn();
+  function makeHandler() {
+    return new AgentHandler({
+      resolveAgent: mockResolve,
+      createAgent: () => ({ run: mockAgentRun, kill: vi.fn(), config: {} } as any),
+    });
   }
-}
-```
+  function makeNode(overrides: Partial<Node> = {}): Node {
+    return { id: "deep", shape: "box", label: "x", agent: "looper", ...overrides } as Node;
+  }
+  beforeEach(() => vi.clearAllMocks());
 
-- [x] **Step 5: Write a real trace-command test**
+  it("first iteration sees prev_note empty; second sees iteration-1's note", async () => {
+    mockResolve.mockReturnValue({ ...noteConfig });
+    let i = 0;
+    const captured: string[] = [];
+    mockAgentRun.mockImplementation(async (opts: any) => {
+      i++;
+      captured.push(String(opts.variables?.prev_note ?? ""));
+      return {
+        exitCode: 0, sessionId: `s${i}`, stdout: null,
+        output: streamJsonResult({
+          done: i >= 2,
+          note: i === 1 ? "started chunk A" : "",
+        }),
+      };
+    });
+    const handler = makeHandler();
+    await handler.execute(
+      makeNode({ maxIterations: 5 }),
+      baseCtx(),
+      makeContext(),
+    );
+    expect(captured[0]).toBe("");
+    expect(captured[1]).toBe("started chunk A");
+  });
 
-```ts
-// src/cli/tests/pipeline-trace-command-validation.test.ts (NEW)
-import { describe, it, expect, beforeAll, beforeEach, afterAll } from "vitest";
-import { mkdtempSync, writeFileSync, mkdirSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { pipelineTraceCommand } from "../commands/pipeline.js";
-import { deriveProjectKey } from "../lib/run-paths.js"; // adjust import to match codebase
+  it("note replaces, does not accumulate", async () => {
+    mockResolve.mockReturnValue({ ...noteConfig });
+    let i = 0;
+    const captured: string[] = [];
+    mockAgentRun.mockImplementation(async (opts: any) => {
+      i++;
+      captured.push(String(opts.variables?.prev_note ?? ""));
+      return {
+        exitCode: 0, sessionId: `s${i}`, stdout: null,
+        output: streamJsonResult({ done: i >= 3, note: `note-${i}` }),
+      };
+    });
+    const handler = makeHandler();
+    await handler.execute(
+      makeNode({ maxIterations: 5 }),
+      baseCtx(),
+      makeContext(),
+    );
+    expect(captured).toEqual(["", "note-1", "note-2"]);
+  });
 
-describe("pipeline trace --node-receive surfaces validation attempts", () => {
-  const logs: string[] = [];
-  const origLog = console.log;
-  beforeEach(() => { logs.length = 0; });
-  beforeAll(() => { console.log = (...a) => logs.push(a.map(String).join(" ")); });
-  afterAll(() => { console.log = origLog; });
-
-  it("prints validation-failure events keyed by nodeReceiveId", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "trace-"));
-    process.env.RALPH_RUNS_ROOT = dir;
-    const project = "/tmp/some-project";
-    const projectKey = deriveProjectKey(project);
-    const tracePath = join(dir, projectKey, "runs", "r1", "pipeline.jsonl");
-    mkdirSync(join(dir, projectKey, "runs", "r1"), { recursive: true });
-
-    const lines = [
-      { kind: "pipeline-start", runId: "r1", pipelineName: "p", nodes: ["start","verifier"], timestamp: "" },
-      { kind: "node-start", nodeReceiveId: "verifier-1", nodeId: "verifier", nodeKind: "agent", timestamp: "", contextSnapshot: { foo: "bar" } },
-      { kind: "validation-failure", nodeReceiveId: "verifier-1", nodeId: "verifier", attempt: 1, errors: [{ path: "preferred_label", message: "Required" }], rawOutputPath: "verifier/raw-attempt-1.txt", timestamp: "" },
-      { kind: "node-end", nodeReceiveId: "verifier-1", nodeId: "verifier", success: false, contextUpdates: {} },
-      { kind: "pipeline-end", runId: "r1", outcome: "failure", timestamp: "" },
-    ];
-    writeFileSync(tracePath, lines.map(l => JSON.stringify(l)).join("\n"));
-
-    await pipelineTraceCommand("r1", { project, nodeReceive: "verifier-1" });
-
-    const out = logs.join("\n");
-    expect(out).toMatch(/validation attempts:/);
-    expect(out).toMatch(/\[1\] ✗ failed — preferred_label: Required/);
-    expect(out).toMatch(/raw: verifier\/raw-attempt-1\.txt/);
+  it("agent without note declaration does not receive prev_note variable", async () => {
+    mockResolve.mockReturnValue({ ...loopBaseConfig }); // no note in outputs
+    let i = 0;
+    const sawPrevNote: boolean[] = [];
+    mockAgentRun.mockImplementation(async (opts: any) => {
+      i++;
+      sawPrevNote.push("prev_note" in (opts.variables ?? {}));
+      return {
+        exitCode: 0, sessionId: `s${i}`, stdout: null,
+        output: streamJsonResult({ done: i >= 2 }),
+      };
+    });
+    const handler = makeHandler();
+    await handler.execute(
+      makeNode({ maxIterations: 5 }),
+      baseCtx(),
+      makeContext(),
+    );
+    expect(sawPrevNote.every(b => b === false)).toBe(true);
   });
 });
 ```
 
-(If `deriveProjectKey` is exported from a different file, update the import. If `pipelineTraceCommand` calls `process.exit` on missing files, this test wraps in a try/catch — adjust as the actual command shape requires. Verify by reading `src/cli/commands/pipeline.ts:775-820` before running.)
+- [ ] **Step 2: Run, expect failure**
 
-- [x] **Step 6: Run tests**
+Run: `npx vitest run src/attractor/tests/agent-handler-deep-loop.test.ts -t "prev_note"`
+Expected: FAIL.
 
-Run: `npx vitest run src/cli/tests/pipeline-trace-command-validation.test.ts`
-Expected: PASS.
+- [ ] **Step 3: Implement variable rebuild**
 
-- [x] **Step 7: Run full test suite**
-
-Run: `npm test`
-Expected: All tests pass.
-
-- [x] **Step 8: Commit**
-
-```bash
-git add src/attractor/core/engine.ts src/cli/commands/pipeline.ts src/cli/tests/pipeline-trace-command-validation.test.ts
-git commit -m "feat(trace): surface validation attempts in --node-receive view + TUI retry block"
-```
-
-### Chunk 2 Review Checkpoint
-
-- [ ] **Run plan-document-reviewer subagent against Chunk 2.** Loop until ✅ Approved.
-- [ ] **Run code-reviewer subagent against the chunk-2 commits.** Address feedback in-chunk.
-
----
-
-## Chunk 3: Validator rules + schema deletion + 7-file migration + pipeline show annotation
-
-**Ships green:** `json_schema_file=` no longer parses; `agent_missing_outputs` validator rule fires on offending pipelines with the migration recipe inline; the 7 in-tree `.json` files are folded into agent frontmatter; `pipeline.dot` drops `json_schema_file=` attributes; `implement.md` declares the empty-output opt-out; `verifier.md` carries the prompt fix; `ralph pipeline show` renders SVG with declared inputs/outputs annotated. Smoke run of `illumination-to-implementation` reaches the human approval gate (the original failing case).
-
-### Task 3.1 — `agent_missing_outputs` validator rule
-
-**Files:**
-- Modify: `src/attractor/core/graph.ts`
-- Test: extend `src/attractor/tests/graph-validator.test.ts` (or create `graph-validator-outputs.test.ts`)
-
-**Status: SHIPPED 2026-04-29** — rule + tests added; 4 new tests; no fallout for migrated agents.
-
-- [x] **Step 1: Write the failing validator test**
+In `src/attractor/handlers/agent-handler.ts`, just before the `for (let i…)` loop, snapshot the base bag and capture whether the agent declares `note`:
 
 ```ts
-// src/attractor/tests/graph-validator-outputs.test.ts
-import { describe, it, expect } from "vitest";
-import { validateGraph } from "../core/graph.js";
-import { mkdtempSync, writeFileSync, mkdirSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+const baseAgentVariables: Record<string, unknown> = { ...agentVariables };
+const agentDeclaresNote =
+  config.outputs && Object.prototype.hasOwnProperty.call(config.outputs, "note");
+let prevNote = "";
+```
 
-describe("validator: agent_missing_outputs", () => {
-  it("fires when a non-interactive agent has no outputs: declared", () => {
-    const dir = mkdtempSync(join(tmpdir(), "validator-"));
-    mkdirSync(join(dir, "p"), { recursive: true });
-    writeFileSync(join(dir, "p", "agent_a.md"), `---
-name: agent_a
-description: no outputs
-model: opus
-permissionMode: default
-tools: []
-mcp: []
----
-do stuff
-`);
-    writeFileSync(join(dir, "p", "pipeline.dot"), `digraph p {
-  goal="t"
-  start [shape=Mdiamond]
-  done [shape=Msquare]
-  n1 [agent="agent_a", prompt="do"]
-  start -> n1 -> done
-}`);
-    const result = validateGraph(join(dir, "p", "pipeline.dot"));
-    expect(result.diagnostics.some(d => d.code === "agent_missing_outputs")).toBe(true);
-    const diag = result.diagnostics.find(d => d.code === "agent_missing_outputs");
-    expect(diag?.message).toMatch(/outputs:/);
-    expect(diag?.message).toMatch(/json_schema_file/);
+Inside the loop body, replace the existing `agent.run({ ..., variables: agentVariables, ... })` call with a per-iteration bag:
+
+```ts
+const iterVariables = agentDeclaresNote
+  ? { ...baseAgentVariables, prev_note: prevNote }
+  : baseAgentVariables;
+let result = await agent.run({
+  cwd, signal, variables: iterVariables, onStdout,
+});
+```
+
+Pass the SAME `iterVariables` to the chunk-2 retry call inside the validation loop.
+
+After the validation block, when a successful parse exists, capture the next iteration's note:
+
+```ts
+if (agentDeclaresNote && parsed && typeof parsed.note === "string") {
+  prevNote = parsed.note;
+}
+```
+
+(Place this BEFORE the `done`-break check so even if iteration N is the last, `prevNote` is updated — though it's then unused.)
+
+- [ ] **Step 4: Run, expect pass**
+
+Run: `npx vitest run src/attractor/tests/agent-handler-deep-loop.test.ts -t "prev_note"`
+Expected: PASS.
+
+- [ ] **Step 5: Run full deep-loop suite**
+
+Run: `npx vitest run src/attractor/tests/agent-handler-deep-loop.test.ts src/attractor/tests/agent-handler.test.ts`
+Expected: all PASS.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add src/attractor/handlers/agent-handler.ts src/attractor/tests/agent-handler-deep-loop.test.ts
+git commit -m "feat(handler): \$prev_note carries last iteration's note into next"
+```
+
+### Task 5.2 — Preflight seeds `prev_note` so it's not flagged as undeclared
+
+**Files:**
+- Modify: `src/attractor/transforms/variable-expansion.ts` (`scanUndeclaredCallerVars` — add `prev_note` to **producers**, not declared/RESERVED)
+- Test: extend `src/attractor/tests/variable-expansion.test.ts`
+
+**Why producers, not declared:** the missing-set is built by subtracting `producers ∪ ctxKeys` from references. Adding to `declared` only affects classification within already-handled refs. Adding to `producers` filters from `missing`.
+
+- [ ] **Step 1: Locate the producers-set construction**
+
+Run: `grep -n "producers\|nodeProduces\|collectProducers" src/attractor/transforms/variable-expansion.ts`
+Identify where the producers set is built across the graph (likely a fold over nodes calling `collectProducers`).
+
+- [ ] **Step 2: Write failing test**
+
+Append to `src/attractor/tests/variable-expansion.test.ts`:
+
+```ts
+describe("scanUndeclaredCallerVars — prev_note seed for note-declaring loop agents", () => {
+  it("does NOT report prev_note as missing when an agent declares note in outputs", () => {
+    /*
+     * Build a test graph:
+     * - tmp dir
+     * - looper.md (frontmatter: loop:true, outputs:{done:boolean, note:string}; body references $prev_note)
+     * - pipeline.dot referencing agent="looper"
+     * Use the same parseDot helper / tmp-dir setup the file's existing tests use.
+     */
+    const result = scanUndeclaredCallerVars(graph, {});
+    const missingNames = result.missing.map(m => typeof m === "string" ? m : (m as any).var ?? (m as any).name);
+    expect(missingNames).not.toContain("prev_note");
   });
 
-  it("does NOT fire when agent has outputs: {}", () => {
-    const dir = mkdtempSync(join(tmpdir(), "validator-"));
-    mkdirSync(join(dir, "p"), { recursive: true });
-    writeFileSync(join(dir, "p", "agent_a.md"), `---
-name: agent_a
-description: opt-out
-model: opus
-permissionMode: default
-tools: []
-mcp: []
-outputs: {}
----
-do stuff
-`);
-    writeFileSync(join(dir, "p", "pipeline.dot"), `digraph p {
-  goal="t"
-  start [shape=Mdiamond]
-  done [shape=Msquare]
-  n1 [agent="agent_a", prompt="do"]
-  start -> n1 -> done
-}`);
-    const result = validateGraph(join(dir, "p", "pipeline.dot"));
-    expect(result.diagnostics.some(d => d.code === "agent_missing_outputs")).toBe(false);
-  });
-
-  it("does NOT fire for interactive=true agents", () => {
-    const dir = mkdtempSync(join(tmpdir(), "validator-"));
-    mkdirSync(join(dir, "p"), { recursive: true });
-    writeFileSync(join(dir, "p", "agent_b.md"), `---
-name: agent_b
-description: interactive
-model: opus
-permissionMode: default
-tools: []
-mcp: []
----
-chat
-`);
-    writeFileSync(join(dir, "p", "pipeline.dot"), `digraph p {
-  goal="t"
-  start [shape=Mdiamond]
-  done [shape=Msquare]
-  n1 [agent="agent_b", interactive=true, prompt="chat"]
-  start -> n1 -> done
-}`);
-    const result = validateGraph(join(dir, "p", "pipeline.dot"));
-    expect(result.diagnostics.some(d => d.code === "agent_missing_outputs")).toBe(false);
+  it("DOES report prev_note as missing when no agent declares note in outputs", () => {
+    /* graph with a normal agent referencing $prev_note in body */
+    const result = scanUndeclaredCallerVars(graph, {});
+    const missingNames = result.missing.map(m => typeof m === "string" ? m : (m as any).var ?? (m as any).name);
+    expect(missingNames).toContain("prev_note");
   });
 });
 ```
 
-- [x] **Step 2: Run tests to verify they fail**
+(Mirror the file's existing test patterns for the `/* setup */` comments.)
 
-Run: `npx vitest run src/attractor/tests/graph-validator-outputs.test.ts`
-Expected: FAIL — rule not implemented.
+- [ ] **Step 3: Run, expect failure**
 
-- [x] **Step 3: Implement the rule in `graph.ts`**
+Run: `npx vitest run src/attractor/tests/variable-expansion.test.ts -t "prev_note seed"`
+Expected: first test FAIL (prev_note flagged), second test PASS (correctly flagged).
 
-In `src/attractor/core/graph.ts`, inside the agent-node iteration where other agent rules already run (search for existing `produces_redundant_with_outputs` or similar), add:
+- [ ] **Step 4: Implement seed**
+
+In `scanUndeclaredCallerVars`, after `collectProducers` runs across nodes, walk the graph and for each agent that declares `note` in `outputs:`, add `prev_note` to the producers set:
 
 ```ts
-// agent_missing_outputs: non-interactive agent must declare outputs:
-// (chunk 3 — replaces the legacy json_schema_file= attribute path).
-const isInteractive = node.interactive === true || node.interactive === "true";
-if (!isInteractive) {
-  const cfg = resolveAgent(node.agent as string, { projectDir: dotDir, allowBundledFallback: false });
-  if (!cfg.outputs) {
-    diagnostics.push({
-      code: "agent_missing_outputs",
-      severity: "error",
-      message: [
-        `node "${node.id}" agent "${node.agent}" has no outputs: declared`,
-        ``,
-        `Non-interactive agents must declare structured output in frontmatter:`,
-        `  outputs:`,
-        `    <key>: <type-or-fragment>`,
-        ``,
-        `If you previously used \`json_schema_file=\`, that attribute was removed.`,
-        `Move the schema into the agent's outputs: frontmatter.`,
-      ].join("\n"),
-    });
-  } else if (Object.keys(cfg.outputs).length === 0) {
-    diagnostics.push({
-      code: "agent_outputs_empty",
-      severity: "warning",
-      message: `node "${node.id}" agent "${node.agent}" declares outputs: {} (pure-work opt-out). Confirm the agent intentionally returns no structured data.`,
-    });
+// After producers are collected from `produces=` attrs:
+for (const node of graph.nodes.values()) {
+  const agentName = (node as Record<string, unknown>).agent;
+  if (typeof agentName !== "string") continue;
+  // (node has its own prompt or label that overrides agent body — same skip rule
+  // collectAgentBodyRefs already uses, but for producers we don't need to skip,
+  // we just need to know what the agent might emit.)
+  const path = resolveAgentMdPath(projectDir, agentName);
+  if (!path) continue;
+  let raw: string;
+  try { raw = readFileSync(path, "utf8"); } catch { continue; }
+  const { attributes } = parseFrontmatter(raw);
+  const outputs = (attributes as Record<string, unknown>).outputs;
+  if (outputs && typeof outputs === "object" && Object.prototype.hasOwnProperty.call(outputs, "note")) {
+    producers.add("prev_note");
   }
 }
 ```
 
-- [x] **Step 4: Run tests to verify they pass**
+(`producers` is the set already built earlier in the function; `resolveAgentMdPath` exists at line 176; `parseFrontmatter` is already imported. Adapt names to match the actual local-variable conventions.)
 
-Run: `npx vitest run src/attractor/tests/graph-validator-outputs.test.ts`
-Expected: PASS.
+- [ ] **Step 5: Run, expect pass**
 
-- [x] **Step 5: Commit**
+Run: `npx vitest run src/attractor/tests/variable-expansion.test.ts -t "prev_note seed"`
+Expected: both PASS.
+
+- [ ] **Step 6: Run full preflight suite**
+
+Run: `npx vitest run src/attractor/tests/variable-expansion.test.ts`
+Expected: all PASS.
+
+- [ ] **Step 7: Commit**
 
 ```bash
-git add src/attractor/core/graph.ts src/attractor/tests/graph-validator-outputs.test.ts
-git commit -m "feat(validator): agent_missing_outputs (with migration recipe) + agent_outputs_empty warning"
+git add src/attractor/transforms/variable-expansion.ts src/attractor/tests/variable-expansion.test.ts
+git commit -m "feat(preflight): seed prev_note producer for note-declaring loop agents"
 ```
 
-### Task 3.2 — Atomic: delete `jsonSchemaFile` + migrate 7 schemas + drop `json_schema_file=` attributes + `implement` opt-out
+---
 
-**This task is a single atomic commit** because deleting the schema field breaks every node that references `json_schema_file=` until the migration finishes. Do all changes, run tests, then commit once.
+## Chunk 6: Migration of `implement` agent
+
+**Ships green:** `pipelines/illumination-to-implementation/implement.md` declares `loop: true` + `outputs: { done: boolean }`; prompt body instructs the agent to emit `done` truthfully on each iteration WITHOUT compromising its tool use (bash/git). Validator passes; smoke pipelines stay green.
+
+### Task 6.1 — Update implement agent frontmatter and prompt
 
 **Files:**
-- Modify: `src/attractor/core/schemas.ts` (delete `jsonSchemaFile` field from `AgentNodeSchema`)
-- Modify: `src/attractor/handlers/agent-handler.ts` (remove the `node.jsonSchemaFile` branch — always go through `config.jsonSchema`)
-- Modify (frontmatter additions, 7 agents):
-  - `pipelines/illumination-to-implementation/change-explainer.md` — add `outputs: { explainer_render: string }`
-  - `pipelines/illumination-to-implementation/design-writer.md` — add `outputs: { design_doc_path: string }`
-  - `pipelines/illumination-to-implementation/plan-writer.md` — add `outputs: { plan_path: string }`
-  - `pipelines/illumination-to-implementation/memory-writer.md` — add `outputs: { memory_path: string }`
-  - `pipelines/illumination-to-implementation/memory-reflector.md` — add `outputs: { illumination_path: {type: [string, "null"]}, reasoning: string }`
-  - `pipelines/illumination-to-implementation/task.md` — add `outputs: { refinements: string, scope_changed: boolean }` (used by `chat_summarizer` node)
-  - `pipelines/illumination-to-implementation/tmux-tester.md` — add `outputs: { test_result: {enum: [pass, fail]}, test_summary: string, issues_found: {type: array, items: string}, test_render: string }`
-  - `pipelines/illumination-to-implementation/implement.md` — add `outputs: {}` (pure-work opt-out)
-- Modify: `pipelines/illumination-to-implementation/pipeline.dot` — remove every `json_schema_file="..."` attribute from every node
-- Delete: `pipelines/illumination-to-implementation/{explainer,design-writer,plan-writer,memory-writer,memory-reflector,chat-summarizer,tmux-test-result}.json` (7 files)
+- Modify: `pipelines/illumination-to-implementation/implement.md`
 
-**Status: SHIPPED 2026-04-29** — atomic migration of 7 illumination agents + smoke pipelines; 12 stale .json deleted; jsonSchemaFile field removed; all 1253 tests pass.
+**Pre-read:** `agent-handler.ts:95-96` defines `jsonWrappedPrompt`. When `jsonSchema` is set, the handler appends a JSON-only reminder to the prompt: `IMPORTANT: Your FINAL response MUST be valid JSON … No markdown, no preamble, output ONLY the JSON object.` This applies to the FINAL turn, not in-session bash/git tool use. The implement agent must therefore use tools freely DURING the iteration but emit ONLY JSON as the FINAL textual response.
 
-- [x] **Step 1: Snapshot the existing 7 .json files for reference**
+- [ ] **Step 1: Read current implement.md**
 
-Run: `for f in pipelines/illumination-to-implementation/*.json; do echo "=== $(basename $f) ==="; cat $f; done > /tmp/old-schemas.txt`
-Inspect to confirm the YAML mapping below matches.
+Run: `cat pipelines/illumination-to-implementation/implement.md`
+Confirm current frontmatter has `outputs: {}` and tools list `tools: []`.
 
-- [x] **Step 2: Delete `jsonSchemaFile` field from `AgentNodeSchema`**
+- [ ] **Step 2: Edit frontmatter**
 
-In `src/attractor/core/schemas.ts`, remove the `jsonSchemaFile: z.string().optional()...` line from `AgentNodeSchema` (and any sibling fields specific to this attribute).
-
-- [x] **Step 3: Remove `node.jsonSchemaFile` branch from `agent-handler.ts`**
-
-In `src/attractor/handlers/agent-handler.ts`, replace the block from chunk-1 task 1.1 with the simpler version:
-
-```ts
-// jsonSchema comes from agent frontmatter outputs: only.
-// (Legacy json_schema_file= attribute removed in chunk 3.)
-const jsonSchema: string | undefined = config.jsonSchema;
-```
-
-(Also delete the now-unused `readFileSync`/`resolve` imports if they were only used here.)
-
-- [x] **Step 4: Add `outputs:` to each of the 7 agent .md files**
-
-For each agent, edit its `.md` frontmatter to insert the `outputs:` block before the closing `---`. Example for `change-explainer.md`:
-
-```yaml
----
-name: change-explainer
-... (existing fields)
-outputs:
-  explainer_render:
-    type: string
-    description: Markdown render shown verbatim in the approval gate label.
----
-```
-
-Repeat for the remaining six agents using the YAML equivalents from the spec table.
-
-- [x] **Step 5: Add `outputs: {}` to `implement.md`**
+Replace the YAML frontmatter:
 
 ```yaml
 ---
 name: implement
-... (existing fields)
-outputs: {}
+description: Autonomous code implementation loop
+model: opus
+permissionMode: dangerouslySkipPermissions
+tools: []
+mcp: []
+loop: true
+outputs:
+  done: boolean
 ---
 ```
 
-- [x] **Step 6: Drop `json_schema_file="..."` from every node in `pipeline.dot`**
+(`loop: true` placed adjacent to `outputs:` for visual coupling.)
 
-Run: `grep -n "json_schema_file" pipelines/illumination-to-implementation/pipeline.dot`
-For each line, remove only the `json_schema_file="..."` portion (preserve sibling attributes and the closing `]`).
+- [ ] **Step 3: Append `## Output contract` to the prompt body**
 
-- [x] **Step 7: Delete the 7 stale `.json` files**
+After the existing numbered instructions (i.e., after the line ending with "Take your time. I know you got this. I love you.", or wherever the last instruction line is), add:
 
-Run: `rm pipelines/illumination-to-implementation/{explainer,design-writer,plan-writer,memory-writer,memory-reflector,chat-summarizer,tmux-test-result}.json`
+```markdown
 
-- [x] **Step 8: Run pipeline validate to confirm migration is consistent**
+## Output contract
 
-Run: `npx tsx src/cli/index.ts pipeline validate pipelines/illumination-to-implementation/pipeline.dot`
-Expected: PASS (no `agent_missing_outputs`, no `agent_outputs_empty` errors; warning for `implement` is acceptable).
+This agent runs in a deep loop: each iteration is a fresh process; you do work via Bash/git/subagent tools during the iteration; the LAST text response of each iteration MUST be a single JSON object describing whether the implementation plan is complete.
 
-- [x] **Step 9: Run the full test suite**
+Use Bash, git, and subagents freely during the iteration to read, write, commit, and push.
 
-Run: `npm test`
-Expected: All tests pass.
+After committing your chunk (or determining no chunks remain), emit JSON as your FINAL TEXT response. Never inside a thinking block.
 
-- [x] **Step 10: Commit atomically**
+JSON shape:
+- `done: true` — when **every** chunk in the implementation plan is marked complete (`[x]`) AND no `[ ]` items remain.
+- `done: false` — when at least one `[ ]` item remains in the plan.
+
+Be honest. False positives leave incomplete work committed and visible in git history. False negatives waste iterations. Re-read the plan after committing to verify your judgment.
+
+Example final response:
+
+\`\`\`json
+{ "done": false }
+\`\`\`
+```
+
+(The trailing instruction "Emit JSON as your final TEXT response. Never inside a thinking block." mirrors the verifier prompt fix from chunk-1. Intentional duplication — both agents need the same anti-thinking-block hint. Edits to one should be considered for the other.)
+
+- [ ] **Step 4: Validate the pipeline**
+
+Run: `npm run build && npx ralph pipeline validate pipelines/illumination-to-implementation/pipeline.dot`
+Expected: zero errors. (`agent_outputs_empty` warning is gone; `loop_missing_done_field` does not fire because `done: boolean` is now present.)
+
+- [ ] **Step 5: Validate every other pipeline regressions**
+
+Run:
+```bash
+for f in $(find pipelines src/cli/pipelines -name "*.dot"); do
+  echo "--- $f"
+  npx ralph pipeline validate "$f"
+done
+```
+Expected: zero errors per pipeline.
+
+- [ ] **Step 6: Run full vitest suite**
+
+Run: `npm run test`
+Expected: all PASS.
+
+- [ ] **Step 7: Commit**
 
 ```bash
-git add -A
-git commit -m "refactor(pipelines): finish outputs: migration; delete json_schema_file= attribute"
+git add pipelines/illumination-to-implementation/implement.md
+git commit -m "feat(implement-agent): adopt loop:true + done:boolean contract"
 ```
 
-### Task 3.3 — Annotated SVG (DONE) — see `src/cli/lib/annotate-show.ts`, `src/cli/commands/pipeline.ts`, `src/cli/tests/pipeline-show-annotation.test.ts`
+### Task 6.2 — `pipelines/implement.dot` housekeeping
 
-### Task 3.4 — End-to-end smoke verification
+**Files:** `src/cli/pipelines/implement.dot`
 
-**Status (this session):**
-- [x] **Step 3:** Smoke validate — all 14 `pipelines/smoke/*` pipelines green.
-- [ ] **Step 1:** Live `illumination-to-implementation` pipeline run — DEFERRED to a human-driven run (requires interactive human gates and a real Claude session; not appropriate for the autonomous loop).
-- [ ] **Step 2:** Trace inspect after validation retry — DEFERRED, depends on Step 1.
-- [ ] **Step 4:** Tag `chunk-7-agent-output-validation` — being created at end-of-session by the parent loop.
+- [ ] **Step 1: Inspect**
 
-### Chunk 3 Review Checkpoint
+Run: `cat src/cli/pipelines/implement.dot`
 
-- [x] **Run code-reviewer subagent against the chunk-3 commits + the spec.** PASS verdict (this session). Follow-up: deleted dead `Node.jsonSchemaFile` field (`src/attractor/types.ts`) + updated stale `json_schema_file` wording in interactive-mismatch failureReason (`src/attractor/handlers/agent-handler.ts:109`) + matching test (`src/attractor/tests/agent-handler-interactive.test.ts:128`).
+- [ ] **Step 2: Decide**
 
----
+`max_iterations="$max_iterations"` is harmless and supports the `--max N` escape hatch. Keep it. Without `--max` the variable expands to empty → cascade falls to agent default (loop → Infinity). With `--max N` the node-level cap wins.
 
-## Plan Review Loop
+(No edit. This step is verification only.)
 
-After each chunk:
+- [ ] **Step 3: Smoke validate**
 
-1. Dispatch `superpowers:code-reviewer` against the chunk's commits + the spec at `docs/superpowers/specs/2026-04-29-agent-output-validation-and-retry.md`.
-2. Address feedback in-chunk; re-dispatch if needed.
-3. Tag chunk in git for bisectable history (`chunk-7-agent-output-validation` after Chunk 3).
+Run: `npx ralph pipeline validate src/cli/pipelines/implement.dot`
+Expected: zero errors.
 
 ---
 
-## Post-execution memory capture
+## Chunk 7: Documentation
 
-**REQUIRED after Chunk 3 lands.** Capture for the next session:
+**Ships green:** README has a short authoring guide for deep-loop agents.
 
-- Any model-behavior surprises in the validation retry (does `--resume` consistently break the thinking-block trap?)
-- Whether the empty-output corrective message phrasing actually heals the verifier case in production
-- Plan-vs-reality deltas
-- Any zod fragment shapes the migration revealed we need but did not include in the strict accept-list (D3)
+### Task 7.1 — README "Deep loop nodes" section
 
-**Procedure:**
+**Files:** `README.md`
 
-1. Land the final commit + tag (`chunk-7-agent-output-validation`).
-2. Dispatch the `memory-writer` subagent with the chunk's session transcript path:
-   ```
-   Agent({
-     description: "Capture chunk-7 implementation memory",
-     subagent_type: "memory-writer",
-     prompt: "Analyze the implementation session for Chunk 7 (agent output validation + retry). Transcript: <path>. Capture: model-behavior surprises, empty-output corrective effectiveness, zod fragment gaps, plan-vs-reality deltas. Write to /Users/josu/.claude/projects/-Users-josu-Documents-projects-ralph-cli/memory/. Update MEMORY.md index."
-   })
-   ```
-3. Memory file naming: `2026-04-29-chunk-7-agent-output-validation-shipped.md` (or `-deferred.md` if any sub-task slipped).
-4. Memory `type:` is `project`.
+- [ ] **Step 1: Locate insertion point**
+
+Run: `grep -n "^## \|^### " README.md | head -40`
+Identify the heading after which the new section fits best (typically below "Pipeline tool nodes and `cwd=`" if it exists; otherwise above the bottom Specs links). Confirm the exact heading with the grep output before editing.
+
+- [ ] **Step 2: Insert section**
+
+Add the following content at the chosen insertion point:
+
+```markdown
+### Deep loop nodes (agent-driven self-termination)
+
+Agents that need to iterate until self-declared "done" — e.g. the implement
+agent walking an implementation plan one chunk at a time — opt in by adding
+`loop: true` and a `done: boolean` field to their frontmatter:
+
+\`\`\`yaml
+---
+name: my-deep-agent
+description: Iterates until the work stack is empty.
+model: opus
+loop: true
+outputs:
+  done: boolean
+  note: string         # optional cross-iteration handoff
+---
+\`\`\`
+
+The handler runs the agent in a fresh context window per iteration. After
+each iteration it parses the structured output; when `done=true`, the loop
+breaks and the pipeline advances. Per-iteration state lives on the
+filesystem (commits, plan file). The optional `note: string` field carries
+into the next iteration as `$prev_note` (replace, not accumulate). The
+LAST iteration's `note` is discarded — persist anything important via files.
+
+Cap behavior:
+
+- `loop: true` with no cap → unlimited; agent's `done` is the only stop.
+- Pipeline node attribute `max_iterations="N"` → tightens the cap for one use.
+- Agent frontmatter `maxIterations: N` → default cap for the agent.
+- Cascade: node > agent > (loop ? Infinity : 1).
+
+Routing on `done`:
+
+\`\`\`dot
+deep_node -> next_step  [condition="done=true"]
+deep_node -> escalate   [condition="done=false"]
+\`\`\`
+
+`done=false` reaches downstream only when the cap is hit without
+self-termination. Pipelines can route on it for retry / escalate paths.
+
+Authoring checklist:
+
+- [ ] `loop: true` in frontmatter
+- [ ] `outputs: { done: boolean }` (boolean shorthand or `{type: "boolean"}`)
+- [ ] Prompt body instructs the agent to emit `done` after each iteration as the FINAL TEXT response (never in a thinking block)
+- [ ] (Optional) `note: string` + a `$prev_note` slot in the prompt for cross-iteration self-talk
+- [ ] `pipeline validate` passes
+
+The validator rejects `loop: true` without `done: boolean` with error
+`loop_missing_done_field`. A non-zero exit during any deep-loop iteration
+exits the loop with `agent.success=false`.
+```
+
+- [ ] **Step 3: Verify markdown**
+
+Eyeball or run a markdown linter if available.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add README.md
+git commit -m "docs(readme): authoring guide for deep loop nodes"
+```
+
+---
+
+## Final verification
+
+- [ ] **Step 1: Full test sweep**
+
+Run: `npm run test`
+Expected: every test passes; no skipped suites.
+
+- [ ] **Step 2: TypeScript clean**
+
+Run: `npx tsc --noEmit`
+Expected: zero errors.
+
+- [ ] **Step 3: Build succeeds**
+
+Run: `npm run build`
+Expected: `dist/` produced; no build errors.
+
+- [ ] **Step 4: Validate every pipeline in the repo**
+
+Run:
+```bash
+for f in $(find pipelines src/cli/pipelines -name "*.dot"); do
+  echo "--- $f"
+  npx ralph pipeline validate "$f"
+done
+```
+Expected: zero errors across all `.dot` files.
+
+- [ ] **Step 5: Live smoke — `ralph implement` on a tiny disposable plan**
+
+In a scratch project:
+
+1. Create `IMPLEMENTATION_PLAN.md` with one chunk and a single `[ ]` task.
+2. Run `npx ralph implement <scratch-folder>`.
+3. Confirm: agent commits the chunk, marks `[x]`, emits `{ "done": true }` as final text, loop terminates without Ctrl+C.
+4. Confirm: TUI shows iteration progress (`onIterationStart` / `onIterationEnd` blocks) and a clean exit.
+
+(Hands-on verification; document the result in the implementation memory but do not block CI on it.)
+
+- [ ] **Step 6: Tag**
+
+```bash
+git tag deep-loop-nodes
+git push origin main --tags
+```
+
+- [ ] **Step 7: Memory write**
+
+Append a short memory file under `/Users/josu/.claude/projects/-Users-josu-Documents-projects-ralph-cli/memory/` named `2026-04-29-deep-loop-nodes-shipped.md` referencing the spec, the chunks, any surprises during implementation. Add an index line to `MEMORY.md`.
+
+---
+
+## Notes for the executing agent
+
+- Chunks 1–3 of `agent-output-validation-and-retry` are **shipped to main** — `evaluateAgentOutput`, `outputs-to-zod.ts`, and the `--resume` retry path already exist. Do not redo.
+- Chunk 4 is the largest behavioral change. Run its tests after every edit to the iteration loop body, not just at the end.
+- `signal?.aborted` checks remain at the top of the iteration loop body. Do NOT remove them when restructuring.
+- Iteration counter must NOT increment on retries (Chunk 4 explicit). Retries are sub-attempts of the same iteration.
+- The `onIterationEnd` TUI hook fires only when the loop will continue to iteration `i+1`. When breaking on `done=true`, do NOT call it — the outer `onNodeEnd` closes the block.
+- The pre-existing test "does not fail on non-zero exit during multi-iteration loop" (`agent-handler.test.ts:100`) is intentionally re-classified in Chunk 4. It now asserts the OPPOSITE — that any non-zero exit during multi-iteration mode ends the loop with failure. The plan rewrites it; do not skip that step.
+- If a behavior gap surfaces during execution that this plan does not cover, update the plan in place and continue. A follow-up chunk is preferred to silent extension.
