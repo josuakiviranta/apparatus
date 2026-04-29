@@ -1369,7 +1369,7 @@ inputs:
 - [x] verifier.md (commit e2dd8a4)
 - [x] change-explainer.md (commit beb75de)
 - [x] chat-refiner.md (commit 5c7d68c)
-- [ ] design-writer.md
+- [x] design-writer.md (commit eda94f6)
 - [ ] plan-writer.md
 - [ ] tmux-tester.md
 - [ ] memory-writer.md
