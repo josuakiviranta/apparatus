@@ -1,6 +1,6 @@
 digraph chat_only {
   start [shape=Mdiamond];
-  chat  [agent="chat", interactive=true, prompt="You are a helpful assistant. Introduce yourself in one sentence, then ask the user what they want to talk about."];
+  chat  [agent="chat", interactive=true];
   done  [shape=Msquare];
   start -> chat;
   chat  -> done;
