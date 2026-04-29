@@ -1,6 +1,7 @@
 ---
 name: tmux-tester
 description: Drive a tmux window to build, test, smoke, and fix the project in-session — loop test → fix → commit until the project is healthy, then report
+auto_inputs: true
 model: opus
 permissionMode: dangerouslySkipPermissions
 tools:
@@ -16,6 +17,9 @@ outputs:
   test_result: {enum: [pass, fail]}
   test_summary: string
   test_render: string
+inputs:
+  - project
+  - run_id
 ---
 
 # Mission
@@ -187,9 +191,16 @@ If `$SESSION` is empty (i.e. the pipeline is not running inside a tmux session),
 
 If Phase 1 fails, you MAY skip Phases 2–3 for this cycle and go straight to the **Fix step** — a broken build or red suite means smoke runs are unreliable.
 
-## Phase 2 — Additional verification (per node prompt)
+## Phase 2 — Smoke pipelines
 
-If Phase 1 passed, run any additional verification the node prompt instructs (e.g. smoke pipelines, deeper integration runs). If Phase 1 failed, skip this phase and go straight to the **Fix step** — extra verification against a broken build or red suite is noise; loop on Phase 1 until tests are green, then re-enter this phase.
+After Phase 1 (build + test) is GREEN, run every smoke pipeline unconditionally — no diff filtering, no skipping, cost is acceptable.
+
+1. If Phase 1 is RED, do NOT enter the smoke phase. Stay in the Fix loop until tests pass, then re-run Phase 1, then enter this phase.
+2. List every smoke in your shell (not the tmux window): `ls $project/pipelines/smoke/*.dot`.
+3. For each smoke, read its `.dot` header to extract required `--var` keys, then send into the window:
+   `ralph pipeline run pipelines/smoke/<name>.dot --var <required-vars>`
+4. After each run: `wait_stable 180000`, `capture`, read `current.txt`. Apply your agent-level observation criteria (crashes, exits ≠ 0, hangs, TUI glitches, copy regressions).
+5. Run all smokes every cycle. Do not skip. If a smoke is genuinely incompatible with this environment, run it anyway and let it fail — the failure is the data.
 
 For any command you drive in the window, apply these observation criteria:
 - crashes / stack traces
