@@ -6,6 +6,7 @@ import {
   resolveAgent,
   listAgents,
   agentExists,
+  parseAgentFile,
 } from "../lib/agent-registry.js";
 
 describe("agent-registry", () => {
@@ -100,5 +101,30 @@ Do things.`;
 
   it("agentExists returns false for missing agent", () => {
     expect(agentExists("nope", { userDir, bundledDir })).toBe(false);
+  });
+
+  describe("parseAgentFile auto_inputs", () => {
+    it("parses auto_inputs from frontmatter", () => {
+      const md = `---
+name: foo
+description: x
+auto_inputs: true
+inputs: [a, b]
+---
+body`;
+      const cfg = parseAgentFile(md);
+      expect(cfg.autoInputs).toBe(true);
+      expect(cfg.inputs).toEqual(["a", "b"]);
+    });
+
+    it("defaults autoInputs to undefined when not declared", () => {
+      const md = `---
+name: foo
+description: x
+---
+body`;
+      const cfg = parseAgentFile(md);
+      expect(cfg.autoInputs).toBeUndefined();
+    });
   });
 });

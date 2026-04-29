@@ -56,6 +56,7 @@ export interface AgentConfig {
   jsonSchema?: string;
   outputs?: Record<string, JsonSchemaFragment>;
   inputs?: string[];
+  autoInputs?: boolean;
   loop?: boolean;
   maxIterations?: number;
 }
@@ -459,7 +460,7 @@ export class Agent {
 }
 
 export function validateAgentConfig(
-  config: Partial<AgentConfig> & { prompt?: string },
+  config: Partial<AgentConfig> & { prompt?: string; auto_inputs?: boolean },
 ): AgentConfig {
   if (!config.name) throw new Error("name is required");
   if (!config.description) throw new Error("description is required");
@@ -493,6 +494,9 @@ export function validateAgentConfig(
     ...(derivedJsonSchema !== undefined ? { jsonSchema: derivedJsonSchema } : {}),
     ...(config.outputs !== undefined ? { outputs: config.outputs } : {}),
     ...(config.inputs !== undefined ? { inputs: config.inputs } : {}),
+    ...(config.autoInputs !== undefined || (config as any).auto_inputs !== undefined
+      ? { autoInputs: config.autoInputs ?? Boolean((config as any).auto_inputs) }
+      : {}),
     ...(config.loop !== undefined ? { loop: config.loop } : {}),
     ...(config.maxIterations !== undefined ? { maxIterations: config.maxIterations } : {}),
   };
