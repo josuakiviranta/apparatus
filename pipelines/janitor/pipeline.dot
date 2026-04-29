@@ -4,7 +4,7 @@ digraph janitor {
   inputs="project"
 
   start [shape=Mdiamond]
-  janitor [agent="janitor", prompt="Run the janitor procedure for $project."]
+  janitor [agent="janitor"]
   done [shape=Msquare]
 
   start -> janitor -> done
