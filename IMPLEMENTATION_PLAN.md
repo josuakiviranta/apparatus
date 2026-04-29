@@ -1612,7 +1612,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 - [x] 5. conditional (commit 2aca955)
 - [x] 6. gate
 - [x] 7. json-schema-stream (commit deb434e)
-- [ ] 8. meditate-steer
+- [x] 8. meditate-steer
 - [ ] 9. missing-caller-var
 - [ ] 10. static-multi-node
 - [ ] 11. store
