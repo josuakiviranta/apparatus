@@ -3,20 +3,11 @@ digraph static_multi_node {
 
   start [shape=Mdiamond]
 
-  node_a [
-    agent="task",
-    prompt="Output exactly one line: 'node-a: ok'. Do NOT use any tools."
-  ]
+  node_a [agent="node_a"]
 
-  node_b [
-    agent="task",
-    prompt="Output exactly one line: 'node-b: ok'. Do NOT use any tools."
-  ]
+  node_b [agent="node_b"]
 
-  node_c [
-    agent="task",
-    prompt="Output exactly one line: 'node-c: ok'. Do NOT use any tools."
-  ]
+  node_c [agent="node_c"]
 
   done [shape=Msquare]
 
