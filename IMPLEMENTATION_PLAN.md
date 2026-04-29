@@ -1,169 +1,1671 @@
-# Pipeline Folder Architecture Redesign — Implementation Plan
+# Agent Output Validation and Retry — Implementation Plan
 
-> **For agentic workers:** This plan is in its post-shipping summary state. The Pipeline Folder Architecture Redesign (D8) is COMPLETE at v0.1.61. When the next initiative is scoped, follow the "Next plan" section below — use superpowers:writing-plans to draft the new chunks, then superpowers:subagent-driven-development (or superpowers:executing-plans) to implement them with task checkboxes.
+> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Migrate ralph-cli pipelines from scattered concept folders to per-pipeline folders with self-describing node files. Net: `src/` becomes the harness, `pipelines/` becomes behavior, concept count for authors drops from 7 to ~3.
+**Goal:** Finish wiring chunk-1's `outputs:` frontmatter into the runtime, add self-healing validation retry inside the agent handler, persist the failure trail in run dirs + JSONL trace, delete the legacy `json_schema_file=` attribute, and migrate the 7 remaining `.json` schema files into per-agent frontmatter.
 
-**Architecture:** Six sequential chunks, each producing working software. Chunk 1 lands `outputs:` frontmatter on agents (foundation). Chunk 2 adds `inputs:` + flow validator (safety net for later moves). Chunk 3 moves gates to `.md` files. Chunk 4 migrates project pipelines to per-folder layout and relocates agents out of `src/cli/agents/`. Chunk 5 introduces `src/cli/templates/` and converts `pipeline create` to a pipeline. Chunk 6 collapses remaining workflow commands (`plan`, `meditate`, `new`, `pipeline refine`) to pipelines.
+**Architecture:** Handler reads `config.jsonSchema` (already derived from `outputs:` per `agent.ts:464`) when `node.jsonSchemaFile` is absent. A new `outputs-to-zod.ts` helper builds a `z.ZodObject` from the frontmatter fragment. After every agent run, the handler `safeParse`s the output; on failure it persists the raw output, emits a JSONL `validation-failure` event, opens a TUI iteration block via the existing `onIterationStart` hook, then re-invokes the agent via `--resume <sessionId>` with a corrective user turn. Cap defaults to 1 retry; per-node override `output_validation_retries=N`. After cap exhaustion, the node fails with `agent.success=false` so the engine's existing retry idiom (`max_retries=N`, condition self-edges) can compose on top.
 
-**Tech Stack:** TypeScript, Node.js, vitest, zod (already in use for node schemas), `yaml` (already a dep, used by `parseFrontmatter`), graphviz (`@ts-graphviz/ast`, existing).
+**Tech Stack:** TypeScript, Node.js, vitest, zod (already in use in `src/attractor/core/schemas.ts`), `yaml` (already a dep), `@ts-graphviz/ast` (existing, used for SVG rendering).
 
-**Spec:** `docs/superpowers/specs/2026-04-27-pipeline-folder-architecture-redesign.md`
-
-**Plan structure note:** This plan was originally written chunk-by-chunk with full TDD step expansion. After all six chunks shipped (v0.1.61, tag `chunk-6-command-templates`), the verbose per-task blocks were collapsed into the chunk-by-chunk summaries below. Per-chunk implementation lessons live in the memory folder linked from each summary; this file is now the high-level historical index.
+**Spec:** `docs/superpowers/specs/2026-04-29-agent-output-validation-and-retry.md`
 
 ---
 
 ## File Structure
 
-The redesign touches files across the engine, CLI, and pipelines. Below is the high-level inventory; each chunk specifies exact files.
-
-| Area | Files | What changes |
+| Area | File | What changes |
 |---|---|---|
-| `src/attractor/core/schemas.ts` | Modify | Add `inputs:`, `outputs:` to `AgentNodeSchema`. Add `GateNodeFrontmatterSchema` for new `.md`-based gates. Add validation refinements (D2 conflict, D5 flow rules). |
-| `src/attractor/core/graph.ts` | Modify | Extend validator with `outputs_and_schema_file_conflict`, `derive_produces_from_outputs`, `missing_input_producer`, `branch_incomplete_input`, `input_type_mismatch`, `orphan_output`, `required_caller_vars`, `degenerate_pipeline`. |
-| `src/cli/lib/agent.ts` | Modify | Extend `AgentConfig` interface with optional `inputs?: string[]` and `outputs?: Record<string, JsonSchemaFragment>`. Modify the literal-object factory `validateAgentConfig` (`:420-437`) to derive a JSON Schema from `outputs:` and serialize it into the existing `jsonSchema?: string` field. **No change to runtime path** (agent-handler uses `config.jsonSchema` unchanged). |
-| `src/cli/lib/agent-registry.ts` | Verify only (Chunk 1) | `parseAgentFile` (`:35-38`) already spreads `...attributes` into `validateAgentConfig`, so `outputs`/`inputs` flow through automatically. Tested end-to-end via `resolveAgent`. After Chunk 4, lookup order changes (pipeline folder first, no fallback). |
-| `src/attractor/handlers/agent-handler.ts` | No change in Chunk 1 | The runtime path consumes `config.jsonSchema` (string) and merges every key from the parsed LLM output into `contextUpdates`. No filtering by `produces=`. Chunk 1's frontmatter changes feed the same `jsonSchema` field; no handler edit needed. |
-| `src/cli/agents/*.md` | Move (Chunks 4-6) | Each agent file moves into the pipeline folder that uses it (with `outputs:`/`inputs:` added). |
-| `src/cli/prompts/*.md` | Delete (Chunks 5-6) | All bespoke prompts dissolved into templates. |
-| `src/cli/templates/*` | Create (Chunk 5) | Bundled pipeline starters: `blank/`, `pipeline-create/`, plus `meditate/`, `plan/`, `new/`, `pipeline-refine/` in Chunk 6. |
-| `src/cli/lib/assets.ts` | Modify (Chunk 5) | Add `getBundledTemplatesDir()` mirroring `getBundledAgentsDir()`. |
-| `src/cli/commands/{plan,meditate,new}.ts` | Modify (Chunk 6) | Collapse to thin shims that call `runPipeline(bundledTemplatePath, vars)`. |
-| `pipelines/<name>.dot` | Move (Chunk 4) | Each becomes `pipelines/<name>/pipeline.dot` + per-node files. |
-| `pipelines/scripts/*` | Move + delete (Chunk 4) | Scripts move into the pipeline folder that uses them; folder deleted. |
-| `pipelines/schemas/*` | Delete (Chunks 1, 4) | Schemas dissolved into agent `outputs:`. Folder deleted at end of Chunk 4. |
+| Handler unification | `src/attractor/handlers/agent-handler.ts` | Use `config.jsonSchema` when `node.jsonSchemaFile` absent. Add validation+retry loop using the extracted `evaluate-agent-output` helper. Write `raw-attempt-N.txt` per attempt. Emit `onValidationFailure` callbacks. |
+| Output evaluator | `src/attractor/handlers/evaluate-agent-output.ts` (NEW) | `evaluateAgentOutput(raw, zodSchema) → {ok, parsed} | {ok:false, errors}`. Parses stream-json, extracts the result payload, runs zod safeParse. Pure helper, easily unit-testable. |
+| Agent SDK | `src/cli/lib/agent.ts` | Allow `-p` + stdin pipe on `isResume` runs so corrective message reaches a resumed session. |
+| Zod builder | `src/cli/lib/outputs-to-zod.ts` (NEW) | Convert `Record<string, JsonSchemaFragment>` → `z.ZodObject`. Strict accept-list: string/number/boolean/enum/array-of-primitives/nullable/maxLength/description. Throw on unsupported shapes. |
+| Corrective message | `src/cli/lib/corrective-message.ts` (NEW) | `buildCorrectiveMessage(rawOutput, errors, schemaJsonString) → string`. Two paths: empty-output, invalid-output. |
+| Tracer | `src/attractor/tracer/jsonl-pipeline-tracer.ts` | Add `onValidationFailure({nodeReceiveId, node, attempt, errors, rawOutputPath})` writing `validation-failure` events via `this.append`. |
+| Tracer interface | `src/attractor/tracer/pipeline-tracer.ts` | Add optional `onValidationFailure?` method matching the existing `on*` naming convention. |
+| Engine wiring | `src/attractor/core/engine.ts` | Add `onValidationRetryStart` to `EngineRunOptions`. In `meta` block, inject `onValidationFailure` (closes over `nodeReceiveId` + `node` and forwards to `traceWriter.onValidationFailure`) and `onValidationRetryStart`. |
+| Handler context | `src/attractor/handlers/registry.ts` | Add `onValidationFailure?: (...) => void` and `onValidationRetryStart?: (nodeId, attempt) => void` to `HandlerExecutionContext`. Engine injects `nodeReceiveId` so the handler does not need to know it. |
+| Pipeline command wiring | `src/cli/commands/pipeline.ts` | Provide `onValidationRetryStart` that emits a TUI iteration block via existing `emit({kind:"start"...})`. Extend `--node-receive` view to surface validation attempts inline (filtered by `nodeReceiveId`). |
+| Node schema | `src/attractor/core/schemas.ts` | Delete `jsonSchemaFile` field from `AgentNodeSchema`. Add `outputValidationRetries: z.coerce.number().int().nonnegative().optional()`. |
+| Validator | `src/attractor/core/graph.ts` | Add `agent_missing_outputs` rule (error) + `agent_outputs_empty` rule (warning) per spec D2. |
+| Pipeline show annotation | `src/cli/commands/pipeline.ts` (or sibling `pipeline-show.ts` if extracted) | Augment SVG render pass with declared inputs/outputs sublabels per agent node and edge labels for inferred data flow. |
+| Migration target | `pipelines/illumination-to-implementation/` | Fold 7 `.json` files into agent `.md` frontmatter; remove `json_schema_file=...` attributes from `pipeline.dot`; declare `outputs: {}` on `implement.md`; append prompt fix to `verifier.md`. |
+| Tests | `src/attractor/tests/agent-handler-validation.test.ts` (NEW), `src/attractor/tests/agent-handler-retry.test.ts` (NEW), `src/cli/tests/outputs-to-zod.test.ts` (NEW), `src/cli/tests/corrective-message.test.ts` (NEW), `src/attractor/tests/agent-handler-frontmatter-jsonschema.test.ts` (NEW), `src/attractor/tests/pipeline-tracer.test.ts` (extend), `src/attractor/tests/graph-validator.test.ts` (extend), `src/cli/tests/pipeline-trace-command.test.ts` (extend), `src/cli/tests/pipeline-show.test.ts` (extend) | New + extended tests per chunk. |
 
 ---
 
-## Chunk 1: `outputs:` frontmatter + verifier migration (D2) — SHIPPED 2026-04-27
+## Chunk 1: Handler unification + zod builder + verifier prompt fix
 
-**Tag:** `chunk-1-outputs-frontmatter` (commits ending at `4ee0d28`)
-**What landed:** Agent frontmatter parser learned `outputs:`; `validateAgentConfig` now derives a serialized JSON Schema into the existing `jsonSchema` string field, leaving the runtime path untouched. Validator gained `outputs_and_schema_file_conflict` + `produces_redundant_with_outputs` and derives `nodeProduces` from `outputs:` keys. The `verifier` agent migrated end-to-end as proof and `pipelines/schemas/verifier.json` was deleted.
-**Tasks:** 7 tasks complete. Key files touched: `src/cli/lib/agent.ts`, `src/cli/lib/frontmatter.ts`, `src/attractor/core/graph.ts`, `src/cli/agents/verifier.md`.
-**Carry-overs / notes:** Stale-cache caveat for agent registry surfaced; `debugProducedKeys` seam introduced to make validator output testable.
-**Memory file:** `2026-04-27-pipeline-redesign-chunk-1-implementation.md`
+**Ships green:** `outputs:`-only agents (no `json_schema_file=` on the node) now activate the structured-output parse path. Verifier-style failures from chunk-1 stop being silent. Verifier prompt one-liner reduces the empty-output trap.
+
+### Task 1.1 — Handler reads `config.jsonSchema` when `node.jsonSchemaFile` absent
+
+**Files:**
+- Test: `src/attractor/tests/agent-handler-frontmatter-jsonschema.test.ts` (NEW)
+- Modify: `src/attractor/handlers/agent-handler.ts:69-78`
+
+- [x] **Step 1: Write the failing test**
+
+```ts
+// src/attractor/tests/agent-handler-frontmatter-jsonschema.test.ts
+import { describe, it, expect, vi } from "vitest";
+import { AgentHandler } from "../handlers/agent-handler.js";
+
+describe("AgentHandler — frontmatter outputs activates parse path", () => {
+  it("uses config.jsonSchema when node has no json_schema_file", async () => {
+    const fakeAgent = {
+      run: vi.fn().mockResolvedValue({
+        exitCode: 0,
+        sessionId: "s-1",
+        output: JSON.stringify([
+          { type: "system", subtype: "init", session_id: "s-1" },
+          { type: "result", subtype: "success", result: '{"foo":"bar"}' },
+        ]),
+      }),
+    };
+    const handler = new AgentHandler({
+      resolveAgent: () => ({
+        name: "a", description: "d", model: "opus",
+        permissionMode: "default", tools: [], mcp: [], prompt: "",
+        outputs: { foo: "string" },
+        jsonSchema: '{"type":"object","properties":{"foo":{"type":"string"}},"required":["foo"],"additionalProperties":false}',
+      }) as any,
+      createAgent: () => fakeAgent as any,
+    });
+    const node: any = { id: "n1", agent: "a", prompt: "do it" };
+    const ctx: any = { values: {} };
+    const meta: any = {
+      logsRoot: "/tmp/test-runs", cwd: process.cwd(), dotDir: "/tmp",
+      completedNodes: [], nodeRetries: {},
+    };
+    const outcome = await handler.execute(node, ctx, meta);
+    expect(outcome.status).toBe("success");
+    expect(outcome.contextUpdates).toMatchObject({ foo: "bar" });
+  });
+});
+```
+
+- [x] **Step 2: Run test to verify it fails**
+
+Run: `npx vitest run src/attractor/tests/agent-handler-frontmatter-jsonschema.test.ts`
+Expected: FAIL — `contextUpdates` will not contain `foo` because handler skips parse path.
+
+- [x] **Step 3: Modify handler to fall back to `config.jsonSchema`**
+
+In `src/attractor/handlers/agent-handler.ts` replace the block at lines 69-78:
+
+```ts
+// Read JSON schema: prefer node.jsonSchemaFile (legacy, deleted in chunk 3),
+// fall back to config.jsonSchema derived from agent frontmatter outputs:.
+const jsonSchemaFile = node.jsonSchemaFile as string | undefined;
+let jsonSchema: string | undefined;
+if (jsonSchemaFile) {
+  try {
+    jsonSchema = readFileSync(resolve(dotDir, jsonSchemaFile), "utf8");
+  } catch (err) {
+    return { status: "fail", failureReason: `Failed to read json_schema_file "${jsonSchemaFile}": ${(err as Error).message}` };
+  }
+} else if (config.jsonSchema) {
+  jsonSchema = config.jsonSchema;
+}
+```
+
+- [x] **Step 4: Run test to verify it passes**
+
+Run: `npx vitest run src/attractor/tests/agent-handler-frontmatter-jsonschema.test.ts`
+Expected: PASS.
+
+- [x] **Step 5: Run full test suite to confirm no regressions**
+
+Run: `npm test`
+Expected: All tests pass.
+
+- [x] **Step 6: Commit**
+
+```bash
+git add src/attractor/handlers/agent-handler.ts src/attractor/tests/agent-handler-frontmatter-jsonschema.test.ts
+git commit -m "feat(handler): activate parse path from frontmatter outputs:"
+```
+
+### Task 1.2 — `outputs-to-zod.ts` strict accept-list helper
+
+**Files:**
+- Create: `src/cli/lib/outputs-to-zod.ts`
+- Test: `src/cli/tests/outputs-to-zod.test.ts` (NEW)
+
+- [x] **Step 1: Write the failing tests covering the strict accept-list**
+
+```ts
+// src/cli/tests/outputs-to-zod.test.ts
+import { describe, it, expect } from "vitest";
+import { outputsToZod } from "../lib/outputs-to-zod.js";
+
+describe("outputsToZod", () => {
+  it("shorthand string", () => {
+    const schema = outputsToZod({ foo: "string" });
+    expect(schema.safeParse({ foo: "x" }).success).toBe(true);
+    expect(schema.safeParse({ foo: 1 }).success).toBe(false);
+  });
+
+  it("shorthand number/boolean", () => {
+    const s = outputsToZod({ n: "number", b: "boolean" });
+    expect(s.safeParse({ n: 1, b: true }).success).toBe(true);
+    expect(s.safeParse({ n: "1", b: true }).success).toBe(false);
+  });
+
+  it("enum", () => {
+    const s = outputsToZod({ label: { enum: ["true", "false", "empty"] } });
+    expect(s.safeParse({ label: "true" }).success).toBe(true);
+    expect(s.safeParse({ label: "maybe" }).success).toBe(false);
+  });
+
+  it("array of primitives", () => {
+    const s = outputsToZod({ xs: { type: "array", items: "string" } });
+    expect(s.safeParse({ xs: ["a","b"] }).success).toBe(true);
+    expect(s.safeParse({ xs: [1] }).success).toBe(false);
+  });
+
+  it("nullable form ([type, null])", () => {
+    const s = outputsToZod({ p: { type: ["string", "null"] } });
+    expect(s.safeParse({ p: "x" }).success).toBe(true);
+    expect(s.safeParse({ p: null }).success).toBe(true);
+    expect(s.safeParse({ p: 1 }).success).toBe(false);
+  });
+
+  it("string maxLength", () => {
+    const s = outputsToZod({ short: { type: "string", maxLength: 5 } });
+    expect(s.safeParse({ short: "abcde" }).success).toBe(true);
+    expect(s.safeParse({ short: "abcdef" }).success).toBe(false);
+  });
+
+  it("description is passive (does not affect validation)", () => {
+    const s = outputsToZod({ foo: { type: "string", description: "anything" } });
+    expect(s.safeParse({ foo: "x" }).success).toBe(true);
+  });
+
+  it("all keys required by default (no optional support)", () => {
+    const s = outputsToZod({ foo: "string", bar: "string" });
+    expect(s.safeParse({ foo: "x" }).success).toBe(false);
+  });
+
+  it("rejects unsupported fragment shapes with a clear message", () => {
+    expect(() => outputsToZod({ foo: { type: "object", properties: {} } as any }))
+      .toThrow(/outputs\[foo\]: unsupported fragment shape/);
+    expect(() => outputsToZod({ foo: { type: "number", minimum: 0 } as any }))
+      .toThrow(/outputs\[foo\]: unsupported fragment shape/);
+  });
+});
+```
+
+- [x] **Step 2: Run tests to verify they fail**
+
+Run: `npx vitest run src/cli/tests/outputs-to-zod.test.ts`
+Expected: FAIL — module does not exist.
+
+- [x] **Step 3: Implement `outputs-to-zod.ts`**
+
+```ts
+// src/cli/lib/outputs-to-zod.ts
+import { z, type ZodObject, type ZodTypeAny } from "zod";
+import type { JsonSchemaFragment } from "./agent.js";
+
+const ALLOWED_KEYS_OBJECT = new Set(["type", "enum", "items", "maxLength", "description"]);
+
+function fragmentToZod(key: string, frag: JsonSchemaFragment): ZodTypeAny {
+  if (typeof frag === "string") {
+    switch (frag) {
+      case "string": return z.string();
+      case "number": return z.number();
+      case "boolean": return z.boolean();
+      default:
+        throw new Error(`outputs[${key}]: unsupported fragment shape (shorthand "${frag}"). Supported shorthands: string, number, boolean.`);
+    }
+  }
+  const obj = frag as Record<string, unknown>;
+  const unknownKeys = Object.keys(obj).filter(k => !ALLOWED_KEYS_OBJECT.has(k));
+  if (unknownKeys.length > 0) {
+    throw new Error(`outputs[${key}]: unsupported fragment shape (unknown keys: ${unknownKeys.join(", ")}). Supported: type (string|number|boolean|array), enum, items, maxLength, description, nullable form ([type, "null"]).`);
+  }
+  // enum
+  if (Array.isArray(obj.enum)) {
+    const values = obj.enum.map(String);
+    return z.enum(values as [string, ...string[]]);
+  }
+  // array
+  if (obj.type === "array") {
+    const items = obj.items;
+    if (typeof items !== "string") {
+      throw new Error(`outputs[${key}]: array requires items: <primitive type>`);
+    }
+    const inner = fragmentToZod(`${key}.items`, items as JsonSchemaFragment);
+    return z.array(inner);
+  }
+  // nullable ([type, "null"])
+  if (Array.isArray(obj.type) && obj.type.length === 2 && obj.type.includes("null")) {
+    const realType = obj.type.find(t => t !== "null") as string;
+    const inner = fragmentToZod(`${key}.nullable`, realType as JsonSchemaFragment);
+    return inner.nullable();
+  }
+  // string with maxLength
+  if (obj.type === "string") {
+    let s = z.string();
+    if (typeof obj.maxLength === "number") s = s.max(obj.maxLength);
+    return s;
+  }
+  if (obj.type === "number") return z.number();
+  if (obj.type === "boolean") return z.boolean();
+
+  throw new Error(`outputs[${key}]: unsupported fragment shape (type=${JSON.stringify(obj.type)}). Supported: type (string|number|boolean|array), enum, items, maxLength, description, nullable form ([type, "null"]).`);
+}
+
+export function outputsToZod(
+  outputs: Record<string, JsonSchemaFragment>,
+): ZodObject<Record<string, ZodTypeAny>> {
+  const shape: Record<string, ZodTypeAny> = {};
+  for (const [key, frag] of Object.entries(outputs)) {
+    shape[key] = fragmentToZod(key, frag);
+  }
+  return z.object(shape).strict();
+}
+```
+
+- [x] **Step 4: Run tests to verify they pass**
+
+Run: `npx vitest run src/cli/tests/outputs-to-zod.test.ts`
+Expected: PASS.
+
+- [x] **Step 5: Commit**
+
+```bash
+git add src/cli/lib/outputs-to-zod.ts src/cli/tests/outputs-to-zod.test.ts
+git commit -m "feat(outputs-to-zod): strict accept-list zod builder for outputs: frontmatter"
+```
+
+### Task 1.3 — Verifier prompt fix (cheap prevention)
+
+**Files:**
+- Modify: `pipelines/illumination-to-implementation/verifier.md` (Output section, ~line 70)
+
+- [x] **Step 1: Read verifier.md to confirm location**
+
+Run: `grep -n "# Output" pipelines/illumination-to-implementation/verifier.md`
+Expected: line ~70.
+
+- [x] **Step 2: Append the prevention line to the Output section**
+
+In `pipelines/illumination-to-implementation/verifier.md` `# Output` section, after the existing field bullets, add a final line:
+
+```
+- Emit JSON as your final TEXT response. Never inside a thinking block.
+```
+
+- [x] **Step 3: Validate the agent file still parses (re-run the existing test suite)**
+
+Run: `npx vitest run src/cli/tests/agent-registry.test.ts`
+Expected: PASS. (The agent-registry tests load real `.md` files via `parseAgentFile`; if the YAML in verifier.md is malformed, those tests will fail.)
+
+- [x] **Step 4: Commit**
+
+```bash
+git add pipelines/illumination-to-implementation/verifier.md
+git commit -m "fix(verifier): force final TEXT response (prevent thinking-block trap)"
+```
+
+### Chunk 1 Review Checkpoint
+
+- [ ] **Run plan-document-reviewer subagent against Chunk 1.** If issues found → fix in Chunk 1 → re-dispatch. Loop until ✅ Approved.
+- [ ] **Run code-reviewer subagent against the chunk-1 commits.** Address feedback in-chunk; re-dispatch if needed.
 
 ---
 
-## Chunk 2: `inputs:` frontmatter + flow validator (D5) — SHIPPED 2026-04-27
+## Chunk 2: Validation + retry loop + observability
 
-**Tag:** `chunk-2-inputs-flow-validator`
-**What landed:** Agents now declare `inputs:` (consumed context keys). Validator grew the full flow-safety ruleset: `missing_input_producer`, `branch_incomplete_input`, `input_type_mismatch`, `orphan_output`, `required_caller_vars`. Verifier agent migrated to use `inputs:`. End-to-end topology test for `illumination-to-implementation.dot` keeps the validator honest.
-**Tasks:** 13 tasks complete. Key files touched: `src/attractor/core/graph.ts`, `src/cli/agents/verifier.md`, `src/attractor/tests/`.
-**Carry-overs / notes:** `Diagnostic.nodeId` TODO logged. `RESERVED` set is duplicated between `validateGraph` and `checkRequiredCallerVars` — DRY hoist deferred until the next validator rule lands (YAGNI).
-**Memory file:** `2026-04-27-pipeline-redesign-chunk-2-shipped.md`
+**Ships green:** Empty/invalid agent output triggers a self-healing retry via `--resume <sessionId>`. Each attempt's raw output is persisted to disk and announced via JSONL `validation-failure` events. TUI renders retries as visible iteration blocks. `ralph pipeline trace --node-receive` surfaces validation attempts.
+
+### Task 2.1 — `agent.ts` supports prompt on resume
+
+**Files:**
+- Modify: `src/cli/lib/agent.ts:208-255` (the `run` method's resume/stdin branches)
+- Test: extend or add `src/cli/tests/agent-resume.test.ts` (NEW)
+
+- [ ] **Step 1: Write the failing test**
+
+```ts
+// src/cli/tests/agent-resume.test.ts
+import { describe, it, expect } from "vitest";
+import { Agent } from "../lib/agent.js";
+
+describe("Agent.run resume support", () => {
+  it("on resume, builds args with -p AND a session id", () => {
+    const a = new Agent({
+      name: "a", description: "d", model: "opus",
+      permissionMode: "default", tools: [], mcp: [], prompt: "system prompt",
+    } as any);
+    const args = a.buildArgs({ cwd: ".", resume: "sess-123" });
+    // Note: -p is added in run(); buildArgs covers --resume and --output-format
+    expect(args).toContain("--resume");
+    expect(args).toContain("sess-123");
+  });
+});
+```
+
+- [ ] **Step 2: Run test to verify current state**
+
+Run: `npx vitest run src/cli/tests/agent-resume.test.ts`
+Expected: PASS — `buildArgs` already adds `--resume` (line 155-156). This test pins the contract.
+
+- [ ] **Step 3: Modify `agent.ts:run()` to send `-p` and pipe `options.message` on resume**
+
+In `src/cli/lib/agent.ts`, replace lines 210-213:
+
+```ts
+// Add -p for non-interactive runs (resume or fresh — corrective message
+// goes via stdin in both cases)
+if (!isInteractive) {
+  args.unshift("-p");
+}
+```
+
+And replace lines 248-255:
+
+```ts
+// Pipe content for non-interactive runs.
+// Resume: only the new user-turn (system prompt already in the resumed session).
+// Fresh: full system prompt, optionally followed by an initial message.
+if (!isInteractive && child.stdin) {
+  const stdinContent = isResume
+    ? (options.message ?? "")
+    : (options.message
+        ? `${expandedPrompt}\n\n${options.message}`
+        : expandedPrompt);
+  child.stdin.write(stdinContent);
+  child.stdin.end();
+}
+```
+
+- [ ] **Step 4: Add a behavioural test that resume + message reaches stdin**
+
+Append to `src/cli/tests/agent-resume.test.ts`:
+
+```ts
+import { spawn } from "node:child_process";
+import { vi } from "vitest";
+
+vi.mock("node:child_process", () => ({
+  spawn: vi.fn(),
+}));
+
+it("on resume with message, pipes only the message to stdin", async () => {
+  const writes: string[] = [];
+  const fakeChild: any = {
+    stdin: { write: (c: string) => writes.push(c), end: () => {}, destroyed: false },
+    stdout: null,
+    once: vi.fn(),
+    kill: vi.fn(),
+    pid: 1234,
+  };
+  (spawn as any).mockReturnValue(fakeChild);
+
+  const a = new Agent({
+    name: "a", description: "d", model: "opus",
+    permissionMode: "dangerouslySkipPermissions", tools: [], mcp: [], prompt: "system",
+  } as any);
+
+  // Fire-and-forget: we only care that stdin received the message before
+  // the (mocked) child loop completes. Use a short race.
+  void a.run({ cwd: ".", resume: "s-1", message: "fix your output" }).catch(() => {});
+  await new Promise(r => setTimeout(r, 10));
+
+  expect(writes).toContain("fix your output");
+  expect(writes.find(w => w.includes("system"))).toBeUndefined();
+});
+```
+
+- [ ] **Step 5: Run tests to verify they pass**
+
+Run: `npx vitest run src/cli/tests/agent-resume.test.ts`
+Expected: PASS.
+
+- [ ] **Step 6: Run full test suite to confirm no regressions**
+
+Run: `npm test`
+Expected: All tests pass.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add src/cli/lib/agent.ts src/cli/tests/agent-resume.test.ts
+git commit -m "feat(agent): pipe corrective message to stdin on --resume"
+```
+
+### Task 2.2 — `corrective-message.ts` builder
+
+**Files:**
+- Create: `src/cli/lib/corrective-message.ts`
+- Test: `src/cli/tests/corrective-message.test.ts` (NEW)
+
+- [ ] **Step 1: Write the failing tests**
+
+```ts
+// src/cli/tests/corrective-message.test.ts
+import { describe, it, expect } from "vitest";
+import { buildCorrectiveMessage } from "../lib/corrective-message.js";
+
+describe("buildCorrectiveMessage", () => {
+  const schema = '{"type":"object","properties":{"foo":{"type":"string"}},"required":["foo"]}';
+
+  it("empty output → no-text-content phrasing + thinking-block warning", () => {
+    const msg = buildCorrectiveMessage(
+      "",
+      [{ path: "(root)", message: "no text content in response" }],
+      schema,
+    );
+    expect(msg).toMatch(/no text content/i);
+    expect(msg).toMatch(/thinking block/i);
+    expect(msg).toContain(schema);
+  });
+
+  it("invalid output → lists errors + truncates raw to 500 chars", () => {
+    const raw = "x".repeat(1000);
+    const msg = buildCorrectiveMessage(
+      raw,
+      [{ path: "foo", message: "Expected string, received number" }],
+      schema,
+    );
+    expect(msg).toMatch(/foo/);
+    expect(msg).toMatch(/Expected string/);
+    expect(msg).not.toContain("x".repeat(1000));
+    expect(msg).toContain("x".repeat(500));
+  });
+});
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+Run: `npx vitest run src/cli/tests/corrective-message.test.ts`
+Expected: FAIL — module does not exist.
+
+- [ ] **Step 3: Implement `corrective-message.ts`**
+
+```ts
+// src/cli/lib/corrective-message.ts
+const RAW_TRUNCATE = 500;
+
+export interface ValidationError {
+  path: string;
+  message: string;
+}
+
+export function buildCorrectiveMessage(
+  rawOutput: string,
+  errors: ValidationError[],
+  schemaJsonString: string,
+): string {
+  const trimmed = rawOutput.trim();
+  if (trimmed.length === 0) {
+    return [
+      "Your previous response had no text content — the response body was empty",
+      "(possibly because the JSON ended up inside a thinking block).",
+      "",
+      "Required output schema:",
+      schemaJsonString,
+      "",
+      "Re-emit your verdict NOW as a plain TEXT response. JSON only.",
+      "Do NOT place the JSON inside a thinking block — emit as text content.",
+    ].join("\n");
+  }
+  const truncated = rawOutput.length > RAW_TRUNCATE
+    ? rawOutput.slice(0, RAW_TRUNCATE) + "..."
+    : rawOutput;
+  const errorBullets = errors
+    .map(e => `  • ${e.path || "(root)"}: ${e.message}`)
+    .join("\n");
+  return [
+    "Your previous response failed schema validation:",
+    errorBullets,
+    "",
+    "Your previous raw response (first 500 chars):",
+    "<<<",
+    truncated,
+    ">>>",
+    "",
+    "Required output schema:",
+    schemaJsonString,
+    "",
+    "Re-emit valid JSON matching the schema. Plain TEXT response, no thinking block, no markdown fences.",
+  ].join("\n");
+}
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+Run: `npx vitest run src/cli/tests/corrective-message.test.ts`
+Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/cli/lib/corrective-message.ts src/cli/tests/corrective-message.test.ts
+git commit -m "feat(corrective-message): deterministic builder for empty/invalid output retry"
+```
+
+### Task 2.3 — Tracer extension: `onValidationFailure`
+
+**Files:**
+- Modify: `src/attractor/tracer/pipeline-tracer.ts` (interface — existing methods are `onPipelineStart`/`onNodeStart`/`onNodeEnd`/`onPipelineEnd`; add `onValidationFailure?` matching that naming convention)
+- Modify: `src/attractor/tracer/jsonl-pipeline-tracer.ts` (implementation — uses `private append(...)`, NOT `write`)
+- Test: `src/attractor/tests/pipeline-tracer-validation.test.ts` (NEW)
+
+- [ ] **Step 1: Read existing tracer files to confirm shape**
+
+Run: `cat src/attractor/tracer/pipeline-tracer.ts src/attractor/tracer/jsonl-pipeline-tracer.ts`
+Confirm: methods are `onPipelineStart`, `onNodeStart`, `onNodeEnd`, `onPipelineEnd`. The serializer is `private append(event: object)` at the bottom of `jsonl-pipeline-tracer.ts`.
+
+- [ ] **Step 2: Write the failing tracer test**
+
+```ts
+// src/attractor/tests/pipeline-tracer-validation.test.ts (NEW)
+import { describe, it, expect } from "vitest";
+import { mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { JsonlPipelineTracer } from "../tracer/jsonl-pipeline-tracer.js";
+
+describe("JsonlPipelineTracer.onValidationFailure", () => {
+  it("emits a validation-failure event line", () => {
+    const dir = mkdtempSync(join(tmpdir(), "tracer-"));
+    const path = join(dir, "pipeline.jsonl");
+    const t = new JsonlPipelineTracer(path);
+    const fakeNode = { id: "verifier" } as any;
+    t.onValidationFailure({
+      nodeReceiveId: "verifier-734e",
+      node: fakeNode,
+      attempt: 1,
+      errors: [{ path: "preferred_label", message: "Required" }],
+      rawOutputPath: "verifier/raw-attempt-1.txt",
+    });
+    const lines = readFileSync(path, "utf8").trim().split("\n");
+    const evt = JSON.parse(lines[lines.length - 1]);
+    expect(evt.kind).toBe("validation-failure");
+    expect(evt.nodeReceiveId).toBe("verifier-734e");
+    expect(evt.nodeId).toBe("verifier");
+    expect(evt.attempt).toBe(1);
+    expect(evt.errors[0]).toMatchObject({ path: "preferred_label" });
+    expect(evt.rawOutputPath).toBe("verifier/raw-attempt-1.txt");
+    expect(typeof evt.timestamp).toBe("string");
+  });
+});
+```
+
+- [ ] **Step 3: Run test to verify it fails**
+
+Run: `npx vitest run src/attractor/tests/pipeline-tracer-validation.test.ts`
+Expected: FAIL — method missing.
+
+- [ ] **Step 4: Add `onValidationFailure` to interface and implementation**
+
+In `src/attractor/tracer/pipeline-tracer.ts` add to the `PipelineTracer` interface (after the existing `onPipelineEnd` line):
+
+```ts
+onValidationFailure?(meta: {
+  nodeReceiveId: string;
+  node: Node;
+  attempt: number;
+  errors: Array<{ path: string; message: string }>;
+  rawOutputPath: string;
+}): void;
+```
+
+In `src/attractor/tracer/jsonl-pipeline-tracer.ts` add the method following the same shape as `onNodeEnd` (uses `this.append`):
+
+```ts
+onValidationFailure({ nodeReceiveId, node, attempt, errors, rawOutputPath }: {
+  nodeReceiveId: string;
+  node: Node;
+  attempt: number;
+  errors: Array<{ path: string; message: string }>;
+  rawOutputPath: string;
+}): void {
+  this.append({
+    kind: "validation-failure",
+    nodeReceiveId,
+    nodeId: node.id,
+    attempt,
+    errors,
+    rawOutputPath,
+    timestamp: new Date().toISOString(),
+  });
+}
+```
+
+- [ ] **Step 5: Run test to verify it passes**
+
+Run: `npx vitest run src/attractor/tests/pipeline-tracer-validation.test.ts`
+Expected: PASS.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add src/attractor/tracer/pipeline-tracer.ts src/attractor/tracer/jsonl-pipeline-tracer.ts src/attractor/tests/pipeline-tracer-validation.test.ts
+git commit -m "feat(tracer): add onValidationFailure for retry observability"
+```
+
+### Task 2.4 — Extract `evaluate-agent-output.ts` helper
+
+The validation+retry loop in the next task is large enough that inlining the parse/validate logic in `agent-handler.ts` would push that file into hard-to-reason-about territory. Extract a focused helper first.
+
+**Files:**
+- Create: `src/attractor/handlers/evaluate-agent-output.ts`
+- Test: `src/attractor/tests/evaluate-agent-output.test.ts` (NEW)
+
+- [ ] **Step 1: Write the failing tests**
+
+```ts
+// src/attractor/tests/evaluate-agent-output.test.ts
+import { describe, it, expect } from "vitest";
+import { z } from "zod";
+import { evaluateAgentOutput } from "../handlers/evaluate-agent-output.js";
+
+const zodSchema = z.object({ foo: z.string() }).strict();
+
+describe("evaluateAgentOutput", () => {
+  it("empty output → fail with 'no text content' error", () => {
+    const r = evaluateAgentOutput("", zodSchema);
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.errors[0]).toMatchObject({ path: "(root)" });
+    expect(r.errors[0].message).toMatch(/no text content/i);
+  });
+
+  it("stream-json with valid result → ok", () => {
+    const stream =
+      '{"type":"system","subtype":"init","session_id":"s"}\n' +
+      '{"type":"result","subtype":"success","result":"{\\"foo\\":\\"bar\\"}"}';
+    const r = evaluateAgentOutput(stream, zodSchema);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.parsed).toEqual({ foo: "bar" });
+  });
+
+  it("stream-json with structured_output payload → ok", () => {
+    const stream =
+      '{"type":"system","subtype":"init","session_id":"s"}\n' +
+      '{"type":"result","subtype":"success","structured_output":{"foo":"x"}}';
+    const r = evaluateAgentOutput(stream, zodSchema);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.parsed).toEqual({ foo: "x" });
+  });
+
+  it("schema mismatch → fail with zod path/message", () => {
+    const stream =
+      '{"type":"result","subtype":"success","result":"{\\"foo\\":1}"}';
+    const r = evaluateAgentOutput(stream, zodSchema);
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.errors[0].path).toBe("foo");
+    expect(r.errors[0].message).toMatch(/string/i);
+  });
+
+  it("unparseable JSON → fail", () => {
+    const r = evaluateAgentOutput("not json at all", zodSchema);
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.errors[0].message).toMatch(/JSON/i);
+  });
+
+  it("no zodSchema → ok when JSON parseable, no validation", () => {
+    const stream =
+      '{"type":"result","subtype":"success","result":"{\\"any\\":1}"}';
+    const r = evaluateAgentOutput(stream, null);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.parsed).toEqual({ any: 1 });
+  });
+});
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+Run: `npx vitest run src/attractor/tests/evaluate-agent-output.test.ts`
+Expected: FAIL — module does not exist.
+
+- [ ] **Step 3: Implement `evaluate-agent-output.ts`**
+
+```ts
+// src/attractor/handlers/evaluate-agent-output.ts
+import type { ZodObject, ZodTypeAny } from "zod";
+
+export interface ValidationError { path: string; message: string }
+
+export type EvaluationResult =
+  | { ok: true; parsed: Record<string, unknown>; raw: string }
+  | { ok: false; errors: ValidationError[]; raw: string };
+
+/**
+ * Inspect a buffered agent stdout (stream-json) and return either the parsed
+ * structured result or a list of validation errors.
+ *
+ * Empty input → single "no text content" error (the verifier-style trap).
+ * Schema validation runs only when zodSchema is non-null.
+ */
+export function evaluateAgentOutput(
+  raw: string,
+  zodSchema: ZodObject<Record<string, ZodTypeAny>> | null,
+): EvaluationResult {
+  if (!raw || raw.trim().length === 0) {
+    return {
+      ok: false,
+      raw: "",
+      errors: [{ path: "(root)", message: "no text content in response" }],
+    };
+  }
+  const resultPayload = extractResultPayload(raw) ?? raw;
+  const jsonMatch = resultPayload.match(/\{"[\s\S]*\}/) ?? resultPayload.match(/\{[\s\S]*\}/);
+  const jsonStr = jsonMatch ? jsonMatch[0] : resultPayload;
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(jsonStr);
+  } catch (e) {
+    return {
+      ok: false,
+      raw,
+      errors: [{ path: "(root)", message: `JSON parse failed: ${(e as Error).message}` }],
+    };
+  }
+  if (zodSchema) {
+    const result = zodSchema.safeParse(parsed);
+    if (!result.success) {
+      return {
+        ok: false,
+        raw,
+        errors: result.error.issues.map(i => ({
+          path: i.path.length === 0 ? "(root)" : i.path.join("."),
+          message: i.message,
+        })),
+      };
+    }
+    return { ok: true, parsed: result.data, raw };
+  }
+  return { ok: true, parsed, raw };
+}
+
+function extractResultPayload(raw: string): string | undefined {
+  let payload: string | undefined;
+  for (const line of raw.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("{")) continue;
+    let evt: Record<string, unknown>;
+    try { evt = JSON.parse(trimmed) as Record<string, unknown>; }
+    catch { continue; }
+    if (evt.type !== "result") continue;
+    if (evt.structured_output != null) {
+      payload = typeof evt.structured_output === "string"
+        ? evt.structured_output
+        : JSON.stringify(evt.structured_output);
+    } else if (evt.result != null && evt.result !== "") {
+      payload = typeof evt.result === "string"
+        ? evt.result
+        : JSON.stringify(evt.result);
+    }
+  }
+  return payload;
+}
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+Run: `npx vitest run src/attractor/tests/evaluate-agent-output.test.ts`
+Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/attractor/handlers/evaluate-agent-output.ts src/attractor/tests/evaluate-agent-output.test.ts
+git commit -m "feat(handlers): extract evaluate-agent-output helper for parse + zod validation"
+```
+
+### Task 2.5 — Handler validation + retry loop
+
+**Files:**
+- Modify: `src/attractor/handlers/agent-handler.ts` (replace existing parse block with attempt loop using the helper from 2.4)
+- Modify: `src/attractor/handlers/registry.ts` (extend `HandlerExecutionContext` with optional callbacks)
+- Modify: `src/attractor/core/schemas.ts:22` area (add `outputValidationRetries` field on `AgentNodeSchema`)
+- Test: `src/attractor/tests/agent-handler-retry.test.ts` (NEW)
+
+- [ ] **Step 1: Add `outputValidationRetries` to `AgentNodeSchema`**
+
+In `src/attractor/core/schemas.ts` near the existing `maxRetries` field (line 22), add:
+
+```ts
+outputValidationRetries: z.coerce.number().int().nonnegative().optional()
+  .describe("Number of times to retry the agent on output validation failure (default 1)."),
+```
+
+- [ ] **Step 2: Extend `HandlerExecutionContext`**
+
+In `src/attractor/handlers/registry.ts` add to the `HandlerExecutionContext` interface (callback names mirror the tracer's `on*` convention; the `nodeReceiveId` is injected by the engine wiring in Task 2.6, so the handler does not need to know it):
+
+```ts
+onValidationFailure?: (args: {
+  attempt: number;
+  errors: Array<{ path: string; message: string }>;
+  rawOutputPath: string;
+}) => void;
+onValidationRetryStart?: (nodeId: string, attempt: number) => void;
+```
+
+- [ ] **Step 3: Write the failing handler-retry tests**
+
+```ts
+// src/attractor/tests/agent-handler-retry.test.ts
+import { describe, it, expect, vi } from "vitest";
+import { mkdtempSync, existsSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { AgentHandler } from "../handlers/agent-handler.js";
+
+function makeAgent(responses: Array<{ raw: string; sessionId?: string }>) {
+  let i = 0;
+  return {
+    run: vi.fn(async () => {
+      const r = responses[Math.min(i, responses.length - 1)];
+      i++;
+      return {
+        exitCode: 0,
+        sessionId: r.sessionId ?? "sess-1",
+        output: JSON.stringify([
+          { type: "system", subtype: "init", session_id: r.sessionId ?? "sess-1" },
+          { type: "result", subtype: "success", result: r.raw },
+        ]),
+      };
+    }),
+  };
+}
+
+function makeMeta(extra: Partial<any> = {}) {
+  const dir = mkdtempSync(join(tmpdir(), "handler-retry-"));
+  return {
+    logsRoot: dir, cwd: process.cwd(), dotDir: "/tmp",
+    completedNodes: [], nodeRetries: {},
+    ...extra,
+  };
+}
+
+const config = (extras: any = {}) => ({
+  name: "v", description: "d", model: "opus",
+  permissionMode: "default", tools: [], mcp: [], prompt: "",
+  outputs: { foo: "string" },
+  jsonSchema: '{"type":"object","properties":{"foo":{"type":"string"}},"required":["foo"],"additionalProperties":false}',
+  ...extras,
+});
+
+describe("AgentHandler — validation retry loop", () => {
+  it("invalid first attempt + valid retry → success on attempt 2", async () => {
+    const fakeAgent = makeAgent([
+      { raw: '{"wrong":"key"}', sessionId: "s-1" },
+      { raw: '{"foo":"bar"}', sessionId: "s-1" },
+    ]);
+    const handler = new AgentHandler({
+      resolveAgent: () => config() as any,
+      createAgent: () => fakeAgent as any,
+    });
+    const meta = makeMeta();
+    const outcome = await handler.execute(
+      { id: "v", agent: "v", prompt: "do" } as any,
+      { values: {} } as any,
+      meta as any,
+    );
+    expect(outcome.status).toBe("success");
+    expect(outcome.contextUpdates?.foo).toBe("bar");
+    expect(fakeAgent.run).toHaveBeenCalledTimes(2);
+    // Second call is the resume-with-message
+    expect(fakeAgent.run.mock.calls[1][0]).toMatchObject({ resume: "s-1" });
+    expect(fakeAgent.run.mock.calls[1][0].message).toMatch(/schema validation/i);
+    // Persist raw outputs
+    expect(existsSync(join(meta.logsRoot, "v", "raw-attempt-1.txt"))).toBe(true);
+    expect(existsSync(join(meta.logsRoot, "v", "raw-attempt-2.txt"))).toBe(true);
+  });
+
+  it("empty output → corrective uses no-text-content phrasing", async () => {
+    const fakeAgent = makeAgent([
+      { raw: "", sessionId: "s-2" },
+      { raw: '{"foo":"x"}', sessionId: "s-2" },
+    ]);
+    const handler = new AgentHandler({
+      resolveAgent: () => config() as any,
+      createAgent: () => fakeAgent as any,
+    });
+    const meta = makeMeta();
+    const outcome = await handler.execute(
+      { id: "v", agent: "v", prompt: "do" } as any,
+      { values: {} } as any,
+      meta as any,
+    );
+    expect(outcome.status).toBe("success");
+    expect(fakeAgent.run.mock.calls[1][0].message).toMatch(/no text content/i);
+  });
+
+  it("invalid 2 attempts → hard fail with attempts logged", async () => {
+    const fakeAgent = makeAgent([
+      { raw: '{"wrong":"a"}', sessionId: "s-3" },
+      { raw: '{"wrong":"b"}', sessionId: "s-3" },
+    ]);
+    const onValidationFailure = vi.fn();
+    const handler = new AgentHandler({
+      resolveAgent: () => config() as any,
+      createAgent: () => fakeAgent as any,
+    });
+    const meta = makeMeta({ onValidationFailure });
+    const outcome = await handler.execute(
+      { id: "v", agent: "v", prompt: "do" } as any,
+      { values: {} } as any,
+      meta as any,
+    );
+    expect(outcome.status).toBe("fail");
+    expect(outcome.failureReason).toMatch(/output validation failed after 2 attempts/i);
+    expect(outcome.contextUpdates?.["agent.success"]).toBe("false");
+    expect(onValidationFailure).toHaveBeenCalledTimes(2);
+    expect(existsSync(join(meta.logsRoot, "v", "raw-attempt-1.txt"))).toBe(true);
+    expect(existsSync(join(meta.logsRoot, "v", "raw-attempt-2.txt"))).toBe(true);
+  });
+
+  it("per-node output_validation_retries=0 → no retry (single attempt only)", async () => {
+    const fakeAgent = makeAgent([
+      { raw: '{"wrong":"a"}', sessionId: "s-4" },
+    ]);
+    const handler = new AgentHandler({
+      resolveAgent: () => config() as any,
+      createAgent: () => fakeAgent as any,
+    });
+    const outcome = await handler.execute(
+      { id: "v", agent: "v", prompt: "do", outputValidationRetries: 0 } as any,
+      { values: {} } as any,
+      makeMeta() as any,
+    );
+    expect(outcome.status).toBe("fail");
+    expect(fakeAgent.run).toHaveBeenCalledTimes(1);
+  });
+});
+```
+
+- [ ] **Step 4: Run tests to verify they fail**
+
+Run: `npx vitest run src/attractor/tests/agent-handler-retry.test.ts`
+Expected: FAIL — retry loop not implemented.
+
+- [ ] **Step 5: Implement validation+retry loop in `agent-handler.ts`**
+
+In `src/attractor/handlers/agent-handler.ts`:
+
+a) Add imports near the top:
+
+```ts
+import { outputsToZod } from "../../cli/lib/outputs-to-zod.js";
+import { buildCorrectiveMessage } from "../../cli/lib/corrective-message.js";
+import { evaluateAgentOutput } from "./evaluate-agent-output.js";
+```
+
+b) **Remove** the existing `if (jsonSchema && !lastResult?.output)` early-return block (currently at `agent-handler.ts:228-238`) AND the existing structured-output parse `try`/`catch` (currently at `agent-handler.ts:240-297`). These are subsumed by the loop below.
+
+c) **Remove** the now-unused `parseStructuredOutput` import at the top of the file (the helper is replaced by `evaluateAgentOutput`).
+
+d) Insert the validation+retry block in place of the deleted parse block:
+
+```ts
+// Validation + retry loop.
+// The first attempt already ran via the iteration loop above
+// (lastResult/lastSessionId hold its result). When jsonSchema is set,
+// validate and possibly retry by resuming the same Claude session.
+let structuredUpdates: Record<string, unknown> = {};
+let preferredLabel: string | undefined;
+
+if (jsonSchema) {
+  // Build zod from frontmatter outputs: when available; otherwise we have no
+  // typed schema and skip schema validation (still catches empty / unparseable
+  // output via the helper).
+  const zodSchema = config.outputs ? outputsToZod(config.outputs) : null;
+
+  const writeRaw = (n: number, raw: string) =>
+    writeFileSync(join(nodeDir, `raw-attempt-${n}.txt`), raw ?? "");
+
+  writeRaw(1, lastResult?.output ?? "");
+
+  const overrideRetries = (node as any).outputValidationRetries;
+  const maxRetries =
+    typeof overrideRetries === "number" && overrideRetries >= 0
+      ? overrideRetries
+      : 1;
+
+  let attempt = 1;
+  let evaluation = evaluateAgentOutput(lastResult?.output ?? "", zodSchema);
+
+  while (!evaluation.ok && attempt <= maxRetries) {
+    meta.onValidationFailure?.({
+      attempt,
+      errors: evaluation.errors,
+      rawOutputPath: `${node.id}/raw-attempt-${attempt}.txt`,
+    });
+
+    if (!lastSessionId) {
+      return {
+        status: "fail",
+        failureReason:
+          `Output validation failed and cannot retry: agent did not report sessionId ` +
+          `(attempt ${attempt}: ${evaluation.errors.map(e => `${e.path}: ${e.message}`).join("; ")})`,
+        contextUpdates: { "agent.iterations": String(iteration), "agent.success": "false" },
+      };
+    }
+
+    attempt += 1;
+    meta.onValidationRetryStart?.(node.id, attempt);
+
+    const corrective = buildCorrectiveMessage(evaluation.raw, evaluation.errors, jsonSchema);
+
+    const retryResult = await agent.run({
+      cwd, signal, variables: agentVariables, onStdout,
+      resume: lastSessionId, message: corrective,
+    });
+    lastResult = retryResult;
+    if (retryResult.sessionId) lastSessionId = retryResult.sessionId;
+    iteration += 1;
+
+    writeRaw(attempt, retryResult.output ?? "");
+    evaluation = evaluateAgentOutput(retryResult.output ?? "", zodSchema);
+  }
+
+  if (!evaluation.ok) {
+    meta.onValidationFailure?.({
+      attempt,
+      errors: evaluation.errors,
+      rawOutputPath: `${node.id}/raw-attempt-${attempt}.txt`,
+    });
+    return {
+      status: "fail",
+      failureReason:
+        `Output validation failed after ${attempt} attempts: ` +
+        evaluation.errors.map(e => `${e.path}: ${e.message}`).join("; "),
+      contextUpdates: { "agent.iterations": String(iteration), "agent.success": "false" },
+    };
+  }
+
+  for (const [key, value] of Object.entries(evaluation.parsed)) {
+    structuredUpdates[key] = typeof value === "string" ? value : String(value);
+  }
+  if (evaluation.parsed.preferred_label != null) {
+    preferredLabel = String(evaluation.parsed.preferred_label);
+  }
+}
+
+return {
+  status: "success",
+  ...(preferredLabel ? { preferredLabel } : {}),
+  contextUpdates: {
+    ...structuredUpdates,
+    "agent.iterations": String(iteration),
+    "agent.success": "true",
+    ...(lastSessionId ? { "agent.sessionId": lastSessionId } : {}),
+  },
+};
+```
+
+- [ ] **Step 6: Run handler-retry tests**
+
+Run: `npx vitest run src/attractor/tests/agent-handler-retry.test.ts`
+Expected: PASS.
+
+- [ ] **Step 7: Run full test suite**
+
+Run: `npm test`
+Expected: All tests pass.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add src/attractor/handlers/agent-handler.ts src/attractor/handlers/registry.ts src/attractor/core/schemas.ts src/attractor/tests/agent-handler-retry.test.ts
+git commit -m "feat(handler): zod validation + smart retry via --resume on output failure"
+```
+
+### Task 2.6 — Engine wiring + TUI retry block + trace command surfacing
+
+**Files:**
+- Modify: `src/attractor/core/engine.ts` (engine constructs the per-node `meta` object at `engine.ts:222-235` — add `onValidationFailure` and `onValidationRetryStart` callbacks here, injecting the in-scope `nodeReceiveId`)
+- Modify: `src/attractor/core/engine.ts` `EngineRunOptions` interface (so `onIterationStart`-style callbacks have a sibling for retry events)
+- Modify: `src/cli/commands/pipeline.ts` (provide `onValidationRetryStart` that emits a TUI iteration block; extend `--node-receive` view to surface validation attempts)
+- Test: `src/cli/tests/pipeline-trace-command-validation.test.ts` (NEW)
+
+- [ ] **Step 1: Locate the handler-context construction**
+
+Run: `grep -n "HandlerExecutionContext\|nodeReceiveId =" src/attractor/core/engine.ts`
+Confirm: `nodeReceiveId` is generated at `engine.ts:169`, the `meta: HandlerExecutionContext = {...}` is built at lines 222-235.
+
+- [ ] **Step 2: In `engine.ts`, wire validation callbacks into `meta`**
+
+In `src/attractor/core/engine.ts` `EngineRunOptions` interface, add (next to the existing `onIterationStart`/`onIterationEnd` fields):
+
+```ts
+onValidationRetryStart?: (nodeId: string, attempt: number) => void;
+```
+
+In the `meta` block at lines 222-235, append two callback fields after `onIterationEnd: opts.onIterationEnd,`:
+
+```ts
+onValidationFailure: (args) => {
+  opts.traceWriter?.onValidationFailure?.({
+    nodeReceiveId,
+    node,
+    attempt: args.attempt,
+    errors: args.errors,
+    rawOutputPath: args.rawOutputPath,
+  });
+},
+onValidationRetryStart: opts.onValidationRetryStart,
+```
+
+(`nodeReceiveId` and `node` are in scope here — they were declared at lines 169 and 167 respectively.)
+
+- [ ] **Step 3: In `src/cli/commands/pipeline.ts`, register `onValidationRetryStart` callback in `engineOpts`**
+
+First locate the existing `onIterationStart` callback (line numbers drift):
+Run: `grep -n "onIterationStart:" src/cli/commands/pipeline.ts`
+
+After that callback's closing `},`, add:
+
+```ts
+onValidationRetryStart: (nodeId, attempt) => {
+  emit({
+    kind: "start",
+    nodeId,
+    label: `agent · validation retry ${attempt - 1}`,
+    blockKind: "agent",
+  });
+},
+```
+
+- [ ] **Step 4: Extend `pipelineTraceCommand` `--node-receive` view to surface validation attempts**
+
+In `src/cli/commands/pipeline.ts` `pipelineTraceCommand`, inside the `if (opts.nodeReceive)` branch (currently at lines 819-857), after the context-snapshot block and before the `completed stages` line, insert:
+
+```ts
+const failures = lines.filter(l =>
+  l.kind === "validation-failure" && l.nodeReceiveId === opts.nodeReceive,
+);
+if (failures.length > 0) {
+  console.log(`\nvalidation attempts:`);
+  for (const f of failures as Array<Record<string, unknown>>) {
+    const errs = (f.errors as Array<{ path: string; message: string }>)
+      .map(e => `${e.path}: ${e.message}`)
+      .join(", ");
+    console.log(`  [${f.attempt}] ✗ failed — ${errs}`);
+    console.log(`      raw: ${f.rawOutputPath}`);
+  }
+}
+```
+
+- [ ] **Step 5: Write a real trace-command test**
+
+```ts
+// src/cli/tests/pipeline-trace-command-validation.test.ts (NEW)
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from "vitest";
+import { mkdtempSync, writeFileSync, mkdirSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { pipelineTraceCommand } from "../commands/pipeline.js";
+import { deriveProjectKey } from "../lib/run-paths.js"; // adjust import to match codebase
+
+describe("pipeline trace --node-receive surfaces validation attempts", () => {
+  const logs: string[] = [];
+  const origLog = console.log;
+  beforeEach(() => { logs.length = 0; });
+  beforeAll(() => { console.log = (...a) => logs.push(a.map(String).join(" ")); });
+  afterAll(() => { console.log = origLog; });
+
+  it("prints validation-failure events keyed by nodeReceiveId", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "trace-"));
+    process.env.RALPH_RUNS_ROOT = dir;
+    const project = "/tmp/some-project";
+    const projectKey = deriveProjectKey(project);
+    const tracePath = join(dir, projectKey, "runs", "r1", "pipeline.jsonl");
+    mkdirSync(join(dir, projectKey, "runs", "r1"), { recursive: true });
+
+    const lines = [
+      { kind: "pipeline-start", runId: "r1", pipelineName: "p", nodes: ["start","verifier"], timestamp: "" },
+      { kind: "node-start", nodeReceiveId: "verifier-1", nodeId: "verifier", nodeKind: "agent", timestamp: "", contextSnapshot: { foo: "bar" } },
+      { kind: "validation-failure", nodeReceiveId: "verifier-1", nodeId: "verifier", attempt: 1, errors: [{ path: "preferred_label", message: "Required" }], rawOutputPath: "verifier/raw-attempt-1.txt", timestamp: "" },
+      { kind: "node-end", nodeReceiveId: "verifier-1", nodeId: "verifier", success: false, contextUpdates: {} },
+      { kind: "pipeline-end", runId: "r1", outcome: "failure", timestamp: "" },
+    ];
+    writeFileSync(tracePath, lines.map(l => JSON.stringify(l)).join("\n"));
+
+    await pipelineTraceCommand("r1", { project, nodeReceive: "verifier-1" });
+
+    const out = logs.join("\n");
+    expect(out).toMatch(/validation attempts:/);
+    expect(out).toMatch(/\[1\] ✗ failed — preferred_label: Required/);
+    expect(out).toMatch(/raw: verifier\/raw-attempt-1\.txt/);
+  });
+});
+```
+
+(If `deriveProjectKey` is exported from a different file, update the import. If `pipelineTraceCommand` calls `process.exit` on missing files, this test wraps in a try/catch — adjust as the actual command shape requires. Verify by reading `src/cli/commands/pipeline.ts:775-820` before running.)
+
+- [ ] **Step 6: Run tests**
+
+Run: `npx vitest run src/cli/tests/pipeline-trace-command-validation.test.ts`
+Expected: PASS.
+
+- [ ] **Step 7: Run full test suite**
+
+Run: `npm test`
+Expected: All tests pass.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add src/attractor/core/engine.ts src/cli/commands/pipeline.ts src/cli/tests/pipeline-trace-command-validation.test.ts
+git commit -m "feat(trace): surface validation attempts in --node-receive view + TUI retry block"
+```
+
+### Chunk 2 Review Checkpoint
+
+- [ ] **Run plan-document-reviewer subagent against Chunk 2.** Loop until ✅ Approved.
+- [ ] **Run code-reviewer subagent against the chunk-2 commits.** Address feedback in-chunk.
 
 ---
 
-## Chunk 3: gates as sibling `.md` files (D3) — SHIPPED 2026-04-27
+## Chunk 3: Validator rules + schema deletion + 7-file migration + pipeline show annotation
 
-**Tag:** `chunk-3-gates-as-md` (commits `f95821e`..`bf5f080`, v0.1.52)
-**What landed:** Gate prompts moved out of DOT `label=` strings into sibling `.md` files. New `GateMdFrontmatterSchema` + `gate-registry`'s `resolveGate` loader. Validator added `gate_handler_missing` plus `.md`/edge consistency rules. Four production gates migrated: `remove_gate`, `approval_gate`, `review_gate`, `tmux_confirm_gate`. `wait-human` handler now loads the prompt from the sibling `.md` when the DOT label is absent.
-**Tasks:** 4 validator rules + 4 gate migrations. Key files touched: `src/attractor/core/schemas.ts`, `src/cli/lib/gate-registry.ts`, `src/attractor/handlers/wait-human-handler.ts`, `pipelines/*.md`.
-**Memory file:** `2026-04-27-chunk-3-gates-as-md-shipped.md`
+**Ships green:** `json_schema_file=` no longer parses; `agent_missing_outputs` validator rule fires on offending pipelines with the migration recipe inline; the 7 in-tree `.json` files are folded into agent frontmatter; `pipeline.dot` drops `json_schema_file=` attributes; `implement.md` declares the empty-output opt-out; `verifier.md` carries the prompt fix; `ralph pipeline show` renders SVG with declared inputs/outputs annotated. Smoke run of `illumination-to-implementation` reaches the human approval gate (the original failing case).
 
+### Task 3.1 — `agent_missing_outputs` validator rule
+
+**Files:**
+- Modify: `src/attractor/core/graph.ts`
+- Test: extend `src/attractor/tests/graph-validator.test.ts` (or create `graph-validator-outputs.test.ts`)
+
+- [ ] **Step 1: Write the failing validator test**
+
+```ts
+// src/attractor/tests/graph-validator-outputs.test.ts
+import { describe, it, expect } from "vitest";
+import { validateGraph } from "../core/graph.js";
+import { mkdtempSync, writeFileSync, mkdirSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+describe("validator: agent_missing_outputs", () => {
+  it("fires when a non-interactive agent has no outputs: declared", () => {
+    const dir = mkdtempSync(join(tmpdir(), "validator-"));
+    mkdirSync(join(dir, "p"), { recursive: true });
+    writeFileSync(join(dir, "p", "agent_a.md"), `---
+name: agent_a
+description: no outputs
+model: opus
+permissionMode: default
+tools: []
+mcp: []
 ---
+do stuff
+`);
+    writeFileSync(join(dir, "p", "pipeline.dot"), `digraph p {
+  goal="t"
+  start [shape=Mdiamond]
+  done [shape=Msquare]
+  n1 [agent="agent_a", prompt="do"]
+  start -> n1 -> done
+}`);
+    const result = validateGraph(join(dir, "p", "pipeline.dot"));
+    expect(result.diagnostics.some(d => d.code === "agent_missing_outputs")).toBe(true);
+    const diag = result.diagnostics.find(d => d.code === "agent_missing_outputs");
+    expect(diag?.message).toMatch(/outputs:/);
+    expect(diag?.message).toMatch(/json_schema_file/);
+  });
 
-## Chunk 4: per-folder pipelines + project agents (D4) — SHIPPED 2026-04-27
-
-**Tag:** chunk landed without single canonical tag — bisectable via key commits below.
-**Key commits:**
-- `bafaef8` — Tasks 4.1 + 4.2: resolver folder-form + janitor pipeline migrated
-- `f367a7c` — Task 4.17: `illumination-to-implementation` migrated to per-folder layout; RESERVED-vars validator fix
-- `8445012` — Task 4.18: project pipelines fully relocated
-- `c8c1255` — Task 4.19: `agent-registry` drops bundled fallback for pipeline runtime (per-folder lookup is authoritative)
-
-**What landed:** Every project pipeline became a folder (`pipelines/<name>/pipeline.dot` + per-node `.md`/script files). Agents that belonged to a pipeline moved out of `src/cli/agents/` into their owning pipeline folder. Pipeline runtime no longer falls back to bundled agents — pipeline-folder lookup is the single source of truth. 14 smoke pipelines + 2 critical pipelines (`illumination-to-implementation`, `janitor`) migrated; 11 stale agents deleted; `pipelines/schemas/` and `pipelines/scripts/` folders removed.
-**Tasks:** 20 tasks complete (4.1–4.20). Key files touched: `src/cli/lib/agent-registry.ts`, `src/attractor/core/resolver.ts`, every `pipelines/*` folder.
-**Carry-overs / notes:** Bundled-fallback drop simplified the lookup model but means a typo in a pipeline-local agent name now fails fast (intentional). Closed the chunk by expanding Chunk 5 scope.
-**Memory files:** `2026-04-27-chunk-4-task-4.1-and-4.2-shipped.md`, `2026-04-27-chunk-4-task-4.17-shipped.md`, `2026-04-27-chunk-4-completion-per-folder-architecture.md`, `2026-04-27-chunk-4-close-and-chunk-5-expansion.md`
-
+  it("does NOT fire when agent has outputs: {}", () => {
+    const dir = mkdtempSync(join(tmpdir(), "validator-"));
+    mkdirSync(join(dir, "p"), { recursive: true });
+    writeFileSync(join(dir, "p", "agent_a.md"), `---
+name: agent_a
+description: opt-out
+model: opus
+permissionMode: default
+tools: []
+mcp: []
+outputs: {}
 ---
+do stuff
+`);
+    writeFileSync(join(dir, "p", "pipeline.dot"), `digraph p {
+  goal="t"
+  start [shape=Mdiamond]
+  done [shape=Msquare]
+  n1 [agent="agent_a", prompt="do"]
+  start -> n1 -> done
+}`);
+    const result = validateGraph(join(dir, "p", "pipeline.dot"));
+    expect(result.diagnostics.some(d => d.code === "agent_missing_outputs")).toBe(false);
+  });
 
-## Chunk 5: `src/cli/templates/` + `pipeline create` shim (D7) — SHIPPED 2026-04-27
-
-**Tag:** `chunk-5-templates-and-create-shim` (v0.1.55)
-**What landed:** New bundled `src/cli/templates/` directory with `blank/` and `pipeline-create/` starters. `getBundledTemplatesDir()` added to `assets.ts`. `pipeline create` command became a thin shim over the `pipeline-create` template. Dead code (`renderCodeFrame`, `existsSync` imports) cleaned up.
-**Tasks:** 7 tasks. Task 5.6 (deleting `composeCreatePrompt` + `agent-creator`) deferred to Chunk 6 because `refine` and `ralph agent create` still consumed those targets at the time. Task 5.7 prod-bundle smoke green (one `orphan_output` warning noted, non-blocking).
-**Key files touched:** `src/cli/templates/{blank,pipeline-create}/`, `src/cli/lib/assets.ts`, `src/cli/commands/pipeline.ts`.
-**Memory file:** `2026-04-27-chunk-5-shipped.md`
-
+  it("does NOT fire for interactive=true agents", () => {
+    const dir = mkdtempSync(join(tmpdir(), "validator-"));
+    mkdirSync(join(dir, "p"), { recursive: true });
+    writeFileSync(join(dir, "p", "agent_b.md"), `---
+name: agent_b
+description: interactive
+model: opus
+permissionMode: default
+tools: []
+mcp: []
 ---
+chat
+`);
+    writeFileSync(join(dir, "p", "pipeline.dot"), `digraph p {
+  goal="t"
+  start [shape=Mdiamond]
+  done [shape=Msquare]
+  n1 [agent="agent_b", interactive=true, prompt="chat"]
+  start -> n1 -> done
+}`);
+    const result = validateGraph(join(dir, "p", "pipeline.dot"));
+    expect(result.diagnostics.some(d => d.code === "agent_missing_outputs")).toBe(false);
+  });
+});
+```
 
-## Chunk 6: workflow commands collapse to pipelines (D8) — SHIPPED 2026-04-28
+- [ ] **Step 2: Run tests to verify they fail**
 
-**Tag:** `chunk-6-command-templates` (v0.1.61, last commit `7102946`)
-**What landed:** Every remaining workflow command — `plan`, `meditate`, `meditate-create`, `new`, `pipeline refine` — became a thin shim over a bundled template. Dead `composeCreatePrompt`, `agent-creator.md`, and `ralph agent create` deleted (the deferred Task 5.6 cleanup). `src/cli/prompts/` directory removed entirely. Two surviving cross-pipeline agents (`chat-summarizer`, `meditate-observer`) relocated into their owning per-pipeline folders. README + spec docs aligned with the D8 layout.
+Run: `npx vitest run src/attractor/tests/graph-validator-outputs.test.ts`
+Expected: FAIL — rule not implemented.
 
-### Sub-chunk 6a: `plan` command as `templates/plan/` — SHIPPED
-- `097d000` feat(templates): plan single-node interactive template
-- `4d60bb9` refactor(plan): convert command to thin shim
-- `652efbf` chore(agents): remove `plan.md` (now `templates/plan/plan.md`)
-- `ceba572` docs(chunk-6a): mark SHIPPED
+- [ ] **Step 3: Implement the rule in `graph.ts`**
 
-### Sub-chunk 6b: `meditate` + `meditate-create` as templates — SHIPPED
-- `0fc0bc1` feat(templates): meditate template (with `steer` var)
-- `d844144` feat(templates): meditate-create template
-- `f4b69fb` refactor(meditate): thin shim
-- `1d8adaa` refactor(meditate-create): thin shim
-- `770ed90` refactor(meditate): replace `--steer` flag with `--var steer=...`
-- `2d84c7a` chore(agents): remove `meditate` / `meditate-create`
-- `c75a139` docs(chunk-6b): mark SHIPPED
+In `src/attractor/core/graph.ts`, inside the agent-node iteration where other agent rules already run (search for existing `produces_redundant_with_outputs` or similar), add:
 
-### Sub-chunk 6c: `new` command as `templates/new/` — SHIPPED
-- `b3f0c5d` feat(templates): new single-node kickoff template
-- `becb7ee` refactor(new): thin shim
-- `d4e1e88` chore(prompts): remove `PROMPT_kickoff.md`
-- `bd8b4fb` docs(chunk-6c): mark SHIPPED
+```ts
+// agent_missing_outputs: non-interactive agent must declare outputs:
+// (chunk 3 — replaces the legacy json_schema_file= attribute path).
+const isInteractive = node.interactive === true || node.interactive === "true";
+if (!isInteractive) {
+  const cfg = resolveAgent(node.agent as string, { projectDir: dotDir, allowBundledFallback: false });
+  if (!cfg.outputs) {
+    diagnostics.push({
+      code: "agent_missing_outputs",
+      severity: "error",
+      message: [
+        `node "${node.id}" agent "${node.agent}" has no outputs: declared`,
+        ``,
+        `Non-interactive agents must declare structured output in frontmatter:`,
+        `  outputs:`,
+        `    <key>: <type-or-fragment>`,
+        ``,
+        `If you previously used \`json_schema_file=\`, that attribute was removed.`,
+        `Move the schema into the agent's outputs: frontmatter.`,
+      ].join("\n"),
+    });
+  } else if (Object.keys(cfg.outputs).length === 0) {
+    diagnostics.push({
+      code: "agent_outputs_empty",
+      severity: "warning",
+      message: `node "${node.id}" agent "${node.agent}" declares outputs: {} (pure-work opt-out). Confirm the agent intentionally returns no structured data.`,
+    });
+  }
+}
+```
 
-### Sub-chunk 6d: `pipeline refine` as `templates/pipeline-refine/` — SHIPPED
-- `0ff621c` feat(templates): pipeline-refine template + refiner agent
-- `e09aa58` refactor(pipeline-refine): thin shim
-- `a3c876f` docs(chunk-6d): mark SHIPPED
-- Memory file: `2026-04-28-chunk-6d-shipped.md`
+- [ ] **Step 4: Run tests to verify they pass**
 
-### Sub-chunk 6e: deferred Task 5.6 cleanup — SHIPPED
-- `a74a841` chore(pipeline): drop dead `composeCreatePrompt` + `PROMPT_pipeline_create.md`
-- `40084c4` chore(agents): drop `ralph agent create` + `agent-creator.md`
-- `0482e67` docs(chunk-6e): mark SHIPPED
-- `7c43e83` chore(release): bump to v0.1.60
+Run: `npx vitest run src/attractor/tests/graph-validator-outputs.test.ts`
+Expected: PASS.
 
-### Sub-chunk 6f: kill `src/cli/prompts/`; relocate cross-pipeline agents — SHIPPED
-- `1440a4f` chore(prompts): remove `src/cli/prompts/` entirely
-- `55f7a16` chore(agents): move `chat-summarizer` + `meditate-observer` into per-pipeline folders
-- `9cbe729` docs(readme): update commands + architecture for D8
-- `5d25680` docs(specs): align architecture + commands with D8 templates
-- `cc6b872` docs: fix stale prompts/agents references after chunk-6f cleanup
+- [ ] **Step 5: Commit**
 
-### Sub-chunk 6g: release — SHIPPED
-- `7102946` chore(release): bump version to 0.1.61 (chunk-6f + 6g shipped)
+```bash
+git add src/attractor/core/graph.ts src/attractor/tests/graph-validator-outputs.test.ts
+git commit -m "feat(validator): agent_missing_outputs (with migration recipe) + agent_outputs_empty warning"
+```
 
-**Memory file:** `2026-04-28-pipeline-redesign-chunk-6f-6g-shipped.md` (covers 6f + 6g; 6a–6e captured in their docs commits and the 6d standalone memory file).
+### Task 3.2 — Atomic: delete `jsonSchemaFile` + migrate 7 schemas + drop `json_schema_file=` attributes + `implement` opt-out
 
+**This task is a single atomic commit** because deleting the schema field breaks every node that references `json_schema_file=` until the migration finishes. Do all changes, run tests, then commit once.
+
+**Files:**
+- Modify: `src/attractor/core/schemas.ts` (delete `jsonSchemaFile` field from `AgentNodeSchema`)
+- Modify: `src/attractor/handlers/agent-handler.ts` (remove the `node.jsonSchemaFile` branch — always go through `config.jsonSchema`)
+- Modify (frontmatter additions, 7 agents):
+  - `pipelines/illumination-to-implementation/change-explainer.md` — add `outputs: { explainer_render: string }`
+  - `pipelines/illumination-to-implementation/design-writer.md` — add `outputs: { design_doc_path: string }`
+  - `pipelines/illumination-to-implementation/plan-writer.md` — add `outputs: { plan_path: string }`
+  - `pipelines/illumination-to-implementation/memory-writer.md` — add `outputs: { memory_path: string }`
+  - `pipelines/illumination-to-implementation/memory-reflector.md` — add `outputs: { illumination_path: {type: [string, "null"]}, reasoning: string }`
+  - `pipelines/illumination-to-implementation/task.md` — add `outputs: { refinements: string, scope_changed: boolean }` (used by `chat_summarizer` node)
+  - `pipelines/illumination-to-implementation/tmux-tester.md` — add `outputs: { test_result: {enum: [pass, fail]}, test_summary: string, issues_found: {type: array, items: string}, test_render: string }`
+  - `pipelines/illumination-to-implementation/implement.md` — add `outputs: {}` (pure-work opt-out)
+- Modify: `pipelines/illumination-to-implementation/pipeline.dot` — remove every `json_schema_file="..."` attribute from every node
+- Delete: `pipelines/illumination-to-implementation/{explainer,design-writer,plan-writer,memory-writer,memory-reflector,chat-summarizer,tmux-test-result}.json` (7 files)
+
+- [ ] **Step 1: Snapshot the existing 7 .json files for reference**
+
+Run: `for f in pipelines/illumination-to-implementation/*.json; do echo "=== $(basename $f) ==="; cat $f; done > /tmp/old-schemas.txt`
+Inspect to confirm the YAML mapping below matches.
+
+- [ ] **Step 2: Delete `jsonSchemaFile` field from `AgentNodeSchema`**
+
+In `src/attractor/core/schemas.ts`, remove the `jsonSchemaFile: z.string().optional()...` line from `AgentNodeSchema` (and any sibling fields specific to this attribute).
+
+- [ ] **Step 3: Remove `node.jsonSchemaFile` branch from `agent-handler.ts`**
+
+In `src/attractor/handlers/agent-handler.ts`, replace the block from chunk-1 task 1.1 with the simpler version:
+
+```ts
+// jsonSchema comes from agent frontmatter outputs: only.
+// (Legacy json_schema_file= attribute removed in chunk 3.)
+const jsonSchema: string | undefined = config.jsonSchema;
+```
+
+(Also delete the now-unused `readFileSync`/`resolve` imports if they were only used here.)
+
+- [ ] **Step 4: Add `outputs:` to each of the 7 agent .md files**
+
+For each agent, edit its `.md` frontmatter to insert the `outputs:` block before the closing `---`. Example for `change-explainer.md`:
+
+```yaml
 ---
-
-## Status as of 2026-04-28
-
-**Pipeline Folder Architecture Redesign (D8): COMPLETE.**
-- v0.1.61 / tag `chunk-6-command-templates`
-- 1222/1222 vitest tests green; `tsc --noEmit` clean
-- All 6 chunks shipped; no carry-over work
-
+name: change-explainer
+... (existing fields)
+outputs:
+  explainer_render:
+    type: string
+    description: Markdown render shown verbatim in the approval gate label.
 ---
+```
 
-## Open carry-overs (none blocking)
+Repeat for the remaining six agents using the YAML equivalents from the spec table.
 
-- **DRY follow-up:** `RESERVED` set is duplicated in `src/attractor/core/graph.ts` (`validateGraph` + `checkRequiredCallerVars`). Hoist to a module-level constant when the next validator rule needs it (per Chunk 2 review note). YAGNI — defer until a new rule lands.
+- [ ] **Step 5: Add `outputs: {}` to `implement.md`**
 
+```yaml
 ---
+name: implement
+... (existing fields)
+outputs: {}
+---
+```
 
-## Next plan
+- [ ] **Step 6: Drop `json_schema_file="..."` from every node in `pipeline.dot`**
 
-When the next initiative is scoped:
-1. Write its spec under `docs/superpowers/specs/`.
-2. Replace the chunk summaries above with the new plan's chunk outline.
-3. Keep this header / File Structure / Plan Review Loop / Post-execution memory capture scaffolding intact.
+Run: `grep -n "json_schema_file" pipelines/illumination-to-implementation/pipeline.dot`
+For each line, remove only the `json_schema_file="..."` portion (preserve sibling attributes and the closing `]`).
+
+- [ ] **Step 7: Delete the 7 stale `.json` files**
+
+Run: `rm pipelines/illumination-to-implementation/{explainer,design-writer,plan-writer,memory-writer,memory-reflector,chat-summarizer,tmux-test-result}.json`
+
+- [ ] **Step 8: Run pipeline validate to confirm migration is consistent**
+
+Run: `npx tsx src/cli/index.ts pipeline validate pipelines/illumination-to-implementation/pipeline.dot`
+Expected: PASS (no `agent_missing_outputs`, no `agent_outputs_empty` errors; warning for `implement` is acceptable).
+
+- [ ] **Step 9: Run the full test suite**
+
+Run: `npm test`
+Expected: All tests pass.
+
+- [ ] **Step 10: Commit atomically**
+
+```bash
+git add -A
+git commit -m "refactor(pipelines): finish outputs: migration; delete json_schema_file= attribute"
+```
+
+### Task 3.3 — Annotated `ralph pipeline show` SVG with inputs/outputs
+
+**Files:**
+- Modify: the show-command rendering pass (locate via `grep -n "pipelineShowCommand\|\.svg" src/cli/`)
+- Test: `src/cli/tests/pipeline-show-annotation.test.ts` (NEW)
+
+- [ ] **Step 1: Locate the show command implementation and SVG render path**
+
+Run: `grep -rn "pipelineShowCommand\|graphvizSvg\|wasm-graphviz" src/cli/`
+
+- [ ] **Step 2: Write the failing annotation test**
+
+```ts
+// src/cli/tests/pipeline-show-annotation.test.ts
+import { describe, it, expect } from "vitest";
+import { mkdtempSync, writeFileSync, mkdirSync, readFileSync, existsSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { pipelineShowCommand } from "../commands/pipeline.js";
+
+describe("pipeline show annotates SVG with declared inputs/outputs", () => {
+  it("includes outputs: keys as a sublabel on agent nodes", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "show-"));
+    mkdirSync(join(dir, "p"));
+    writeFileSync(join(dir, "p", "verifier.md"), `---
+name: verifier
+description: x
+model: opus
+permissionMode: default
+tools: []
+mcp: []
+inputs: [foo]
+outputs:
+  preferred_label: {enum: [true, false, empty]}
+  summary: string
+---
+verify
+`);
+    writeFileSync(join(dir, "p", "pipeline.dot"), `digraph p {
+  goal="t"
+  start [shape=Mdiamond]
+  done [shape=Msquare]
+  verifier [agent="verifier", prompt="do"]
+  start -> verifier -> done
+}`);
+    await pipelineShowCommand(join(dir, "p", "pipeline.dot"), {});
+    const svg = readFileSync(join(dir, "p", "pipeline.svg"), "utf8");
+    expect(svg).toContain("preferred_label");
+    expect(svg).toContain("summary");
+    // Inputs sublabel
+    expect(svg).toContain("foo");
+  });
+});
+```
+
+- [ ] **Step 3: Run test to verify it fails**
+
+Run: `npx vitest run src/cli/tests/pipeline-show-annotation.test.ts`
+Expected: FAIL — annotations not rendered.
+
+- [ ] **Step 4: Augment the show command's render pass**
+
+In the show command implementation (file determined in Step 1), before handing the .dot off to graphviz, transform agent nodes by appending an HTML-style label or a sublabel string with declared inputs/outputs. Example transformation for each agent node:
+
+```ts
+// For each agent node, build a multi-line label.
+// Existing: label="<node.id>"
+// New: label="{<node.id>|in: <inputs>|out: <outputs>}"
+// (graphviz's record-shape syntax; works with default shape=record on agent nodes).
+function annotatedLabel(node: AgentNode, agentConfig: AgentConfig): string {
+  const inputs = agentConfig.inputs?.length ? `in: ${agentConfig.inputs.join(", ")}` : "";
+  const outputs = agentConfig.outputs ? `out: ${Object.keys(agentConfig.outputs).join(", ")}` : "";
+  return [node.id, inputs, outputs].filter(Boolean).join("\\n");
+}
+```
+
+For data-flow edge labels, compute the intersection of upstream `outputs:` and downstream `inputs:` and join with `, ` as the edge label (only when non-empty).
+
+Implementation guidance:
+- Mutate the in-memory DOT AST (the codebase already uses `@ts-graphviz/ast` per chunk-2 work) before serializing.
+- If the rendering path uses string concatenation rather than AST, prefer to migrate to AST mutation here.
+- Preserve existing `[shape=Mdiamond]` / `[shape=Msquare]` for start/done; only annotate agent and gate nodes.
+
+- [ ] **Step 5: Run the annotation test**
+
+Run: `npx vitest run src/cli/tests/pipeline-show-annotation.test.ts`
+Expected: PASS.
+
+- [ ] **Step 6: Manual check — render the real pipeline and visually confirm**
+
+Run: `npx tsx src/cli/index.ts pipeline show pipelines/illumination-to-implementation/pipeline.dot`
+Open `pipelines/illumination-to-implementation/pipeline.svg`. Confirm verifier shows in/out keys; data-flow edges from verifier → explainer carry the relevant key labels.
+
+- [ ] **Step 7: Run full test suite**
+
+Run: `npm test`
+Expected: All tests pass.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add src/cli/commands/pipeline.ts src/cli/tests/pipeline-show-annotation.test.ts
+git commit -m "feat(pipeline-show): annotate SVG with declared inputs/outputs + edge dataflow labels"
+```
+
+### Task 3.4 — End-to-end smoke verification
+
+**Files:** none modified.
+
+- [ ] **Step 1: Run the originally-failing pipeline**
+
+Run:
+```bash
+npx tsx src/cli/index.ts pipeline run pipelines/illumination-to-implementation/pipeline.dot \
+  --project . \
+  --var illuminations_dir=meditations/illuminations \
+  --var specs_dir=docs/superpowers/specs \
+  --var plans_dir=docs/superpowers/plans
+```
+Expected:
+- Verifier runs and emits `preferred_label` to context (the chunk-1 bug is gone)
+- If verifier hits the thinking-block trap again, the validation retry recovers (chunk-2 self-healing)
+- Pipeline reaches a human gate (`approval_gate` for `=true`, `remove_gate` for `=false`, or `done` for `=empty`)
+- No silent halt with `outcome:"failure"` after only `agent.*` keys in contextUpdates
+
+- [ ] **Step 2: If a validation retry fired, inspect the trace**
+
+Run:
+```bash
+npx tsx src/cli/index.ts pipeline trace <runId> --node-receive verifier-<id>
+```
+Expected: `validation attempts:` block listing the failed attempt(s) with `raw: verifier/raw-attempt-N.txt` references.
+
+- [ ] **Step 3: Run smoke pipelines to catch regressions**
+
+Run: `for f in pipelines/smoke/*.dot; do echo "=== $f ==="; npx tsx src/cli/index.ts pipeline validate "$f" || break; done`
+Expected: every smoke validates green.
+
+- [ ] **Step 4: Tag the chunk**
+
+```bash
+git tag chunk-7-agent-output-validation
+git log -3 --oneline
+```
+
+### Chunk 3 Review Checkpoint
+
+- [ ] **Run plan-document-reviewer subagent against Chunk 3.** Loop until ✅ Approved.
+- [ ] **Run code-reviewer subagent against the chunk-3 commits + the spec.** Address feedback in-chunk; re-dispatch if needed.
 
 ---
 
@@ -171,37 +1673,31 @@ When the next initiative is scoped:
 
 After each chunk:
 
-1. Dispatch `superpowers:code-reviewer` against the chunk's commits + the spec.
+1. Dispatch `superpowers:code-reviewer` against the chunk's commits + the spec at `docs/superpowers/specs/2026-04-29-agent-output-validation-and-retry.md`.
 2. Address feedback in-chunk; re-dispatch if needed.
-3. Tag chunk in git for bisectable history.
-4. Expand the next chunk's outline into full TDD steps.
+3. Tag chunk in git for bisectable history (`chunk-7-agent-output-validation` after Chunk 3).
 
 ---
 
 ## Post-execution memory capture
 
-**REQUIRED after every chunk lands.** Each chunk's implementation session produces lessons that future Claude sessions need to pick up cold:
+**REQUIRED after Chunk 3 lands.** Capture for the next session:
 
-- What was harder than the plan predicted (and why)
-- Codebase facts the plan got wrong or surprised the implementer
-- Tests that turned out flaky / non-deterministic
-- Edge cases the validator missed during real runs
-- Migration friction the user noticed (regressions, ergonomic complaints)
-- Decisions the implementer made that weren't in the plan (and why)
+- Any model-behavior surprises in the validation retry (does `--resume` consistently break the thinking-block trap?)
+- Whether the empty-output corrective message phrasing actually heals the verifier case in production
+- Plan-vs-reality deltas
+- Any zod fragment shapes the migration revealed we need but did not include in the strict accept-list (D3)
 
-**Procedure at the end of each chunk:**
+**Procedure:**
 
-1. Land the final commit + tag (`chunk-N-<name>`).
+1. Land the final commit + tag (`chunk-7-agent-output-validation`).
 2. Dispatch the `memory-writer` subagent with the chunk's session transcript path:
    ```
    Agent({
-     description: "Capture chunk-N implementation memory",
+     description: "Capture chunk-7 implementation memory",
      subagent_type: "memory-writer",
-     prompt: "Analyze the implementation session for Chunk N of the pipeline folder architecture redesign. Transcript: <path>. Capture: codebase surprises, validator gaps discovered, plan-vs-reality deltas, ergonomic friction. Write to /Users/josu/.claude/projects/-Users-josu-Documents-projects-ralph-cli/memory/. Update MEMORY.md index."
+     prompt: "Analyze the implementation session for Chunk 7 (agent output validation + retry). Transcript: <path>. Capture: model-behavior surprises, empty-output corrective effectiveness, zod fragment gaps, plan-vs-reality deltas. Write to /Users/josu/.claude/projects/-Users-josu-Documents-projects-ralph-cli/memory/. Update MEMORY.md index."
    })
    ```
-3. Memory file naming: `2026-MM-DD-pipeline-redesign-chunk-N-implementation.md`.
-4. Memory `type:` is `project` (captures execution state and lessons applicable to subsequent chunks).
-5. The memory file feeds into the expansion of Chunk N+1's outline — read it before writing Chunk N+1's TDD steps.
-
-**Why this is non-optional:** the architecture spec captures decisions that should survive 6 months. The implementation memories capture decisions that should survive the next chunk. Both layers protect against drift between what's documented and what actually shipped.
+3. Memory file naming: `2026-04-29-chunk-7-agent-output-validation-shipped.md` (or `-deferred.md` if any sub-task slipped).
+4. Memory `type:` is `project`.
