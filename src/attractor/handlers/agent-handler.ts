@@ -8,6 +8,7 @@ import { resolveAgent as defaultResolveAgent } from "../../cli/lib/agent-registr
 import { getIlluminationServerPath, getMetaMeditationsDir } from "../../cli/lib/assets.js";
 import { buildPreamble } from "../transforms/preamble.js";
 import { expandVariables, extractDefaults } from "../transforms/variable-expansion.js";
+import { renderInputsBlock } from "../transforms/inputs-renderer.js";
 import { outputsToZod } from "../../cli/lib/outputs-to-zod.js";
 import { buildCorrectiveMessage } from "../../cli/lib/corrective-message.js";
 import { evaluateAgentOutput } from "./evaluate-agent-output.js";
@@ -76,25 +77,41 @@ export class AgentHandler implements NodeHandler {
     // Build prompt with pipeline context preamble
     const nodeDir = join(logsRoot, node.id);
     mkdirSync(nodeDir, { recursive: true });
-    const nodeTask = node.prompt ?? node.label;
-    const agentRubric = (config.prompt ?? "").trim();
+    const agentInstructions = (config.prompt ?? "").trim();
     const defaults = extractDefaults(node as unknown as Record<string, unknown>);
-    // Expand ONLY the node task. Rubric bodies are authored manuals —
-    // their literal `$var` tokens (e.g. `$run_id` in tmux-tester.md as documentation)
-    // must not reach expandVariables or undefined ones throw.
-    // Spider case (no node task) keeps the old behavior: rubric IS the template, so expand it.
-    const expandedTask = nodeTask ? expandVariables(nodeTask, ctx.values, defaults) : undefined;
-    const expandedRawPrompt = expandedTask
-      ? (agentRubric ? `${agentRubric}\n\n---\n\n${expandedTask}` : expandedTask)
-      : expandVariables(agentRubric, ctx.values, defaults);
+
+    let assembledPrompt: string;
+    if (config.autoInputs === true) {
+      // Auto-inputs path: inject Inputs block from declared inputs, treat node.prompt as optional prose steering
+      const declaredInputs = (config.inputs as string[] | undefined) ?? [];
+      const nodeAttrs = node as unknown as Record<string, unknown>;
+      const inputsBlock = renderInputsBlock(declaredInputs, ctx.values, nodeAttrs);
+      const steeringRaw = (node.prompt ?? "").trim();
+      const steeringBlock = steeringRaw
+        ? `\n\n## Steering\n\n${steeringRaw}\n`
+        : "";
+      assembledPrompt = `${agentInstructions}\n\n---\n\n${inputsBlock}${steeringBlock}`;
+    } else {
+      // Legacy path: expand $variables in node task / rubric
+      const nodeTask = node.prompt ?? node.label;
+      // Expand ONLY the node task. Rubric bodies are authored manuals —
+      // their literal `$var` tokens (e.g. `$run_id` in tmux-tester.md as documentation)
+      // must not reach expandVariables or undefined ones throw.
+      // Spider case (no node task) keeps the old behavior: rubric IS the template, so expand it.
+      const expandedTask = nodeTask ? expandVariables(nodeTask, ctx.values, defaults) : undefined;
+      assembledPrompt = expandedTask
+        ? (agentInstructions ? `${agentInstructions}\n\n---\n\n${expandedTask}` : expandedTask)
+        : expandVariables(agentInstructions, ctx.values, defaults);
+    }
+
     const fidelity = (node.fidelity as string | undefined) ?? "compact";
     const preamble = buildPreamble(
       { timestamp: "", currentNode: node.id, completedNodes, nodeRetries, context: ctx.values } as CheckpointState,
       fidelity,
     );
     const jsonWrappedPrompt = jsonSchema
-      ? `IMPORTANT: Your FINAL response MUST be valid JSON matching this schema. No markdown, no preamble, output ONLY the JSON object.\nSchema: ${jsonSchema}\n\n${expandedRawPrompt}\n\nREMINDER: Output MUST be valid JSON matching the schema above. No markdown, no explanation.`
-      : expandedRawPrompt;
+      ? `IMPORTANT: Your FINAL response MUST be valid JSON matching this schema. No markdown, no preamble, output ONLY the JSON object.\nSchema: ${jsonSchema}\n\n${assembledPrompt}\n\nREMINDER: Output MUST be valid JSON matching the schema above. No markdown, no explanation.`
+      : assembledPrompt;
     const prompt = preamble + jsonWrappedPrompt;
     writeFileSync(join(nodeDir, "prompt.md"), prompt);
 
@@ -203,6 +220,9 @@ export class AgentHandler implements NodeHandler {
       !!config.outputs && Object.prototype.hasOwnProperty.call(config.outputs, "note");
     let prevNote = "";
 
+    // When auto_inputs is true, namespace meta keys under node.id; otherwise use legacy "agent" prefix.
+    const metaPrefix = config.autoInputs === true ? node.id : "agent";
+
     for (let i = 0; i < maxIterations; i++) {
       if (signal?.aborted) break;
 
@@ -224,8 +244,8 @@ export class AgentHandler implements NodeHandler {
           status: "fail",
           failureReason: `Agent "${agentName}" exited with code ${result.exitCode}`,
           contextUpdates: {
-            "agent.iterations": String(iteration),
-            "agent.success": "false",
+            [`${metaPrefix}.iterations`]: String(iteration),
+            [`${metaPrefix}.success`]: "false",
           },
         };
       }
@@ -248,7 +268,7 @@ export class AgentHandler implements NodeHandler {
               failureReason:
                 `Output validation failed and cannot retry: agent did not report sessionId ` +
                 `(iter ${i + 1} attempt ${attempt}: ${evaluation.errors.map(e => `${e.path}: ${e.message}`).join("; ")})`,
-              contextUpdates: { "agent.iterations": String(iteration), "agent.success": "false" },
+              contextUpdates: { [`${metaPrefix}.iterations`]: String(iteration), [`${metaPrefix}.success`]: "false" },
             };
           }
           attempt += 1;
@@ -277,7 +297,7 @@ export class AgentHandler implements NodeHandler {
             failureReason:
               `Output validation failed in iteration ${i + 1} after ${attempt} attempts: ` +
               evaluation.errors.map(e => `${e.path}: ${e.message}`).join("; "),
-            contextUpdates: { "agent.iterations": String(iteration), "agent.success": "false" },
+            contextUpdates: { [`${metaPrefix}.iterations`]: String(iteration), [`${metaPrefix}.success`]: "false" },
           };
         }
 
@@ -302,7 +322,9 @@ export class AgentHandler implements NodeHandler {
     let structuredUpdates: Record<string, unknown> = {};
     if (lastParsed) {
       for (const [key, value] of Object.entries(lastParsed)) {
-        structuredUpdates[key] = typeof value === "string" ? value : String(value);
+        // When auto_inputs is true, namespace each key under the node id; otherwise bare key (legacy).
+        const outKey = config.autoInputs === true ? `${node.id}.${key}` : key;
+        structuredUpdates[outKey] = typeof value === "string" ? value : String(value);
       }
     }
 
@@ -311,9 +333,9 @@ export class AgentHandler implements NodeHandler {
       ...(preferredLabel ? { preferredLabel } : {}),
       contextUpdates: {
         ...structuredUpdates,
-        "agent.iterations": String(iteration),
-        "agent.success": "true",
-        ...(lastSessionId ? { "agent.sessionId": lastSessionId } : {}),
+        [`${metaPrefix}.iterations`]: String(iteration),
+        [`${metaPrefix}.success`]: "true",
+        ...(lastSessionId ? { [`${metaPrefix}.sessionId`]: lastSessionId } : {}),
       },
     };
   }
