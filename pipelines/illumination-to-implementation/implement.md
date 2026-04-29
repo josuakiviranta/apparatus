@@ -6,6 +6,9 @@ permissionMode: dangerouslySkipPermissions
 tools: []
 mcp: []
 loop: true
+auto_inputs: true
+inputs:
+  - plan_writer.plan_path
 outputs:
   done: boolean
 ---
