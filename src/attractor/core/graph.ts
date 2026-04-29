@@ -433,7 +433,7 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
 
       if (cfg.autoInputs === true && Array.isArray(cfg.inputs)) {
         // rendered_tag_collision — detect two decls that map to the same XML tag
-        const seenTags = new Map<string, string>(); // renderedTag → first decl
+        const seenTags = new Map<string, string>();
         for (const decl of cfg.inputs) {
           let r;
           try { r = resolveInputDecl(decl); } catch { continue; }
