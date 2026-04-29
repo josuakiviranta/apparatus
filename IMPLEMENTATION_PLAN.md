@@ -278,7 +278,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 ### Task 1.3: Build `inputs-renderer.ts` (pure render to XML block)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `src/attractor/tests/inputs-renderer.test.ts`:
 
@@ -355,12 +355,12 @@ describe("renderInputsBlock", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run src/attractor/tests/inputs-renderer.test.ts`
 Expected: FAIL — module does not exist.
 
-- [ ] **Step 3: Implement `inputs-renderer.ts`**
+- [x] **Step 3: Implement `inputs-renderer.ts`**
 
 Create `src/attractor/transforms/inputs-renderer.ts`:
 
@@ -408,12 +408,12 @@ export function renderInputsBlock(
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run src/attractor/tests/inputs-renderer.test.ts`
 Expected: PASS — all cases green. (The escape test allows either form; pick whichever the implementation produces.)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/attractor/transforms/inputs-renderer.ts src/attractor/tests/inputs-renderer.test.ts
