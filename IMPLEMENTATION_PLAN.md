@@ -1666,6 +1666,8 @@ These notes call out non-obvious deviations from the common template. Re-audit a
 
 **10. store** — `type="store"` node smoke. Store handler writes to ctx; under new system should follow qualified-key convention. Verify handler if needed (may be a small store-handler edit, not a Chunk 1 deliverable; flag as "out-of-scope drift" if discovered).
 
+- **Out-of-scope drift (smoke #11):** Store handler at `src/attractor/handlers/store.ts:35` returns `contextUpdates: { "store.path": ... }` instead of `<nodeId>.path`. Pre-existing drift surfaced during smoke #11 migration. **Chunk 6 TODO:** Update handler to use qualified key + audit any consumers.
+
 **11. tmux-tester** — tmux integration smoke. Common-template applies. Watch for hardcoded ctx-key references in tmux bindings.
 
 **12. tool** — tool-node smoke. Tool nodes don't have `auto_inputs` (no agent frontmatter). Their consumers do — verify consumers reference tool-node outputs as `<toolNodeId>.<key>`.
