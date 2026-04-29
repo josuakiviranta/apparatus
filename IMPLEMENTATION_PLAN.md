@@ -269,22 +269,22 @@ git commit -m "feat(validateAgentConfig): accept and propagate loop and maxItera
 
 ---
 
-## Chunk 2: Validator rule `loop_missing_done_field`
+## Chunk 2: Validator rule `loop_missing_done_field` ✅ SHIPPED (4ee115f)
 
 **Ships green:** `pipeline validate` errors when an agent declares `loop: true` without a `done: boolean` field in `outputs:`. Empty-outputs case routes to the new error and suppresses the existing `agent_outputs_empty` warning.
 
-### Task 2.1 — Add `checkLoopRequiresDoneField` rule
+### Task 2.1 — Add `checkLoopRequiresDoneField` rule ✅ DONE
 
 **Files:**
 - Modify: `src/attractor/core/graph.ts` (add function below `checkAgentMissingOutputs` at line 683; wire into dispatcher at lines 393–398; update `checkAgentMissingOutputs` empty-branch to skip when `loop:true`)
 - Test: locate the existing validator test file
 
-- [ ] **Step 1: Locate validator test conventions**
+- [x] **Step 1: Locate validator test conventions**
 
 Run: `grep -n "checkAgentMissingOutputs\|agent_missing_outputs" src/attractor/tests/*.test.ts`
 Identify the existing test file (e.g., `src/attractor/tests/graph-validator.test.ts` or `src/attractor/tests/graph.test.ts`). Read its imports — copy the same `parseDot` / graph-loading helper that existing rule tests use. Do NOT invent a `cli/lib/dot-parser.js` import.
 
-- [ ] **Step 2: Write failing tests**
+- [x] **Step 2: Write failing tests**
 
 In the located validator test file, append a new describe block. Mimic the existing tests' setup pattern (tmp dir, write `.dot` + sibling `.md`, parse via the same helper, call `validate(graph, dotDir)`):
 
@@ -327,12 +327,12 @@ describe("validator — loop_missing_done_field", () => {
 
 Replace the `/* setup */` comments with the actual fixtures (mirror surrounding `agent_missing_outputs` tests for the exact helper calls).
 
-- [ ] **Step 3: Run tests, expect failure**
+- [x] **Step 3: Run tests, expect failure**
 
 Run: `npx vitest run src/attractor/tests/graph*.test.ts -t "loop_missing_done_field"`
 Expected: all FAIL.
 
-- [ ] **Step 4: Implement `checkLoopRequiresDoneField`**
+- [x] **Step 4: Implement `checkLoopRequiresDoneField`**
 
 In `src/attractor/core/graph.ts`, add below `checkAgentMissingOutputs` (after line 683):
 
@@ -367,7 +367,7 @@ function checkLoopRequiresDoneField(
 }
 ```
 
-- [ ] **Step 5: Modify `checkAgentMissingOutputs` to suppress `agent_outputs_empty` when `loop:true`**
+- [x] **Step 5: Modify `checkAgentMissingOutputs` to suppress `agent_outputs_empty` when `loop:true`**
 
 In `src/attractor/core/graph.ts:675-682`, change the empty-outputs branch:
 
@@ -384,7 +384,7 @@ if (typeof agentConfig.outputs === "object" && Object.keys(agentConfig.outputs).
 }
 ```
 
-- [ ] **Step 6: Wire into the dispatcher at `graph.ts:393-398`**
+- [x] **Step 6: Wire into the dispatcher at `graph.ts:393-398`**
 
 ```ts
 if (dotDir) {
@@ -395,17 +395,17 @@ if (dotDir) {
 }
 ```
 
-- [ ] **Step 7: Run tests, expect pass**
+- [x] **Step 7: Run tests, expect pass**
 
 Run: `npx vitest run src/attractor/tests/graph*.test.ts -t "loop_missing_done_field"`
 Expected: all PASS.
 
-- [ ] **Step 8: Run full validator test**
+- [x] **Step 8: Run full validator test**
 
 Run: `npx vitest run src/attractor/tests/`
 Expected: all PASS.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit** _(done: 4ee115f)_
 
 ```bash
 git add src/attractor/core/graph.ts src/attractor/tests/
