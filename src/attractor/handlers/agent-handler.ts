@@ -322,8 +322,9 @@ export class AgentHandler implements NodeHandler {
     let structuredUpdates: Record<string, unknown> = {};
     if (lastParsed) {
       for (const [key, value] of Object.entries(lastParsed)) {
-        // When auto_inputs is true, namespace each key under the node id; otherwise bare key (legacy).
-        const outKey = config.autoInputs === true ? `${node.id}.${key}` : key;
+        // When auto_inputs is true metaPrefix === node.id, so namespace under node.id.key;
+        // otherwise metaPrefix === "agent" and legacy path keeps bare key.
+        const outKey = config.autoInputs === true ? `${metaPrefix}.${key}` : key;
         structuredUpdates[outKey] = typeof value === "string" ? value : String(value);
       }
     }
