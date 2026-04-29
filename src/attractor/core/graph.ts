@@ -398,6 +398,23 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
     }
   }
 
+  // inputs_missing_frontmatter — auto_inputs: true requires explicit inputs: declaration
+  if (dotDir) {
+    for (const node of nodes.values()) {
+      if (!node.agent) continue;
+      const cfg = tryResolveAgent(node, dotDir);
+      if (!cfg) continue;
+      if (cfg.autoInputs === true && cfg.inputs === undefined) {
+        diags.push({
+          rule: "inputs_missing_frontmatter",
+          severity: "error",
+          message: `Agent "${node.agent}" has auto_inputs: true but is missing required \`inputs:\` declaration. Use \`inputs: []\` if no inputs are needed.`,
+          location: node.sourceLocation,
+        });
+      }
+    }
+  }
+
   // resolveAgent needs projectDir to locate project-local agents; without dotDir we can't fetch agent configs.
   if (dotDir) {
     checkMissingInputProducer(graph, nodeProduces, dotDir, diags);

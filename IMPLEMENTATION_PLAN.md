@@ -776,7 +776,7 @@ The new rules ONLY fire for agents whose frontmatter has `auto_inputs: true`. Le
 
 Severity: error. Fires when an agent has `auto_inputs: true` but no `inputs:` declaration.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `src/attractor/tests/graph-validator-auto-inputs.test.ts`:
 
@@ -865,12 +865,12 @@ body`,
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run src/attractor/tests/graph-validator-auto-inputs.test.ts -t "inputs_missing_frontmatter"`
 Expected: FAIL — rule does not exist.
 
-- [ ] **Step 3: Add rule to `validateGraph`**
+- [x] **Step 3: Add rule to `validateGraph`**
 
 In `src/attractor/core/graph.ts:validateGraph`, after existing per-node loop, add a pass that:
 1. For each node with `node.agent`, resolve its agent config (`resolveAgent(node.agent, { projectDir: dotDir, allowBundledFallback: false })`).
@@ -899,12 +899,12 @@ for (const node of nodes.values()) {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run src/attractor/tests/graph-validator-auto-inputs.test.ts -t "inputs_missing_frontmatter"`
 Expected: PASS — all 3 cases green.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/attractor/core/graph.ts src/attractor/tests/graph-validator-auto-inputs.test.ts
