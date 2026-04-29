@@ -1609,7 +1609,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 ### Migration progress
 
-- [ ] 1. agent-implement (deferred to Chunk 6)
+- [x] 1. agent-implement (migrated under Chunk 6 Task 6.1)
 - [x] 2. agent-json-vars (commits ed9baa3, 1644fd1)
 - [x] 3. chat-end-to-end (commit 05a2d76)
 - [x] 4. chat-only (commit 59e93d6)
@@ -1696,12 +1696,12 @@ Once every in-tree agent has `auto_inputs: true`, the legacy code path is dead w
 
 ### Task 6.1: Verify migration complete + migrate the deferred holdouts
 
-- [ ] **Step 1: Find every agent file lacking `auto_inputs`**
+- [x] **Step 1: Find every agent file lacking `auto_inputs`**
 
 Use `find` (portable across shells; the bash glob `**/*.md` requires `globstar` enabled in zsh/bash and silently misbehaves otherwise):
 
 ```bash
-find pipelines -name '*.md' -type f | while read f; do
+find pipelines -name '*.md' -type f -not -path '*/tests/fixtures/*' | while read f; do
   if ! grep -q "^auto_inputs: true$" "$f"; then
     echo "Missing auto_inputs: $f"
   fi
@@ -1713,19 +1713,22 @@ Expected output after Chunks 3-5: a small set of intentional holdouts:
 - 4 gate files (`*_gate.md`) — gates don't migrate, ever; they are exempt by design.
 - `pipelines/smoke/agent-implement/` agents (deferred to this chunk per Chunk 5 note #1).
 
+Note: `*/tests/fixtures/*` files are excluded — they are illumination-state test data, not agent files (no `name:` frontmatter).
+
 If anything else surfaces, that's a missed migration in Chunks 3-5; migrate that pipeline before continuing.
 
-- [ ] **Step 2: Migrate the deferred holdouts**
+- [x] **Step 2: Migrate the deferred holdouts**
 
 For `pipelines/illumination-to-implementation/task.md` and `pipelines/smoke/agent-implement/`:
 
 - Add `auto_inputs: true, inputs: []` to each `task.md` (the empty form for a no-input generic agent).
-- Update `pipelines/smoke/agent-implement/pipeline.dot` to drop `prompt=` from the task node.
-- Run `npx vitest run src/cli/tests/pipeline-smoke-agent-implement-folder.test.ts`. Expect PASS.
+- Update `pipelines/smoke/agent-implement/pipeline.dot` to drop `prompt=` from the task node. **(Decision: kept as optional Steering per spec D6; no `.dot` edit needed.)**
+- Also migrated 4 unreferenced template-leftover smoke `task.md` files surfaced by Step 1 (`smoke/{conditional,gate,json-schema-stream,static-multi-node}/task.md`) — same pattern.
+- Ran full smoke suite (`pipeline-smoke-agent-implement-folder` + 4 affected smokes + entire `npx vitest run`). 1327/1327 PASS.
 
-- [ ] **Step 3: Re-run Step 1's `find` command — expect only the 4 gate files in the output**.
+- [x] **Step 3: Re-run Step 1's `find` command (with `-not -path '*/tests/fixtures/*'`) — expect only the 4 gate files in the output (test fixtures excluded, non-agent .md files ignored by the path filter)**. ✅ Confirmed: only `approval_gate.md`, `remove_gate.md`, `review_gate.md`, `tmux_confirm_gate.md` remain.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git commit -m "feat(pipelines): migrate deferred legacy-path holdouts to auto_inputs
