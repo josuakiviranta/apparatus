@@ -45,7 +45,7 @@ Each node carries a `type=` attribute that selects a handler and a set of handle
 | `type` | all | Handler selector (see Node Types below) |
 | `shape` | all | Visual + structural contract (validated per type) |
 | `label` | all | Human-readable display name |
-| `prompt` | agent nodes | Prompt text, variable-expanded at execute time |
+| `prompt` | agent nodes | Optional per-call steering text (pure prose; no `$var` substitution — inputs are injected via the auto-rendered Inputs block from agent frontmatter) |
 | `tool_command` | tool nodes | Shell command to execute |
 | `script_file` | tool nodes | Path to external script under `pipelines/scripts/` |
 | `script_args` | tool nodes | Arguments appended to `script_file` invocation |
@@ -123,11 +123,11 @@ Adding a new node type requires: a handler module, registration in `buildHandler
 
 ### Agent Schema Descriptions
 
-Agent nodes that declare `json_schema_file` have the full stringified schema (all `description` fields verbatim) injected above the rubric reference in the assembled prompt by `src/attractor/handlers/agent-handler.ts`. A schema `description` is therefore a prompt input, not just developer documentation — and it arrives with stronger framing (`IMPORTANT:` banner) than the rubric reference. Schema descriptions MUST NOT encode output shape (section names, bullet conventions, sentence/word/bullet counts, heading patterns, tier structure). Output shape lives in the agent rubric at `src/cli/agents/<agent-name>.md`. Descriptions state *what* the field is and MAY carry content rules that the rubric cannot enforce (shell-safety, append-vs-replace semantics, emit-when conditions). The lint test `src/cli/tests/pipeline-schema-descriptions.test.ts` enforces this — it fails loudly on banned shape vocabulary and on descriptions over 160 characters.
+Agent nodes that declare `json_schema_file` have the full stringified schema (all `description` fields verbatim) injected above the agent instructions in the assembled prompt by `src/attractor/handlers/agent-handler.ts`. A schema `description` is therefore a prompt input, not just developer documentation — and it arrives with stronger framing (`IMPORTANT:` banner) than the agent instructions. Schema descriptions MUST NOT encode output shape (section names, bullet conventions, sentence/word/bullet counts, heading patterns, tier structure). Output shape lives in the agent instructions at `src/cli/agents/<agent-name>.md`. Descriptions state *what* the field is and MAY carry content rules that the instructions cannot enforce (shell-safety, append-vs-replace semantics, emit-when conditions). The lint test `src/cli/tests/pipeline-schema-descriptions.test.ts` enforces this — it fails loudly on banned shape vocabulary and on descriptions over 160 characters.
 
 ## Variable Expansion
 
-`src/attractor/transforms/variable-expansion.ts` expands `$name` and `${name}` references in node prompts, commands, and selected attributes.
+`src/attractor/transforms/variable-expansion.ts` expands `$name` and `${name}` references in tool-node commands, script args, `cwd`, and edge conditions. Agent-node `prompt=` (steering) is **not** variable-expanded — agent inputs are injected automatically via the Inputs block rendered from agent frontmatter `inputs:` declarations.
 
 ### Syntax
 
