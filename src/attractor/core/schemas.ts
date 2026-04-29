@@ -17,7 +17,6 @@ export const BaseNodeSchema = z.object({
 export const AgentNodeSchema = BaseNodeSchema.extend({
   agent: z.string().describe("Agent identifier (e.g. claude-code) or $variable."),
   prompt: z.string().optional().describe("Prompt text sent to the agent."),
-  jsonSchemaFile: z.string().optional().describe("Path to JSON schema file validating the agent's structured output."),
   produces: z.string().optional().describe("Context key under which the agent result is stored."),
   maxRetries: z.coerce.number().int().nonnegative().optional().describe("Retry count on agent failure before giving up."),
   outputValidationRetries: z.coerce.number().int().nonnegative().optional()

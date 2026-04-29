@@ -14,6 +14,9 @@ mcp:
     args:
       - "{{ILLUMINATION_SERVER_PATH}}"
       - "{{PROJECT_ROOT}}"
+outputs:
+  illumination_path: {type: [string, "null"]}
+  reasoning: string
 ---
 
 # Mission

@@ -2,9 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { AgentHandler } from "../handlers/agent-handler.js";
 import type { HandlerExecutionContext } from "../handlers/registry.js";
 import type { Node, PipelineContext } from "../types.js";
-import { readFileSync, writeFileSync, mkdirSync } from "fs";
+import { readFileSync, mkdtempSync, rmSync } from "fs";
 import { join } from "path";
-import { mkdtempSync, rmSync } from "fs";
 import { tmpdir } from "os";
 
 const baseCtx = (): PipelineContext => ({ values: {} });
@@ -394,16 +393,7 @@ describe("AgentHandler", () => {
     const handler = new AgentHandler({
       resolveAgent: mockResolve,
       createAgent: () => ({ run: mockAgentRun, kill: mockAgentKill, config: {}, runInteractive: mockRunInteractive } as any),
-      render: (element: any) => {
-        const { session, child, onExit } = element.props;
-        session.exitReason = "user_end";
-        setTimeout(async () => {
-          await child.end();
-          onExit("user_end");
-        }, 5);
-        return { unmount: () => {}, waitUntilExit: async () => {} };
-      },
-    });
+    } as any);
     await handler.execute(
       makeNode({ interactive: "true" } as any),
       baseCtx(),
@@ -442,14 +432,11 @@ describe("AgentHandler", () => {
     }
   });
 
-  it("reads jsonSchemaFile and passes schema to agent config", async () => {
+  it("uses config.jsonSchema (from agent frontmatter outputs:) as schema source", async () => {
     const schema = JSON.stringify({ type: "object", properties: { verdict: { type: "string" } }, required: ["verdict"] });
     const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-test-"));
-    const schemaDir = join(logsDir, "schemas");
-    mkdirSync(schemaDir, { recursive: true });
-    writeFileSync(join(schemaDir, "test.json"), schema);
 
-    mockResolve.mockReturnValue({ ...baseConfig });
+    mockResolve.mockReturnValue({ ...baseConfig, jsonSchema: schema });
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: JSON.stringify([{ type: "result", result: "", structured_output: { verdict: "true" } }]) });
 
     let capturedConfig: any = null;
@@ -460,7 +447,7 @@ describe("AgentHandler", () => {
 
     try {
       await handler.execute(
-        makeNode({ jsonSchemaFile: "schemas/test.json" } as any),
+        makeNode(),
         baseCtx(),
         makeContext({ logsRoot: logsDir, cwd: logsDir, dotDir: logsDir }),
       );
@@ -474,11 +461,8 @@ describe("AgentHandler", () => {
   it("merges parsed JSON output into contextUpdates", async () => {
     const schema = JSON.stringify({ type: "object", properties: { verdict: { type: "string" }, path: { type: "string" } } });
     const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-test-"));
-    const schemaDir = join(logsDir, "schemas");
-    mkdirSync(schemaDir, { recursive: true });
-    writeFileSync(join(schemaDir, "test.json"), schema);
 
-    mockResolve.mockReturnValue({ ...baseConfig });
+    mockResolve.mockReturnValue({ ...baseConfig, jsonSchema: schema });
     const jsonArrayOutput = JSON.stringify([
       { type: "result", result: "", structured_output: { verdict: "true", path: "/foo.md" }, session_id: "s1" },
     ]);
@@ -491,7 +475,7 @@ describe("AgentHandler", () => {
 
     try {
       const outcome = await handler.execute(
-        makeNode({ jsonSchemaFile: "schemas/test.json" } as any),
+        makeNode(),
         baseCtx(),
         makeContext({ logsRoot: logsDir, cwd: logsDir, dotDir: logsDir }),
       );
@@ -508,11 +492,8 @@ describe("AgentHandler", () => {
   it("unwraps Claude CLI --output-format json array wrapper before parsing", async () => {
     const schema = JSON.stringify({ type: "object", properties: { verdict: { type: "string" }, path: { type: "string" } } });
     const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-test-"));
-    const schemaDir = join(logsDir, "schemas");
-    mkdirSync(schemaDir, { recursive: true });
-    writeFileSync(join(schemaDir, "test.json"), schema);
 
-    mockResolve.mockReturnValue({ ...baseConfig });
+    mockResolve.mockReturnValue({ ...baseConfig, jsonSchema: schema });
     // Real Claude CLI --output-format json: single-line JSON array of events
     const jsonArrayOutput = JSON.stringify([
       { type: "system", subtype: "init", session_id: "s1" },
@@ -528,7 +509,7 @@ describe("AgentHandler", () => {
 
     try {
       const outcome = await handler.execute(
-        makeNode({ jsonSchemaFile: "schemas/test.json" } as any),
+        makeNode(),
         baseCtx(),
         makeContext({ logsRoot: logsDir, cwd: logsDir, dotDir: logsDir }),
       );
@@ -546,11 +527,8 @@ describe("AgentHandler", () => {
   it("extracts structured_output from result event (real CLI format)", async () => {
     const schema = JSON.stringify({ type: "object", properties: { preferred_label: { type: "string" } } });
     const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-test-"));
-    const schemaDir = join(logsDir, "schemas");
-    mkdirSync(schemaDir, { recursive: true });
-    writeFileSync(join(schemaDir, "test.json"), schema);
 
-    mockResolve.mockReturnValue({ ...baseConfig });
+    mockResolve.mockReturnValue({ ...baseConfig, jsonSchema: schema });
     // Real CLI: result="" with structured_output containing the data
     const wrapper = JSON.stringify([
       { type: "system", subtype: "init", session_id: "s2" },
@@ -565,7 +543,7 @@ describe("AgentHandler", () => {
 
     try {
       const outcome = await handler.execute(
-        makeNode({ jsonSchemaFile: "schemas/test.json" } as any),
+        makeNode(),
         baseCtx(),
         makeContext({ logsRoot: logsDir, cwd: logsDir, dotDir: logsDir }),
       );
@@ -581,11 +559,8 @@ describe("AgentHandler", () => {
   it("sets preferredLabel from parsed JSON preferred_label key", async () => {
     const schema = JSON.stringify({ type: "object", properties: { preferred_label: { type: "string" } } });
     const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-test-"));
-    const schemaDir = join(logsDir, "schemas");
-    mkdirSync(schemaDir, { recursive: true });
-    writeFileSync(join(schemaDir, "test.json"), schema);
 
-    mockResolve.mockReturnValue({ ...baseConfig });
+    mockResolve.mockReturnValue({ ...baseConfig, jsonSchema: schema });
     const jsonArrayOutput = JSON.stringify([
       { type: "result", result: "", structured_output: { preferred_label: "false" } },
     ]);
@@ -598,7 +573,7 @@ describe("AgentHandler", () => {
 
     try {
       const outcome = await handler.execute(
-        makeNode({ jsonSchemaFile: "schemas/test.json" } as any),
+        makeNode(),
         baseCtx(),
         makeContext({ logsRoot: logsDir, cwd: logsDir, dotDir: logsDir }),
       );
@@ -612,11 +587,8 @@ describe("AgentHandler", () => {
   it("returns fail when structured output cannot be parsed", async () => {
     const schema = JSON.stringify({ type: "object" });
     const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-test-"));
-    const schemaDir = join(logsDir, "schemas");
-    mkdirSync(schemaDir, { recursive: true });
-    writeFileSync(join(schemaDir, "test.json"), schema);
 
-    mockResolve.mockReturnValue({ ...baseConfig });
+    mockResolve.mockReturnValue({ ...baseConfig, jsonSchema: schema });
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: "not valid json" });
 
     const handler = new AgentHandler({
@@ -626,7 +598,7 @@ describe("AgentHandler", () => {
 
     try {
       const outcome = await handler.execute(
-        makeNode({ jsonSchemaFile: "schemas/test.json" } as any),
+        makeNode(),
         baseCtx(),
         makeContext({ logsRoot: logsDir, cwd: logsDir, dotDir: logsDir }),
       );
@@ -641,11 +613,8 @@ describe("AgentHandler", () => {
   it("parses JSON from result field when Claude prefixes prose before JSON (stream-json mode)", async () => {
     const schema = JSON.stringify({ type: "object", properties: { preferred_label: { type: "string" }, summary: { type: "string" } } });
     const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-test-"));
-    const schemaDir = join(logsDir, "schemas");
-    mkdirSync(schemaDir, { recursive: true });
-    writeFileSync(join(schemaDir, "test.json"), schema);
 
-    mockResolve.mockReturnValue({ ...baseConfig });
+    mockResolve.mockReturnValue({ ...baseConfig, jsonSchema: schema });
     // stream-json mode: structured_output is absent; result contains prose + JSON
     const proseResult = 'All three claims verified. Here\'s the verdict:\n\n{"preferred_label":"true","summary":"gap confirmed"}';
     const output = JSON.stringify([
@@ -660,7 +629,7 @@ describe("AgentHandler", () => {
 
     try {
       const outcome = await handler.execute(
-        makeNode({ jsonSchemaFile: "schemas/test.json" } as any),
+        makeNode(),
         baseCtx(),
         makeContext({ logsRoot: logsDir, cwd: logsDir, dotDir: logsDir }),
       );
@@ -676,11 +645,8 @@ describe("AgentHandler", () => {
   it("parses JSON when prose prefix contains literal ${...} brace markers", async () => {
     const schema = JSON.stringify({ type: "object", properties: { preferred_label: { type: "string" }, summary: { type: "string" } } });
     const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-test-"));
-    const schemaDir = join(logsDir, "schemas");
-    mkdirSync(schemaDir, { recursive: true });
-    writeFileSync(join(schemaDir, "test.json"), schema);
 
-    mockResolve.mockReturnValue({ ...baseConfig });
+    mockResolve.mockReturnValue({ ...baseConfig, jsonSchema: schema });
     // Agent quotes source code containing ${var} template syntax in its prose preamble.
     // Greedy /\{[\s\S]*\}/ would grab from `{agentRubric}` through the real JSON's
     // closing brace, producing invalid JSON. The extractor must anchor to `{"`.
@@ -697,7 +663,7 @@ describe("AgentHandler", () => {
 
     try {
       const outcome = await handler.execute(
-        makeNode({ jsonSchemaFile: "schemas/test.json" } as any),
+        makeNode(),
         baseCtx(),
         makeContext({ logsRoot: logsDir, cwd: logsDir, dotDir: logsDir }),
       );

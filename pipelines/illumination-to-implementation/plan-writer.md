@@ -11,6 +11,8 @@ tools:
   - Task
   - Skill
 mcp: []
+outputs:
+  plan_path: string
 ---
 
 # Mission

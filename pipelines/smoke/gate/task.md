@@ -12,4 +12,5 @@ tools:
   - Bash
   - Task
 mcp: []
+outputs: {}
 ---

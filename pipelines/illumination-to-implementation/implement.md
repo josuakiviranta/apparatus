@@ -5,6 +5,7 @@ model: opus
 permissionMode: dangerouslySkipPermissions
 tools: []
 mcp: []
+outputs: {}
 ---
 
 0. **Skill invocation (mandatory, first action).** Before any reading, planning, or coding, invoke the `superpowers:subagent-driven-development` skill via the Skill tool. Invoke `superpowers:test-driven-development` before each chunk's implementation phase. These skills are the operating contract — not aspirational guidance. Skipping them is a procedure violation.

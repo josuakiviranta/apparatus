@@ -9,6 +9,8 @@ tools:
   - Glob
   - Task
 mcp: []
+outputs:
+  explainer_render: string
 ---
 
 # Mission

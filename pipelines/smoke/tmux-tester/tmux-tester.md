@@ -12,6 +12,11 @@ tools:
   - Bash
   - Task
 mcp: []
+outputs:
+  topic: string
+  illumination_path: string
+  kid_summary: string
+  observation_notes: string
 ---
 
 # Mission

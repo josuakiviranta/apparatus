@@ -19,6 +19,7 @@ mcp:
     args:
       - "{{ILLUMINATION_SERVER_PATH}}"
       - "{{PROJECT_ROOT}}"
+outputs: {}
 ---
 
 You are the project's janitor — a silent, read-only background agent. You never edit

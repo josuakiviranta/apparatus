@@ -390,6 +390,13 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
     checkAgentOutputsConflict(node, dotDir, diags);
   }
 
+  // agent_missing_outputs + agent_outputs_empty — only when dotDir is available for resolution
+  if (dotDir) {
+    for (const node of nodes.values()) {
+      checkAgentMissingOutputs(node, dotDir, diags);
+    }
+  }
+
   // resolveAgent needs projectDir to locate project-local agents; without dotDir we can't fetch agent configs.
   if (dotDir) {
     checkMissingInputProducer(graph, nodeProduces, dotDir, diags);
@@ -637,6 +644,39 @@ function checkAgentOutputsConflict(
       rule: "produces_redundant_with_outputs",
       severity: "error",
       message: `Agent "${node.agent}" declares outputs: in frontmatter (the SSoT). ${detail} Remove produces= from this node.`,
+      location: node.sourceLocation,
+    });
+  }
+}
+
+function checkAgentMissingOutputs(
+  node: Node,
+  dotDir: string,
+  diags: Diagnostic[],
+): void {
+  if (!node.agent) return;
+
+  // Interactive agents are exempt — they produce chat.output implicitly.
+  if (node.interactive === true || node.interactive === "true") return;
+
+  const agentConfig = tryResolveAgent(node, dotDir);
+  if (!agentConfig) return; // unresolvable agent — other rules handle this
+
+  if (agentConfig.outputs === undefined || agentConfig.outputs === null) {
+    diags.push({
+      rule: "agent_missing_outputs",
+      severity: "error",
+      message: `Agent "${node.agent}" at node "${node.id}" declares no outputs: block. Add outputs: to the agent frontmatter (or use json_schema_file= on the node for legacy agents that predate the outputs: convention).`,
+      location: node.sourceLocation,
+    });
+    return;
+  }
+
+  if (typeof agentConfig.outputs === "object" && Object.keys(agentConfig.outputs).length === 0) {
+    diags.push({
+      rule: "agent_outputs_empty",
+      severity: "warning",
+      message: `Agent "${node.agent}" at node "${node.id}" has outputs: {} with no keys. Declare at least one output key, or remove outputs: if this agent intentionally produces nothing.`,
       location: node.sourceLocation,
     });
   }

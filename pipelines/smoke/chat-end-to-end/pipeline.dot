@@ -9,8 +9,7 @@ digraph chat_end_to_end {
 
   summarize [
     agent="chat",
-    prompt="Summarize this chat into a single sentence. Input:\n\n$chat.output",
-    json_schema_file="summary.json"
+    prompt="Summarize this chat into a single sentence. Input:\n\n$chat.output"
   ];
 
   recovery [

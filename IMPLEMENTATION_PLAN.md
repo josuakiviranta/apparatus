@@ -1283,7 +1283,9 @@ git commit -m "feat(trace): surface validation attempts in --node-receive view +
 - Modify: `src/attractor/core/graph.ts`
 - Test: extend `src/attractor/tests/graph-validator.test.ts` (or create `graph-validator-outputs.test.ts`)
 
-- [ ] **Step 1: Write the failing validator test**
+**Status: SHIPPED 2026-04-29** — rule + tests added; 4 new tests; no fallout for migrated agents.
+
+- [x] **Step 1: Write the failing validator test**
 
 ```ts
 // src/attractor/tests/graph-validator-outputs.test.ts
@@ -1372,12 +1374,12 @@ chat
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `npx vitest run src/attractor/tests/graph-validator-outputs.test.ts`
 Expected: FAIL — rule not implemented.
 
-- [ ] **Step 3: Implement the rule in `graph.ts`**
+- [x] **Step 3: Implement the rule in `graph.ts`**
 
 In `src/attractor/core/graph.ts`, inside the agent-node iteration where other agent rules already run (search for existing `produces_redundant_with_outputs` or similar), add:
 
@@ -1412,12 +1414,12 @@ if (!isInteractive) {
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `npx vitest run src/attractor/tests/graph-validator-outputs.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/attractor/core/graph.ts src/attractor/tests/graph-validator-outputs.test.ts
@@ -1443,16 +1445,18 @@ git commit -m "feat(validator): agent_missing_outputs (with migration recipe) + 
 - Modify: `pipelines/illumination-to-implementation/pipeline.dot` — remove every `json_schema_file="..."` attribute from every node
 - Delete: `pipelines/illumination-to-implementation/{explainer,design-writer,plan-writer,memory-writer,memory-reflector,chat-summarizer,tmux-test-result}.json` (7 files)
 
-- [ ] **Step 1: Snapshot the existing 7 .json files for reference**
+**Status: SHIPPED 2026-04-29** — atomic migration of 7 illumination agents + smoke pipelines; 12 stale .json deleted; jsonSchemaFile field removed; all 1253 tests pass.
+
+- [x] **Step 1: Snapshot the existing 7 .json files for reference**
 
 Run: `for f in pipelines/illumination-to-implementation/*.json; do echo "=== $(basename $f) ==="; cat $f; done > /tmp/old-schemas.txt`
 Inspect to confirm the YAML mapping below matches.
 
-- [ ] **Step 2: Delete `jsonSchemaFile` field from `AgentNodeSchema`**
+- [x] **Step 2: Delete `jsonSchemaFile` field from `AgentNodeSchema`**
 
 In `src/attractor/core/schemas.ts`, remove the `jsonSchemaFile: z.string().optional()...` line from `AgentNodeSchema` (and any sibling fields specific to this attribute).
 
-- [ ] **Step 3: Remove `node.jsonSchemaFile` branch from `agent-handler.ts`**
+- [x] **Step 3: Remove `node.jsonSchemaFile` branch from `agent-handler.ts`**
 
 In `src/attractor/handlers/agent-handler.ts`, replace the block from chunk-1 task 1.1 with the simpler version:
 
@@ -1464,7 +1468,7 @@ const jsonSchema: string | undefined = config.jsonSchema;
 
 (Also delete the now-unused `readFileSync`/`resolve` imports if they were only used here.)
 
-- [ ] **Step 4: Add `outputs:` to each of the 7 agent .md files**
+- [x] **Step 4: Add `outputs:` to each of the 7 agent .md files**
 
 For each agent, edit its `.md` frontmatter to insert the `outputs:` block before the closing `---`. Example for `change-explainer.md`:
 
@@ -1481,7 +1485,7 @@ outputs:
 
 Repeat for the remaining six agents using the YAML equivalents from the spec table.
 
-- [ ] **Step 5: Add `outputs: {}` to `implement.md`**
+- [x] **Step 5: Add `outputs: {}` to `implement.md`**
 
 ```yaml
 ---
@@ -1491,26 +1495,26 @@ outputs: {}
 ---
 ```
 
-- [ ] **Step 6: Drop `json_schema_file="..."` from every node in `pipeline.dot`**
+- [x] **Step 6: Drop `json_schema_file="..."` from every node in `pipeline.dot`**
 
 Run: `grep -n "json_schema_file" pipelines/illumination-to-implementation/pipeline.dot`
 For each line, remove only the `json_schema_file="..."` portion (preserve sibling attributes and the closing `]`).
 
-- [ ] **Step 7: Delete the 7 stale `.json` files**
+- [x] **Step 7: Delete the 7 stale `.json` files**
 
 Run: `rm pipelines/illumination-to-implementation/{explainer,design-writer,plan-writer,memory-writer,memory-reflector,chat-summarizer,tmux-test-result}.json`
 
-- [ ] **Step 8: Run pipeline validate to confirm migration is consistent**
+- [x] **Step 8: Run pipeline validate to confirm migration is consistent**
 
 Run: `npx tsx src/cli/index.ts pipeline validate pipelines/illumination-to-implementation/pipeline.dot`
 Expected: PASS (no `agent_missing_outputs`, no `agent_outputs_empty` errors; warning for `implement` is acceptable).
 
-- [ ] **Step 9: Run the full test suite**
+- [x] **Step 9: Run the full test suite**
 
 Run: `npm test`
 Expected: All tests pass.
 
-- [ ] **Step 10: Commit atomically**
+- [x] **Step 10: Commit atomically**
 
 ```bash
 git add -A

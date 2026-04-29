@@ -1,5 +1,5 @@
-import { mkdirSync, writeFileSync, readFileSync } from "fs";
-import { join, resolve } from "path";
+import { mkdirSync, writeFileSync } from "fs";
+import { join } from "path";
 import { randomUUID } from "crypto";
 import type { NodeHandler, HandlerExecutionContext } from "./registry.js";
 import type { Node, Outcome, PipelineContext, CheckpointState } from "../types.js";
@@ -46,7 +46,7 @@ export class AgentHandler implements NodeHandler {
     // Apply node-level overrides
     if (node.llmModel) config = { ...config, model: node.llmModel as string };
 
-    const { logsRoot, cwd, dotDir, signal, onStdout, completedNodes, nodeRetries, onInteractiveRequest } = meta;
+    const { logsRoot, cwd, signal, onStdout, completedNodes, nodeRetries, onInteractiveRequest } = meta;
 
     // Dev-mode: tsx is needed to run .ts MCP servers (the bundled paths from
     // getIlluminationServerPath() etc point at .ts in dev, .js in prod).
@@ -68,19 +68,8 @@ export class AgentHandler implements NodeHandler {
       ...ctx.values,
     };
 
-    // Read JSON schema: prefer node.jsonSchemaFile (legacy, deleted in chunk 3),
-    // fall back to config.jsonSchema derived from agent frontmatter outputs:.
-    const jsonSchemaFile = node.jsonSchemaFile as string | undefined;
-    let jsonSchema: string | undefined;
-    if (jsonSchemaFile) {
-      try {
-        jsonSchema = readFileSync(resolve(dotDir, jsonSchemaFile), "utf8");
-      } catch (err) {
-        return { status: "fail", failureReason: `Failed to read json_schema_file "${jsonSchemaFile}": ${(err as Error).message}` };
-      }
-    } else if (config.jsonSchema) {
-      jsonSchema = config.jsonSchema;
-    }
+    // JSON schema comes exclusively from agent frontmatter outputs:
+    const jsonSchema: string | undefined = config.jsonSchema;
     // DOT attributes parse as strings; coerce explicitly to boolean
     const interactive = node.interactive === true || node.interactive === "true";
 

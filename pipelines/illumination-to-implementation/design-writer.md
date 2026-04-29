@@ -11,6 +11,8 @@ tools:
   - Task
   - Skill
 mcp: []
+outputs:
+  design_doc_path: string
 ---
 
 # Mission

@@ -17,6 +17,8 @@ mcp:
     args:
       - "{{ILLUMINATION_SERVER_PATH}}"
       - "{{PROJECT_ROOT}}"
+outputs:
+  memory_path: string
 ---
 
 # Mission

@@ -12,4 +12,7 @@ tools:
   - Bash
   - Task
 mcp: []
+outputs:
+  refinements: string
+  scope_changed: boolean
 ---

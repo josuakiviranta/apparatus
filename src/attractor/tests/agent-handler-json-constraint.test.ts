@@ -4,12 +4,15 @@
  * Root cause documented in: memory/2026-04-13-json-schema-agentic-sessions.md
  * The --json-schema CLI flag alone does not constrain the model's final message in long
  * agentic sessions. An explicit prompt-level instruction must also be injected.
+ *
+ * After Task 3.2 migration: jsonSchema is sourced exclusively from agent frontmatter
+ * outputs: (via config.jsonSchema). The legacy json_schema_file= node attribute is removed.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { AgentHandler } from "../handlers/agent-handler.js";
 import type { HandlerExecutionContext } from "../handlers/registry.js";
 import type { Node, PipelineContext } from "../types.js";
-import { writeFileSync, mkdirSync, existsSync } from "fs";
+import { existsSync } from "fs";
 import { join } from "path";
 import { mkdtempSync, rmSync } from "fs";
 import { tmpdir } from "os";
@@ -52,11 +55,8 @@ describe("AgentHandler – JSON constraint injection", () => {
   it("prepends JSON constraint to prompt when jsonSchema is set", async () => {
     const schema = JSON.stringify({ type: "object", properties: { verdict: { type: "string" } }, required: ["verdict"] });
     const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-json-constraint-"));
-    const schemaDir = join(logsDir, "schemas");
-    mkdirSync(schemaDir, { recursive: true });
-    writeFileSync(join(schemaDir, "test.json"), schema);
 
-    mockResolve.mockReturnValue({ ...baseConfig });
+    mockResolve.mockReturnValue({ ...baseConfig, jsonSchema: schema });
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: JSON.stringify([{ type: "result", result: "", structured_output: { verdict: "pass" } }]) });
 
     let capturedConfig: any = null;
@@ -67,7 +67,7 @@ describe("AgentHandler – JSON constraint injection", () => {
 
     try {
       await handler.execute(
-        makeNode({ prompt: "Verify the implementation", jsonSchemaFile: "schemas/test.json" } as any),
+        makeNode({ prompt: "Verify the implementation" }),
         baseCtx(),
         makeContext({ logsRoot: logsDir, cwd: logsDir, dotDir: logsDir }),
       );
@@ -86,11 +86,8 @@ describe("AgentHandler – JSON constraint injection", () => {
   it("appends JSON constraint to prompt when jsonSchema is set", async () => {
     const schema = JSON.stringify({ type: "object", properties: { verdict: { type: "string" } }, required: ["verdict"] });
     const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-json-constraint-"));
-    const schemaDir = join(logsDir, "schemas");
-    mkdirSync(schemaDir, { recursive: true });
-    writeFileSync(join(schemaDir, "test.json"), schema);
 
-    mockResolve.mockReturnValue({ ...baseConfig });
+    mockResolve.mockReturnValue({ ...baseConfig, jsonSchema: schema });
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: JSON.stringify([{ type: "result", result: "", structured_output: { verdict: "pass" } }]) });
 
     let capturedConfig: any = null;
@@ -101,7 +98,7 @@ describe("AgentHandler – JSON constraint injection", () => {
 
     try {
       await handler.execute(
-        makeNode({ prompt: "Verify the implementation", jsonSchemaFile: "schemas/test.json" } as any),
+        makeNode({ prompt: "Verify the implementation" }),
         baseCtx(),
         makeContext({ logsRoot: logsDir, cwd: logsDir, dotDir: logsDir }),
       );
@@ -146,11 +143,8 @@ describe("AgentHandler – JSON constraint injection", () => {
     // with garbled data instead of surfacing the failure to the pipeline.
     const schema = JSON.stringify({ type: "object", properties: { verdict: { type: "string" } } });
     const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-json-constraint-"));
-    const schemaDir = join(logsDir, "schemas");
-    mkdirSync(schemaDir, { recursive: true });
-    writeFileSync(join(schemaDir, "test.json"), schema);
 
-    mockResolve.mockReturnValue({ ...baseConfig });
+    mockResolve.mockReturnValue({ ...baseConfig, jsonSchema: schema });
     // Simulate the real failure: model returns markdown despite --json-schema flag
     mockAgentRun.mockResolvedValue({
       exitCode: 0,
@@ -166,7 +160,7 @@ describe("AgentHandler – JSON constraint injection", () => {
 
     try {
       const outcome = await handler.execute(
-        makeNode({ jsonSchemaFile: "schemas/test.json" } as any),
+        makeNode(),
         baseCtx(),
         makeContext({ logsRoot: logsDir, cwd: logsDir, dotDir: logsDir }),
       );
@@ -182,11 +176,8 @@ describe("AgentHandler – JSON constraint injection", () => {
   it("parses JSON array output and extracts structured_output from result event", async () => {
     const schema = JSON.stringify({ type: "object", properties: { verdict: { type: "string" } } });
     const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-json-constraint-"));
-    const schemaDir = join(logsDir, "schemas");
-    mkdirSync(schemaDir, { recursive: true });
-    writeFileSync(join(schemaDir, "test.json"), schema);
 
-    mockResolve.mockReturnValue({ ...baseConfig });
+    mockResolve.mockReturnValue({ ...baseConfig, jsonSchema: schema });
     // Real Claude CLI --output-format json: JSON array with structured_output
     const jsonArray = JSON.stringify([
       { type: "assistant", message: { content: "thinking..." } },
@@ -202,7 +193,7 @@ describe("AgentHandler – JSON constraint injection", () => {
 
     try {
       const outcome = await handler.execute(
-        makeNode({ jsonSchemaFile: "schemas/test.json" } as any),
+        makeNode(),
         baseCtx(),
         makeContext({ logsRoot: logsDir, cwd: logsDir, dotDir: logsDir }),
       );
@@ -218,11 +209,8 @@ describe("AgentHandler – JSON constraint injection", () => {
   it("returns descriptive failure when output has no {type:'result'} event", async () => {
     const schema = JSON.stringify({ type: "object", properties: { verdict: { type: "string" } } });
     const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-json-constraint-"));
-    const schemaDir = join(logsDir, "schemas");
-    mkdirSync(schemaDir, { recursive: true });
-    writeFileSync(join(schemaDir, "test.json"), schema);
 
-    mockResolve.mockReturnValue({ ...baseConfig });
+    mockResolve.mockReturnValue({ ...baseConfig, jsonSchema: schema });
     // Truncated session: JSON array with events but no result
     const jsonArray = JSON.stringify([
       { type: "assistant", message: { content: "working..." } },
@@ -237,7 +225,7 @@ describe("AgentHandler – JSON constraint injection", () => {
 
     try {
       const outcome = await handler.execute(
-        makeNode({ jsonSchemaFile: "schemas/test.json" } as any),
+        makeNode(),
         baseCtx(),
         makeContext({ logsRoot: logsDir, cwd: logsDir, dotDir: logsDir }),
       );
@@ -252,11 +240,8 @@ describe("AgentHandler – JSON constraint injection", () => {
   it("parses structured_output when it is a raw object", async () => {
     const schema = JSON.stringify({ type: "object", properties: { verdict: { type: "string" } } });
     const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-json-constraint-"));
-    const schemaDir = join(logsDir, "schemas");
-    mkdirSync(schemaDir, { recursive: true });
-    writeFileSync(join(schemaDir, "test.json"), schema);
 
-    mockResolve.mockReturnValue({ ...baseConfig });
+    mockResolve.mockReturnValue({ ...baseConfig, jsonSchema: schema });
     // structured_output as raw object (not stringified) — exercises the non-string branch
     const jsonArray = JSON.stringify([
       { type: "assistant", message: { content: "done" } },
@@ -271,7 +256,7 @@ describe("AgentHandler – JSON constraint injection", () => {
 
     try {
       const outcome = await handler.execute(
-        makeNode({ jsonSchemaFile: "schemas/test.json" } as any),
+        makeNode(),
         baseCtx(),
         makeContext({ logsRoot: logsDir, cwd: logsDir, dotDir: logsDir }),
       );
@@ -283,14 +268,11 @@ describe("AgentHandler – JSON constraint injection", () => {
     }
   });
 
-  it("writes raw-output.txt to nodeDir when jsonSchema output is present", async () => {
+  it("writes raw-attempt-1.txt to nodeDir when jsonSchema output is present", async () => {
     const schema = JSON.stringify({ type: "object", properties: { verdict: { type: "string" } } });
     const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-json-constraint-"));
-    const schemaDir = join(logsDir, "schemas");
-    mkdirSync(schemaDir, { recursive: true });
-    writeFileSync(join(schemaDir, "test.json"), schema);
 
-    mockResolve.mockReturnValue({ ...baseConfig });
+    mockResolve.mockReturnValue({ ...baseConfig, jsonSchema: schema });
     const jsonArray = JSON.stringify([
       { type: "result", result: "", structured_output: { verdict: "pass" } },
     ]);
@@ -303,7 +285,7 @@ describe("AgentHandler – JSON constraint injection", () => {
 
     try {
       await handler.execute(
-        makeNode({ jsonSchemaFile: "schemas/test.json" } as any),
+        makeNode(),
         baseCtx(),
         makeContext({ logsRoot: logsDir, cwd: logsDir, dotDir: logsDir }),
       );
@@ -315,16 +297,13 @@ describe("AgentHandler – JSON constraint injection", () => {
     }
   });
 
-  it("resolves json_schema_file relative to dotDir, not cwd", async () => {
+  it("uses config.jsonSchema (from agent frontmatter) independent of dotDir/cwd", async () => {
     const schema = JSON.stringify({ type: "object", properties: { verdict: { type: "string" } }, required: ["verdict"] });
     const dotDir = mkdtempSync(join(tmpdir(), "ralph-dotdir-"));
     const projectDir = mkdtempSync(join(tmpdir(), "ralph-project-"));
-    const schemaDir = join(dotDir, "pipelines", "schemas");
-    mkdirSync(schemaDir, { recursive: true });
-    writeFileSync(join(schemaDir, "test.json"), schema);
-    // NOTE: schema is in dotDir, NOT in projectDir — resolution must use dotDir
+    // NOTE: schema is passed via config.jsonSchema — no file needed in any dir
 
-    mockResolve.mockReturnValue({ ...baseConfig });
+    mockResolve.mockReturnValue({ ...baseConfig, jsonSchema: schema });
     mockAgentRun.mockResolvedValue({
       exitCode: 0, sessionId: null, stdout: null,
       output: JSON.stringify([{ type: "result", result: "", structured_output: { verdict: "pass" } }]),
@@ -337,7 +316,7 @@ describe("AgentHandler – JSON constraint injection", () => {
 
     try {
       const outcome = await handler.execute(
-        makeNode({ prompt: "Verify", jsonSchemaFile: "pipelines/schemas/test.json" } as any),
+        makeNode({ prompt: "Verify" }),
         baseCtx(),
         makeContext({ logsRoot: projectDir, cwd: projectDir, dotDir: dotDir }),
       );
@@ -352,11 +331,8 @@ describe("AgentHandler – JSON constraint injection", () => {
   it("returns descriptive failure when agent produces no output", async () => {
     const schema = JSON.stringify({ type: "object", properties: { verdict: { type: "string" } } });
     const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-json-constraint-"));
-    const schemaDir = join(logsDir, "schemas");
-    mkdirSync(schemaDir, { recursive: true });
-    writeFileSync(join(schemaDir, "test.json"), schema);
 
-    mockResolve.mockReturnValue({ ...baseConfig });
+    mockResolve.mockReturnValue({ ...baseConfig, jsonSchema: schema });
     // Simulate timeout: agent exits without producing output
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: undefined });
 
@@ -367,7 +343,7 @@ describe("AgentHandler – JSON constraint injection", () => {
 
     try {
       const outcome = await handler.execute(
-        makeNode({ jsonSchemaFile: "schemas/test.json" } as any),
+        makeNode(),
         baseCtx(),
         makeContext({ logsRoot: logsDir, cwd: logsDir, dotDir: logsDir }),
       );

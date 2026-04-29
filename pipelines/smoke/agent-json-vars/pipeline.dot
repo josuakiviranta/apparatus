@@ -6,7 +6,6 @@ digraph agent_json_vars_smoke {
   // Agent produces JSON with two fields
   producer [
     agent="task",
-    json_schema_file="agent-json-vars.json",
     prompt="Return JSON with exactly: { \"result\": \"hello\", \"label\": \"world\" }. Do NOT use any tools."
   ]
 

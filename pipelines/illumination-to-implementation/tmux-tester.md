@@ -12,6 +12,11 @@ tools:
   - Bash
   - Task
 mcp: []
+outputs:
+  test_result: {enum: [pass, fail]}
+  test_summary: string
+  issues_found: {type: array, items: {type: string}}
+  test_render: string
 ---
 
 # Mission

@@ -109,22 +109,19 @@ describe("AgentHandler — interactive branch", () => {
     }
   });
 
-  it("rejects interactive=true combined with jsonSchemaFile", async () => {
+  it("rejects interactive=true combined with agent config.jsonSchema", async () => {
     const agent = makeFakeAgent(() => {});
+    const configWithSchema = { ...agent.config, jsonSchema: "{}" };
     const handler = new AgentHandler({
-      resolveAgent: () => agent.config,
+      resolveAgent: () => configWithSchema,
       createAgent: () => agent,
     });
     const tmp = mkdtempSync(join(tmpdir(), "ralph-handler-"));
     try {
-      const { writeFileSync } = await import("fs");
-      const schemaPath = join(tmp, "schema.json");
-      writeFileSync(schemaPath, "{}");
       const node: Node = {
         id: "n1",
         prompt: "chat",
         interactive: true,
-        jsonSchemaFile: "schema.json",
       };
       const out = await handler.execute(node, baseCtx(), baseMeta(tmp, tmp));
       expect(out.status).toBe("fail");
