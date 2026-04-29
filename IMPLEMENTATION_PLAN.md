@@ -1773,11 +1773,11 @@ Now that every agent uses the new path, the flag is redundant.
 
 ### Task 6.5: Update docs
 
-- [ ] **Step 1: Update `README.md`** — pipeline usage section reflects new authoring model.
-- [ ] **Step 2: Update `specs/` (current behavioral specs)** if any reference the old `prompt=` model.
-- [ ] **Step 3: Update `CLAUDE.md`** if any pipeline-authoring guidance is obsolete.
-- [ ] **Step 4: Move design doc to "implemented" status** — edit `docs/superpowers/specs/2026-04-29-pipeline-context-flow-redesign.md` header: `Status: implemented`.
-- [ ] **Step 5: Commit**
+- [x] **Step 1: Update `README.md`** — no changes needed; README has no pipeline authoring section describing the old `prompt=` model.
+- [x] **Step 2: Update `specs/` (current behavioral specs)** — `specs/pipeline.md` updated: `prompt=` attribute table entry now describes steering-only role; Variable Expansion section clarifies agent-node steering is excluded from `$var` expansion; Agent Schema Descriptions section renames "rubric" → "agent instructions" (D7). `AGENTS.md`, `specs/commands.md` — no changes needed (no obsolete content).
+- [x] **Step 3: Update `CLAUDE.md`** — no changes needed; no pipeline-authoring guidance present.
+- [x] **Step 4: Move design doc to "implemented" status** — `docs/superpowers/specs/2026-04-29-pipeline-context-flow-redesign.md` header updated to `Status: implemented`.
+- [x] **Step 5: Commit** — `fb72542`
 
 ### Task 6.6: Tag release
 
