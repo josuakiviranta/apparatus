@@ -1372,15 +1372,15 @@ inputs:
 - [x] design-writer.md (commit eda94f6)
 - [x] plan-writer.md (commit f374f78)
 - [x] tmux-tester.md (commit d8e9fbb)
-- [ ] memory-writer.md
-- [ ] memory-reflector.md
+- [x] memory-writer.md (commit 24f44c2)
+- [x] memory-reflector.md (commit cf68f51)
 
 Per agent:
 
-- [ ] **Step 1: Edit frontmatter** (add auto_inputs + the inputs above).
-- [ ] **Step 2: Update body $var references** to qualified form where applicable.
-- [ ] **Step 3: Run validate** — `ralph pipeline validate pipelines/illumination-to-implementation/pipeline.dot --project .`. Expect errors will surface; record them, fix iteratively.
-- [ ] **Step 4: Commit each agent migration as a separate commit** for granular rollback. Format: `feat(pipelines/illumination-to-implementation): migrate <agent> to auto_inputs`.
+- [x] **Step 1: Edit frontmatter** (add auto_inputs + the inputs above).
+- [x] **Step 2: Update body $var references** to qualified form where applicable.
+- [x] **Step 3: Run validate** — `ralph pipeline validate pipelines/illumination-to-implementation/pipeline.dot --project .`. Expect errors will surface; record them, fix iteratively.
+- [x] **Step 4: Commit each agent migration as a separate commit** for granular rollback. Format: `feat(pipelines/illumination-to-implementation): migrate <agent> to auto_inputs`.
 
 ### Task 3.5: Migrate `pipeline.dot`
 
