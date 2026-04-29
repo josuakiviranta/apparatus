@@ -1,6 +1,7 @@
 ---
 name: memory-reflector
 description: Reflect on a just-written session memory file and decide whether to surface one new illumination capturing what was learned during the run
+auto_inputs: true
 model: opus
 permissionMode: dontAsk
 tools:
@@ -16,6 +17,13 @@ mcp:
       - "{{PROJECT_ROOT}}"
 outputs:
   illumination_path: {type: [string, "null"]}
+inputs:
+  - run_id
+  - project
+  - memory_writer.memory_path
+  - design_writer.design_doc_path
+  - plan_writer.plan_path
+  - illumination_path
 ---
 
 # Mission
@@ -28,16 +36,16 @@ You produce zero or one illumination per run. You are not a backlog generator �
 
 - `$run_id` — pipeline run identifier; used for idempotency and provenance.
 - `$project` — repo root.
-- `$memory_path` — absolute path to the memory file just written by memory-writer (primary input).
-- `$design_doc_path` — design that drove this run.
-- `$plan_path` — implementation plan that drove this run.
+- `$memory_writer.memory_path` — absolute path to the memory file just written by memory-writer (primary input).
+- `$design_writer.design_doc_path` — design that drove this run.
+- `$plan_writer.plan_path` — implementation plan that drove this run.
 - `$illumination_path` — original illumination this session sprang from. Note: by the time you run, memory-writer's step 7b may have moved this file from `meditations/illuminations/` to `meditations/implemented-illuminations/`. If `$illumination_path` does not exist on disk, look up the basename under `meditations/implemented-illuminations/` instead.
 
 # Procedure
 
 1. **Idempotency check.** Glob `$project/meditations/illuminations/*.md` and grep each match for the line `Pipeline run id: $run_id`. If any file matches, this is a `--resume` re-run and a previous attempt already wrote the illumination. Emit structured JSON with `illumination_path` set to the existing match's absolute path. Exit. (You may state your reasoning as plain prose in the response above the JSON for trace observability — it will be captured in the run trace, but it is not a structured output field.)
 
-2. **Read the inputs.** Read `$memory_path` first — it is memory-writer's distillation of the session trace. Then read `$design_doc_path`, `$plan_path`, and `$illumination_path` (with the post-move fallback above) for cross-reference context. Do not re-open the raw `pipeline.jsonl` trace; if the memory file lacks signal, that signal is gone for your purposes.
+2. **Read the inputs.** Read `$memory_writer.memory_path` first — it is memory-writer's distillation of the session trace. Then read `$design_writer.design_doc_path`, `$plan_writer.plan_path`, and `$illumination_path` (with the post-move fallback above) for cross-reference context. Do not re-open the raw `pipeline.jsonl` trace; if the memory file lacks signal, that signal is gone for your purposes.
 
 3. **Apply skip-fast signals.** Lean toward skipping when any of these hold:
    - The memory file has no `## Learnings from the run` section.
@@ -74,7 +82,7 @@ You produce zero or one illumination per run. You are not a backlog generator �
 
    ## Provenance
 
-   - Source memory: `<repo-relative path to $memory_path>`
+   - Source memory: `<repo-relative path to $memory_writer.memory_path>`
    - Pipeline run id: `$run_id`
    - Surfaced by: memory-reflector
    ```
