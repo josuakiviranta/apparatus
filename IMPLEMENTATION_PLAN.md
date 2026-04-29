@@ -1254,12 +1254,12 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 For each of the 9 agents (verifier, change-explainer, chat-refiner, design-writer, plan-writer, implement, tmux-tester, memory-writer, memory-reflector):
 
-- [ ] **Step A: Add `auto_inputs: true` to frontmatter**
-- [ ] **Step B: Declare `inputs:` listing every var the agent needs**
+- [x] **Step A: Add `auto_inputs: true` to frontmatter**
+- [x] **Step B: Declare `inputs:` listing every var the agent needs**
   - Bare for caller-provided / system (project, run_id, illuminations_dir, specs_dir, plans_dir).
   - Qualified for upstream-produced (verifier.summary, etc.).
-- [ ] **Step C: Update body docs to reference inputs by qualified `$node_key` form**
-- [ ] **Step D: For tmux-tester specifically — absorb the smoke-phase spec from the current pipeline.dot prompt** into Phase 2 of the agent body, since that's the only genuinely pipeline-specific content there.
+- [x] **Step C: Update body docs to reference inputs by qualified `$node_key` form**
+- [x] **Step D: For tmux-tester specifically — absorb the smoke-phase spec from the current pipeline.dot prompt** into Phase 2 of the agent body, since that's the only genuinely pipeline-specific content there.
 
 #### Detailed migrations per agent
 
@@ -1462,8 +1462,8 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 ### Task 3.6: End-to-end verification
 
-- [ ] **Step 1: Run validate (final)**: 0 errors, 0 unexpected warnings.
-- [ ] **Step 2: Run any pipeline-specific tests**: `npx vitest run src/cli/tests/pipeline-janitor-folder.test.ts` (if applies) — verify no test broken.
+- [x] **Step 1: Run validate (final)**: 0 errors, 0 unexpected warnings.
+- [x] **Step 2: Run any pipeline-specific tests**: `npx vitest run src/cli/tests/pipeline-janitor-folder.test.ts` (if applies) — verify no test broken.
 - [ ] **Step 3: Live run** (optional but strongly recommended):
 
 ```bash
@@ -1479,7 +1479,9 @@ Drive through the verifier → archive happy path on a known illumination. Confi
 - ctx.values uses qualified keys in `checkpoint.json`
 - pipeline reaches `done` without crash.
 
-- [ ] **Step 4: Commit any tweaks** found during live test.
+- [x] **Step 4: Commit any tweaks** found during live test.
+
+**Audit note (2026-04-29):** Validate — 0 errors, 0 warnings (✔ Pipeline valid, 18 nodes, 28 edges). Three validator bugs were found and fixed in `src/attractor/core/graph.ts` (checkOrphanOutput): (1) qualified inputs like `verifier.summary` were not resolving to their localKey `summary` in the consumed set; (2) qualified condition keys like `verifier.preferred_label=true` were not resolving to `preferred_label`; (3) gate node inputs were ignored entirely. Also fixed: `loop: true` agents' mandatory `done` sentinel was incorrectly warned as orphan. Tests: `src/cli/tests/pipeline-` suite — 30 test files, 108 tests, all pass. `src/attractor/tests/` — 50 test files, 555 tests, all pass. Step 3 (live run) deferred to human.
 
 ---
 
