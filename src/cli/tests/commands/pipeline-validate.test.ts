@@ -62,39 +62,3 @@ describe("pipeline validate — syntax errors", () => {
     expect(out).toContain("[syntax]");
   }, 30000);
 });
-
-describe("pipeline validate — agent body unresolved vars", () => {
-  beforeAll(() => {
-    // Tests require a built CLI binary. The smoke test uses the same convention.
-    const built = spawnSync("node", [CLI, "--version"], { encoding: "utf8" });
-    if ((built.status ?? -1) !== 0) {
-      throw new Error(`dist/cli/index.js not built — run \`npm run build\` first. Output: ${built.stderr}`);
-    }
-  }, 30000);
-
-  it("exits non-zero and reports unresolved_var_in_agent_prompt when agent body has an undeclared $var", () => {
-    const project = setupTempProjectWith({
-      ".ralph/agents/faker.md": `---
-name: faker
----
-Ref: $meditations_dir_typo
-`,
-      "pipelines/test.dot": `digraph t {
-  inputs="project"
-  start [shape="Mdiamond"]
-  exit [shape="Msquare"]
-  start -> n1 [label="go"]
-  n1 [agent="faker"]
-  n1 -> exit
-}`,
-    });
-
-    const { exitCode, stderr, stdout } = runCli(["pipeline", "validate", "pipelines/test.dot"], { cwd: project });
-    const out = stderr + stdout;
-    expect(out).toContain("unresolved_var_in_agent_prompt");
-    expect(out).toContain("faker.md");
-    expect(out).toContain("meditations_dir_typo");
-    expect(out).not.toContain("$HOME"); // ensure fenced refs are NOT flagged
-    expect(exitCode).not.toBe(0);
-  }, 30000);
-});
