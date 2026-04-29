@@ -129,6 +129,136 @@ body`,
   });
 });
 
+describe("validator — source_missing_output_key", () => {
+  it("errors when consumer requests a key not in producer outputs:", () => {
+    const dir = join(tmpdir(), `rule-smok-${Date.now()}`);
+    setup(dir, {
+      "producer.md": `---
+name: producer
+description: x
+auto_inputs: true
+inputs: []
+outputs: { foo: string }
+---
+body`,
+      "consumer.md": `---
+name: consumer
+description: x
+auto_inputs: true
+inputs: [producer.bar]
+outputs: { result: string }
+---
+body`,
+    });
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      producer [agent="producer"]
+      consumer [agent="consumer"]
+      done [shape=Msquare]
+      start -> producer -> consumer -> done
+    }`;
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    const d = diags.find(d => d.rule === "source_missing_output_key");
+    expect(d).toBeDefined();
+    expect(d!.severity).toBe("error");
+    expect(d!.message).toMatch(/producer\.bar/);
+    expect(d!.message).toMatch(/"bar"/);
+    expect(d!.message).toMatch(/"producer"/);
+    expect(d!.message).toMatch(/outputs:/);
+  });
+
+  it("does not fire when producer declares the requested key", () => {
+    const dir = join(tmpdir(), `rule-smok-ok-${Date.now()}`);
+    setup(dir, {
+      "producer.md": `---
+name: producer
+description: x
+auto_inputs: true
+inputs: []
+outputs: { bar: string }
+---
+body`,
+      "consumer.md": `---
+name: consumer
+description: x
+auto_inputs: true
+inputs: [producer.bar]
+outputs: { result: string }
+---
+body`,
+    });
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      producer [agent="producer"]
+      consumer [agent="consumer"]
+      done [shape=Msquare]
+      start -> producer -> consumer -> done
+    }`;
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    expect(diags.find(d => d.rule === "source_missing_output_key")).toBeUndefined();
+  });
+
+  it("errors when tool node lacks produces_from_stdout and consumer requests a key", () => {
+    const dir = join(tmpdir(), `rule-smok-tool-${Date.now()}`);
+    setup(dir, {
+      "consumer.md": `---
+name: consumer
+description: x
+auto_inputs: true
+inputs: [tool_node.bar]
+outputs:
+  result:
+    type: string
+---
+body`,
+    });
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      tool_node [type="tool" cwd="$project" tool_command="echo hello"]
+      c [agent="consumer"]
+      done [shape=Msquare]
+      start -> tool_node -> c -> done
+    }`;
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    const d = diags.find(d => d.rule === "source_missing_output_key");
+    expect(d).toBeDefined();
+    expect(d!.severity).toBe("error");
+    expect(d!.message).toMatch(/tool_node\.bar/);
+    expect(d!.message).toMatch(/"bar"/);
+    expect(d!.message).toMatch(/"tool_node"/);
+    expect(d!.message).toMatch(/produces_from_stdout/);
+  });
+
+  it("does not fire when tool node has produces_from_stdout set", () => {
+    const dir = join(tmpdir(), `rule-smok-tool-ok-${Date.now()}`);
+    setup(dir, {
+      "consumer.md": `---
+name: consumer
+description: x
+auto_inputs: true
+inputs: [tool_node.bar]
+outputs:
+  result:
+    type: string
+---
+body`,
+    });
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      tool_node [type="tool" cwd="$project" tool_command="echo hello" produces_from_stdout="true"]
+      c [agent="consumer"]
+      done [shape=Msquare]
+      start -> tool_node -> c -> done
+    }`;
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    expect(diags.find(d => d.rule === "source_missing_output_key")).toBeUndefined();
+  });
+});
+
 describe("validator — malformed input declarations", () => {
   // resolveInputDecl throws on multi-dot keys (e.g. "a.b.c") and empty strings.
   // validateGraph must NOT crash — it should absorb the throw and continue emitting

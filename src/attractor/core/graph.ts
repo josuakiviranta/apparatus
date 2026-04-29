@@ -431,6 +431,40 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
               message: `Agent "${node.agent}" references source node "${resolved.sourceNode}" in inputs:, but no such node exists in the graph.`,
               location: node.sourceLocation,
             });
+            continue;
+          }
+          // source_missing_output_key — source node exists but doesn't declare the requested key
+          if (resolved.sourceNode !== undefined) {
+            const sourceNode = nodes.get(resolved.sourceNode);
+            if (sourceNode) {
+              if (sourceNode.type === "tool") {
+                // Tool nodes: producesFromStdout must be set (truthy) for any key to be valid.
+                // The field merges stdout JSON into context but doesn't name specific keys —
+                // so we flag if producesFromStdout is absent/false entirely.
+                const pfStdout = sourceNode.producesFromStdout;
+                const hasPfStdout = pfStdout === true || pfStdout === "true";
+                if (!hasPfStdout) {
+                  diags.push({
+                    rule: "source_missing_output_key",
+                    severity: "error",
+                    message: `Input "${decl}" references key "${resolved.localKey}" which "${resolved.sourceNode}" does not declare in produces_from_stdout`,
+                    location: node.sourceLocation,
+                  });
+                }
+              } else if (sourceNode.agent) {
+                const sourceCfg = tryResolveAgent(sourceNode, dotDir);
+                if (sourceCfg && sourceCfg.outputs !== undefined) {
+                  if (!(resolved.localKey in sourceCfg.outputs)) {
+                    diags.push({
+                      rule: "source_missing_output_key",
+                      severity: "error",
+                      message: `Input "${decl}" references key "${resolved.localKey}" which "${resolved.sourceNode}" does not declare in outputs:`,
+                      location: node.sourceLocation,
+                    });
+                  }
+                }
+              }
+            }
           }
         }
       }
