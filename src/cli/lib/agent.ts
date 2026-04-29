@@ -494,8 +494,8 @@ export function validateAgentConfig(
     ...(derivedJsonSchema !== undefined ? { jsonSchema: derivedJsonSchema } : {}),
     ...(config.outputs !== undefined ? { outputs: config.outputs } : {}),
     ...(config.inputs !== undefined ? { inputs: config.inputs } : {}),
-    ...(config.autoInputs !== undefined || (config as any).auto_inputs !== undefined
-      ? { autoInputs: config.autoInputs ?? Boolean((config as any).auto_inputs) }
+    ...(config.autoInputs !== undefined || config.auto_inputs !== undefined
+      ? { autoInputs: config.autoInputs ?? config.auto_inputs }
       : {}),
     ...(config.loop !== undefined ? { loop: config.loop } : {}),
     ...(config.maxIterations !== undefined ? { maxIterations: config.maxIterations } : {}),
