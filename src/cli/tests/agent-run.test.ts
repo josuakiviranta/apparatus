@@ -107,9 +107,9 @@ describe("Agent.run", () => {
       expect.arrayContaining(["--resume", "sess-abc"]),
       expect.any(Object),
     );
-    // Should not include -p when resuming
+    // -p is now included on resume too — corrective message goes via stdin
     const args = mockSpawn.mock.calls[0][1] as string[];
-    expect(args).not.toContain("-p");
+    expect(args).toContain("-p");
   });
 
   it("captures session ID from stream-json output", async () => {

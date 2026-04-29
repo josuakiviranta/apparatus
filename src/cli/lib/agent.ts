@@ -207,8 +207,9 @@ export class Agent {
       const isInteractive = !!options.interactive;
       const isResume = !!options.resume;
 
-      // Add -p for non-interactive, non-resume runs (prompt piped via stdin)
-      if (!isInteractive && !isResume) {
+      // Add -p for non-interactive runs (resume or fresh — corrective message
+      // goes via stdin in both cases)
+      if (!isInteractive) {
         args.unshift("-p");
       }
 
@@ -245,11 +246,15 @@ export class Agent {
         }
       }
 
-      // Pipe prompt to stdin for non-interactive, non-resume
-      if (!isInteractive && !isResume && child.stdin) {
-        const stdinContent = options.message
-          ? `${expandedPrompt}\n\n${options.message}`
-          : expandedPrompt;
+      // Pipe content for non-interactive runs.
+      // Resume: only the new user-turn (system prompt already in the resumed session).
+      // Fresh: full system prompt, optionally followed by an initial message.
+      if (!isInteractive && child.stdin) {
+        const stdinContent = isResume
+          ? (options.message ?? "")
+          : (options.message
+              ? `${expandedPrompt}\n\n${options.message}`
+              : expandedPrompt);
         child.stdin.write(stdinContent);
         child.stdin.end();
       }

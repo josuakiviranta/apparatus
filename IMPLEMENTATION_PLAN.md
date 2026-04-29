@@ -313,8 +313,8 @@ git commit -m "fix(verifier): force final TEXT response (prevent thinking-block 
 
 ### Chunk 1 Review Checkpoint
 
-- [ ] **Run plan-document-reviewer subagent against Chunk 1.** If issues found → fix in Chunk 1 → re-dispatch. Loop until ✅ Approved.
-- [ ] **Run code-reviewer subagent against the chunk-1 commits.** Address feedback in-chunk; re-dispatch if needed.
+- [x] **Run plan-document-reviewer subagent against Chunk 1.** If issues found → fix in Chunk 1 → re-dispatch. Loop until ✅ Approved.
+- [x] **Run code-reviewer subagent against the chunk-1 commits.** Address feedback in-chunk; re-dispatch if needed.
 
 ---
 
@@ -328,7 +328,7 @@ git commit -m "fix(verifier): force final TEXT response (prevent thinking-block 
 - Modify: `src/cli/lib/agent.ts:208-255` (the `run` method's resume/stdin branches)
 - Test: extend or add `src/cli/tests/agent-resume.test.ts` (NEW)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // src/cli/tests/agent-resume.test.ts
@@ -349,12 +349,12 @@ describe("Agent.run resume support", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify current state**
+- [x] **Step 2: Run test to verify current state**
 
 Run: `npx vitest run src/cli/tests/agent-resume.test.ts`
 Expected: PASS — `buildArgs` already adds `--resume` (line 155-156). This test pins the contract.
 
-- [ ] **Step 3: Modify `agent.ts:run()` to send `-p` and pipe `options.message` on resume**
+- [x] **Step 3: Modify `agent.ts:run()` to send `-p` and pipe `options.message` on resume**
 
 In `src/cli/lib/agent.ts`, replace lines 210-213:
 
@@ -383,7 +383,7 @@ if (!isInteractive && child.stdin) {
 }
 ```
 
-- [ ] **Step 4: Add a behavioural test that resume + message reaches stdin**
+- [x] **Step 4: Add a behavioural test that resume + message reaches stdin**
 
 Append to `src/cli/tests/agent-resume.test.ts`:
 
@@ -421,17 +421,17 @@ it("on resume with message, pipes only the message to stdin", async () => {
 });
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `npx vitest run src/cli/tests/agent-resume.test.ts`
 Expected: PASS.
 
-- [ ] **Step 6: Run full test suite to confirm no regressions**
+- [x] **Step 6: Run full test suite to confirm no regressions**
 
 Run: `npm test`
 Expected: All tests pass.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/cli/lib/agent.ts src/cli/tests/agent-resume.test.ts
