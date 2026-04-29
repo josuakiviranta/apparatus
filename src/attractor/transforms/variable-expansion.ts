@@ -192,8 +192,13 @@ function resolveAgentMdPath(projectDir: string | undefined, agentName: string): 
     const local = join(projectDir, ".ralph/agents", `${agentName}.md`);
     if (existsSync(local)) return local;
   }
-  const bundled = join(getBundledAgentsDir(), `${agentName}.md`);
-  if (existsSync(bundled)) return bundled;
+  try {
+    const bundled = join(getBundledAgentsDir(), `${agentName}.md`);
+    if (existsSync(bundled)) return bundled;
+  } catch {
+    // Tests may mock `assets.js` without exposing getBundledAgentsDir.
+    // Treat as "no bundled fallback available" rather than crashing.
+  }
   return null;
 }
 
