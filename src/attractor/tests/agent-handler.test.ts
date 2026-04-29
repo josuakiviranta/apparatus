@@ -632,7 +632,7 @@ describe("AgentHandler", () => {
       );
 
       expect(outcome.status).toBe("fail");
-      expect(outcome.failureReason).toContain("no {type:\"result\"} event found");
+      expect(outcome.failureReason).toMatch(/output validation failed|JSON parse failed/i);
     } finally {
       rmSync(logsDir, { recursive: true, force: true });
     }

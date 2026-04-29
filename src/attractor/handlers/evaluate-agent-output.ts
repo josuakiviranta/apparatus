@@ -24,7 +24,20 @@ export function evaluateAgentOutput(
       errors: [{ path: "(root)", message: "no text content in response" }],
     };
   }
-  const resultPayload = extractResultPayload(raw) ?? raw;
+  // Normalise: if the raw output is a JSON array (e.g. from test mocks), convert
+  // each element to an NDJSON line so extractResultPayload can process it.
+  const normalised = normaliseRaw(raw);
+  const extracted = extractResultPayload(normalised);
+  // extracted === "" means a result event was found but it had empty content
+  // (e.g. Claude emitted a thinking-block-only response). Treat as no-text-content.
+  if (extracted === "") {
+    return {
+      ok: false,
+      raw: "",
+      errors: [{ path: "(root)", message: "no text content in response" }],
+    };
+  }
+  const resultPayload = extracted ?? normalised;
   const jsonMatch = resultPayload.match(/\{"[\s\S]*\}/) ?? resultPayload.match(/\{[\s\S]*\}/);
   const jsonStr = jsonMatch ? jsonMatch[0] : resultPayload;
   let parsed: Record<string, unknown>;
@@ -54,6 +67,22 @@ export function evaluateAgentOutput(
   return { ok: true, parsed, raw };
 }
 
+/**
+ * If raw is a JSON array (e.g. from test mocks that return JSON.stringify([...])),
+ * convert each element to an NDJSON line. Otherwise return raw unchanged.
+ */
+function normaliseRaw(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed.startsWith("[")) return raw;
+  try {
+    const arr = JSON.parse(trimmed);
+    if (Array.isArray(arr)) {
+      return arr.map((item: unknown) => JSON.stringify(item)).join("\n");
+    }
+  } catch { /* not a JSON array — fall through */ }
+  return raw;
+}
+
 function extractResultPayload(raw: string): string | undefined {
   let payload: string | undefined;
   for (const line of raw.split("\n")) {
@@ -67,7 +96,9 @@ function extractResultPayload(raw: string): string | undefined {
       payload = typeof evt.structured_output === "string"
         ? evt.structured_output
         : JSON.stringify(evt.structured_output);
-    } else if (evt.result != null && evt.result !== "") {
+    } else if (evt.result != null) {
+      // Preserve empty string as "" so callers can distinguish "found empty result"
+      // from "no result event found at all" (undefined).
       payload = typeof evt.result === "string"
         ? evt.result
         : JSON.stringify(evt.result);

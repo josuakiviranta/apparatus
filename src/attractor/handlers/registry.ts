@@ -25,6 +25,14 @@ export interface HandlerExecutionContext {
   onIterationStart?: (nodeId: string, iterationIndex: number) => void;
   /** Called after iteration i when more iterations will follow — pipeline.ts closes current TUI block */
   onIterationEnd?: (nodeId: string, iterationIndex: number) => void;
+  /** Called per validation failure — handler reports attempt + zod errors + raw output relpath */
+  onValidationFailure?: (args: {
+    attempt: number;
+    errors: Array<{ path: string; message: string }>;
+    rawOutputPath: string;
+  }) => void;
+  /** Called before a validation retry begins — opens a TUI iteration block */
+  onValidationRetryStart?: (nodeId: string, attempt: number) => void;
   /** Absolute path to the project root — used for project-local agent resolution */
   projectDir?: string;
 }

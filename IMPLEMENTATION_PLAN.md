@@ -833,7 +833,7 @@ git commit -m "feat(handlers): extract evaluate-agent-output helper for parse + 
 - Modify: `src/attractor/core/schemas.ts:22` area (add `outputValidationRetries` field on `AgentNodeSchema`)
 - Test: `src/attractor/tests/agent-handler-retry.test.ts` (NEW)
 
-- [ ] **Step 1: Add `outputValidationRetries` to `AgentNodeSchema`**
+- [x] **Step 1: Add `outputValidationRetries` to `AgentNodeSchema`**
 
 In `src/attractor/core/schemas.ts` near the existing `maxRetries` field (line 22), add:
 
@@ -842,7 +842,7 @@ outputValidationRetries: z.coerce.number().int().nonnegative().optional()
   .describe("Number of times to retry the agent on output validation failure (default 1)."),
 ```
 
-- [ ] **Step 2: Extend `HandlerExecutionContext`**
+- [x] **Step 2: Extend `HandlerExecutionContext`**
 
 In `src/attractor/handlers/registry.ts` add to the `HandlerExecutionContext` interface (callback names mirror the tracer's `on*` convention; the `nodeReceiveId` is injected by the engine wiring in Task 2.6, so the handler does not need to know it):
 
@@ -855,7 +855,7 @@ onValidationFailure?: (args: {
 onValidationRetryStart?: (nodeId: string, attempt: number) => void;
 ```
 
-- [ ] **Step 3: Write the failing handler-retry tests**
+- [x] **Step 3: Write the failing handler-retry tests**
 
 ```ts
 // src/attractor/tests/agent-handler-retry.test.ts
@@ -989,12 +989,12 @@ describe("AgentHandler — validation retry loop", () => {
 });
 ```
 
-- [ ] **Step 4: Run tests to verify they fail**
+- [x] **Step 4: Run tests to verify they fail**
 
 Run: `npx vitest run src/attractor/tests/agent-handler-retry.test.ts`
 Expected: FAIL — retry loop not implemented.
 
-- [ ] **Step 5: Implement validation+retry loop in `agent-handler.ts`**
+- [x] **Step 5: Implement validation+retry loop in `agent-handler.ts`**
 
 In `src/attractor/handlers/agent-handler.ts`:
 
@@ -1109,17 +1109,17 @@ return {
 };
 ```
 
-- [ ] **Step 6: Run handler-retry tests**
+- [x] **Step 6: Run handler-retry tests**
 
 Run: `npx vitest run src/attractor/tests/agent-handler-retry.test.ts`
 Expected: PASS.
 
-- [ ] **Step 7: Run full test suite**
+- [x] **Step 7: Run full test suite**
 
 Run: `npm test`
 Expected: All tests pass.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/attractor/handlers/agent-handler.ts src/attractor/handlers/registry.ts src/attractor/core/schemas.ts src/attractor/tests/agent-handler-retry.test.ts

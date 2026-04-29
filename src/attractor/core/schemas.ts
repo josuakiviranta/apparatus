@@ -20,6 +20,8 @@ export const AgentNodeSchema = BaseNodeSchema.extend({
   jsonSchemaFile: z.string().optional().describe("Path to JSON schema file validating the agent's structured output."),
   produces: z.string().optional().describe("Context key under which the agent result is stored."),
   maxRetries: z.coerce.number().int().nonnegative().optional().describe("Retry count on agent failure before giving up."),
+  outputValidationRetries: z.coerce.number().int().nonnegative().optional()
+    .describe("Number of times to retry the agent on output validation failure (default 1)."),
   retryTarget: z.string().optional().describe("Node id to jump to on retry."),
   fallbackRetryTarget: z.string().optional().describe("Node id to jump to when maxRetries exhausted."),
   interactive: z.union([z.boolean(), z.literal("true"), z.literal("false")]).optional().describe("Run the agent as an interactive TUI session."),

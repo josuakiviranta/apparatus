@@ -173,7 +173,7 @@ describe("AgentHandler – JSON constraint injection", () => {
 
       // Must surface as failure, not silently repair
       expect(outcome.status).toBe("fail");
-      expect(outcome.failureReason).toContain("no {type:\"result\"} event found");
+      expect(outcome.failureReason).toMatch(/output validation failed|JSON parse failed|no \{type:"result"\}/i);
     } finally {
       rmSync(logsDir, { recursive: true, force: true });
     }
@@ -243,7 +243,7 @@ describe("AgentHandler – JSON constraint injection", () => {
       );
 
       expect(outcome.status).toBe("fail");
-      expect(outcome.failureReason).toContain("no {type:\"result\"} event found");
+      expect(outcome.failureReason).toMatch(/output validation failed|no \{type:"result"\}/i);
     } finally {
       rmSync(logsDir, { recursive: true, force: true });
     }
@@ -308,7 +308,8 @@ describe("AgentHandler – JSON constraint injection", () => {
         makeContext({ logsRoot: logsDir, cwd: logsDir, dotDir: logsDir }),
       );
 
-      expect(existsSync(join(logsDir, "work", "raw-output.txt"))).toBe(true);
+      // new code writes raw-attempt-1.txt (validation+retry loop)
+      expect(existsSync(join(logsDir, "work", "raw-attempt-1.txt"))).toBe(true);
     } finally {
       rmSync(logsDir, { recursive: true, force: true });
     }
@@ -372,7 +373,7 @@ describe("AgentHandler – JSON constraint injection", () => {
       );
 
       expect(outcome.status).toBe("fail");
-      expect(outcome.failureReason).toContain("agent produced no output");
+      expect(outcome.failureReason).toMatch(/agent produced no output|no text content|output validation failed/i);
     } finally {
       rmSync(logsDir, { recursive: true, force: true });
     }

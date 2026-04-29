@@ -8,7 +8,9 @@ import { resolveAgent as defaultResolveAgent } from "../../cli/lib/agent-registr
 import { getIlluminationServerPath, getMetaMeditationsDir } from "../../cli/lib/assets.js";
 import { buildPreamble } from "../transforms/preamble.js";
 import { expandVariables, extractDefaults } from "../transforms/variable-expansion.js";
-import { parseStructuredOutput } from "../../cli/lib/parse-structured-output.js";
+import { outputsToZod } from "../../cli/lib/outputs-to-zod.js";
+import { buildCorrectiveMessage } from "../../cli/lib/corrective-message.js";
+import { evaluateAgentOutput } from "./evaluate-agent-output.js";
 import { Session, buildSessionDigest } from "../../cli/lib/session.js";
 
 export interface AgentHandlerDeps {
@@ -224,78 +226,84 @@ export class AgentHandler implements NodeHandler {
       }
     }
 
-    // Parse structured output if jsonSchema was set
+    // Validation + retry loop.
+    // The first attempt already ran via the iteration loop above
+    // (lastResult/lastSessionId hold its result). When jsonSchema is set,
+    // validate and possibly retry by resuming the same Claude session.
     let structuredUpdates: Record<string, unknown> = {};
     let preferredLabel: string | undefined;
 
-    // Fail explicitly if jsonSchema was set but agent produced no output
-    if (jsonSchema && !lastResult?.output) {
-      return {
-        status: "fail",
-        failureReason: "Structured output: agent produced no output (possible timeout or token limit)",
-        contextUpdates: {
-          "agent.iterations": String(iteration),
-          "agent.success": "false",
-        },
-      };
-    }
+    if (jsonSchema) {
+      const zodSchema = config.outputs ? outputsToZod(config.outputs) : null;
 
-    if (jsonSchema && lastResult?.output) {
-      writeFileSync(join(nodeDir, "raw-output.txt"), lastResult.output);
-      try {
-        const events = parseStructuredOutput(lastResult.output);
+      const writeRaw = (n: number, raw: string) =>
+        writeFileSync(join(nodeDir, `raw-attempt-${n}.txt`), raw ?? "");
 
-        // Find the last {type:"result"} event.
-        // structured_output (json-schema mode) takes priority over result field.
-        let resultPayload: string | undefined;
+      writeRaw(1, lastResult?.output ?? "");
 
-        for (const evt of events) {
-          const event = evt as Record<string, unknown>;
-          if (event?.type !== "result") continue;
+      const overrideRetries = (node as any).outputValidationRetries;
+      const maxRetries =
+        typeof overrideRetries === "number" && overrideRetries >= 0
+          ? overrideRetries
+          : 1;
 
-          if (event.structured_output != null) {
-            resultPayload = typeof event.structured_output === "string"
-              ? event.structured_output
-              : JSON.stringify(event.structured_output);
-          } else if (event.result != null && event.result !== "") {
-            resultPayload = typeof event.result === "string"
-              ? event.result
-              : JSON.stringify(event.result);
-          }
-        }
+      let attempt = 1;
+      let evaluation = evaluateAgentOutput(lastResult?.output ?? "", zodSchema);
 
-        if (!resultPayload) {
+      while (!evaluation.ok && attempt <= maxRetries) {
+        meta.onValidationFailure?.({
+          attempt,
+          errors: evaluation.errors,
+          rawOutputPath: `${node.id}/raw-attempt-${attempt}.txt`,
+        });
+
+        if (!lastSessionId) {
           return {
             status: "fail",
-            failureReason: `Structured output: no {type:"result"} event found in ${events.length} events`,
-            contextUpdates: {
-              "agent.iterations": String(iteration),
-              "agent.success": "false",
-            },
+            failureReason:
+              `Output validation failed and cannot retry: agent did not report sessionId ` +
+              `(attempt ${attempt}: ${evaluation.errors.map(e => `${e.path}: ${e.message}`).join("; ")})`,
+            contextUpdates: { "agent.iterations": String(iteration), "agent.success": "false" },
           };
         }
 
-        // Claude sometimes outputs prose before the JSON object (e.g. in stream-json mode).
-        // Anchor to `{"` so prose that quotes source-code template syntax like
-        // `${agentRubric}` doesn't hijack the extraction; fall back to any `{...}`.
-        const jsonMatch = resultPayload.match(/\{"[\s\S]*\}/) ?? resultPayload.match(/\{[\s\S]*\}/);
-        const jsonStr = jsonMatch ? jsonMatch[0] : resultPayload;
-        const parsed = JSON.parse(jsonStr);
-        for (const [key, value] of Object.entries(parsed)) {
-          structuredUpdates[key] = String(value);
-        }
-        if (parsed.preferred_label != null) {
-          preferredLabel = String(parsed.preferred_label);
-        }
-      } catch (err) {
+        attempt += 1;
+        meta.onValidationRetryStart?.(node.id, attempt);
+
+        const corrective = buildCorrectiveMessage(evaluation.raw, evaluation.errors, jsonSchema);
+
+        const retryResult = await agent.run({
+          cwd, signal, variables: agentVariables, onStdout,
+          resume: lastSessionId, message: corrective,
+        });
+        lastResult = retryResult;
+        if (retryResult.sessionId) lastSessionId = retryResult.sessionId;
+        iteration += 1;
+
+        writeRaw(attempt, retryResult.output ?? "");
+        evaluation = evaluateAgentOutput(retryResult.output ?? "", zodSchema);
+      }
+
+      if (!evaluation.ok) {
+        meta.onValidationFailure?.({
+          attempt,
+          errors: evaluation.errors,
+          rawOutputPath: `${node.id}/raw-attempt-${attempt}.txt`,
+        });
         return {
           status: "fail",
-          failureReason: `Structured output parsing failed: ${(err as Error).message}`,
-          contextUpdates: {
-            "agent.iterations": String(iteration),
-            "agent.success": "false",
-          },
+          failureReason:
+            `Output validation failed after ${attempt} attempts: ` +
+            evaluation.errors.map(e => `${e.path}: ${e.message}`).join("; "),
+          contextUpdates: { "agent.iterations": String(iteration), "agent.success": "false" },
         };
+      }
+
+      for (const [key, value] of Object.entries(evaluation.parsed)) {
+        structuredUpdates[key] = typeof value === "string" ? value : String(value);
+      }
+      if (evaluation.parsed.preferred_label != null) {
+        preferredLabel = String(evaluation.parsed.preferred_label);
       }
     }
 
