@@ -658,7 +658,7 @@ The validation+retry loop in the next task is large enough that inlining the par
 - Create: `src/attractor/handlers/evaluate-agent-output.ts`
 - Test: `src/attractor/tests/evaluate-agent-output.test.ts` (NEW)
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 // src/attractor/tests/evaluate-agent-output.test.ts
@@ -725,12 +725,12 @@ describe("evaluateAgentOutput", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `npx vitest run src/attractor/tests/evaluate-agent-output.test.ts`
 Expected: FAIL — module does not exist.
 
-- [ ] **Step 3: Implement `evaluate-agent-output.ts`**
+- [x] **Step 3: Implement `evaluate-agent-output.ts`**
 
 ```ts
 // src/attractor/handlers/evaluate-agent-output.ts
@@ -813,12 +813,12 @@ function extractResultPayload(raw: string): string | undefined {
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `npx vitest run src/attractor/tests/evaluate-agent-output.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/attractor/handlers/evaluate-agent-output.ts src/attractor/tests/evaluate-agent-output.test.ts
