@@ -433,7 +433,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 ### Task 1.4: Wire new prompt assembly path in `agent-handler.ts`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `src/attractor/tests/agent-handler-auto-inputs.test.ts`:
 
@@ -590,12 +590,12 @@ You are v.`,
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run src/attractor/tests/agent-handler-auto-inputs.test.ts`
 Expected: FAIL — handler doesn't yet branch on autoInputs.
 
-- [ ] **Step 3: Modify `agent-handler.ts` prompt assembly**
+- [x] **Step 3: Modify `agent-handler.ts` prompt assembly**
 
 Edit `src/attractor/handlers/agent-handler.ts`:
 
@@ -647,7 +647,7 @@ import { renderInputsBlock } from "../transforms/inputs-renderer.js";
 
 **Do NOT remove** the existing `extractDefaults` or `expandVariables` imports — the legacy branch still uses both.
 
-- [ ] **Step 4: Modify structured-updates writeback (namespacing)**
+- [x] **Step 4: Modify structured-updates writeback (namespacing)**
 
 In the same file, lines ~302-318 — wrap structuredUpdates with node-id prefix when `config.autoInputs === true`:
 
@@ -710,12 +710,12 @@ Three call sites need this swap:
 
 Verify by `grep -n "agent.iterations\|agent.success" src/attractor/handlers/agent-handler.ts` and confirming no occurrence remains except the legacy fallback constant declared above.
 
-- [ ] **Step 5: Run test to verify it passes**
+- [x] **Step 5: Run test to verify it passes**
 
 Run: `npx vitest run src/attractor/tests/agent-handler-auto-inputs.test.ts`
 Expected: PASS — all 3 cases green.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/attractor/handlers/agent-handler.ts src/attractor/tests/agent-handler-auto-inputs.test.ts
@@ -735,17 +735,17 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 ### Task 1.5: Verify no regression on existing pipelines
 
-- [ ] **Step 1: Run all attractor tests**
+- [x] **Step 1: Run all attractor tests**
 
 Run: `npx vitest run src/attractor`
 Expected: PASS — all pre-existing tests green (legacy path proves backward-compat).
 
-- [ ] **Step 2: Run all CLI tests**
+- [x] **Step 2: Run all CLI tests**
 
 Run: `npx vitest run src/cli`
 Expected: PASS — including the new agent-registry test for auto_inputs parsing.
 
-- [ ] **Step 3: Build + smoke a legacy pipeline**
+- [x] **Step 3: Build + smoke a legacy pipeline**
 
 ```bash
 npm run build
@@ -753,9 +753,11 @@ ralph pipeline run pipelines/smoke/static-multi-node/pipeline.dot --var project=
 ```
 Expected: pipeline runs to completion (legacy behavior).
 
-- [ ] **Step 4: Note expected output**
+- [x] **Step 4: Note expected output**
 
 The smoke should print its trace and complete without errors. If any smoke fails here, that's a Chunk 1 regression — fix before moving on.
+
+**Verification result (2026-04-29):** all 552 attractor + 699 CLI tests pass; typecheck clean. Live legacy smoke deferred to Chunk 5 batch.
 
 ---
 
