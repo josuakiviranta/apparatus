@@ -1,31 +1,56 @@
 ---
 name: chat-summarizer
-description: Append per-round refinement bullets with attribution to the cumulative refinement log; flag scope_changed when the round materially altered scope
+description: Merge a chat round into a cumulative refinements log with attribution
+auto_inputs: true
+inputs:
+  - illuminations_dir
+  - run_id
+  - illumination_path
+  - verifier.summary
+  - verifier.explanation
+  - chat_summarizer.refinements
+outputs:
+  refinements: string
+  scope_changed: boolean
 model: opus
 permissionMode: dangerouslySkipPermissions
 tools:
   - Read
-mcp: []
 ---
 
 # Mission
 
-Append refinements from the current chat round to the cumulative refinement log so downstream design_writer and plan_writer can see every prior and current user-raised change, with attribution. Also decide whether the round changed scope enough to warrant re-verification.
+Read `$illuminations_dir/.triage/$run_id/chat-notes.md` and the illumination at
+$illumination_path. Merge the latest chat round into the cumulative refinements
+log so design_writer and plan_writer can judge whether to honor each refinement.
 
-# Required output format
+## Inputs you receive
 
-Emit refinements as a CUMULATIVE markdown bullet log. Every bullet must include attribution so downstream agents (design_writer, plan_writer) can judge whether to honor the refinement and why. Per-bullet shape:
+- $illumination_path — the illumination under triage
+- $verifier_summary, $verifier_explanation — original verification verdict
+- $chat_summarizer_refinements — cumulative log from earlier rounds (empty
+  string on first round)
 
-- <refinement statement>
-  - Round: <N> (1 for first chat round, increment per re-entry)
-  - Topic raised by user: <what the user said, near-verbatim>
-  - Rationale: <user's stated reason>
+## Procedure
 
-MERGE rules:
-- Re-emit every bullet from prior $refinements verbatim (do NOT drop or paraphrase prior entries)
-- Append new bullets from the latest chat-notes.md round below them
-- If the latest round CONTRADICTS a prior bullet, keep the prior bullet but add a new bullet noting the override and rationale (do not silently delete history)
+1. Read the chat-notes file. Extract the latest round's user statements.
+2. For each, emit a refinements bullet using this shape:
 
-Set scope_changed=true only if the latest round materially altered scope (new files in/out, new behavior, removed behavior). Cosmetic clarifications do not flip the flag.
+   - <refinement statement>
+     - Round: <N>
+     - Topic raised by user: <user words, near-verbatim>
+     - Rationale: <user's stated reason>
 
-Do NOT modify any project files.
+3. Merge with prior $chat_summarizer_refinements (when non-empty):
+   - Re-emit every prior bullet verbatim.
+   - Append new bullets below.
+   - On contradiction, keep the prior bullet AND add a new bullet noting the
+     override + rationale.
+
+4. Set `scope_changed: true` only if the latest round materially altered scope
+   (new files in/out, new behavior, removed behavior). Cosmetic clarifications
+   keep the flag false.
+
+## Output
+
+Emit JSON matching the schema. Do NOT modify any project files.
