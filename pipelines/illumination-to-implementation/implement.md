@@ -5,7 +5,9 @@ model: opus
 permissionMode: dangerouslySkipPermissions
 tools: []
 mcp: []
-outputs: {}
+loop: true
+outputs:
+  done: boolean
 ---
 
 0. **Skill invocation (mandatory, first action).** Before any reading, planning, or coding, invoke the `superpowers:subagent-driven-development` skill via the Skill tool. Invoke `superpowers:test-driven-development` before each chunk's implementation phase. These skills are the operating contract — not aspirational guidance. Skipping them is a procedure violation.
@@ -35,3 +37,23 @@ outputs: {}
 9999999999999999. Use tmux harnessing tools to verify output for terminal outputs and other terminal UI related implementations.
 
 Take your time. I know you got this. I love you.
+
+## Output contract
+
+This agent runs in a deep loop: each iteration is a fresh process; you do work via Bash/git/subagent tools during the iteration; the LAST text response of each iteration MUST be a single JSON object describing whether the implementation plan is complete.
+
+Use Bash, git, and subagents freely during the iteration to read, write, commit, and push.
+
+After committing your chunk (or determining no chunks remain), emit JSON as your FINAL TEXT response. Never inside a thinking block.
+
+JSON shape:
+- `done: true` — when **every** chunk in the implementation plan is marked complete (`[x]`) AND no `[ ]` items remain.
+- `done: false` — when at least one `[ ]` item remains in the plan.
+
+Be honest. False positives leave incomplete work committed and visible in git history. False negatives waste iterations. Re-read the plan after committing to verify your judgment.
+
+Example final response:
+
+```json
+{ "done": false }
+```
