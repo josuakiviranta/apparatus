@@ -414,17 +414,17 @@ git commit -m "feat(validator): loop_missing_done_field rule + agent_outputs_emp
 
 ---
 
-## Chunk 3: Cap cascade in handler
+## Chunk 3: Cap cascade in handler ✅ SHIPPED
 
 **Ships green:** Handler computes `final_cap` per the D3 cascade. Behavior unchanged for non-loop agents (default `1` preserved); for `loop:true` agents the default becomes `Infinity`. Per-iteration loop body untouched in this chunk; existing `maxIterations === 1` crash guard untouched (it moves in Chunk 4).
 
-### Task 3.1 — Cascade resolution
+### Task 3.1 — Cascade resolution ✅ DONE
 
 **Files:**
 - Modify: `src/attractor/handlers/agent-handler.ts:168-174` (replace cap parse)
 - Test: extend `src/attractor/tests/agent-handler.test.ts` (uses existing helpers `mockResolve`, `mockAgentRun`, `makeNode`, `makeContext`, `baseCtx`, `baseConfig`, `makeHandler`)
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Append to `src/attractor/tests/agent-handler.test.ts` (inside the existing `describe("AgentHandler", …)` block):
 
@@ -503,12 +503,12 @@ describe("cap cascade", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests, expect failure**
+- [x] **Step 2: Run tests, expect failure**
 
 Run: `npx vitest run src/attractor/tests/agent-handler.test.ts -t "cap cascade"`
-Expected: FAIL — current code reads only `node.maxIterations`.
+Expected: FAIL — current code reads only `node.maxIterations`. **Confirmed:** 2/5 failed (loop:true defaults).
 
-- [ ] **Step 3: Implement cascade**
+- [x] **Step 3: Implement cascade**
 
 Replace `src/attractor/handlers/agent-handler.ts:168-174` with:
 
@@ -530,19 +530,19 @@ const maxIterations =
         : (loopMode ? Infinity : 1));
 ```
 
-- [ ] **Step 4: Run tests, expect pass**
+- [x] **Step 4: Run tests, expect pass**
 
 Run: `npx vitest run src/attractor/tests/agent-handler.test.ts -t "cap cascade"`
-Expected: all PASS.
+Expected: all PASS. **Confirmed:** 5/5 cap-cascade pass.
 
-- [ ] **Step 5: Run full handler test suite**
+- [x] **Step 5: Run full handler test suite**
 
 Run: `npx vitest run src/attractor/tests/agent-handler.test.ts`
-Expected: all PASS — including pre-existing tests `loops when node has maxIterations`, `does not fail on non-zero exit during multi-iteration loop`, and `max_iterations=0 runs until signal aborted`.
+Expected: all PASS — including pre-existing tests `loops when node has maxIterations`, `does not fail on non-zero exit during multi-iteration loop`, and `max_iterations=0 runs until signal aborted`. **Confirmed:** 37/37 pass; full vitest 1273/1273; typecheck clean.
 
 (These pass because: the cascade preserves `nodeCap=N` semantics when set; the existing crash guard at line 206 is still in place; the `0 → Infinity` idiom is preserved at the node level.)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit** (in progress, this commit)
 
 ```bash
 git add src/attractor/handlers/agent-handler.ts src/attractor/tests/agent-handler.test.ts
