@@ -66,7 +66,8 @@ export class AgentHandler implements NodeHandler {
       ...ctx.values,
     };
 
-    // Read JSON schema from file if specified
+    // Read JSON schema: prefer node.jsonSchemaFile (legacy, deleted in chunk 3),
+    // fall back to config.jsonSchema derived from agent frontmatter outputs:.
     const jsonSchemaFile = node.jsonSchemaFile as string | undefined;
     let jsonSchema: string | undefined;
     if (jsonSchemaFile) {
@@ -75,6 +76,8 @@ export class AgentHandler implements NodeHandler {
       } catch (err) {
         return { status: "fail", failureReason: `Failed to read json_schema_file "${jsonSchemaFile}": ${(err as Error).message}` };
       }
+    } else if (config.jsonSchema) {
+      jsonSchema = config.jsonSchema;
     }
     // DOT attributes parse as strings; coerce explicitly to boolean
     const interactive = node.interactive === true || node.interactive === "true";
