@@ -3,6 +3,10 @@ name: meditate-observer
 description: Drive 'ralph meditate' inside a tmux window, wait for it to finish, and produce the four-field summary (topic / illumination_path / kid_summary / observation_notes)
 model: opus
 permissionMode: dangerouslySkipPermissions
+auto_inputs: true
+inputs:
+  - run_id
+  - project
 tools:
   - Read
   - Grep
@@ -18,7 +22,19 @@ outputs:
 
 # Mission
 
-Drive 'ralph meditate' inside a pre-opened tmux window, wait for it to finish, read the resulting illumination, and emit the four-field schema summary. This rubric encodes the output shape only; harness-binding steps (source helpers, set SESSION/WIN, --var steer=... invocation, pid-file polling, mtime-newest illumination pick) stay in the calling node's inline prompt because they are runtime context.
+Drive 'ralph meditate' inside a pre-opened tmux window, wait for it to finish, read the resulting illumination, and emit the four-field schema summary.
+
+Runtime context injected automatically:
+- `$run_id` — identifies the tmux window opened by the prior tool node (window name: `pipe-tmux-tester-inner-$run_id`)
+- `$project` — absolute path to the project folder; used as cwd for git commands and to locate `.meditate.pid`
+
+Steps:
+1. Source the harness helpers from `docs/harness/tmux-drive.md`.
+2. Set `SESSION=$(tmux display-message -p '#S')` and `WIN=pipe-tmux-tester-inner-$run_id`.
+3. Pick a topic from the current project state. Run `git log -5 --oneline` and `git status --short` in `$project` to see recent activity, then choose one short sentence describing something to reflect on. Do not explore deeply — pick fast.
+4. Send into the window via the harness: `ralph meditate . --var steer="<your topic>"`
+5. Wait for the meditation to finish. Detection: the file `$project/.meditate.pid` is written while meditate is alive and removed on exit. Poll every 10s with a 600000ms (10min) budget. In parallel capture_pane occasionally so you can describe what you saw in the TUI.
+6. After pid file is gone: list `meditations/illuminations/` sorted by mtime, take the newest file, read it.
 
 # Required output format
 
