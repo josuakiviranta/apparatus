@@ -547,6 +547,135 @@ body`,
   });
 });
 
+describe("validator — missing_input_producer (qualified inputs)", () => {
+  it("fires when verifier is not on every path to consumer (one path bypasses verifier)", () => {
+    // Graph: start -> verifier -> consumer -> done
+    //        start -> bypass -> consumer
+    // consumer has inputs: [verifier.summary] — but 'bypass' path skips verifier
+    const dir = join(tmpdir(), `rule-mip-qual-fail-${Date.now()}`);
+    setup(dir, {
+      "verifier.md": `---
+name: verifier
+description: x
+auto_inputs: true
+inputs: []
+outputs: { summary: string }
+---
+body`,
+      "bypass.md": `---
+name: bypass
+description: x
+auto_inputs: true
+inputs: []
+outputs: { other: string }
+---
+body`,
+      "consumer.md": `---
+name: consumer
+description: x
+auto_inputs: true
+inputs: [verifier.summary]
+outputs: { result: string }
+---
+body`,
+    });
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      verifier [agent="verifier"]
+      bypass [agent="bypass"]
+      consumer [agent="consumer"]
+      done [shape=Msquare]
+      start -> verifier -> consumer -> done
+      start -> bypass -> consumer
+    }`;
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    const d = diags.find(d => d.rule === "missing_input_producer");
+    expect(d).toBeDefined();
+    expect(d!.severity).toBe("error");
+    expect(d!.message).toMatch(/verifier\.summary/);
+    expect(d!.message).toMatch(/"consumer"/);
+    expect(d!.message).toMatch(/verifier/);
+  });
+
+  it("does NOT fire when verifier is on every path to consumer (verifier dominates consumer)", () => {
+    // Graph: start -> verifier -> consumer -> done
+    //        start -> verifier (single path, verifier dominates consumer)
+    const dir = join(tmpdir(), `rule-mip-qual-ok-${Date.now()}`);
+    setup(dir, {
+      "verifier.md": `---
+name: verifier
+description: x
+auto_inputs: true
+inputs: []
+outputs: { summary: string }
+---
+body`,
+      "consumer.md": `---
+name: consumer
+description: x
+auto_inputs: true
+inputs: [verifier.summary]
+outputs: { result: string }
+---
+body`,
+    });
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      verifier [agent="verifier"]
+      consumer [agent="consumer"]
+      done [shape=Msquare]
+      start -> verifier -> consumer -> done
+    }`;
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    expect(diags.find(d => d.rule === "missing_input_producer")).toBeUndefined();
+  });
+
+  it("does NOT fire when consumer has a default_ fallback for the qualified input", () => {
+    const dir = join(tmpdir(), `rule-mip-qual-default-${Date.now()}`);
+    setup(dir, {
+      "verifier.md": `---
+name: verifier
+description: x
+auto_inputs: true
+inputs: []
+outputs: { summary: string }
+---
+body`,
+      "bypass.md": `---
+name: bypass
+description: x
+auto_inputs: true
+inputs: []
+outputs: { other: string }
+---
+body`,
+      "consumer.md": `---
+name: consumer
+description: x
+auto_inputs: true
+inputs: [verifier.summary]
+outputs: { result: string }
+---
+body`,
+    });
+    // consumer node has default_summary= — should suppress the diagnostic
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      verifier [agent="verifier"]
+      bypass [agent="bypass"]
+      consumer [agent="consumer", default_summary="fallback"]
+      done [shape=Msquare]
+      start -> verifier -> consumer -> done
+      start -> bypass -> consumer
+    }`;
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    expect(diags.find(d => d.rule === "missing_input_producer")).toBeUndefined();
+  });
+});
+
 describe("validator — malformed input declarations", () => {
   // resolveInputDecl throws on multi-dot keys (e.g. "a.b.c") and empty strings.
   // validateGraph must NOT crash — it should absorb the throw and continue emitting

@@ -680,6 +680,46 @@ function checkRequiredCallerVars(
   });
 }
 
+/**
+ * Returns true iff every path from `start` to `target` passes through `producer`.
+ * Equivalent to: producer is a dominator of target on the start→target subgraph.
+ *
+ * Strategy: if we can reach `target` from `start` without visiting `producer`,
+ * then producer is NOT on every path → return false. Otherwise true.
+ */
+function isProducerOnEveryPath(
+  graph: Graph,
+  start: string,
+  target: string,
+  producer: string,
+): boolean {
+  if (producer === start) return true; // start itself produces — trivially true
+  if (producer === target) return true; // producer === consumer — degenerate, skip
+
+  // Build forward adjacency
+  const fwd = new Map<string, string[]>();
+  for (const id of graph.nodes.keys()) fwd.set(id, []);
+  for (const e of graph.edges) {
+    if (fwd.has(e.from) && fwd.has(e.to)) fwd.get(e.from)!.push(e.to);
+  }
+
+  // BFS from start, excluding producer — if we can still reach target, producer
+  // is NOT on every path.
+  const visited = new Set<string>();
+  const queue = [start];
+  while (queue.length > 0) {
+    const cur = queue.shift()!;
+    if (visited.has(cur)) continue;
+    visited.add(cur);
+    if (cur === target) return false; // reached target without going through producer
+    for (const next of fwd.get(cur) ?? []) {
+      if (next !== producer) queue.push(next); // skip producer node
+    }
+  }
+  // Cannot reach target without producer → producer dominates target
+  return true;
+}
+
 function checkMissingInputProducer(
   graph: Graph,
   nodeProduces: Map<string, Set<string>>,
@@ -689,6 +729,12 @@ function checkMissingInputProducer(
   const RESERVED = new Set(["goal", "project", "run_id"]);
   const varsInScope = computeVarsInScope(graph, nodeProduces);
   const varsInAnyScope = computeVarsInAnyScope(graph, nodeProduces);
+
+  // Find start node id for per-path reachability checks
+  const startNodeId = [...graph.nodes.values()].find(
+    n => n.shape === "Mdiamond" || n.id === "start",
+  )?.id;
+
   for (const [id, node] of graph.nodes) {
     if (!node.agent) continue;
     const agentConfig = tryResolveAgent(node, dotDir);
@@ -697,6 +743,36 @@ function checkMissingInputProducer(
     const anyScope = varsInAnyScope.get(id) ?? new Set<string>();
     for (const inputKey of agentConfig.inputs) {
       if (RESERVED.has(inputKey)) continue;
+
+      // For auto_inputs consumers, qualified inputs need per-path source-node reachability.
+      if (agentConfig.autoInputs === true) {
+        let resolved: ReturnType<typeof resolveInputDecl> | undefined;
+        try { resolved = resolveInputDecl(inputKey); } catch { continue; }
+
+        if (resolved.qualified && resolved.sourceNode) {
+          // Check for default fallback: default_<localKey>= on the consumer node
+          const fallbackAttrCamel = toCamel(resolved.fallbackAttr);
+          if (node[fallbackAttrCamel] !== undefined) continue;
+
+          // Source node must exist in the graph (unknown_source_node rule handles the
+          // case where it doesn't — we skip here to avoid duplicate errors).
+          if (!graph.nodes.has(resolved.sourceNode)) continue;
+
+          // Check that the source node is on every path from start to consumer.
+          if (startNodeId === undefined) continue;
+          if (!isProducerOnEveryPath(graph, startNodeId, id, resolved.sourceNode)) {
+            diags.push({
+              rule: "missing_input_producer",
+              severity: "error",
+              message: `Input "${inputKey}" declared by "${id}" has no producer on path start → … → ${id}. Node "${resolved.sourceNode}" must be on every path from start to "${id}".`,
+              location: node.sourceLocation,
+            });
+          }
+          continue; // handled — skip bare-key logic below
+        }
+      }
+
+      // Bare-key path: existing behavior (unchanged)
       if (scope.has(inputKey)) continue;
       if (anyScope.has(inputKey)) {
         diags.push({
