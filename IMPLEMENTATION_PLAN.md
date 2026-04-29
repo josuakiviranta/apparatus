@@ -1384,7 +1384,7 @@ Per agent:
 
 ### Task 3.5: Migrate `pipeline.dot`
 
-- [ ] **Step 1: For each node with inline `prompt=`, drop or shrink it**
+- [x] **Step 1: For each node with inline `prompt=`, drop or shrink it**
 
 Most nodes lose their `prompt=` entirely. Surviving steering should be ≤2 lines of pure prose.
 
@@ -1403,7 +1403,7 @@ verifier [agent="verifier",
           default_illumination_path=""]    # fallback for illumination_path (bare)
 ```
 
-- [ ] **Step 2: Update ALL conditions to use qualified producer keys**
+- [x] **Step 2: Update ALL conditions to use qualified producer keys**
 
 Per D2, meta keys (`success`, `iterations`, `sessionId`) AND structured output keys (`preferred_label`, `scope_changed`, etc.) are now node-id-prefixed when `auto_inputs` is true. The current `pipeline.dot` has **6 conditions** referencing un-namespaced keys — every one must migrate:
 
@@ -1424,7 +1424,7 @@ grep -n "condition=" pipelines/illumination-to-implementation/pipeline.dot
 
 Expected: every line printed has a qualified `<nodeId>.<key>=` form after migration. If any line still has a bare key (e.g. `condition="foo=bar"` with no dot), it's a missed migration.
 
-- [ ] **Step 3: Update chat_summarizer node to use the dedicated agent**
+- [x] **Step 3: Update chat_summarizer node to use the dedicated agent**
 
 ```dot
 # Before
@@ -1435,7 +1435,7 @@ chat_summarizer [agent="chat-summarizer",
                  default_refinements=""]
 ```
 
-- [ ] **Step 4: Run pipeline validate**
+- [x] **Step 4: Run pipeline validate**
 
 ```bash
 ralph pipeline validate pipelines/illumination-to-implementation/pipeline.dot --project .
@@ -1443,9 +1443,9 @@ ralph pipeline validate pipelines/illumination-to-implementation/pipeline.dot --
 
 Expected: 0 errors. If errors surface, fix them in Step 5.
 
-- [ ] **Step 5: Iterate on validate errors** — likely candidates: missing `default_*=` on a consumer for first-iteration loop-back vars, overlooked qualified-key references.
+- [x] **Step 5: Iterate on validate errors** — likely candidates: missing `default_*=` on a consumer for first-iteration loop-back vars, overlooked qualified-key references.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pipelines/illumination-to-implementation/pipeline.dot
