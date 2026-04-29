@@ -1097,7 +1097,7 @@ Build a small synthetic pipeline that exercises every new rule (all should pass)
 
 ### Task 3.1: Audit current state
 
-- [ ] **Step 1: Inventory every `.md` file in the folder**
+- [x] **Step 1: Inventory every `.md` file in the folder**
 
 Run: `ls pipelines/illumination-to-implementation/*.md`
 Expected output: 15 `.md` files, grouped as:
@@ -1107,19 +1107,23 @@ Expected output: 15 `.md` files, grouped as:
 - **`task.md`** (generic catch-all; reverts in Task 3.3).
 - **4 gate `.md` files**: `approval_gate.md`, `remove_gate.md`, `review_gate.md`, `tmux_confirm_gate.md`. **Gates are NOT migrated** — per spec D1/Mechanics: "Gates remain text-only decisions; they don't produce or consume the auto-Inputs block." They keep their existing label-based UI; do NOT add `auto_inputs:` to gate files.
 
-- [ ] **Step 2: For each active agent file, capture today's frontmatter shape**
+- [x] **Step 2: For each active agent file, capture today's frontmatter shape**
 
 Read each of the 9 active agent files, note the existing `inputs:` / `outputs:` declarations. Build a per-agent migration checklist locally (won't commit, just for tracking).
 
-- [ ] **Step 3: Capture today's pipeline.dot prompt blocks**
+Audit result (2026-04-29): all 9 active agents declare `outputs:` only (no `auto_inputs:`, no `inputs:` declarations except `verifier.md` which has `inputs:`). `chat-refiner.md` and (former) `chat-summarizer.md` had no inputs/outputs/auto_inputs at all — `chat-summarizer.md` is now migrated by Task 3.2.
+
+- [x] **Step 3: Capture today's pipeline.dot prompt blocks**
 
 Read `pipeline.dot:1-100`. Note which nodes have inline `prompt=`. Currently 10 nodes do (the 9 agent nodes + `chat_summarizer`).
+
+Audit result (2026-04-29): 10 nodes carry inline `prompt=`: `chat_session`, `chat_summarizer`, `design_writer`, `explainer`, `implement`, `memory_reflector`, `memory_writer`, `plan_writer`, `tmux_tester`, `verifier`. (`chat_session` and `explainer` are pipeline-only nodes — no agent file behind them; the rest map 1:1 to agent files.)
 
 ### Task 3.2: Replace existing `chat-summarizer.md` with auto_inputs-shaped version
 
 `chat-summarizer.md` already exists in the folder but is unused (the `chat_summarizer` node currently uses `agent="task"` with the cumulative-refinements logic embedded in pipeline `prompt=`). This task replaces the file's contents with an `auto_inputs: true` version that absorbs the logic from the pipeline prompt; Task 3.5 will rewire the node to actually use this agent.
 
-- [ ] **Step 1: Read current contents to confirm starting state**
+- [x] **Step 1: Read current contents to confirm starting state**
 
 ```bash
 cat pipelines/illumination-to-implementation/chat-summarizer.md
@@ -1127,7 +1131,7 @@ cat pipelines/illumination-to-implementation/chat-summarizer.md
 
 Verify: file has frontmatter with `name: chat-summarizer` but no `auto_inputs`, no `inputs:`, no `outputs:`. The body has the cumulative-refinements format spec already.
 
-- [ ] **Step 2: Replace file contents (write-mode, not create)**
+- [x] **Step 2: Replace file contents (write-mode, not create)**
 
 Overwrite `pipelines/illumination-to-implementation/chat-summarizer.md`:
 
@@ -1190,7 +1194,7 @@ log so design_writer and plan_writer can judge whether to honor each refinement.
 Emit JSON matching the schema. Do NOT modify any project files.
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add pipelines/illumination-to-implementation/chat-summarizer.md
