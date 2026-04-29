@@ -1329,12 +1329,12 @@ git commit -m "feat(preflight): seed prev_note producer for note-declaring loop 
 
 **Pre-read:** `agent-handler.ts:95-96` defines `jsonWrappedPrompt`. When `jsonSchema` is set, the handler appends a JSON-only reminder to the prompt: `IMPORTANT: Your FINAL response MUST be valid JSON … No markdown, no preamble, output ONLY the JSON object.` This applies to the FINAL turn, not in-session bash/git tool use. The implement agent must therefore use tools freely DURING the iteration but emit ONLY JSON as the FINAL textual response.
 
-- [ ] **Step 1: Read current implement.md**
+- [x] **Step 1: Read current implement.md**
 
 Run: `cat pipelines/illumination-to-implementation/implement.md`
 Confirm current frontmatter has `outputs: {}` and tools list `tools: []`.
 
-- [ ] **Step 2: Edit frontmatter**
+- [x] **Step 2: Edit frontmatter**
 
 Replace the YAML frontmatter:
 
@@ -1354,7 +1354,7 @@ outputs:
 
 (`loop: true` placed adjacent to `outputs:` for visual coupling.)
 
-- [ ] **Step 3: Append `## Output contract` to the prompt body**
+- [x] **Step 3: Append `## Output contract` to the prompt body**
 
 After the existing numbered instructions (i.e., after the line ending with "Take your time. I know you got this. I love you.", or wherever the last instruction line is), add:
 
@@ -1383,12 +1383,12 @@ Example final response:
 
 (The trailing instruction "Emit JSON as your final TEXT response. Never inside a thinking block." mirrors the verifier prompt fix from chunk-1. Intentional duplication — both agents need the same anti-thinking-block hint. Edits to one should be considered for the other.)
 
-- [ ] **Step 4: Validate the pipeline**
+- [x] **Step 4: Validate the pipeline**
 
 Run: `npm run build && npx ralph pipeline validate pipelines/illumination-to-implementation/pipeline.dot`
 Expected: zero errors. (`agent_outputs_empty` warning is gone; `loop_missing_done_field` does not fire because `done: boolean` is now present.)
 
-- [ ] **Step 5: Validate every other pipeline regressions**
+- [x] **Step 5: Validate every other pipeline regressions**
 
 Run:
 ```bash
@@ -1399,12 +1399,12 @@ done
 ```
 Expected: zero errors per pipeline.
 
-- [ ] **Step 6: Run full vitest suite**
+- [x] **Step 6: Run full vitest suite**
 
 Run: `npm run test`
 Expected: all PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit** _(done: 6c473df)_
 
 ```bash
 git add pipelines/illumination-to-implementation/implement.md
@@ -1415,20 +1415,20 @@ git commit -m "feat(implement-agent): adopt loop:true + done:boolean contract"
 
 **Files:** `src/cli/pipelines/implement.dot`
 
-- [ ] **Step 1: Inspect**
+- [x] **Step 1: Inspect**
 
 Run: `cat src/cli/pipelines/implement.dot`
 
-- [ ] **Step 2: Decide**
+- [x] **Step 2: Decide**
 
 `max_iterations="$max_iterations"` is harmless and supports the `--max N` escape hatch. Keep it. Without `--max` the variable expands to empty → cascade falls to agent default (loop → Infinity). With `--max N` the node-level cap wins.
 
 (No edit. This step is verification only.)
 
-- [ ] **Step 3: Smoke validate**
+- [x] **Step 3: Smoke validate**
 
 Run: `npx ralph pipeline validate src/cli/pipelines/implement.dot`
-Expected: zero errors.
+Expected: zero errors. (Only `orphan_output` warning — `done` is consumed by the loop handler, not a graph node. Pipeline is valid.)
 
 ---
 
