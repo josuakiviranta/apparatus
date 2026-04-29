@@ -1615,7 +1615,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 - [x] 8. meditate-steer
 - [x] 9. missing-caller-var (no agent files; tool-only smoke — migration N/A)
 - [x] 10. static-multi-node
-- [ ] 11. store
+- [x] 11. store
 - [ ] 12. tmux-tester
 - [ ] 13. tool
 - [ ] 14. tool-runtime-vars
