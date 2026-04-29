@@ -17,7 +17,6 @@ describe("agent-handler auto_inputs path", () => {
       "v.md": `---
 name: v
 description: t
-auto_inputs: true
 inputs: [project, run_id]
 outputs:
   result: string
@@ -42,7 +41,6 @@ You are v.`,
         tools: [],
         mcp: [],
         prompt: "# Mission\nYou are v.",
-
         inputs: ["project", "run_id"],
         jsonSchema: jsonSchema1,
         outputs: { result: "string" },
@@ -94,7 +92,6 @@ You are v.`,
         tools: [],
         mcp: [],
         prompt: "# Mission",
-
         inputs: [],
         jsonSchema: jsonSchema2,
         outputs: { result: "string" },

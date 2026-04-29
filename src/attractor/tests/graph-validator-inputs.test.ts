@@ -16,7 +16,6 @@ describe("validator — inputs_missing_frontmatter", () => {
       "a.md": `---
 name: a
 description: x
-auto_inputs: true
 outputs: { foo: string }
 ---
 body`,
@@ -42,7 +41,6 @@ body`,
       "a.md": `---
 name: a
 description: x
-auto_inputs: true
 inputs: []
 outputs: { foo: string }
 ---
@@ -68,7 +66,6 @@ describe("validator — unknown_source_node", () => {
       "consumer.md": `---
 name: consumer
 description: x
-auto_inputs: true
 inputs: [ghost.value]
 outputs: { foo: string }
 ---
@@ -87,13 +84,12 @@ body`,
     expect(d!.message).toMatch(/source node "ghost"/);
   });
 
-  it("does not fire on legacy agents without auto_inputs", () => {
+  it("does not fire on agents without inputs declaration", () => {
     const dir = join(tmpdir(), `rule-usn-legacy-${Date.now()}`);
     setup(dir, {
       "consumer.md": `---
 name: consumer
 description: x
-auto_inputs: true
 outputs: { foo: string }
 ---
 body`,
@@ -117,7 +113,6 @@ describe("validator — source_missing_output_key", () => {
       "producer.md": `---
 name: producer
 description: x
-auto_inputs: true
 inputs: []
 outputs: { foo: string }
 ---
@@ -125,7 +120,6 @@ body`,
       "consumer.md": `---
 name: consumer
 description: x
-auto_inputs: true
 inputs: [producer.bar]
 outputs: { result: string }
 ---
@@ -155,7 +149,6 @@ body`,
       "producer.md": `---
 name: producer
 description: x
-auto_inputs: true
 inputs: []
 outputs: { bar: string }
 ---
@@ -163,7 +156,6 @@ body`,
       "consumer.md": `---
 name: consumer
 description: x
-auto_inputs: true
 inputs: [producer.bar]
 outputs: { result: string }
 ---
@@ -187,7 +179,6 @@ body`,
       "consumer.md": `---
 name: consumer
 description: x
-auto_inputs: true
 inputs: [tool_node.bar]
 outputs:
   result:
@@ -219,7 +210,6 @@ body`,
       "consumer.md": `---
 name: consumer
 description: x
-auto_inputs: true
 inputs: [tool_node.bar]
 outputs:
   result:
@@ -247,7 +237,6 @@ describe("validator — bare_input_not_in_caller_inputs_or_system", () => {
       "consumer.md": `---
 name: consumer
 description: x
-auto_inputs: true
 inputs: [unknown_var]
 outputs: { foo: string }
 ---
@@ -274,7 +263,6 @@ body`,
       "consumer.md": `---
 name: consumer
 description: x
-auto_inputs: true
 inputs: [unknown_var]
 outputs: { foo: string }
 ---
@@ -298,7 +286,6 @@ body`,
       "consumer.md": `---
 name: consumer
 description: x
-auto_inputs: true
 inputs: [PROJECT_ROOT, ILLUMINATION_SERVER_PATH, META_MEDITATIONS_DIR]
 outputs: { foo: string }
 ---
@@ -315,13 +302,12 @@ body`,
     expect(diags.find(d => d.rule === "bare_input_not_in_caller_inputs_or_system")).toBeUndefined();
   });
 
-  it("does not fire on legacy agents without auto_inputs", () => {
+  it("does not fire on agents without inputs declaration", () => {
     const dir = join(tmpdir(), `rule-binis-legacy-${Date.now()}`);
     setup(dir, {
       "consumer.md": `---
 name: consumer
 description: x
-auto_inputs: true
 outputs: { foo: string }
 ---
 body`,
@@ -343,7 +329,6 @@ body`,
       "consumer.md": `---
 name: consumer
 description: x
-auto_inputs: true
 inputs: [optional_thing]
 outputs: { foo: string }
 ---
@@ -368,7 +353,6 @@ describe("validator — steering_has_var_token", () => {
       "x.md": `---
 name: x
 description: x
-auto_inputs: true
 inputs: []
 outputs: { result: string }
 ---
@@ -399,7 +383,6 @@ describe("validator — rendered_tag_collision", () => {
       "verifier.md": `---
 name: verifier
 description: x
-auto_inputs: true
 inputs: []
 outputs: { summary: string }
 ---
@@ -407,7 +390,6 @@ body`,
       "consumer.md": `---
 name: consumer
 description: x
-auto_inputs: true
 inputs: [verifier.summary, verifier_summary]
 outputs: { result: string }
 ---
@@ -438,7 +420,6 @@ body`,
       "a_b.md": `---
 name: a_b
 description: x
-auto_inputs: true
 inputs: []
 outputs: { c: string }
 ---
@@ -446,7 +427,6 @@ body`,
       "a.md": `---
 name: a
 description: x
-auto_inputs: true
 inputs: []
 outputs: { b_c: string }
 ---
@@ -454,7 +434,6 @@ body`,
       "consumer.md": `---
 name: consumer
 description: x
-auto_inputs: true
 inputs: [a_b.c, a.b_c]
 outputs: { result: string }
 ---
@@ -484,7 +463,6 @@ body`,
       "verifier.md": `---
 name: verifier
 description: x
-auto_inputs: true
 inputs: []
 outputs: { summary: string }
 ---
@@ -492,7 +470,6 @@ body`,
       "consumer.md": `---
 name: consumer
 description: x
-auto_inputs: true
 inputs: [verifier.summary, project]
 outputs: { result: string }
 ---
@@ -511,13 +488,12 @@ body`,
     expect(diags.find(d => d.rule === "rendered_tag_collision")).toBeUndefined();
   });
 
-  it("does not fire on legacy agents without auto_inputs", () => {
+  it("does not fire on agents without inputs declaration", () => {
     const dir = join(tmpdir(), `rule-rtc-legacy-${Date.now()}`);
     setup(dir, {
       "consumer.md": `---
 name: consumer
 description: x
-auto_inputs: true
 outputs: { result: string }
 ---
 body`,
@@ -544,7 +520,6 @@ describe("validator — missing_input_producer (qualified inputs)", () => {
       "verifier.md": `---
 name: verifier
 description: x
-auto_inputs: true
 inputs: []
 outputs: { summary: string }
 ---
@@ -552,7 +527,6 @@ body`,
       "bypass.md": `---
 name: bypass
 description: x
-auto_inputs: true
 inputs: []
 outputs: { other: string }
 ---
@@ -560,7 +534,6 @@ body`,
       "consumer.md": `---
 name: consumer
 description: x
-auto_inputs: true
 inputs: [verifier.summary]
 outputs: { result: string }
 ---
@@ -593,7 +566,6 @@ body`,
       "verifier.md": `---
 name: verifier
 description: x
-auto_inputs: true
 inputs: []
 outputs: { summary: string }
 ---
@@ -601,7 +573,6 @@ body`,
       "consumer.md": `---
 name: consumer
 description: x
-auto_inputs: true
 inputs: [verifier.summary]
 outputs: { result: string }
 ---
@@ -625,7 +596,6 @@ body`,
       "verifier.md": `---
 name: verifier
 description: x
-auto_inputs: true
 inputs: []
 outputs: { summary: string }
 ---
@@ -633,7 +603,6 @@ body`,
       "bypass.md": `---
 name: bypass
 description: x
-auto_inputs: true
 inputs: []
 outputs: { other: string }
 ---
@@ -641,7 +610,6 @@ body`,
       "consumer.md": `---
 name: consumer
 description: x
-auto_inputs: true
 inputs: [verifier.summary]
 outputs: { result: string }
 ---
@@ -674,7 +642,6 @@ describe("validator — malformed input declarations", () => {
       "consumer.md": `---
 name: consumer
 description: x
-auto_inputs: true
 inputs: [a.b.c]
 outputs: { foo: string }
 ---
