@@ -1613,7 +1613,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 - [x] 6. gate
 - [x] 7. json-schema-stream (commit deb434e)
 - [x] 8. meditate-steer
-- [ ] 9. missing-caller-var
+- [x] 9. missing-caller-var (no agent files; tool-only smoke — migration N/A)
 - [ ] 10. static-multi-node
 - [ ] 11. store
 - [ ] 12. tmux-tester
@@ -1660,7 +1660,7 @@ These notes call out non-obvious deviations from the common template. Re-audit a
 
 **7. meditate-steer** — meditate session smoke. Verify meditate handler writes session-digest under qualified keys; update if needed.
 
-**8. missing-caller-var** — explicitly tests validator's missing-var error. Today targets `scanUndeclaredCallerVars`'s legacy error. Under the new system the equivalent failure is `bare_input_not_in_caller_inputs_or_system`. **Update the test's expected error message** to match the new rule name + format.
+**8. missing-caller-var** — explicitly tests validator's missing-var error. Today targets `scanUndeclaredCallerVars`'s legacy error. Under the new system the equivalent failure is `bare_input_not_in_caller_inputs_or_system`. **Update the test's expected error message** to match the new rule name + format. **Update (2026-04-29):** Smoke contains no agent files (only one `tool` node). Migration is a no-op — there is no agent frontmatter to add `auto_inputs:` to. Existing test (zero validator errors) already passes. No test changes needed.
 
 **9. static-multi-node** — multi-node agent chain. Best smoke to verify D2 namespacing end-to-end since outputs flow node-to-node. Update test assertions: producer outputs land under `<nodeId>.<key>` qualified keys; consumers declare qualified inputs.
 
