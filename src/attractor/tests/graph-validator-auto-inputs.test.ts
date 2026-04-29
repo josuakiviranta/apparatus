@@ -106,4 +106,25 @@ body`,
     expect(d).toBeDefined();
     expect(d!.message).toMatch(/source node "ghost"/);
   });
+
+  it("does not fire on legacy agents without auto_inputs", () => {
+    const dir = join(tmpdir(), `rule-usn-legacy-${Date.now()}`);
+    setup(dir, {
+      "consumer.md": `---
+name: consumer
+description: x
+outputs: { foo: string }
+---
+body`,
+    });
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      c [agent="consumer"]
+      done [shape=Msquare]
+      start -> c -> done
+    }`;
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    expect(diags.find(d => d.rule === "unknown_source_node")).toBeUndefined();
+  });
 });
