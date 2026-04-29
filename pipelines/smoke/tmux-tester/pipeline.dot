@@ -1,6 +1,6 @@
 digraph tmux_tester_smoke {
   graph [goal="Verify an agent can drive ralph meditate in a tmux window and summarise the resulting illumination for a 5-year-old"]
-  inputs="run_id,project"
+  inputs="run_id, project"
 
   start [shape=Mdiamond]
 

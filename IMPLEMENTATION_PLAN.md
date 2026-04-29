@@ -1616,7 +1616,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 - [x] 9. missing-caller-var (no agent files; tool-only smoke — migration N/A)
 - [x] 10. static-multi-node
 - [x] 11. store
-- [ ] 12. tmux-tester
+- [x] 12. tmux-tester (commit 4d986a2; agent attribute corrected to meditate-observer)
 - [ ] 13. tool
 - [ ] 14. tool-runtime-vars
 
@@ -1669,6 +1669,8 @@ These notes call out non-obvious deviations from the common template. Re-audit a
 - **Out-of-scope drift (smoke #11):** Store handler at `src/attractor/handlers/store.ts:35` returns `contextUpdates: { "store.path": ... }` instead of `<nodeId>.path`. Pre-existing drift surfaced during smoke #11 migration. **Chunk 6 TODO:** Update handler to use qualified key + audit any consumers.
 
 **11. tmux-tester** — tmux integration smoke. Common-template applies. Watch for hardcoded ctx-key references in tmux bindings.
+
+> **Out-of-scope drift (smoke #12):** `tmux-tester.md` declares 4 meditate-observer outputs (`topic`, `illumination_path`, `kid_summary`, `observation_notes`) that don't match its actual test-fix-loop body. Pre-existing mismatch surfaced during smoke #12 migration; not in scope for the common template. **Chunk 6 TODO:** align outputs with actual agent behavior (or set `outputs: {}` if downstream consumers don't read them).
 
 **12. tool** — tool-node smoke. Tool nodes don't have `auto_inputs` (no agent frontmatter). Their consumers do — verify consumers reference tool-node outputs as `<toolNodeId>.<key>`.
 
