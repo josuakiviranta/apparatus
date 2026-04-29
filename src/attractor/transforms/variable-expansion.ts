@@ -1,8 +1,4 @@
-import { readFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
 import type { Graph, Node } from "../types.js";
-import { parseFrontmatter } from "../../cli/lib/frontmatter.js";
-import { getBundledAgentsDir } from "../../cli/lib/assets.js";
 
 export class UndefinedVariableError extends Error {
   constructor(public readonly variableName: string) {
@@ -116,7 +112,9 @@ export function variableExpansionTransform(graph: Graph, vars: { project?: strin
   const newNodes = new Map(
     [...graph.nodes.entries()].map(([id, node]) => {
       const n = { ...node };
-      if (n.prompt) n.prompt = expand(n.prompt);
+      // node.prompt is deliberately NOT expanded — it's pure prose steering
+      // delivered verbatim to agents. The graph validator's
+      // steering_has_var_token rule rejects $var tokens in prompt text.
       if (n.toolCommand) n.toolCommand = expand(n.toolCommand);
       if (typeof n.cwd === "string") n.cwd = expand(n.cwd);
       if (typeof n.maxIterations === "string") n.maxIterations = expand(n.maxIterations);
@@ -168,90 +166,7 @@ function collectProducers(node: Node, out: Set<string>): void {
   }
 }
 
-function collectAgentNoteSeed(node: Node, projectDir: string | undefined, out: Set<string>): void {
-  const agentName = (node as Record<string, unknown>).agent;
-  if (typeof agentName !== "string") return;
-  const path = resolveAgentMdPath(projectDir, agentName);
-  if (!path) return;
-  let raw: string;
-  try { raw = readFileSync(path, "utf8"); } catch { return; }
-  const { attributes } = parseFrontmatter(raw);
-  const outputs = (attributes as Record<string, unknown>).outputs;
-  if (outputs && typeof outputs === "object") {
-    // Add all declared outputs as produced vars so agent body refs to those vars
-    // are not flagged as unresolved when the agent both consumes and produces a var.
-    for (const key of Object.keys(outputs)) {
-      // "note" output is a special meditate-pattern key; its consumer name is "prev_note".
-      if (key === "note") {
-        out.add("prev_note");
-      } else {
-        out.add(key);
-      }
-    }
-  }
-}
-
-export type MissingRef = {
-  name: string;
-  source?: { file: string; line: number; agentName: string; nodeId: string };
-};
-
-function resolveAgentMdPath(projectDir: string | undefined, agentName: string): string | null {
-  if (projectDir) {
-    const local = join(projectDir, ".ralph/agents", `${agentName}.md`);
-    if (existsSync(local)) return local;
-  }
-  try {
-    const bundled = join(getBundledAgentsDir(), `${agentName}.md`);
-    if (existsSync(bundled)) return bundled;
-  } catch {
-    // Tests may mock `assets.js` without exposing getBundledAgentsDir.
-    // Treat as "no bundled fallback available" rather than crashing.
-  }
-  return null;
-}
-
-type AgentSource = { file: string; line: number; agentName: string; nodeId: string };
-
-function collectAgentBodyRefs(
-  node: Node,
-  projectDir: string | undefined,
-  refs: Map<string, AgentSource[]>,
-): void {
-  const agentName = (node as Record<string, unknown>).agent;
-  if (typeof agentName !== "string") return;
-  // Skip body when an explicit prompt/label is provided — it overrides config.prompt at runtime.
-  if ((node as Record<string, unknown>).prompt) return;
-  if ((node as Record<string, unknown>).label) return;
-  const path = resolveAgentMdPath(projectDir, agentName);
-  if (!path) return;
-  let raw: string;
-  try {
-    raw = readFileSync(path, "utf8");
-  } catch {
-    return;
-  }
-  const { body } = parseFrontmatter(raw);
-  const frontmatterLineOffset = raw.length === body.length
-    ? 0
-    : raw.slice(0, raw.length - body.length).split("\n").length - 1;
-  let segStart = 0;
-  for (const seg of splitFences(body)) {
-    if (!seg.fenced) {
-      const re = new RegExp(VAR_RE.source, VAR_RE.flags);
-      let m: RegExpExecArray | null;
-      while ((m = re.exec(seg.text)) !== null) {
-        const name = m[1].replace(/\.+$/, "");
-        if (RESERVED.has(name)) continue;
-        const line = body.slice(0, segStart + m.index).split("\n").length + frontmatterLineOffset;
-        const entry: AgentSource = { file: path, line, agentName, nodeId: node.id };
-        const existing = refs.get(name);
-        if (existing) existing.push(entry); else refs.set(name, [entry]);
-      }
-    }
-    segStart += seg.text.length;
-  }
-}
+export type MissingRef = { name: string };
 
 export function scanUndeclaredCallerVars(
   graph: Graph,
@@ -259,14 +174,10 @@ export function scanUndeclaredCallerVars(
 ): { missing: MissingRef[]; declared: MissingRef[]; undeclared: MissingRef[] } {
   const attrRefs = new Set<string>();
   const producers = new Set<string>();
-  const agentRefs = new Map<string, AgentSource[]>();
-  const projectDir = typeof initialContext.project === "string" ? initialContext.project : undefined;
 
   for (const node of graph.nodes.values()) {
     collectVarRefs(node, attrRefs);
     collectProducers(node, producers);
-    collectAgentNoteSeed(node, projectDir, producers);
-    collectAgentBodyRefs(node, projectDir, agentRefs);
   }
 
   const ctxKeys = new Set(Object.keys(initialContext));
@@ -275,10 +186,6 @@ export function scanUndeclaredCallerVars(
   for (const name of attrRefs) {
     if (ctxKeys.has(name) || producers.has(name)) continue;
     missing.push({ name });
-  }
-  for (const [name, sources] of agentRefs) {
-    if (ctxKeys.has(name) || producers.has(name)) continue;
-    for (const source of sources) missing.push({ name, source });
   }
   missing.sort((a, b) => a.name.localeCompare(b.name));
 

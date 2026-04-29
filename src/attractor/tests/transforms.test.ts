@@ -21,9 +21,9 @@ function makeGraph(overrides: Partial<Graph> = {}): Graph {
 }
 
 describe("variableExpansionTransform", () => {
-  it("replaces $goal in node prompts", () => {
+  it("delivers node.prompt verbatim (steering is pure prose, never expanded)", () => {
     const g = variableExpansionTransform(makeGraph(), { project: "/my/project" });
-    expect(g.nodes.get("work")?.prompt).toBe("Do Ship it in /my/project");
+    expect(g.nodes.get("work")?.prompt).toBe("Do $goal in $project");
   });
 
   it("replaces $goal in tool_command", () => {
@@ -35,26 +35,10 @@ describe("variableExpansionTransform", () => {
 
   it("does not mutate original graph", () => {
     const g = makeGraph();
-    const original = g.nodes.get("work")?.prompt;
+    g.nodes.get("work")!.toolCommand = "run $goal";
+    const originalCmd = g.nodes.get("work")?.toolCommand;
     variableExpansionTransform(g, { project: "/proj" });
-    expect(g.nodes.get("work")?.prompt).toBe(original);
-  });
-
-  it("expands arbitrary context keys in prompts", () => {
-    const g = makeGraph();
-    g.nodes.get("work")!.prompt = "Iteration $loop.iteration, prior success: $agent.success";
-    const result = variableExpansionTransform(g, {
-      project: "/proj",
-      context: { "loop.iteration": "2", "agent.success": "true" },
-    });
-    expect(result.nodes.get("work")?.prompt).toBe("Iteration 2, prior success: true");
-  });
-
-  it("leaves unknown context variables as-is", () => {
-    const g = makeGraph();
-    g.nodes.get("work")!.prompt = "Value: $unknown.key";
-    const result = variableExpansionTransform(g, { project: "/proj", context: {} });
-    expect(result.nodes.get("work")?.prompt).toBe("Value: $unknown.key");
+    expect(g.nodes.get("work")?.toolCommand).toBe(originalCmd);
   });
 });
 
