@@ -1607,7 +1607,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 - [ ] 1. agent-implement (deferred to Chunk 6)
 - [x] 2. agent-json-vars (commits ed9baa3, 1644fd1)
-- [ ] 3. chat-end-to-end
+- [x] 3. chat-end-to-end (commit 05a2d76)
 - [ ] 4. chat-only
 - [ ] 5. conditional
 - [ ] 6. gate
