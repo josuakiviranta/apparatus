@@ -394,6 +394,7 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
   if (dotDir) {
     for (const node of nodes.values()) {
       checkAgentMissingOutputs(node, dotDir, diags);
+      checkLoopRequiresDoneField(node, dotDir, diags);
     }
   }
 
@@ -673,10 +674,41 @@ function checkAgentMissingOutputs(
   }
 
   if (typeof agentConfig.outputs === "object" && Object.keys(agentConfig.outputs).length === 0) {
+    // When loop:true, loop_missing_done_field handles this case with a stronger error.
+    if (agentConfig.loop === true) return;
     diags.push({
       rule: "agent_outputs_empty",
       severity: "warning",
       message: `Agent "${node.agent}" at node "${node.id}" has outputs: {} with no keys. Declare at least one output key, or remove outputs: if this agent intentionally produces nothing.`,
+      location: node.sourceLocation,
+    });
+  }
+}
+
+function checkLoopRequiresDoneField(
+  node: Node,
+  dotDir: string,
+  diags: Diagnostic[],
+): void {
+  if (!node.agent) return;
+  if (node.interactive === true || node.interactive === "true") return;
+
+  const agentConfig = tryResolveAgent(node, dotDir);
+  if (!agentConfig) return;
+  if (agentConfig.loop !== true) return;
+
+  const outputs = agentConfig.outputs ?? {};
+  const doneShape = (outputs as Record<string, unknown>).done;
+  const ok =
+    doneShape === "boolean" ||
+    (typeof doneShape === "object" && doneShape !== null &&
+     (doneShape as { type?: string }).type === "boolean");
+
+  if (!ok) {
+    diags.push({
+      rule: "loop_missing_done_field",
+      severity: "error",
+      message: `Agent "${node.agent}" at node "${node.id}" declares loop:true but its outputs: lacks a done:boolean field. Add 'done: boolean' to the agent's outputs frontmatter.`,
       location: node.sourceLocation,
     });
   }
