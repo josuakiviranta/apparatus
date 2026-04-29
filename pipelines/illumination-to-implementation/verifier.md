@@ -79,6 +79,7 @@ Structured JSON only. No prose preamble. Fields:
   - On `preferred_label: "false"`: the verification reason. Example: `Feature already implemented at src/bar.ts:42` — not `This illumination is stale because…`.
   - On `preferred_label: "true"`: emit the literal placeholder `Declined at approval gate`. The value is only consumed downstream if the user declines the illumination at the later approval gate; until then it is inert.
   - On `preferred_label: "empty"`: emit empty string `""`.
+- Emit JSON as your final TEXT response. Never inside a thinking block.
 
 # Hard rules (output discipline)
 
