@@ -145,7 +145,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 ### Task 1.2: Build `inputs-resolver.ts` (pure split logic)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `src/attractor/tests/inputs-resolver.test.ts`:
 
@@ -191,12 +191,12 @@ describe("resolveInputDecl", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run src/attractor/tests/inputs-resolver.test.ts`
 Expected: FAIL — module does not exist.
 
-- [ ] **Step 3: Implement `inputs-resolver.ts`**
+- [x] **Step 3: Implement `inputs-resolver.ts`**
 
 Create `src/attractor/transforms/inputs-resolver.ts`:
 
@@ -257,12 +257,12 @@ export function resolveInputDecl(decl: string): ResolvedInput {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run src/attractor/tests/inputs-resolver.test.ts`
 Expected: PASS — all 4 cases green.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/attractor/transforms/inputs-resolver.ts src/attractor/tests/inputs-resolver.test.ts
