@@ -257,3 +257,96 @@ describe("AgentHandler deep loop — chunk-2 retry composition", () => {
     expect(outcome.contextUpdates?.["agent.iterations"]).toBe("2");
   });
 });
+
+const noteConfig = {
+  ...loopBaseConfig,
+  outputs: { done: "boolean", note: "string" },
+  jsonSchema: JSON.stringify({
+    type: "object",
+    properties: { done: { type: "boolean" }, note: { type: "string" } },
+    required: ["done", "note"],
+    additionalProperties: false,
+  }),
+};
+
+describe("AgentHandler deep loop — $prev_note carry-over", () => {
+  const mockResolve = vi.fn();
+  const mockAgentRun = vi.fn();
+  function makeHandler() {
+    return new AgentHandler({
+      resolveAgent: mockResolve,
+      createAgent: () => ({ run: mockAgentRun, kill: vi.fn(), config: {} } as any),
+    });
+  }
+  function makeNode(overrides: Partial<Node> = {}): Node {
+    return { id: "deep", shape: "box", label: "x", agent: "looper", ...overrides } as Node;
+  }
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it("first iteration sees prev_note empty; second sees iteration-1's note", async () => {
+    mockResolve.mockReturnValue({ ...noteConfig });
+    let i = 0;
+    const captured: string[] = [];
+    mockAgentRun.mockImplementation(async (opts: any) => {
+      i++;
+      captured.push(String(opts.variables?.prev_note ?? ""));
+      return {
+        exitCode: 0, sessionId: `s${i}`, stdout: null,
+        output: streamJsonResult({
+          done: i >= 2,
+          note: i === 1 ? "started chunk A" : "",
+        }),
+      };
+    });
+    const handler = makeHandler();
+    await handler.execute(
+      makeNode({ maxIterations: 5 }),
+      baseCtx(),
+      makeContext(),
+    );
+    expect(captured[0]).toBe("");
+    expect(captured[1]).toBe("started chunk A");
+  });
+
+  it("note replaces, does not accumulate", async () => {
+    mockResolve.mockReturnValue({ ...noteConfig });
+    let i = 0;
+    const captured: string[] = [];
+    mockAgentRun.mockImplementation(async (opts: any) => {
+      i++;
+      captured.push(String(opts.variables?.prev_note ?? ""));
+      return {
+        exitCode: 0, sessionId: `s${i}`, stdout: null,
+        output: streamJsonResult({ done: i >= 3, note: `note-${i}` }),
+      };
+    });
+    const handler = makeHandler();
+    await handler.execute(
+      makeNode({ maxIterations: 5 }),
+      baseCtx(),
+      makeContext(),
+    );
+    expect(captured).toEqual(["", "note-1", "note-2"]);
+  });
+
+  it("agent without note declaration does not receive prev_note variable", async () => {
+    mockResolve.mockReturnValue({ ...loopBaseConfig });
+    let i = 0;
+    const sawPrevNote: boolean[] = [];
+    mockAgentRun.mockImplementation(async (opts: any) => {
+      i++;
+      sawPrevNote.push("prev_note" in (opts.variables ?? {}));
+      return {
+        exitCode: 0, sessionId: `s${i}`, stdout: null,
+        output: streamJsonResult({ done: i >= 2 }),
+      };
+    });
+    const handler = makeHandler();
+    await handler.execute(
+      makeNode({ maxIterations: 5 }),
+      baseCtx(),
+      makeContext(),
+    );
+    expect(sawPrevNote.every(b => b === false)).toBe(true);
+  });
+});

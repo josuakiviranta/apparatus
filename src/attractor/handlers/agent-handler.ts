@@ -198,13 +198,22 @@ export class AgentHandler implements NodeHandler {
     const writeRaw = (n: number, raw: string) =>
       writeFileSync(join(nodeDir, `raw-attempt-${n}.txt`), raw ?? "");
 
+    const baseAgentVariables: Record<string, unknown> = { ...agentVariables };
+    const agentDeclaresNote =
+      !!config.outputs && Object.prototype.hasOwnProperty.call(config.outputs, "note");
+    let prevNote = "";
+
     for (let i = 0; i < maxIterations; i++) {
       if (signal?.aborted) break;
 
       if (i > 0) meta.onIterationStart?.(node.id, i);
 
+      const iterVariables = agentDeclaresNote
+        ? { ...baseAgentVariables, prev_note: prevNote }
+        : baseAgentVariables;
+
       let result = await agent.run({
-        cwd, signal, variables: agentVariables, onStdout,
+        cwd, signal, variables: iterVariables, onStdout,
       });
       iteration++;
       if (result.sessionId) lastSessionId = result.sessionId;
@@ -246,7 +255,7 @@ export class AgentHandler implements NodeHandler {
           meta.onValidationRetryStart?.(node.id, attempt);
           const corrective = buildCorrectiveMessage(evaluation.raw, evaluation.errors, jsonSchema);
           const retryResult = await agent.run({
-            cwd, signal, variables: agentVariables, onStdout,
+            cwd, signal, variables: iterVariables, onStdout,
             resume: lastSessionId, message: corrective,
           });
           result = retryResult;
@@ -275,6 +284,10 @@ export class AgentHandler implements NodeHandler {
         parsed = evaluation.parsed as Record<string, unknown>;
         lastParsed = parsed;
         if (parsed.preferred_label != null) preferredLabel = String(parsed.preferred_label);
+      }
+
+      if (agentDeclaresNote && parsed && typeof parsed.note === "string") {
+        prevNote = parsed.note;
       }
 
       // Deep-loop break MUST be checked BEFORE onIterationEnd; if we break,
