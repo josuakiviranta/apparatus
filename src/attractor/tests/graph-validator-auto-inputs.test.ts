@@ -128,3 +128,32 @@ body`,
     expect(diags.find(d => d.rule === "unknown_source_node")).toBeUndefined();
   });
 });
+
+describe("validator — malformed input declarations", () => {
+  // resolveInputDecl throws on multi-dot keys (e.g. "a.b.c") and empty strings.
+  // validateGraph must NOT crash — it should absorb the throw and continue emitting
+  // diagnostics for the rest of the graph. The unknown_source_node rule skips
+  // malformed entries; a future dedicated rule can flag them explicitly.
+  it("does not throw when inputs contain a multi-dot key (e.g. 'a.b.c')", () => {
+    const dir = join(tmpdir(), `rule-malformed-${Date.now()}`);
+    setup(dir, {
+      "consumer.md": `---
+name: consumer
+description: x
+auto_inputs: true
+inputs: [a.b.c]
+outputs: { foo: string }
+---
+body`,
+    });
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      c [agent="consumer"]
+      done [shape=Msquare]
+      start -> c -> done
+    }`;
+    const graph = parseDot(dot);
+    // Must not throw — malformed decls are skipped inside unknown_source_node
+    expect(() => validateGraph(graph, dir)).not.toThrow();
+  });
+});

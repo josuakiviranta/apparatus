@@ -416,7 +416,14 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
       }
       if (cfg.autoInputs === true && Array.isArray(cfg.inputs)) {
         for (const decl of cfg.inputs) {
-          const resolved = resolveInputDecl(decl);
+          let resolved;
+          try {
+            resolved = resolveInputDecl(decl);
+          } catch {
+            // Malformed decl (e.g. multi-dot key, empty string) — skip here;
+            // a dedicated rule can flag these without crashing the validator.
+            continue;
+          }
           if (resolved.sourceNode !== undefined && !nodes.has(resolved.sourceNode)) {
             diags.push({
               rule: "unknown_source_node",
