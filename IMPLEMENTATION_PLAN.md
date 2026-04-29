@@ -444,7 +444,7 @@ git commit -m "feat(agent): pipe corrective message to stdin on --resume"
 - Create: `src/cli/lib/corrective-message.ts`
 - Test: `src/cli/tests/corrective-message.test.ts` (NEW)
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 // src/cli/tests/corrective-message.test.ts
@@ -480,12 +480,12 @@ describe("buildCorrectiveMessage", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `npx vitest run src/cli/tests/corrective-message.test.ts`
 Expected: FAIL — module does not exist.
 
-- [ ] **Step 3: Implement `corrective-message.ts`**
+- [x] **Step 3: Implement `corrective-message.ts`**
 
 ```ts
 // src/cli/lib/corrective-message.ts
@@ -537,12 +537,12 @@ export function buildCorrectiveMessage(
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `npx vitest run src/cli/tests/corrective-message.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/cli/lib/corrective-message.ts src/cli/tests/corrective-message.test.ts
