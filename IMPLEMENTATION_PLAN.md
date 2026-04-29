@@ -1056,13 +1056,15 @@ git commit -m "feat(handler): per-iteration outputs parse + done break + crash-a
 
 ---
 
-## Chunk 5: `$prev_note` channel
+## Chunk 5: `$prev_note` channel ✅ SHIPPED
 
 **Ships green:** When an agent declares `note: string` in `outputs:`, its emitted value carries forward as variable `prev_note` in the next iteration's prompt expansion. First iteration sees `$prev_note=""`. Preflight does not raise undeclared-variable errors for `prev_note` on such agents.
 
 The LAST iteration's `note` is intentionally discarded — only inter-iteration self-talk is supported. Persisting state at the end of the loop is the agent's job (filesystem, git).
 
-### Task 5.1 — Per-iteration variable bag rebuild
+**Status:** Task 5.1 + 5.2 shipped (commits `ab65842`, `23ce6de`, `a3e0bb9`). Full vitest 1286/1286 green; `tsc --noEmit` clean.
+
+### Task 5.1 — Per-iteration variable bag rebuild ✅ DONE
 
 **Files:**
 - Modify: `src/attractor/handlers/agent-handler.ts` (within the iteration loop body from Chunk 4; build a per-iteration variable bag with `prev_note`)
@@ -1223,7 +1225,7 @@ git add src/attractor/handlers/agent-handler.ts src/attractor/tests/agent-handle
 git commit -m "feat(handler): \$prev_note carries last iteration's note into next"
 ```
 
-### Task 5.2 — Preflight seeds `prev_note` so it's not flagged as undeclared
+### Task 5.2 — Preflight seeds `prev_note` so it's not flagged as undeclared ✅ DONE
 
 **Files:**
 - Modify: `src/attractor/transforms/variable-expansion.ts` (`scanUndeclaredCallerVars` — add `prev_note` to **producers**, not declared/RESERVED)
