@@ -541,17 +541,49 @@ function checkOrphanOutput(
   // inputs:, edge condition= clauses, and $key references in prompts/labels.
   const consumed = new Set<string>();
 
-  for (const node of graph.nodes.values()) {
-    if (!node.agent) continue;
-    const cfg = tryResolveAgent(node, dotDir);
-    if (!cfg?.inputs) continue;
-    for (const k of cfg.inputs) consumed.add(k);
+  for (const [id, node] of graph.nodes) {
+    if (node.agent) {
+      const cfg = tryResolveAgent(node, dotDir);
+      if (!cfg?.inputs) continue;
+      for (const k of cfg.inputs) {
+        // Resolve qualified inputs (e.g. "verifier.summary") to their localKey ("summary")
+        // so they register as consuming the producer's output.
+        try {
+          const resolved = resolveInputDecl(k);
+          consumed.add(resolved.localKey);
+        } catch {
+          // Malformed input decl — skip silently (other rules handle the error).
+        }
+      }
+    } else if (node.shape === "hexagon") {
+      // Gate nodes can also consume outputs via their inputs: frontmatter.
+      try {
+        const gateCfg = resolveGate(id, { dotDir });
+        if (gateCfg?.inputs) {
+          for (const k of gateCfg.inputs) {
+            try {
+              const resolved = resolveInputDecl(k);
+              consumed.add(resolved.localKey);
+            } catch {
+              // Malformed input decl — skip silently.
+            }
+          }
+        }
+      } catch {
+        // Gate not found or parse error — skip silently (other rules handle this).
+      }
+    }
   }
 
   for (const edge of graph.edges) {
     if (!edge.condition) continue;
     const clauses = parseConditionClauses(String(edge.condition));
-    for (const clause of clauses) consumed.add(clause.key);
+    for (const clause of clauses) {
+      consumed.add(clause.key);
+      // Also register the localKey portion of qualified keys (e.g. "verifier.preferred_label" → "preferred_label")
+      const dotIdx = clause.key.indexOf(".");
+      if (dotIdx !== -1) consumed.add(clause.key.slice(dotIdx + 1));
+    }
   }
 
   const VAR_RE_LOCAL = /\$([a-zA-Z_][\w.]*)/g;
@@ -573,6 +605,10 @@ function checkOrphanOutput(
     if (!cfg?.outputs) continue;
     for (const key of Object.keys(cfg.outputs)) {
       if (consumed.has(key)) continue;
+      // loop: true agents require a "done" field — it is consumed internally by the
+      // loop-retry mechanism (condition="<nodeId>.success=false"), not by downstream agents.
+      // Don't warn about this mandatory sentinel key being unconsumed externally.
+      if (key === "done" && cfg.loop === true) continue;
       diags.push({
         rule: "orphan_output",
         severity: "warning",
