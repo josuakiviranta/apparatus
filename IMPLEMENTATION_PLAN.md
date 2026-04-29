@@ -1751,11 +1751,11 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 Now that every agent uses the new path, the flag is redundant.
 
-- [ ] **Step 1: Remove `autoInputs` field from `AgentConfig`**.
-- [ ] **Step 2: Remove `auto_inputs: true` from every agent .md file** (mechanical sed across `pipelines/**/*.md`).
-- [ ] **Step 3: Remove the flag-gating from validator rules** — every rule applies to every agent now.
-- [ ] **Step 4: Run all tests + smokes**. Expect green.
-- [ ] **Step 5: Commit**
+- [x] **Step 1: Remove `autoInputs` field from `AgentConfig`**.
+- [x] **Step 2: Remove `auto_inputs: true` from every agent .md file** (mechanical sed across `pipelines/**/*.md`).
+- [x] **Step 3: Remove the flag-gating from validator rules** — every rule applies to every agent now.
+- [x] **Step 4: Run all tests + smokes**. Expect green.
+- [x] **Step 5: Commit** — `fa39422` (v0.1.84). 1325 tests pass, tsc clean. Also added `inputs: []` to blank template agent (now required unconditionally).
 
 ### Task 6.4: Drop legacy validator branches
 
