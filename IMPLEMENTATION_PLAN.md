@@ -1610,7 +1610,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 - [x] 3. chat-end-to-end (commit 05a2d76)
 - [x] 4. chat-only (commit 59e93d6)
 - [x] 5. conditional (commit 2aca955)
-- [ ] 6. gate
+- [x] 6. gate
 - [ ] 7. json-schema-stream
 - [ ] 8. meditate-steer
 - [ ] 9. missing-caller-var
