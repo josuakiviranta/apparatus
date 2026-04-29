@@ -1214,7 +1214,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 `task.md` today carries `outputs: { refinements, scope_changed }` which leak into smoke pipelines that use `agent="task"`.
 
-- [ ] **Step 1: Edit `task.md`**
+- [x] **Step 1: Edit `task.md`**
 
 Replace contents of `pipelines/illumination-to-implementation/task.md`:
 
@@ -1238,7 +1238,7 @@ mcp: []
 
 (No `outputs:`. No `inputs:`. No body. Pure generic.)
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add pipelines/illumination-to-implementation/task.md
@@ -1366,7 +1366,7 @@ inputs:
 #### Per-agent migration progress
 
 - [x] implement.md (commit e8d785c)
-- [ ] verifier.md
+- [x] verifier.md (commit e2dd8a4)
 - [ ] change-explainer.md
 - [ ] chat-refiner.md
 - [ ] design-writer.md
