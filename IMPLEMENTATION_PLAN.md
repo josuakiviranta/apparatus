@@ -1430,6 +1430,15 @@ Run: `cat src/cli/pipelines/implement.dot`
 Run: `npx ralph pipeline validate src/cli/pipelines/implement.dot`
 Expected: zero errors. (Only `orphan_output` warning — `done` is consumed by the loop handler, not a graph node. Pipeline is valid.)
 
+- [x] **Step 4: Add sibling agent file (discovered gap)**
+
+**Discovered gap:** Chunk 4 per-folder architecture requires every bundled `.dot` file to ship its agent `.md` files adjacent to it. `agent-handler.ts` calls the resolver with `allowBundledFallback: false`, so a missing sibling means "Unknown agent" on clean installs. `src/cli/pipelines/implement.md` did not exist — `ralph implement <project>` was silently relying on a stale `~/.ralph/agents/implement.md` cache that was deleted during Chunk 6 cleanup.
+
+Fix:
+- Copy `pipelines/illumination-to-implementation/implement.md` → `src/cli/pipelines/implement.md`
+- Restore `~/.ralph/agents/implement.md` for local dev convenience
+- The file carries `loop: true` + `outputs: done: boolean` so the deep-loop contract is honoured in the bundled pipeline
+
 ---
 
 ## Chunk 7: Documentation
