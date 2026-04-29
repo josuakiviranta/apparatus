@@ -1483,6 +1483,8 @@ Drive through the verifier → archive happy path on a known illumination. Confi
 
 **Audit note (2026-04-29):** Validate — 0 errors, 0 warnings (✔ Pipeline valid, 18 nodes, 28 edges). Three validator bugs were found and fixed in `src/attractor/core/graph.ts` (checkOrphanOutput): (1) qualified inputs like `verifier.summary` were not resolving to their localKey `summary` in the consumed set; (2) qualified condition keys like `verifier.preferred_label=true` were not resolving to `preferred_label`; (3) gate node inputs were ignored entirely. Also fixed: `loop: true` agents' mandatory `done` sentinel was incorrectly warned as orphan. Tests: `src/cli/tests/pipeline-` suite — 30 test files, 108 tests, all pass. `src/attractor/tests/` — 50 test files, 555 tests, all pass. Step 3 (live run) deferred to human.
 
+**Audit note (2026-04-29, follow-up):** Validator scope expansion (commit `c2aec1e`) addressed the Chunk-2 leakage items: qualified-input/condition resolution (`verifier.summary` → `summary`, `verifier.preferred_label=true` → `preferred_label`), `done` sentinel exemption for `loop: true` agents, and gate `inputs:` honoring so gates can whitelist their prompt-template interpolation vars. Spec amended at line 277 (docs/superpowers/specs/2026-04-29-pipeline-context-flow-redesign.md) to clarify gate semantics: no outputs, no auto-Inputs block, may declare bare `inputs:` for validator coverage of prompt-template substitution. Per-agent migration evidence: lines 1368–1376 list 9 SHAs (`e8d785c`, `e2dd8a4`, `beb75de`, `5c7d68c`, `eda94f6`, `f374f78`, `d8e9fbb`, `24f44c2`, `cf68f51`) covering Steps A–D for all 9 agents including tmux-tester smoke-phase absorption.
+
 ---
 
 ## Chunk 4: Migrate `pipelines/janitor/`
