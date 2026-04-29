@@ -1057,13 +1057,13 @@ function isProducerOnEveryPath(graph: Graph, start: string, target: string, prod
 }
 ```
 
-- [ ] **Step 1: Write the failing test** — consumer `inputs: [verifier.summary]`, two paths to consumer; one passes through verifier, one doesn't. Expect `missing_input_producer` error with message `Input "verifier.summary" declared by "consumer" has no producer on path start → … → consumer`. Add a second test case asserting it does NOT fire when verifier dominates the consumer.
-- [ ] **Step 2: Run test, verify fail**
-- [ ] **Step 3: Update rule logic** — in `graph.ts:validateGraph`, when consumer is `auto_inputs: true`, branch per input:
+- [x] **Step 1: Write the failing test** — consumer `inputs: [verifier.summary]`, two paths to consumer; one passes through verifier, one doesn't. Expect `missing_input_producer` error with message `Input "verifier.summary" declared by "consumer" has no producer on path start → … → consumer`. Add a second test case asserting it does NOT fire when verifier dominates the consumer.
+- [x] **Step 2: Run test, verify fail**
+- [x] **Step 3: Update rule logic** — in `graph.ts:validateGraph`, when consumer is `auto_inputs: true`, branch per input:
   - For qualified input (`resolveInputDecl(decl).qualified === true`): check `isProducerOnEveryPath(graph, startNode.id, consumer.id, sourceNode)`.
   - For bare input (qualified=false): existing key-existence logic.
-- [ ] **Step 4: Run new test + existing graph-inputs-flow.test.ts suite** — `npx vitest run src/attractor/tests/graph-inputs-flow.test.ts src/attractor/tests/graph-validator-auto-inputs.test.ts`. Expect both green.
-- [ ] **Step 5: Commit**
+- [x] **Step 4: Run new test + existing graph-inputs-flow.test.ts suite** — `npx vitest run src/attractor/tests/graph-inputs-flow.test.ts src/attractor/tests/graph-validator-auto-inputs.test.ts`. Expect both green.
+- [x] **Step 5: Commit**
 
 ### Task 2.8: Round-trip validate against fixture pipeline (sanity check)
 
