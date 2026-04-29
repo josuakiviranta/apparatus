@@ -1,6 +1,6 @@
 # Deep Loop Nodes Implementation Plan
 
-> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use GitHub-flavored checkbox syntax for tracking (unchecked = pending, `- [x]` = done).
 
 **Goal:** Add agent-driven self-termination for long-running pipeline loops. An agent declares `loop: true` + `done: boolean` in its frontmatter; the handler iterates with fresh contexts and breaks on the agent's `done=true` signal. Replaces manual Ctrl+C as the only termination for `ralph implement`.
 
@@ -566,7 +566,7 @@ This chunk also re-classifies the existing test `does not fail on non-zero exit 
 - Modify: `src/attractor/tests/agent-handler.test.ts` (re-classify existing test)
 - Create: `src/attractor/tests/agent-handler-deep-loop.test.ts`
 
-- [ ] **Step 1: Verify the stream-output fixture format**
+- [x] **Step 1: Verify the stream-output fixture format**
 
 Read `src/attractor/handlers/evaluate-agent-output.ts` (lines 27–84). Note: `normaliseRaw` accepts both NDJSON and `JSON.stringify([...])` shapes. Existing chunk-2 tests in `src/attractor/tests/agent-handler-validation.test.ts` use array-of-events fixtures. Use the same shape.
 
@@ -579,7 +579,7 @@ const streamJsonResult = (result: object): string => JSON.stringify([
 ]);
 ```
 
-- [ ] **Step 2: Write failing tests in `src/attractor/tests/agent-handler-deep-loop.test.ts`**
+- [x] **Step 2: Write failing tests in `src/attractor/tests/agent-handler-deep-loop.test.ts`**
 
 ```ts
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -848,7 +848,7 @@ describe("AgentHandler deep loop — chunk-2 retry composition", () => {
 });
 ```
 
-- [ ] **Step 3: Re-classify the existing test in `agent-handler.test.ts`**
+- [x] **Step 3: Re-classify the existing test in `agent-handler.test.ts`**
 
 Find the test at line 100: `does not fail on non-zero exit during multi-iteration loop`. This contradicts the new spec (D6 says any non-zero exit during deep-loop iteration is hard failure).
 
@@ -890,12 +890,12 @@ it("exits loop on first non-zero exit during deep-loop multi-iteration", async (
 
 (Also delete the original assertion `outcome.status === "success"` and `times(3)` — those reflected the old behavior.)
 
-- [ ] **Step 4: Run tests, expect failure**
+- [x] **Step 4: Run tests, expect failure**
 
 Run: `npx vitest run src/attractor/tests/agent-handler-deep-loop.test.ts src/attractor/tests/agent-handler.test.ts`
 Expected: deep-loop tests FAIL; old-handler tests on the renamed-test branch FAIL until the handler restructure lands.
 
-- [ ] **Step 5: Restructure the handler**
+- [x] **Step 5: Restructure the handler**
 
 In `src/attractor/handlers/agent-handler.ts`, the iteration loop body (currently lines 180–216) plus the validation+retry block (lines 218–297) become a single fused loop. Replace lines 176–308 with:
 
@@ -1032,22 +1032,22 @@ return {
 
 DELETE the now-orphaned old block at the bottom of `execute()` (was lines 218–308 in the pre-chunk version).
 
-- [ ] **Step 6: Run deep-loop tests, expect pass**
+- [x] **Step 6: Run deep-loop tests, expect pass**
 
 Run: `npx vitest run src/attractor/tests/agent-handler-deep-loop.test.ts`
 Expected: all PASS.
 
-- [ ] **Step 7: Run full handler test**
+- [x] **Step 7: Run full handler test**
 
 Run: `npx vitest run src/attractor/tests/agent-handler.test.ts src/attractor/tests/agent-handler-deep-loop.test.ts`
 Expected: all PASS — including the re-classified test.
 
-- [ ] **Step 8: Run chunk-2 regression suite**
+- [x] **Step 8: Run chunk-2 regression suite**
 
 Run: `npx vitest run src/attractor/tests/agent-handler-validation.test.ts src/attractor/tests/agent-handler-retry.test.ts src/attractor/tests/agent-handler-frontmatter-jsonschema.test.ts`
 Expected: all PASS — these tests exercise single-iteration agents; they hit the new in-loop path with `i=0` and break out at the bottom (no `done` field in their schemas → `parsed.done !== true` → loop continues, but `maxIterations === 1` for non-loop → loop ends after one iteration).
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add src/attractor/handlers/agent-handler.ts src/attractor/tests/agent-handler-deep-loop.test.ts src/attractor/tests/agent-handler.test.ts
@@ -1070,7 +1070,7 @@ The LAST iteration's `note` is intentionally discarded — only inter-iteration 
 - Modify: `src/attractor/handlers/agent-handler.ts` (within the iteration loop body from Chunk 4; build a per-iteration variable bag with `prev_note`)
 - Test: extend `src/attractor/tests/agent-handler-deep-loop.test.ts`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Append to `src/attractor/tests/agent-handler-deep-loop.test.ts`:
 
@@ -1169,12 +1169,12 @@ describe("AgentHandler deep loop — \$prev_note carry-over", () => {
 });
 ```
 
-- [ ] **Step 2: Run, expect failure**
+- [x] **Step 2: Run, expect failure**
 
 Run: `npx vitest run src/attractor/tests/agent-handler-deep-loop.test.ts -t "prev_note"`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement variable rebuild**
+- [x] **Step 3: Implement variable rebuild**
 
 In `src/attractor/handlers/agent-handler.ts`, just before the `for (let i…)` loop, snapshot the base bag and capture whether the agent declares `note`:
 
@@ -1208,17 +1208,17 @@ if (agentDeclaresNote && parsed && typeof parsed.note === "string") {
 
 (Place this BEFORE the `done`-break check so even if iteration N is the last, `prevNote` is updated — though it's then unused.)
 
-- [ ] **Step 4: Run, expect pass**
+- [x] **Step 4: Run, expect pass**
 
 Run: `npx vitest run src/attractor/tests/agent-handler-deep-loop.test.ts -t "prev_note"`
 Expected: PASS.
 
-- [ ] **Step 5: Run full deep-loop suite**
+- [x] **Step 5: Run full deep-loop suite**
 
 Run: `npx vitest run src/attractor/tests/agent-handler-deep-loop.test.ts src/attractor/tests/agent-handler.test.ts`
 Expected: all PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/attractor/handlers/agent-handler.ts src/attractor/tests/agent-handler-deep-loop.test.ts
@@ -1233,12 +1233,12 @@ git commit -m "feat(handler): \$prev_note carries last iteration's note into nex
 
 **Why producers, not declared:** the missing-set is built by subtracting `producers ∪ ctxKeys` from references. Adding to `declared` only affects classification within already-handled refs. Adding to `producers` filters from `missing`.
 
-- [ ] **Step 1: Locate the producers-set construction**
+- [x] **Step 1: Locate the producers-set construction**
 
 Run: `grep -n "producers\|nodeProduces\|collectProducers" src/attractor/transforms/variable-expansion.ts`
 Identify where the producers set is built across the graph (likely a fold over nodes calling `collectProducers`).
 
-- [ ] **Step 2: Write failing test**
+- [x] **Step 2: Write failing test**
 
 Append to `src/attractor/tests/variable-expansion.test.ts`:
 
@@ -1268,12 +1268,12 @@ describe("scanUndeclaredCallerVars — prev_note seed for note-declaring loop ag
 
 (Mirror the file's existing test patterns for the `/* setup */` comments.)
 
-- [ ] **Step 3: Run, expect failure**
+- [x] **Step 3: Run, expect failure**
 
 Run: `npx vitest run src/attractor/tests/variable-expansion.test.ts -t "prev_note seed"`
 Expected: first test FAIL (prev_note flagged), second test PASS (correctly flagged).
 
-- [ ] **Step 4: Implement seed**
+- [x] **Step 4: Implement seed**
 
 In `scanUndeclaredCallerVars`, after `collectProducers` runs across nodes, walk the graph and for each agent that declares `note` in `outputs:`, add `prev_note` to the producers set:
 
@@ -1299,17 +1299,17 @@ for (const node of graph.nodes.values()) {
 
 (`producers` is the set already built earlier in the function; `resolveAgentMdPath` exists at line 176; `parseFrontmatter` is already imported. Adapt names to match the actual local-variable conventions.)
 
-- [ ] **Step 5: Run, expect pass**
+- [x] **Step 5: Run, expect pass**
 
 Run: `npx vitest run src/attractor/tests/variable-expansion.test.ts -t "prev_note seed"`
 Expected: both PASS.
 
-- [ ] **Step 6: Run full preflight suite**
+- [x] **Step 6: Run full preflight suite**
 
 Run: `npx vitest run src/attractor/tests/variable-expansion.test.ts`
 Expected: all PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/attractor/transforms/variable-expansion.ts src/attractor/tests/variable-expansion.test.ts
@@ -1358,28 +1358,7 @@ outputs:
 
 After the existing numbered instructions (i.e., after the line ending with "Take your time. I know you got this. I love you.", or wherever the last instruction line is), add:
 
-```markdown
-
-## Output contract
-
-This agent runs in a deep loop: each iteration is a fresh process; you do work via Bash/git/subagent tools during the iteration; the LAST text response of each iteration MUST be a single JSON object describing whether the implementation plan is complete.
-
-Use Bash, git, and subagents freely during the iteration to read, write, commit, and push.
-
-After committing your chunk (or determining no chunks remain), emit JSON as your FINAL TEXT response. Never inside a thinking block.
-
-JSON shape:
-- `done: true` — when **every** chunk in the implementation plan is marked complete (`[x]`) AND no `[ ]` items remain.
-- `done: false` — when at least one `[ ]` item remains in the plan.
-
-Be honest. False positives leave incomplete work committed and visible in git history. False negatives waste iterations. Re-read the plan after committing to verify your judgment.
-
-Example final response:
-
-\`\`\`json
-{ "done": false }
-\`\`\`
-```
+_(README content shipped — see [`README.md` § Deep loop nodes (agent-driven self-termination)](README.md). The plan no longer duplicates it.)_
 
 (The trailing instruction "Emit JSON as your final TEXT response. Never inside a thinking block." mirrors the verifier prompt fix from chunk-1. Intentional duplication — both agents need the same anti-thinking-block hint. Edits to one should be considered for the other.)
 
@@ -1458,61 +1437,7 @@ Identify the heading after which the new section fits best (typically below "Pip
 
 Add the following content at the chosen insertion point:
 
-```markdown
-### Deep loop nodes (agent-driven self-termination)
-
-Agents that need to iterate until self-declared "done" — e.g. the implement
-agent walking an implementation plan one chunk at a time — opt in by adding
-`loop: true` and a `done: boolean` field to their frontmatter:
-
-\`\`\`yaml
----
-name: my-deep-agent
-description: Iterates until the work stack is empty.
-model: opus
-loop: true
-outputs:
-  done: boolean
-  note: string         # optional cross-iteration handoff
----
-\`\`\`
-
-The handler runs the agent in a fresh context window per iteration. After
-each iteration it parses the structured output; when `done=true`, the loop
-breaks and the pipeline advances. Per-iteration state lives on the
-filesystem (commits, plan file). The optional `note: string` field carries
-into the next iteration as `$prev_note` (replace, not accumulate). The
-LAST iteration's `note` is discarded — persist anything important via files.
-
-Cap behavior:
-
-- `loop: true` with no cap → unlimited; agent's `done` is the only stop.
-- Pipeline node attribute `max_iterations="N"` → tightens the cap for one use.
-- Agent frontmatter `maxIterations: N` → default cap for the agent.
-- Cascade: node > agent > (loop ? Infinity : 1).
-
-Routing on `done`:
-
-\`\`\`dot
-deep_node -> next_step  [condition="done=true"]
-deep_node -> escalate   [condition="done=false"]
-\`\`\`
-
-`done=false` reaches downstream only when the cap is hit without
-self-termination. Pipelines can route on it for retry / escalate paths.
-
-Authoring checklist:
-
-- [ ] `loop: true` in frontmatter
-- [ ] `outputs: { done: boolean }` (boolean shorthand or `{type: "boolean"}`)
-- [ ] Prompt body instructs the agent to emit `done` after each iteration as the FINAL TEXT response (never in a thinking block)
-- [ ] (Optional) `note: string` + a `$prev_note` slot in the prompt for cross-iteration self-talk
-- [ ] `pipeline validate` passes
-
-The validator rejects `loop: true` without `done: boolean` with error
-`loop_missing_done_field`. A non-zero exit during any deep-loop iteration
-exits the loop with `agent.success=false`.
-```
+_(README content shipped — see [`README.md` § Deep loop nodes (agent-driven self-termination)](README.md). The plan no longer duplicates it.)_
 
 - [x] **Step 3: Verify markdown**
 
@@ -1529,22 +1454,22 @@ git commit -m "docs(readme): authoring guide for deep loop nodes"
 
 ## Final verification
 
-- [ ] **Step 1: Full test sweep**
+- [x] **Step 1: Full test sweep**
 
 Run: `npm run test`
 Expected: every test passes; no skipped suites.
 
-- [ ] **Step 2: TypeScript clean**
+- [x] **Step 2: TypeScript clean**
 
 Run: `npx tsc --noEmit`
 Expected: zero errors.
 
-- [ ] **Step 3: Build succeeds**
+- [x] **Step 3: Build succeeds**
 
 Run: `npm run build`
 Expected: `dist/` produced; no build errors.
 
-- [ ] **Step 4: Validate every pipeline in the repo**
+- [x] **Step 4: Validate every pipeline in the repo**
 
 Run:
 ```bash
@@ -1555,7 +1480,7 @@ done
 ```
 Expected: zero errors across all `.dot` files.
 
-- [ ] **Step 5: Live smoke — `ralph implement` on a tiny disposable plan**
+- [~] **Step 5: Live smoke — `ralph implement` on a tiny disposable plan** _(deferred — hands-on, not CI-blocking)_
 
 In a scratch project:
 
@@ -1566,14 +1491,14 @@ In a scratch project:
 
 (Hands-on verification; document the result in the implementation memory but do not block CI on it.)
 
-- [ ] **Step 6: Tag**
+- [x] **Step 6: Tag**
 
 ```bash
 git tag deep-loop-nodes
 git push origin main --tags
 ```
 
-- [ ] **Step 7: Memory write**
+- [x] **Step 7: Memory write**
 
 Append a short memory file under `/Users/josu/.claude/projects/-Users-josu-Documents-projects-ralph-cli/memory/` named `2026-04-29-deep-loop-nodes-shipped.md` referencing the spec, the chunks, any surprises during implementation. Add an index line to `MEMORY.md`.
 
