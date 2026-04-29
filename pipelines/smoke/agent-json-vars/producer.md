@@ -2,16 +2,9 @@
 name: producer
 description: Smoke-test producer that emits a fixed JSON object with result and label fields
 auto_inputs: true
-model: opus
+model: haiku
 permissionMode: dangerouslySkipPermissions
-tools:
-  - Read
-  - Write
-  - Edit
-  - Grep
-  - Glob
-  - Bash
-  - Task
+tools: []
 mcp: []
 inputs: []
 outputs:
