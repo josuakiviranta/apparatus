@@ -972,15 +972,15 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 Severity: error. Fires when `inputs: [verifier.foo]` references a key that the source node's agent doesn't declare in `outputs:` (or, for tool nodes, doesn't match `produces_from_stdout`).
 
-- [ ] **Step 1: Write the failing test** — assert error when consumer requests `producer.bar` but producer's `outputs:` only has `{ foo }`.
-- [ ] **Step 2: Run test, verify fail**
-- [ ] **Step 3: Implement rule**:
+- [x] **Step 1: Write the failing test** — assert error when consumer requests `producer.bar` but producer's `outputs:` only has `{ foo }`.
+- [x] **Step 2: Run test, verify fail**
+- [x] **Step 3: Implement rule**:
   - For each consumer node with `auto_inputs: true`, for each qualified input, look up source node.
   - If source is agent: load its config, check `config.outputs[localKey]`.
-  - If source is tool: check `node.producesFromStdout === localKey`.
+  - If source is tool: check `node.producesFromStdout` is truthy (schema is `boolean | "true"`; spec wording `=== localKey` impossible — adapted to "flag when absent/false; tolerate any key when truthy").
   - Else push diagnostic with message `Input "verifier.foo" references key "foo" which "verifier" does not declare in outputs:` (or `produces_from_stdout` for tool nodes).
-- [ ] **Step 4: Run test, verify pass**
-- [ ] **Step 5: Commit**
+- [x] **Step 4: Run test, verify pass**
+- [x] **Step 5: Commit** — `7bcd6fb` (rule + tests) + `bacd0e5` (refactor: flatten guard, simplify pfStdout truthy check)
 
 ### Task 2.4: Rule `bare_input_not_in_caller_inputs_or_system`
 
