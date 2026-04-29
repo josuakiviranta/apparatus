@@ -467,7 +467,7 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
               diags.push({
                 rule: "bare_input_not_in_caller_inputs_or_system",
                 severity: "error",
-                message: `Agent "${node.agent}" requires bare input "${resolved.localKey}" but it is neither declared in the digraph's inputs="..." nor a system-injected var. Add it to inputs="..." on the digraph or qualify it as "<source_node>.${resolved.localKey}".`,
+                message: `Agent "${node.agent}" requires bare input "${resolved.localKey}" but it is neither declared in the digraph's inputs="..." nor a system-injected var. Add it to inputs="...", qualify it as "<source_node>.${resolved.localKey}", or set default_${resolved.localKey}= on this node.`,
                 location: node.sourceLocation,
               });
             }

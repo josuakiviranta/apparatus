@@ -284,6 +284,7 @@ body`,
     expect(d).toBeDefined();
     expect(d!.severity).toBe("error");
     expect(d!.message).toMatch(/unknown_var/);
+    expect(d!.message).toMatch(/default_/);
   });
 
   it("does not fire when bare input is declared in graph inputs=", () => {
