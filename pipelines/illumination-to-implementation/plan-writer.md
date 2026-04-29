@@ -1,6 +1,7 @@
 ---
 name: plan-writer
 description: Turn an approved design doc + refinements into a chunked TDD implementation plan, iterating with a general-purpose plan reviewer (using the writing-plans skill's prompt template) per chunk until both writer and reviewer agree each chunk is ready
+auto_inputs: true
 model: opus
 permissionMode: dangerouslySkipPermissions
 tools:
@@ -13,6 +14,11 @@ tools:
 mcp: []
 outputs:
   plan_path: string
+inputs:
+  - illumination_path
+  - plans_dir
+  - design_writer.design_doc_path
+  - chat_summarizer.refinements
 ---
 
 # Mission
@@ -21,9 +27,9 @@ You turn an approved design doc into a chunked, TDD-shaped implementation plan a
 
 # Inputs you will receive
 
-- `$design_doc_path` — the approved design doc. Primary source of truth.
+- `$design_writer.design_doc_path` — the approved design doc. Primary source of truth.
 - `$illumination_path` — file path to the originating illumination. Use it to derive the plan filename deterministically and to cross-check intent.
-- `$refinements` — cumulative bullet log with per-entry attribution (Round, Topic, Rationale). Authoritative. Use the rationale lines to surface edge cases, test scenarios, and constraints the design doc did not explicitly enumerate.
+- `$chat_summarizer.refinements` — cumulative bullet log with per-entry attribution (Round, Topic, Rationale). Authoritative. Use the rationale lines to surface edge cases, test scenarios, and constraints the design doc did not explicitly enumerate.
 - `$plans_dir` — output directory for the plan.
 - `$project` — repo root. Source code typically lives under `$project/src`; Glob from there when you need concrete code anchors (exact file paths, line numbers, current behavior to diff against).
 
@@ -35,7 +41,7 @@ You turn an approved design doc into a chunked, TDD-shaped implementation plan a
    - Example: illumination `2026-04-19T1100-gate-choice-namespacing.md` → plan `$plans_dir/2026-04-19-gate-choice-namespacing.md`.
    - This keeps the illumination → design doc → plan trail 1:1 auditable. Do not invent a new topic slug.
 
-2. **Load context.** Read `$design_doc_path` in full — it is the source of truth. Walk `$refinements` bullet-by-bullet; the rationale lines tell you which constraints matter and why. Cross-check the illumination for any motivating context the design doc may have compressed away.
+2. **Load context.** Read `$design_writer.design_doc_path` in full — it is the source of truth. Walk `$chat_summarizer.refinements` bullet-by-bullet; the rationale lines tell you which constraints matter and why. Cross-check the illumination for any motivating context the design doc may have compressed away.
 
 3. **Invoke the writing-plans skill.** Load `superpowers:writing-plans` via the Skill tool and follow it end-to-end. Use the required plan header the skill defines.
 
@@ -60,7 +66,7 @@ You turn an approved design doc into a chunked, TDD-shaped implementation plan a
 
      This is a deterministic checklist the downstream `tmux_tester` (and any future coverage reporter) executes verbatim — not an LLM guess. Omitting the sub-block means downstream nodes fall back to brittle rubric heuristics; do not skip it.
 
-6. **Run the Plan Review Loop per chunk.** Dispatch a plan reviewer via the Task tool with `subagent_type: "general-purpose"`, using the prompt template from `plan-document-reviewer-prompt.md` in the `superpowers:writing-plans` skill (load the skill first if you have not already). Pass it the chunk's content + `$design_doc_path`. Act on the verdict:
+6. **Run the Plan Review Loop per chunk.** Dispatch a plan reviewer via the Task tool with `subagent_type: "general-purpose"`, using the prompt template from `plan-document-reviewer-prompt.md` in the `superpowers:writing-plans` skill (load the skill first if you have not already). Pass it the chunk's content + `$design_writer.design_doc_path`. Act on the verdict:
    - ✅ **Approved** → move to the next chunk.
    - ❌ **Issues Found** → fix in-place and re-dispatch.
 
