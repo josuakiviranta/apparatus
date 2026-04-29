@@ -1,6 +1,7 @@
 ---
 name: change-explainer
 description: Render a concrete before/after explainer of a verified illumination for the approval gate
+auto_inputs: true
 model: opus
 permissionMode: dangerouslySkipPermissions
 tools:
@@ -9,6 +10,11 @@ tools:
   - Glob
   - Task
 mcp: []
+inputs:
+  - illumination_path
+  - verifier.summary
+  - verifier.explanation
+  - chat_summarizer.refinements
 outputs:
   explainer_render: string
 ---
@@ -69,16 +75,15 @@ Bullet list of what's in and what's out. Maximum **4 bullets**. No prose.
 # Procedure
 
 1. Read the illumination at `$illumination_path` fully.
-2. Read `$summary` and `$explanation` from upstream verifier for the criteria evidence.
-3. If `$refinements` is non-empty, read them — they override the original scope. Render the before/after against the **refined** scope, not the illumination's original wording.
-4. If `$chat_notes_path` is non-empty, read it for rejected approaches and edge cases the user raised.
-5. Spawn parallel subagents (up to 10) to pull verbatim evidence:
+2. Read `$verifier.summary` and `$verifier.explanation` from upstream verifier for the criteria evidence.
+3. If `$chat_summarizer.refinements` is non-empty, read them — they override the original scope. Render the before/after against the **refined** scope, not the illumination's original wording.
+4. Spawn parallel subagents (up to 10) to pull verbatim evidence:
    - Open the exact files the illumination cites; quote the current lines.
    - If the illumination proposes a command/output change, simulate or read the current output source (printer, formatter, template) to show the real "before".
    - For spec changes, quote the current spec text.
-6. **Draft Tier 1 first.** Close the repo in your head; write 3 jargon-free sentences from the reader's perspective. Verify: could someone who has never opened this codebase understand it? If not, rewrite.
-7. Draft Tier 2 underneath: `## What changes`, `## Why now`, `## Scope`. Respect the word and bullet caps strictly.
-8. Return as the `explainer_render` field in structured JSON.
+5. **Draft Tier 1 first.** Close the repo in your head; write 3 jargon-free sentences from the reader's perspective. Verify: could someone who has never opened this codebase understand it? If not, rewrite.
+6. Draft Tier 2 underneath: `## What changes`, `## Why now`, `## Scope`. Respect the word and bullet caps strictly.
+7. Return as the `explainer_render` field in structured JSON.
 
 # Output
 
