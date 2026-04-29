@@ -1494,13 +1494,13 @@ Janitor is the simplest in-tree pipeline: one agent (`janitor.md`) and a 12-line
 
 ### Task 4.1: Migrate `janitor.md`
 
-- [ ] **Step 1: Read current frontmatter to capture today's contract**
+- [x] **Step 1: Read current frontmatter to capture today's contract**
 
 ```bash
 head -40 pipelines/janitor/janitor.md
 ```
 
-- [ ] **Step 2: Edit frontmatter — add `auto_inputs: true` + declare inputs**
+- [x] **Step 2: Edit frontmatter — add `auto_inputs: true` + declare inputs**
 
 ```yaml
 ---
@@ -1520,9 +1520,9 @@ mcp: ...                          # keep existing
 
 (`project` is the only input the janitor needs per `pipeline.dot:4` — caller seeds it via `--var project=...`.)
 
-- [ ] **Step 3: Update body** — if any prose references `$project`, leave as-is (bare input, no qualified rename needed). No other vars to convert.
+- [x] **Step 3: Update body** — if any prose references `$project`, leave as-is (bare input, no qualified rename needed). No other vars to convert.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add pipelines/janitor/janitor.md
@@ -1534,7 +1534,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 ### Task 4.2: Migrate `pipeline.dot`
 
-- [ ] **Step 1: Edit `pipelines/janitor/pipeline.dot`**
+- [x] **Step 1: Edit `pipelines/janitor/pipeline.dot`**
 
 Preserve every existing graph-level attribute (`goal=`, `headless_safe=`, `inputs=`). Only change the `janitor` node line:
 
@@ -1554,21 +1554,21 @@ digraph janitor {
 
 (Drop the `prompt="Run the janitor procedure for $project."` — it duplicated the agent's mission. The auto-Inputs block now carries `<project>...</project>` into the call.)
 
-- [ ] **Step 2: Validate**
+- [x] **Step 2: Validate**
 
 ```bash
 ralph pipeline validate pipelines/janitor/pipeline.dot --project .
 ```
 Expected: 0 errors.
 
-- [ ] **Step 3: Run the janitor smoke**
+- [x] **Step 3: Run the janitor smoke**
 
 ```bash
 npx vitest run src/cli/tests/pipeline-janitor-folder.test.ts
 ```
 Expected: PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add pipelines/janitor/pipeline.dot
