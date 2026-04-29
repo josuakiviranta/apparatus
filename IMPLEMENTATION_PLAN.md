@@ -922,7 +922,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 Severity: error. Fires when an agent's `inputs:` references a qualified key whose source node doesn't exist in the graph.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `graph-validator-auto-inputs.test.ts`:
 
@@ -955,10 +955,10 @@ body`,
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
-- [ ] **Step 3: Implement rule** — iterate over nodes with `auto_inputs: true`, for each qualified input parse source via `resolveInputDecl`, check `graph.nodes.has(sourceNode)`. If not, push diagnostic.
-- [ ] **Step 4: Run test, verify pass**
-- [ ] **Step 5: Commit**
+- [x] **Step 2: Run test to verify it fails**
+- [x] **Step 3: Implement rule** — iterate over nodes with `auto_inputs: true`, for each qualified input parse source via `resolveInputDecl`, check `graph.nodes.has(sourceNode)`. If not, push diagnostic.
+- [x] **Step 4: Run test, verify pass**
+- [x] **Step 5: Commit**
 
 ```bash
 git add ...
