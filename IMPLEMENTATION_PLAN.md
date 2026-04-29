@@ -1370,7 +1370,7 @@ inputs:
 - [x] change-explainer.md (commit beb75de)
 - [x] chat-refiner.md (commit 5c7d68c)
 - [x] design-writer.md (commit eda94f6)
-- [ ] plan-writer.md
+- [x] plan-writer.md (commit f374f78)
 - [ ] tmux-tester.md
 - [ ] memory-writer.md
 - [ ] memory-reflector.md
