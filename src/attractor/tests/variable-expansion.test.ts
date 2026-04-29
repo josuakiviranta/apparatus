@@ -250,6 +250,44 @@ describe("scanUndeclaredCallerVars with agent body", () => {
   });
 });
 
+describe("scanUndeclaredCallerVars — prev_note seed for note-declaring loop agents", () => {
+  it("does NOT report prev_note as missing when an agent declares note in outputs", () => {
+    const projectDir = makeTempProjectWithAgent(
+      "looper",
+      "---\nname: looper\nloop: true\noutputs:\n  done: boolean\n  note: string\n---\nUse the $prev_note from prior iteration.\n",
+    );
+    const graph = parseInlineDot(`
+      digraph test {
+        inputs="project"
+        start -> n1 [label="go"]
+        n1 [agent="looper"]
+        n1 -> exit
+      }
+    `);
+    const result = scanUndeclaredCallerVars(graph, { project: projectDir });
+    const missingNames = result.missing.map((m) => m.name);
+    expect(missingNames).not.toContain("prev_note");
+  });
+
+  it("DOES report prev_note as missing when no agent declares note in outputs", () => {
+    const projectDir = makeTempProjectWithAgent(
+      "no-note",
+      "---\nname: no-note\noutputs:\n  done: boolean\n---\nUse the $prev_note from prior iteration.\n",
+    );
+    const graph = parseInlineDot(`
+      digraph test {
+        inputs="project"
+        start -> n1 [label="go"]
+        n1 [agent="no-note"]
+        n1 -> exit
+      }
+    `);
+    const result = scanUndeclaredCallerVars(graph, { project: projectDir });
+    const missingNames = result.missing.map((m) => m.name);
+    expect(missingNames).toContain("prev_note");
+  });
+});
+
 describe("extractDefaults", () => {
   it("snake-cases scope changed", () => {
     expect(extractDefaults({ defaultScopeChanged: "false" })).toEqual({ scope_changed: "false" });

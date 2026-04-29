@@ -168,6 +168,20 @@ function collectProducers(node: Node, out: Set<string>): void {
   }
 }
 
+function collectAgentNoteSeed(node: Node, projectDir: string | undefined, out: Set<string>): void {
+  const agentName = (node as Record<string, unknown>).agent;
+  if (typeof agentName !== "string") return;
+  const path = resolveAgentMdPath(projectDir, agentName);
+  if (!path) return;
+  let raw: string;
+  try { raw = readFileSync(path, "utf8"); } catch { return; }
+  const { attributes } = parseFrontmatter(raw);
+  const outputs = (attributes as Record<string, unknown>).outputs;
+  if (outputs && typeof outputs === "object" && Object.prototype.hasOwnProperty.call(outputs, "note")) {
+    out.add("prev_note");
+  }
+}
+
 export type MissingRef = {
   name: string;
   source?: { file: string; line: number; agentName: string; nodeId: string };
@@ -237,6 +251,7 @@ export function scanUndeclaredCallerVars(
   for (const node of graph.nodes.values()) {
     collectVarRefs(node, attrRefs);
     collectProducers(node, producers);
+    collectAgentNoteSeed(node, projectDir, producers);
     collectAgentBodyRefs(node, projectDir, agentRefs);
   }
 
