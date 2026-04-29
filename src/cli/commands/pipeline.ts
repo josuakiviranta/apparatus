@@ -587,6 +587,15 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
         currentBlockNodeId = null;
       },
 
+      onValidationRetryStart: (nodeId, attempt) => {
+        emit({
+          kind: "start",
+          nodeId,
+          label: `agent · validation retry ${attempt - 1}`,
+          blockKind: "agent",
+        });
+      },
+
       onStdout: async (stdout) => {
         const statsStream = new PassThrough();
         const renderStream = new PassThrough();
@@ -850,6 +859,19 @@ export async function pipelineTraceCommand(
           console.log(`  ${key}`);
           console.log(`    ${val}`);
         }
+      }
+    }
+    const failures = lines.filter(l =>
+      l.kind === "validation-failure" && l.nodeReceiveId === opts.nodeReceive,
+    );
+    if (failures.length > 0) {
+      console.log(`\nvalidation attempts:`);
+      for (const f of failures as Array<Record<string, unknown>>) {
+        const errs = (f.errors as Array<{ path: string; message: string }>)
+          .map(e => `${e.path}: ${e.message}`)
+          .join(", ");
+        console.log(`  [${f.attempt}] ✗ failed — ${errs}`);
+        console.log(`      raw: ${f.rawOutputPath}`);
       }
     }
     console.log(`\ncompleted stages: ${completedStages.length > 0 ? completedStages.join(" · ") : "(none)"}`);

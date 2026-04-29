@@ -1134,12 +1134,12 @@ git commit -m "feat(handler): zod validation + smart retry via --resume on outpu
 - Modify: `src/cli/commands/pipeline.ts` (provide `onValidationRetryStart` that emits a TUI iteration block; extend `--node-receive` view to surface validation attempts)
 - Test: `src/cli/tests/pipeline-trace-command-validation.test.ts` (NEW)
 
-- [ ] **Step 1: Locate the handler-context construction**
+- [x] **Step 1: Locate the handler-context construction**
 
 Run: `grep -n "HandlerExecutionContext\|nodeReceiveId =" src/attractor/core/engine.ts`
 Confirm: `nodeReceiveId` is generated at `engine.ts:169`, the `meta: HandlerExecutionContext = {...}` is built at lines 222-235.
 
-- [ ] **Step 2: In `engine.ts`, wire validation callbacks into `meta`**
+- [x] **Step 2: In `engine.ts`, wire validation callbacks into `meta`**
 
 In `src/attractor/core/engine.ts` `EngineRunOptions` interface, add (next to the existing `onIterationStart`/`onIterationEnd` fields):
 
@@ -1164,7 +1164,7 @@ onValidationRetryStart: opts.onValidationRetryStart,
 
 (`nodeReceiveId` and `node` are in scope here — they were declared at lines 169 and 167 respectively.)
 
-- [ ] **Step 3: In `src/cli/commands/pipeline.ts`, register `onValidationRetryStart` callback in `engineOpts`**
+- [x] **Step 3: In `src/cli/commands/pipeline.ts`, register `onValidationRetryStart` callback in `engineOpts`**
 
 First locate the existing `onIterationStart` callback (line numbers drift):
 Run: `grep -n "onIterationStart:" src/cli/commands/pipeline.ts`
@@ -1182,7 +1182,7 @@ onValidationRetryStart: (nodeId, attempt) => {
 },
 ```
 
-- [ ] **Step 4: Extend `pipelineTraceCommand` `--node-receive` view to surface validation attempts**
+- [x] **Step 4: Extend `pipelineTraceCommand` `--node-receive` view to surface validation attempts**
 
 In `src/cli/commands/pipeline.ts` `pipelineTraceCommand`, inside the `if (opts.nodeReceive)` branch (currently at lines 819-857), after the context-snapshot block and before the `completed stages` line, insert:
 
@@ -1202,7 +1202,7 @@ if (failures.length > 0) {
 }
 ```
 
-- [ ] **Step 5: Write a real trace-command test**
+- [x] **Step 5: Write a real trace-command test**
 
 ```ts
 // src/cli/tests/pipeline-trace-command-validation.test.ts (NEW)
@@ -1249,17 +1249,17 @@ describe("pipeline trace --node-receive surfaces validation attempts", () => {
 
 (If `deriveProjectKey` is exported from a different file, update the import. If `pipelineTraceCommand` calls `process.exit` on missing files, this test wraps in a try/catch — adjust as the actual command shape requires. Verify by reading `src/cli/commands/pipeline.ts:775-820` before running.)
 
-- [ ] **Step 6: Run tests**
+- [x] **Step 6: Run tests**
 
 Run: `npx vitest run src/cli/tests/pipeline-trace-command-validation.test.ts`
 Expected: PASS.
 
-- [ ] **Step 7: Run full test suite**
+- [x] **Step 7: Run full test suite**
 
 Run: `npm test`
 Expected: All tests pass.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/attractor/core/engine.ts src/cli/commands/pipeline.ts src/cli/tests/pipeline-trace-command-validation.test.ts

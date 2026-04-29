@@ -32,6 +32,7 @@ export interface EngineOptions {
   onInteractiveRequest?: OnInteractiveRequest;
   onIterationStart?: (nodeId: string, iterationIndex: number) => void;
   onIterationEnd?: (nodeId: string, iterationIndex: number) => void;
+  onValidationRetryStart?: (nodeId: string, attempt: number) => void;
   onNodeEnd?: (node: Node, outcome: Outcome) => void;
   traceWriter?: import("../tracer/pipeline-tracer.js").PipelineTracer;
 }
@@ -231,6 +232,16 @@ export async function runPipeline(graph: Graph, opts: EngineOptions): Promise<Pi
       onInteractiveRequest: opts.onInteractiveRequest,
       onIterationStart: opts.onIterationStart,
       onIterationEnd: opts.onIterationEnd,
+      onValidationFailure: (args) => {
+        opts.traceWriter?.onValidationFailure?.({
+          nodeReceiveId,
+          node,
+          attempt: args.attempt,
+          errors: args.errors,
+          rawOutputPath: args.rawOutputPath,
+        });
+      },
+      onValidationRetryStart: opts.onValidationRetryStart,
       projectDir: opts.project,
     };
     let outcome: Outcome;
