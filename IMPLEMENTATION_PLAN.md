@@ -1759,17 +1759,17 @@ Now that every agent uses the new path, the flag is redundant.
 
 ### Task 6.4: Drop legacy validator branches
 
-- [ ] **Step 1: Simplify `scanUndeclaredCallerVars`** — agent body $var scanning is now redundant (no auto-substitution to fail). Either remove that scan or repurpose as informational.
-- [ ] **Step 2: Drop `nodeTask` branch from `variableExpansionTransform`** — `node.prompt` is now pure prose. First confirm no pipeline still relies on `$goal`/`$project` substitution in `prompt=` text:
+- [x] **Step 1: Simplify `scanUndeclaredCallerVars`** — agent body $var scanning is now redundant (no auto-substitution to fail). Removed `collectAgentBodyRefs`, `collectAgentNoteSeed`, `resolveAgentMdPath`, `AgentSource`, and `MissingRef.source`; scanner now only walks node string attributes. Cleaned the matching `unresolved_var_in_agent_prompt` error paths in `pipelineValidateCommand` and `pipelineRunCommand`.
+- [x] **Step 2: Drop `nodeTask` branch from `variableExpansionTransform`** — `node.prompt` is now pure prose. First confirm no pipeline still relies on `$goal`/`$project` substitution in `prompt=` text:
 
   ```bash
   grep -rn 'prompt=.*\$\(goal\|project\|run_id\)' pipelines/
   ```
 
-  Expected: zero output (every `$var` use is now in agent files / inputs blocks). If any line returns, migrate that prompt's reference into the agent's `inputs:` declaration before proceeding.
+  Expected: zero output (every `$var` use is now in agent files / inputs blocks). If any line returns, migrate that prompt's reference into the agent's `inputs:` declaration before proceeding. Verified zero matches; dropped the `if (n.prompt) n.prompt = expand(n.prompt)` line. Validator's `steering_has_var_token` rule still rejects $var in steering text.
 
-- [ ] **Step 3: Run all tests**. Expect green.
-- [ ] **Step 4: Commit**
+- [x] **Step 3: Run all tests**. `npx vitest run` → 1317 passed, 1 pre-existing PipelineApp integration flake (passes in isolation, same as Task 6.3 baseline). `npx tsc --noEmit` clean.
+- [x] **Step 4: Commit** — `960ec8f`.
 
 ### Task 6.5: Update docs
 
