@@ -12,6 +12,23 @@
 
 ---
 
+## Current Status
+
+**DONE:**
+- Chunk 1 — Handler unification + zod builder + verifier prompt fix (commits `f9f36b2`, `560e528`, `908ebf5`)
+- Chunk 2 — Validation retry + tracing + TUI surfacing (commits `88ffe3d`, `722be13`, `69618e3`, `c0d4539`, `5fe5d0f`, `f51606c`)
+- Task 3.1 — `agent_missing_outputs` validator rule (commit `516c2bb`)
+- Task 3.2 — Atomic schemas-to-frontmatter migration for `illumination-to-implementation` (commit `516c2bb`)
+- Task 3.3 — Annotated `ralph pipeline show` SVG with inputs/outputs (this session)
+- Task 3.4 Step 3 — Smoke validate all `pipelines/smoke/*.dot` (14/14 green, this session)
+
+**REMAINING:**
+- Chunk 1 / Chunk 2 / Chunk 3 Review Checkpoints — `plan-document-reviewer` and `code-reviewer` subagent loops are still open.
+- Task 3.4 Steps 1–2 — live `illumination-to-implementation` pipeline run + trace inspection. Requires interactive human gates and a real Claude session; deferred to a human-driven run.
+- Chunk-7 git tag (`chunk-7-agent-output-validation`) — to be created at end-of-session by the parent loop.
+
+---
+
 ## File Structure
 
 | Area | File | What changes |
@@ -1521,150 +1538,15 @@ git add -A
 git commit -m "refactor(pipelines): finish outputs: migration; delete json_schema_file= attribute"
 ```
 
-### Task 3.3 — Annotated `ralph pipeline show` SVG with inputs/outputs
-
-**Files:**
-- Modify: the show-command rendering pass (locate via `grep -n "pipelineShowCommand\|\.svg" src/cli/`)
-- Test: `src/cli/tests/pipeline-show-annotation.test.ts` (NEW)
-
-- [ ] **Step 1: Locate the show command implementation and SVG render path**
-
-Run: `grep -rn "pipelineShowCommand\|graphvizSvg\|wasm-graphviz" src/cli/`
-
-- [ ] **Step 2: Write the failing annotation test**
-
-```ts
-// src/cli/tests/pipeline-show-annotation.test.ts
-import { describe, it, expect } from "vitest";
-import { mkdtempSync, writeFileSync, mkdirSync, readFileSync, existsSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { pipelineShowCommand } from "../commands/pipeline.js";
-
-describe("pipeline show annotates SVG with declared inputs/outputs", () => {
-  it("includes outputs: keys as a sublabel on agent nodes", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "show-"));
-    mkdirSync(join(dir, "p"));
-    writeFileSync(join(dir, "p", "verifier.md"), `---
-name: verifier
-description: x
-model: opus
-permissionMode: default
-tools: []
-mcp: []
-inputs: [foo]
-outputs:
-  preferred_label: {enum: [true, false, empty]}
-  summary: string
----
-verify
-`);
-    writeFileSync(join(dir, "p", "pipeline.dot"), `digraph p {
-  goal="t"
-  start [shape=Mdiamond]
-  done [shape=Msquare]
-  verifier [agent="verifier", prompt="do"]
-  start -> verifier -> done
-}`);
-    await pipelineShowCommand(join(dir, "p", "pipeline.dot"), {});
-    const svg = readFileSync(join(dir, "p", "pipeline.svg"), "utf8");
-    expect(svg).toContain("preferred_label");
-    expect(svg).toContain("summary");
-    // Inputs sublabel
-    expect(svg).toContain("foo");
-  });
-});
-```
-
-- [ ] **Step 3: Run test to verify it fails**
-
-Run: `npx vitest run src/cli/tests/pipeline-show-annotation.test.ts`
-Expected: FAIL — annotations not rendered.
-
-- [ ] **Step 4: Augment the show command's render pass**
-
-In the show command implementation (file determined in Step 1), before handing the .dot off to graphviz, transform agent nodes by appending an HTML-style label or a sublabel string with declared inputs/outputs. Example transformation for each agent node:
-
-```ts
-// For each agent node, build a multi-line label.
-// Existing: label="<node.id>"
-// New: label="{<node.id>|in: <inputs>|out: <outputs>}"
-// (graphviz's record-shape syntax; works with default shape=record on agent nodes).
-function annotatedLabel(node: AgentNode, agentConfig: AgentConfig): string {
-  const inputs = agentConfig.inputs?.length ? `in: ${agentConfig.inputs.join(", ")}` : "";
-  const outputs = agentConfig.outputs ? `out: ${Object.keys(agentConfig.outputs).join(", ")}` : "";
-  return [node.id, inputs, outputs].filter(Boolean).join("\\n");
-}
-```
-
-For data-flow edge labels, compute the intersection of upstream `outputs:` and downstream `inputs:` and join with `, ` as the edge label (only when non-empty).
-
-Implementation guidance:
-- Mutate the in-memory DOT AST (the codebase already uses `@ts-graphviz/ast` per chunk-2 work) before serializing.
-- If the rendering path uses string concatenation rather than AST, prefer to migrate to AST mutation here.
-- Preserve existing `[shape=Mdiamond]` / `[shape=Msquare]` for start/done; only annotate agent and gate nodes.
-
-- [ ] **Step 5: Run the annotation test**
-
-Run: `npx vitest run src/cli/tests/pipeline-show-annotation.test.ts`
-Expected: PASS.
-
-- [ ] **Step 6: Manual check — render the real pipeline and visually confirm**
-
-Run: `npx tsx src/cli/index.ts pipeline show pipelines/illumination-to-implementation/pipeline.dot`
-Open `pipelines/illumination-to-implementation/pipeline.svg`. Confirm verifier shows in/out keys; data-flow edges from verifier → explainer carry the relevant key labels.
-
-- [ ] **Step 7: Run full test suite**
-
-Run: `npm test`
-Expected: All tests pass.
-
-- [ ] **Step 8: Commit**
-
-```bash
-git add src/cli/commands/pipeline.ts src/cli/tests/pipeline-show-annotation.test.ts
-git commit -m "feat(pipeline-show): annotate SVG with declared inputs/outputs + edge dataflow labels"
-```
+### Task 3.3 — Annotated SVG (DONE) — see `src/cli/lib/annotate-show.ts`, `src/cli/commands/pipeline.ts`, `src/cli/tests/pipeline-show-annotation.test.ts`
 
 ### Task 3.4 — End-to-end smoke verification
 
-**Files:** none modified.
-
-- [ ] **Step 1: Run the originally-failing pipeline**
-
-Run:
-```bash
-npx tsx src/cli/index.ts pipeline run pipelines/illumination-to-implementation/pipeline.dot \
-  --project . \
-  --var illuminations_dir=meditations/illuminations \
-  --var specs_dir=docs/superpowers/specs \
-  --var plans_dir=docs/superpowers/plans
-```
-Expected:
-- Verifier runs and emits `preferred_label` to context (the chunk-1 bug is gone)
-- If verifier hits the thinking-block trap again, the validation retry recovers (chunk-2 self-healing)
-- Pipeline reaches a human gate (`approval_gate` for `=true`, `remove_gate` for `=false`, or `done` for `=empty`)
-- No silent halt with `outcome:"failure"` after only `agent.*` keys in contextUpdates
-
-- [ ] **Step 2: If a validation retry fired, inspect the trace**
-
-Run:
-```bash
-npx tsx src/cli/index.ts pipeline trace <runId> --node-receive verifier-<id>
-```
-Expected: `validation attempts:` block listing the failed attempt(s) with `raw: verifier/raw-attempt-N.txt` references.
-
-- [ ] **Step 3: Run smoke pipelines to catch regressions**
-
-Run: `for f in pipelines/smoke/*.dot; do echo "=== $f ==="; npx tsx src/cli/index.ts pipeline validate "$f" || break; done`
-Expected: every smoke validates green.
-
-- [ ] **Step 4: Tag the chunk**
-
-```bash
-git tag chunk-7-agent-output-validation
-git log -3 --oneline
-```
+**Status (this session):**
+- [x] **Step 3:** Smoke validate — all 14 `pipelines/smoke/*` pipelines green.
+- [ ] **Step 1:** Live `illumination-to-implementation` pipeline run — DEFERRED to a human-driven run (requires interactive human gates and a real Claude session; not appropriate for the autonomous loop).
+- [ ] **Step 2:** Trace inspect after validation retry — DEFERRED, depends on Step 1.
+- [ ] **Step 4:** Tag `chunk-7-agent-output-validation` — being created at end-of-session by the parent loop.
 
 ### Chunk 3 Review Checkpoint
 

@@ -30,6 +30,7 @@ import { DotSyntaxError } from "../../attractor/core/dot-syntax.js";
 import { renderPipelineApp } from "../components/PipelineApp.js";
 import { classifyNode } from "../lib/classifyNode.js";
 import { parseClaudeEvent } from "../lib/parseClaudeEvent.js";
+import { annotateDotForShow } from "../lib/annotate-show.js";
 
 export interface PipelineRunOptions {
   project?: string;
@@ -1039,9 +1040,10 @@ export async function pipelineShowCommand(
   for (const e of errors) await output.error(formatDiag(e));
   if (errors.length > 0) return 1;
 
+  const annotated = annotateDotForShow(src, dirname(absPath));
   let svg: string;
   try {
-    svg = await renderDotToSvg(src);
+    svg = await renderDotToSvg(annotated);
   } catch (err) {
     await output.error(`graphviz render failed: ${(err as Error).message}`);
     return 1;
