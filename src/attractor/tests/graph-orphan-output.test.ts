@@ -212,4 +212,99 @@ body
     const diags = validateGraph(graph);
     expect(diags.find(d => d.rule === "orphan_output")).toBeUndefined();
   });
+
+  it("does not warn when an outputs key is consumed via a downstream agent's qualified input (someNode.value)", () => {
+    const dir = join(tmpdir(), `orphan-output-qualified-agent-${Date.now()}`);
+    setupAgents(dir, {
+      "producer.md": `---
+name: producer
+description: produces value
+auto_inputs: true
+outputs:
+  value: string
+---
+body
+`,
+      "consumer.md": `---
+name: consumer
+description: consumes someNode.value
+auto_inputs: true
+inputs:
+  - someNode.value
+---
+body
+`,
+    });
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      someNode [agent="producer"]
+      c [agent="consumer"]
+      done [shape=Msquare]
+      start -> someNode -> c -> done
+    }`;
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    expect(diags.find(d => d.rule === "orphan_output")).toBeUndefined();
+  });
+
+  it("does not warn when an outputs key is consumed via a gate's qualified input (someNode.output)", () => {
+    const dir = join(tmpdir(), `orphan-output-qualified-gate-${Date.now()}`);
+    setupAgents(dir, {
+      "producer.md": `---
+name: producer
+description: produces output
+auto_inputs: true
+outputs:
+  output: string
+---
+body
+`,
+    });
+    writeFileSync(join(dir, "gate.md"), `---
+type: gate
+choices:
+  - ok
+inputs:
+  - someNode.output
+---
+Pick.
+`);
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      someNode [agent="producer"]
+      gate [shape=hexagon]
+      done [shape=Msquare]
+      start -> someNode -> gate
+      gate -> done [label="ok"]
+    }`;
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    expect(diags.find(d => d.rule === "orphan_output")).toBeUndefined();
+  });
+
+  it("does not warn about `done` output on a loop:true agent even when no downstream node consumes it", () => {
+    const dir = join(tmpdir(), `orphan-output-loop-done-${Date.now()}`);
+    setupAgents(dir, {
+      "looper.md": `---
+name: looper
+description: loops until done
+auto_inputs: true
+loop: true
+outputs:
+  done: boolean
+---
+body
+`,
+    });
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      l [agent="looper"]
+      done [shape=Msquare]
+      start -> l -> done
+    }`;
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    const orphans = diags.filter(d => d.rule === "orphan_output");
+    expect(orphans.find(d => d.message.includes('"done"'))).toBeUndefined();
+  });
 });

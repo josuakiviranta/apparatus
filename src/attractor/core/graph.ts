@@ -17,6 +17,10 @@ import { SYSTEM_INJECTED_VARS } from "../handlers/agent-handler.js";
 
 const SYSTEM_VARS = new Set<string>(SYSTEM_INJECTED_VARS);
 
+function isQualifiedKey(key: string): boolean {
+  return key.includes(".");
+}
+
 export function parseDot(src: string): Graph {
   return parseDotV2(src);
 }
@@ -581,8 +585,9 @@ function checkOrphanOutput(
     for (const clause of clauses) {
       consumed.add(clause.key);
       // Also register the localKey portion of qualified keys (e.g. "verifier.preferred_label" → "preferred_label")
-      const dotIdx = clause.key.indexOf(".");
-      if (dotIdx !== -1) consumed.add(clause.key.slice(dotIdx + 1));
+      if (isQualifiedKey(clause.key)) {
+        consumed.add(clause.key.slice(clause.key.indexOf(".") + 1));
+      }
     }
   }
 
