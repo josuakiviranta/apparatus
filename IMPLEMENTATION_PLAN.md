@@ -1617,8 +1617,8 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 - [x] 10. static-multi-node
 - [x] 11. store
 - [x] 12. tmux-tester (commit 4d986a2; agent attribute corrected to meditate-observer)
-- [ ] 13. tool
-- [ ] 14. tool-runtime-vars
+- [x] 13. tool (no agent files; tool-only smoke — migration N/A)
+- [x] 14. tool-runtime-vars (no agent files; tool-only smoke — migration N/A)
 
 ### Common per-smoke migration template
 
