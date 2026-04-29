@@ -1363,6 +1363,18 @@ inputs:
   - illumination_path
 ```
 
+#### Per-agent migration progress
+
+- [x] implement.md (commit e8d785c)
+- [ ] verifier.md
+- [ ] change-explainer.md
+- [ ] chat-refiner.md
+- [ ] design-writer.md
+- [ ] plan-writer.md
+- [ ] tmux-tester.md
+- [ ] memory-writer.md
+- [ ] memory-reflector.md
+
 Per agent:
 
 - [ ] **Step 1: Edit frontmatter** (add auto_inputs + the inputs above).
