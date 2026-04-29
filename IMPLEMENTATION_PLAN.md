@@ -1609,7 +1609,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 - [x] 2. agent-json-vars (commits ed9baa3, 1644fd1)
 - [x] 3. chat-end-to-end (commit 05a2d76)
 - [x] 4. chat-only (commit 59e93d6)
-- [ ] 5. conditional
+- [x] 5. conditional (commit 2aca955)
 - [ ] 6. gate
 - [ ] 7. json-schema-stream
 - [ ] 8. meditate-steer
@@ -1652,6 +1652,7 @@ These notes call out non-obvious deviations from the common template. Re-audit a
 **3. chat-end-to-end / chat-only** — interactive chat pipelines. Verify session-digest writeback uses qualified meta keys (`<nodeId>.output`, `<nodeId>.success`, etc.) per Task 1.4 Step 4. Update any test asserting on `agent.output` or similar.
 
 **4. conditional** — gate-routing smoke. Conditions on edges may reference `agent.<key>`. Migrate to `<nodeId>.<key>`.
+> **Validator gap discovered (2026-04-29, conditional smoke):** `graph.ts:554` adds the raw condition clause key (e.g. `result`) to the `consumed` set without checking whether the producing node uses `auto_inputs`. So a bare `condition="result=pass"` against an `auto_inputs` producer passes static validation but breaks at runtime (engine stores `classify.result`, ctx lookup of bare `result` returns undefined, neither edge matches → deadlock). Track as separate validator hardening item: when consumed key references an `auto_inputs` producer's output field, expect/require the qualified `<nodeId>.<key>` form. For now, smoke migrations must manually qualify edge conditions on auto_inputs producer outputs.
 
 **5. gate** — gate UI smoke. Gate-choice writes to `<gateNodeId>.choice` already; under new system this remains qualified. Verify no change needed.
 
