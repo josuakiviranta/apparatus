@@ -840,4 +840,77 @@ describe("AgentHandler", () => {
     }
   });
 
+  describe("cap cascade", () => {
+    it("loop:true with no cap defaults to Infinity (loops until signal abort)", async () => {
+      mockResolve.mockReturnValue({ ...baseConfig, loop: true });
+
+      const controller = new AbortController();
+      let calls = 0;
+      mockAgentRun.mockImplementation(async () => {
+        calls++;
+        if (calls >= 4) controller.abort();
+        return { exitCode: 0, sessionId: `s${calls}`, stdout: null };
+      });
+
+      const handler = makeHandler();
+      await handler.execute(
+        makeNode(),
+        baseCtx(),
+        makeContext({ signal: controller.signal }),
+      );
+      expect(calls).toBe(4);
+    });
+
+    it("loop:false (default) caps at 1 iteration", async () => {
+      mockResolve.mockReturnValue({ ...baseConfig });
+      mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: "s", stdout: null });
+
+      const handler = makeHandler();
+      await handler.execute(makeNode(), baseCtx(), makeContext());
+      expect(mockAgentRun).toHaveBeenCalledTimes(1);
+    });
+
+    it("node.maxIterations overrides agent.maxIterations", async () => {
+      mockResolve.mockReturnValue({ ...baseConfig, loop: true, maxIterations: 20 });
+      mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: "s", stdout: null });
+
+      const handler = makeHandler();
+      await handler.execute(
+        makeNode({ maxIterations: 3 }),
+        baseCtx(),
+        makeContext(),
+      );
+      expect(mockAgentRun).toHaveBeenCalledTimes(3);
+    });
+
+    it("agent.maxIterations applies when node has none", async () => {
+      mockResolve.mockReturnValue({ ...baseConfig, loop: true, maxIterations: 2 });
+      mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: "s", stdout: null });
+
+      const handler = makeHandler();
+      await handler.execute(makeNode(), baseCtx(), makeContext());
+      expect(mockAgentRun).toHaveBeenCalledTimes(2);
+    });
+
+    it("max_iterations=0 maps to Infinity at node level (back-compat)", async () => {
+      mockResolve.mockReturnValue({ ...baseConfig, loop: true });
+
+      const controller = new AbortController();
+      let calls = 0;
+      mockAgentRun.mockImplementation(async () => {
+        calls++;
+        if (calls >= 3) controller.abort();
+        return { exitCode: 0, sessionId: `s${calls}`, stdout: null };
+      });
+
+      const handler = makeHandler();
+      await handler.execute(
+        makeNode({ maxIterations: 0 }),
+        baseCtx(),
+        makeContext({ signal: controller.signal }),
+      );
+      expect(calls).toBe(3);
+    });
+  });
+
 });

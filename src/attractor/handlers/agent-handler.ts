@@ -165,13 +165,21 @@ export class AgentHandler implements NodeHandler {
     }
     // --- end interactive branch; legacy path below is unchanged ---
 
-    const rawIter = node.maxIterations;
-    const parsedIter = typeof rawIter === "string" ? parseInt(rawIter, 10)
-                     : typeof rawIter === "number"  ? rawIter
-                     : undefined;
-    const maxIterations = parsedIter == null || isNaN(parsedIter) || parsedIter < 0 ? 1
-                        : parsedIter === 0 ? Infinity
-                        : parsedIter;
+    const nodeCapRaw = node.maxIterations;
+    const nodeCapParsed = typeof nodeCapRaw === "string" ? parseInt(nodeCapRaw, 10)
+                        : typeof nodeCapRaw === "number"  ? nodeCapRaw
+                        : undefined;
+    const nodeCapValid = nodeCapParsed != null && !isNaN(nodeCapParsed) && nodeCapParsed >= 0;
+
+    const agentCap = config.maxIterations;
+    const loopMode = config.loop === true;
+
+    const maxIterations =
+      nodeCapValid
+        ? (nodeCapParsed === 0 ? Infinity : nodeCapParsed!)
+        : (typeof agentCap === "number" && agentCap >= 0
+            ? (agentCap === 0 ? Infinity : agentCap)
+            : (loopMode ? Infinity : 1));
 
     let lastResult: RunResult | null = null;
     let lastSessionId: string | null = null;
