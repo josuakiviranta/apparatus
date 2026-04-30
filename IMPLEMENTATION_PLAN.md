@@ -343,24 +343,24 @@ git commit -m "feat(illumination): drop status:open from writeIllumination front
 - Modify: `src/cli/mcp/illumination-server.ts` (delete lines 66-330 — all three `mark_*` functions; delete lines for `mark_implemented`, `mark_dispatched`, `mark_archived` MCP tool registrations)
 - Modify: `src/cli/tests/illumination-server.test.ts` (delete imports for `markImplemented`, `markDispatched`, `markArchived`; delete every `describe(...)` block testing them)
 
-- [ ] **Step 1: Find every reference to the three functions in tests**
+- [x] **Step 1: Find every reference to the three functions in tests**
 
 Run: `grep -nE "markImplemented|markDispatched|markArchived" src/cli/tests/illumination-server.test.ts`
 Note every line and which `describe` block it belongs to.
 
-- [ ] **Step 2: Delete the test imports and describe blocks**
+- [x] **Step 2: Delete the test imports and describe blocks**
 
 In `src/cli/tests/illumination-server.test.ts`:
 - Line 14: remove `markImplemented`, `markDispatched`, `markArchived` from the named imports.
 - Delete every `describe("markImplemented", ...)`, `describe("markDispatched", ...)`, `describe("markArchived", ...)` block in full (including all nested `it(...)` cases).
 - Delete any `listIlluminations` test asserting `status="archived"` reads from `meditations/archived-illuminations/` or `status="implemented"` reads from `meditations/implemented-illuminations/`.
 
-- [ ] **Step 3: Run tests — confirm remaining tests still pass**
+- [x] **Step 3: Run tests — confirm remaining tests still pass**
 
 Run: `npx vitest run src/cli/tests/illumination-server.test.ts`
 Expected: PASS — imports for the three mark_* functions are gone; the function definitions themselves are still in the source file (unused exports are not TS errors). Surviving tests (writeIllumination, listIlluminations, consume, plan helpers) all green.
 
-- [ ] **Step 4: Delete the three function definitions**
+- [x] **Step 4: Delete the three function definitions**
 
 In `src/cli/mcp/illumination-server.ts`:
 - Delete `markImplemented` (around lines 66-133)
@@ -369,16 +369,16 @@ In `src/cli/mcp/illumination-server.ts`:
 
 The exact line ranges may shift after Task 1.3. Search-and-delete by function name; do not touch surrounding helpers (`parseIlluminationDescription`, `writeIllumination`, `consume`, `listIlluminations`).
 
-- [ ] **Step 5: Delete the three MCP tool registrations**
+- [x] **Step 5: Delete the three MCP tool registrations**
 
 In `src/cli/mcp/illumination-server.ts`, delete the three `server.tool("mark_implemented", …)`, `server.tool("mark_dispatched", …)`, `server.tool("mark_archived", …)` blocks. After deletion, the `consume` registration from Task 1.2 should sit alone where they used to be.
 
-- [ ] **Step 6: Run typecheck + tests**
+- [x] **Step 6: Run typecheck + tests**
 
 Run: `npx tsc --noEmit && npx vitest run src/cli/tests/illumination-server.test.ts`
 Expected: PASS — no unresolved imports, all surviving tests green.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/cli/mcp/illumination-server.ts src/cli/tests/illumination-server.test.ts
