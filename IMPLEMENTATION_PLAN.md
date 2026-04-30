@@ -696,7 +696,7 @@ git commit -m "refactor(pipeline): collapse gate to implement/decline, drop mark
 **Files:**
 - Modify: `pipelines/illumination-to-implementation/verifier.md` (lines 38, 60)
 
-- [ ] **Step 1: Update the discovery rule (line 38)**
+- [x] **Step 1: Update the discovery rule (line 38)**
 
 Find the sentence forbidding direct enumeration of illumination dirs (currently mentions all three folders). Replace with a single-folder version:
 
@@ -706,7 +706,7 @@ Find the sentence forbidding direct enumeration of illumination dirs (currently 
 
 (Drop the `archived-illuminations`, `implemented-illuminations` mentions.)
 
-- [ ] **Step 2: Update the list call (line 60)**
+- [x] **Step 2: Update the list call (line 60)**
 
 Replace:
 
@@ -720,7 +720,7 @@ with:
 - Otherwise: call `mcp__illumination__list_illuminations` (no parameters). The tool returns one `<filename> — <description>` line per illumination in `meditations/illuminations/`, or the literal string `No illuminations found.` when empty.
 ```
 
-- [ ] **Step 3: Delete `archive_reason_short` from the verifier output schema and rubric**
+- [x] **Step 3: Delete `archive_reason_short` from the verifier output schema and rubric**
 
 The verifier's `archive_reason_short` field used to feed `mark-archived.mjs` via `pipeline.dot`'s `script_args="$verifier.archive_reason_short"`. After Task 2.3 the new tool node hardcodes `declined` as the consume reason — no consumer reads `archive_reason_short` anymore. Delete it entirely (YAGNI):
 
@@ -738,7 +738,7 @@ The verifier's `archive_reason_short` field used to feed `mark-archived.mjs` via
     - You MUST emit `archive_reason_short` on every verdict (`true`, `false`, `empty`). The mark_archived script consumes it verbatim as the illumination's archived frontmatter `reason:` value on whichever path triggers archiving (remove_gate on `false`, approval_gate decline on `true`). Treat the shape constraints (one sentence, ≤100 chars, shell-safe) as strict. Use `Declined at approval gate` on `true` and empty string on `empty`.
     ```
 
-- [ ] **Step 4: Update line 61's stale "dispatched / archived" wording**
+- [x] **Step 4: Update line 61's stale "dispatched / archived" wording**
 
 Line 61 currently reads:
 
@@ -752,17 +752,19 @@ Change to:
 2. **Pick one.** If the tool returned `No illuminations found.` → emit `preferred_label: empty`, empty paths, summary "No illuminations found", explanation "No illuminations remain in `meditations/illuminations/`." (Skip on re-entry — the path is already set.) Otherwise pick one filename and construct `illumination_path` as `meditations/illuminations/<filename>`.
 ```
 
-- [ ] **Step 5: Final sweep — confirm no stale lifecycle vocabulary remains**
+- [x] **Step 5: Final sweep — confirm no stale lifecycle vocabulary remains**
 
 Run: `grep -nE "status.*open|status.*dispatched|archived-illuminations|implemented-illuminations|mark_dispatched|mark_archived|archive_reason" pipelines/illumination-to-implementation/verifier.md`
 Expected: no matches.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pipelines/illumination-to-implementation/verifier.md
 git commit -m "docs(pipeline): update verifier.md to single-folder list_illuminations"
 ```
+
+**Follow-up nit (discovered during code review of b7bf0cd):** `verifier.md` still says "the MCP server resolves the dir based on the file's lifecycle status" in the read_file hard-rule (~line 39) and procedure step 3 (~line 62). Under the single-folder model that rationale is stale — files always live in `meditations/illuminations/`. Suggest replacing the rationale with: "the MCP server is the authoritative path resolver for illumination files." Pick up in a later sweep alongside Tasks 2.5–2.7 prompt updates.
 
 ### Task 2.5: Update `plan-writer.md` — drop `illumination_source` frontmatter
 
