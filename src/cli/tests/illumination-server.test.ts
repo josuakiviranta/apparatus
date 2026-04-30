@@ -11,7 +11,7 @@ vi.mock("node:child_process", () => ({
   execSync: mockExecSync,
 }));
 
-import { validateFilename, validateSlug, composeIlluminationFilename, writeIllumination, assertWithinRoot, readFile, validateGlobPattern, globFiles, projectTree, listMetaMeditations, readMetaMeditation, listIlluminations, markImplemented, markDispatched, markArchived, listPlans, markPlanImplemented } from "../mcp/illumination-server";
+import { validateFilename, validateSlug, composeIlluminationFilename, writeIllumination, assertWithinRoot, readFile, validateGlobPattern, globFiles, projectTree, listMetaMeditations, readMetaMeditation, listIlluminations, markImplemented, markDispatched, markArchived, listPlans, markPlanImplemented, consume } from "../mcp/illumination-server";
 
 let tmpDir: string;
 
@@ -1308,5 +1308,56 @@ describe("markPlanImplemented", () => {
     if (!result.success) {
       expect(result.error).toContain("Invalid filename");
     }
+  });
+});
+
+describe("consume", () => {
+  function seedIllumination(filename: string, body = "body"): string {
+    const dir = join(tmpDir, "meditations", "illuminations");
+    mkdirSync(dir, { recursive: true });
+    const filePath = join(dir, filename);
+    writeFileSync(filePath, `---\ndate: 2026-04-30\ndescription: test\n---\n\n${body}`, "utf8");
+    return filePath;
+  }
+
+  it("deletes the illumination file from disk", () => {
+    const filePath = seedIllumination("2026-04-30T1200-x.md");
+    consume(tmpDir, "2026-04-30T1200-x.md", "implemented");
+    expect(existsSync(filePath)).toBe(false);
+  });
+
+  it("commits with reason in the message — implemented", () => {
+    seedIllumination("2026-04-30T1200-x.md");
+    consume(tmpDir, "2026-04-30T1200-x.md", "implemented");
+    const calls = mockExecSync.mock.calls.map((c) => c[0] as string);
+    expect(calls.some((cmd) => cmd.includes("git -C") && cmd.includes("rm"))).toBe(true);
+    expect(calls.some((cmd) => cmd.includes("commit -m") && cmd.includes("(implemented)"))).toBe(true);
+  });
+
+  it("commits with reason in the message — declined", () => {
+    seedIllumination("2026-04-30T1200-y.md");
+    consume(tmpDir, "2026-04-30T1200-y.md", "declined");
+    const calls = mockExecSync.mock.calls.map((c) => c[0] as string);
+    expect(calls.some((cmd) => cmd.includes("commit -m") && cmd.includes("(declined)"))).toBe(true);
+  });
+
+  it("rejects invalid filenames", () => {
+    expect(() => consume(tmpDir, "../oops", "declined")).toThrow(/Invalid filename/);
+  });
+
+  it("rejects unknown reasons", () => {
+    seedIllumination("2026-04-30T1200-z.md");
+    expect(() => consume(tmpDir, "2026-04-30T1200-z.md", "archived" as never)).toThrow(/reason/i);
+  });
+
+  it("returns success descriptor with consumed filename", () => {
+    seedIllumination("2026-04-30T1200-r.md");
+    const result = consume(tmpDir, "2026-04-30T1200-r.md", "implemented");
+    expect(result).toEqual({ success: true, filename: "2026-04-30T1200-r.md", reason: "implemented" });
+  });
+
+  it("returns failure when file does not exist", () => {
+    const result = consume(tmpDir, "2026-04-30T1200-missing.md", "implemented");
+    expect(result).toEqual({ success: false, error: "Illumination file not found" });
   });
 });

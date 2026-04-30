@@ -63,6 +63,40 @@ export function writeIllumination(
   return filePath;
 }
 
+export type ConsumeReason = "implemented" | "declined";
+
+export function consume(
+  projectRoot: string,
+  filename: string,
+  reason: ConsumeReason,
+): { success: true; filename: string; reason: ConsumeReason }
+  | { success: false; error: string } {
+  const fnErr = validateFilename(filename);
+  if (fnErr) throw new Error(fnErr);
+  if (reason !== "implemented" && reason !== "declined") {
+    throw new Error(`Invalid reason "${reason}". Must be "implemented" or "declined".`);
+  }
+
+  const filePath = join(projectRoot, "meditations", "illuminations", filename);
+  if (!existsSync(filePath)) {
+    return { success: false, error: "Illumination file not found" };
+  }
+
+  rmSync(filePath);
+
+  try {
+    execSync(`git -C "${projectRoot}" rm "${filePath}"`, { stdio: "ignore" });
+    execSync(
+      `git -C "${projectRoot}" commit -m "meditate: consume ${filename} (${reason})"`,
+      { stdio: "ignore" },
+    );
+  } catch {
+    // git unavailable / not a repo / nothing to commit — non-fatal, file already removed.
+  }
+
+  return { success: true, filename, reason };
+}
+
 export function markImplemented(
   projectRoot: string,
   filename: string,
