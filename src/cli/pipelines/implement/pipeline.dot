@@ -1,5 +1,6 @@
 digraph implement {
   goal="Autonomous implementation loop"
+  inputs="specs_dir,max_iterations,llm_model"
 
   start [shape=Mdiamond]
   run   [agent="implement", max_iterations="$max_iterations"]

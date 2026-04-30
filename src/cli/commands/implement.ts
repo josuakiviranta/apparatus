@@ -22,6 +22,7 @@ export async function implementCommand(
   await pipelineRunCommand("implement", {
     project: absPath,
     variables: {
+      specs_dir: "docs/specs",
       max_iterations: String(options.max ?? 0),  // 0 = unlimited
       ...(options.model ? { llm_model: options.model } : {}),
     },

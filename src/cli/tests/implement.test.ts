@@ -44,4 +44,14 @@ describe("implementCommand", () => {
       })
     );
   });
+
+  it("passes specs_dir default of docs/specs to pipeline runtime", async () => {
+    await implementCommand("/my/project", {});
+    expect(mockPipeline).toHaveBeenCalledWith(
+      "implement",
+      expect.objectContaining({
+        variables: expect.objectContaining({ specs_dir: "docs/specs" }),
+      })
+    );
+  });
 });

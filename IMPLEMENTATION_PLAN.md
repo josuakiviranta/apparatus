@@ -270,15 +270,15 @@ git commit -am "feat(meditate): default specs_dir to docs/specs"
 - Modify: `src/cli/pipelines/implement/pipeline.dot` (add `inputs="specs_dir,max_iterations,llm_model"` — the latter two were previously implicit; declaring them is good hygiene but if scope creep, add `specs_dir` only)
 - Modify: `src/cli/commands/implement.ts:24–27` (add `specs_dir: "docs/specs"` to `variables`)
 
-- [ ] **Step 1: Add a rubric assertion test** (new test in `src/cli/tests/implement.test.ts` or wherever implement contract tests live; mirror Task 2.1 pattern). Assert rubric contains `$specs_dir`, not literal `specs/`.
+- [x] **Step 1: Add a rubric assertion test** (new test in `src/cli/tests/implement.test.ts` or wherever implement contract tests live; mirror Task 2.1 pattern). Assert rubric contains `$specs_dir`, not literal `specs/`.
 
-- [ ] **Step 2: RED**
+- [x] **Step 2: RED**
 
-- [ ] **Step 3: Apply edits — rubric, dot, command. Include the same empty-value fallback sentence used in Task 2.1 Step 4.**
+- [x] **Step 3: Apply edits — rubric, dot, command. Include the same empty-value fallback sentence used in Task 2.1 Step 4.**
 
-- [ ] **Step 4: GREEN**
+- [x] **Step 4: GREEN**
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit -am "refactor(implement): \$specs_dir variable + docs/specs default"
