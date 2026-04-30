@@ -31,7 +31,7 @@ This chunk lands a working janitor end-to-end with qualified keys. After Commit 
 **Files:**
 - Modify: `src/attractor/tests/tool-handler.test.ts` (add new test in `produces_from_stdout` describe block)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add this test after line 354 (inside the `describe("ToolHandler — produces_from_stdout", ...)` block, before the closing `});`):
 
@@ -54,7 +54,7 @@ it("produces_from_stdout=true qualifies emitted keys with node.id", async () => 
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run src/attractor/tests/tool-handler.test.ts -t "qualifies emitted keys"`
 Expected: FAIL — `outcome.contextUpdates?.["weather.a"]` is `undefined` (current behavior emits bare `a`).
@@ -64,7 +64,7 @@ Expected: FAIL — `outcome.contextUpdates?.["weather.a"]` is `undefined` (curre
 **Files:**
 - Modify: `src/attractor/handlers/tool.ts:65-83`
 
-- [ ] **Step 1: Update `buildUpdates` to qualify keys**
+- [x] **Step 1: Update `buildUpdates` to qualify keys**
 
 Replace lines 65-83 in `src/attractor/handlers/tool.ts` with:
 
@@ -89,7 +89,7 @@ Replace lines 65-83 in `src/attractor/handlers/tool.ts` with:
     };
 ```
 
-- [ ] **Step 2: Run test to verify it passes**
+- [x] **Step 2: Run test to verify it passes**
 
 Run: `npx vitest run src/attractor/tests/tool-handler.test.ts -t "qualifies emitted keys"`
 Expected: PASS.
@@ -101,12 +101,12 @@ The existing tests in `src/attractor/tests/tool-handler.test.ts` still assert ba
 **Files:**
 - Modify: `src/attractor/tests/tool-handler.test.ts`
 
-- [ ] **Step 1: Run full test file to see all failures**
+- [x] **Step 1: Run full test file to see all failures**
 
 Run: `npx vitest run src/attractor/tests/tool-handler.test.ts`
 Expected: 3 failing tests — the ones asserting bare keys at lines 247-248, 263-264, 350-351. The regression test at line 311 still passes (asserts `undefined` — both bare and qualified are undefined when producesFromStdout is omitted). Tests at lines 267, 283, 297, 327 do not assert flat keys; unaffected.
 
-- [ ] **Step 2: Update line 247-248 (test "produces_from_stdout=true + last-line JSON …")**
+- [x] **Step 2: Update line 247-248 (test "produces_from_stdout=true + last-line JSON …")**
 
 Replace:
 ```ts
@@ -121,7 +121,7 @@ With:
 
 (Node id is `"t"` per line 240.)
 
-- [ ] **Step 3: Update line 263-264 (test "produces_from_stdout as string 'true' …")**
+- [x] **Step 3: Update line 263-264 (test "produces_from_stdout as string 'true' …")**
 
 Replace:
 ```ts
@@ -134,7 +134,7 @@ With:
     expect(outcome.contextUpdates?.["t.b"]).toBe(2);
 ```
 
-- [ ] **Step 4: Update line 350-352 (test "produces_from_stdout=true works with tool_command branch too")**
+- [x] **Step 4: Update line 350-352 (test "produces_from_stdout=true works with tool_command branch too")**
 
 Replace:
 ```ts
@@ -149,11 +149,11 @@ With:
     expect(outcome.contextUpdates?.["tool.output"]).toContain("prelude");
 ```
 
-- [ ] **Step 5: Verify line 311 test still passes**
+- [x] **Step 5: Verify line 311 test still passes**
 
 Test "absence of produces_from_stdout → stdout never parsed" asserts `outcome.contextUpdates?.a` is undefined. After change, both bare `a` and qualified `t.a` are undefined when producesFromStdout is omitted. Test still passes — no edit needed.
 
-- [ ] **Step 6: Run full test file**
+- [x] **Step 6: Run full test file**
 
 Run: `npx vitest run src/attractor/tests/tool-handler.test.ts`
 Expected: All tests pass.
@@ -163,7 +163,7 @@ Expected: All tests pass.
 **Files:**
 - Modify: `src/attractor/tests/tool-handler.test.ts` (add at end of `produces_from_stdout` describe block)
 
-- [ ] **Step 1: Write the test**
+- [x] **Step 1: Write the test**
 
 Add inside the `describe("ToolHandler — produces_from_stdout", ...)` block, after the test added in Task 1.1:
 
@@ -194,7 +194,7 @@ it("two nodes emitting same JSON key produce non-colliding qualified keys", asyn
 });
 ```
 
-- [ ] **Step 2: Run test**
+- [x] **Step 2: Run test**
 
 Run: `npx vitest run src/attractor/tests/tool-handler.test.ts -t "non-colliding"`
 Expected: PASS.
@@ -204,7 +204,7 @@ Expected: PASS.
 **Files:**
 - Modify: `pipelines/janitor/janitor.md:23-25`
 
-- [ ] **Step 1: Update inputs block**
+- [x] **Step 1: Update inputs block**
 
 Replace lines 23-25:
 ```yaml
@@ -220,7 +220,7 @@ inputs:
   - read_vision.vision
 ```
 
-- [ ] **Step 2: Verify body text needs no change**
+- [x] **Step 2: Verify body text needs no change**
 
 Body lines 35 and 37 currently reference `<read_vision_vision>`. With qualified input `read_vision.vision`, the rendered tag becomes `read_vision_vision` (per `inputs-resolver.ts:41`: dot replaced by underscore). Body matches — **no body edits needed**.
 
@@ -232,7 +232,7 @@ Expected: only the two existing body references; no leftover bare `<vision>` tag
 **Files:**
 - Verify only: `pipelines/janitor/pipeline.dot`
 
-- [ ] **Step 1: Read the file and confirm structure**
+- [x] **Step 1: Read the file and confirm structure**
 
 Run: `cat pipelines/janitor/pipeline.dot`
 Expected to contain:
@@ -249,7 +249,7 @@ This stays. Per design decision, `default_vision=""` is a defensive backstop and
 
 **Note on edit ordering:** Steps below modify three line ranges. Do them in the order given (top-to-bottom) so line numbers do not desynchronize: example block first (around line 226), then the prose at line 229, then the table row at line 52 (separate region — order independent vs the others).
 
-- [ ] **Step 1: Update the example block at lines 222-227**
+- [x] **Step 1: Update the example block at lines 222-227**
 
 Read the example block at `specs/pipeline.md:222-227` and replace `produces_from_stdout="dispatch_result"` with `produces_from_stdout=true` (the boolean form is the live API; the string form was the older spec). Add a one-line DOT comment immediately after the `produces_from_stdout=true` line showing the qualified consumer:
 
@@ -263,7 +263,7 @@ mark_dispatched [type="tool",
 // declare `inputs: [mark_dispatched.dispatch_result]`
 ```
 
-- [ ] **Step 2: Update the prose paragraph at line 229**
+- [x] **Step 2: Update the prose paragraph at line 229**
 
 Replace line 229 (the paragraph starting `script_file paths are resolved...`) with:
 
@@ -271,7 +271,7 @@ Replace line 229 (the paragraph starting `script_file paths are resolved...`) wi
 `script_file` paths are resolved relative to the `.dot` file's directory. The script inherits the process environment, receives `script_args` (variable-expanded) on the command line, and runs in `cwd`. If `produces_from_stdout=true` is declared, the script's last-line JSON is parsed and each top-level key is stored in `ctx.values` as `${node_id}.${key}`, preserving native JSON types. Consumers must declare these as qualified inputs (e.g. `inputs: [read_vision.vision]`); bare consumer keys are rejected by the validator. See `pipelines/scripts/mark-dispatched.mjs` for the canonical example.
 ```
 
-- [ ] **Step 3: Update the table row at line 52**
+- [x] **Step 3: Update the table row at line 52**
 
 Replace line 52:
 ```
@@ -285,12 +285,12 @@ With:
 
 ### Task 1.8: End-to-end verification of janitor
 
-- [ ] **Step 1: Build and run full test suite**
+- [x] **Step 1: Build and run full test suite**
 
 Run: `npm run build && npm test`
 Expected: build succeeds, all tests pass.
 
-- [ ] **Step 2: Run janitor pipeline manually and inspect trace**
+- [x] **Step 2: Run janitor pipeline manually and inspect trace**
 
 Run:
 ```bash
@@ -307,14 +307,14 @@ Expected:
 - `read_vision` node-end shows `contextUpdates: { "read_vision.vision": "..." }` (qualified)
 - `janitor` node-receive Inputs block contains `<read_vision_vision>...</read_vision_vision>` populated with VISION.md contents
 
-- [ ] **Step 3: Validate the pipeline**
+- [x] **Step 3: Validate the pipeline**
 
 Run: `ralph pipeline validate pipelines/janitor/pipeline.dot`
 Expected: clean (no errors). The validator currently allows qualified `read_vision.vision` in consumer inputs.
 
 ### Task 1.9: Commit Chunk 1
 
-- [ ] **Step 1: Stage files**
+- [x] **Step 1: Stage files**
 
 ```bash
 git add \
@@ -324,7 +324,7 @@ git add \
   specs/pipeline.md
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git commit -m "$(cat <<'EOF'
@@ -347,7 +347,7 @@ EOF
 )"
 ```
 
-- [ ] **Step 3: Verify commit**
+- [x] **Step 3: Verify commit**
 
 Run: `git log --oneline -1`
 Expected: commit appears with the message above.
