@@ -1,6 +1,6 @@
 import { existsSync, readdirSync } from "fs";
 import { describe, it, expect } from "vitest";
-import { getAssetPath, getIlluminationServerPath, getMetaMeditationsDir } from "../lib/assets";
+import { getBundledPipelinesDir, getIlluminationServerPath, getMetaMeditationsDir } from "../lib/assets";
 
 describe("assets", () => {
   it("getIlluminationServerPath returns a path ending in illumination-server.ts or .js", () => {
@@ -17,9 +17,9 @@ describe("assets", () => {
     expect(files).toContain("red-green-tdd-is-non-negotiable.md");
   });
 
-  it("getAssetPath resolves relative to this file's directory", () => {
-    const p = getAssetPath("templates");
+  it("getBundledPipelinesDir resolves to an existing directory", () => {
+    const p = getBundledPipelinesDir();
     expect(typeof p).toBe("string");
-    expect(p.length).toBeGreaterThan(0);
+    expect(existsSync(p)).toBe(true);
   });
 });

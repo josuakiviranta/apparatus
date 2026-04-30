@@ -2,17 +2,6 @@
 
 All commands are registered in `src/cli/program.ts` via Commander.
 
-## `ralph plan <project-folder>`
-
-Opens an interactive Claude planning session. This command is a thin shim backed by the bundled `templates/plan/` pipeline template.
-
-**Behavior:**
-1. Validates the project folder exists.
-2. Calls `resolveBundledTemplate("plan")` to get the bundled `templates/plan/pipeline.dot` path.
-3. Delegates to `pipelineRunCommand(dotFile, { project })`.
-
-The pipeline template handles the full planning workflow (non-interactive kickoff → session capture → interactive TUI resume).
-
 ## `ralph implement <project-folder>`
 
 Runs the agentic implementation loop.
@@ -28,25 +17,9 @@ Runs the agentic implementation loop.
 
 See [loop.md](loop.md) for iteration details, signal handling, and git push behavior.
 
-## `ralph new <project-name>`
-
-Scaffolds a new project and launches a kickoff session. This command is a thin shim backed by the bundled `templates/new/` pipeline template.
-
-**Behavior:**
-1. Conflict check: warns and exits if `./project-name/` already exists.
-2. Creates directory scaffold:
-   - `specs/`, `src/`
-   - `meditations/illuminations/`, `meditations/archived-illuminations/`, `meditations/implemented-illuminations/`
-   - Empty files: `README.md`, `AGENTS.md`, `IMPLEMENTATION_PLAN.md`
-   - `.gitignore` with `IMPLEMENTATION_PLAN.md`
-3. Runs `git init -b main`.
-4. Calls `resolveBundledTemplate("new")` and delegates to `pipelineRunCommand(dotFile, { project, variables: { project_name } })`.
-
-The pipeline template handles the kickoff session (non-interactive Claude run → interactive TUI resume for refinement).
-
 ## `ralph meditate <project-folder>`
 
-Launches a meditation pipeline session. This command is a thin shim backed by the bundled `templates/meditate/` pipeline template.
+Launches a meditation pipeline session. This command is a thin shim backed by the bundled `pipelines/meditate/` folder pipeline.
 
 **Behavior:**
 1. Validates project folder exists.
@@ -54,22 +27,12 @@ Launches a meditation pipeline session. This command is a thin shim backed by th
 3. Ensures `meditations/{illuminations,archived-illuminations,implemented-illuminations}/` directories exist.
 4. Appends meditate-specific entries (`.meditate.json`, `.meditate.pid`, MCP config glob) to `.gitignore` if missing.
 5. Writes a PID lock file (`<project-folder>/.meditate.pid`).
-6. Calls `resolveBundledTemplate("meditate")` and delegates to `pipelineRunCommand(dotFile, { project, variables: { steer } })`.
+6. Calls `resolveBundledPipeline("meditate")` and delegates to `pipelineRunCommand(dotFile, { project, variables: { steer, vision } })`.
 7. Removes the PID lock file in a `finally` block.
 
-**`--var steer=<text>` flag:** passes a steering directive into the pipeline context as the `steer` variable (replaces the old `--steer` flag). This lets the caller influence which kind of meditation the pipeline runs without modifying the template.
+**`--var steer=<text>` flag:** passes a steering directive into the pipeline context as the `steer` variable. This lets the caller influence which kind of meditation the pipeline runs without modifying the bundled pipeline.
 
 **Stopping:** `Ctrl-C` on the session, or `ralph heartbeat stop meditate:<project>` for scheduled sessions.
-
-## `ralph meditate create <project-folder>`
-
-Creates a new meditate stimuli script via a pipeline session. This command is a thin shim backed by the bundled `templates/meditate-create/` pipeline template.
-
-**Behavior:**
-1. Validates project folder exists.
-2. Calls `resolveBundledTemplate("meditate-create")` and delegates to `pipelineRunCommand(dotFile, { project })`.
-
-No PID lock file is written; the pipeline itself handles the Claude session for generating new meditation topics.
 
 ## `ralph heartbeat` (subcommands)
 
@@ -158,7 +121,7 @@ Because `--resume` re-executes the node that was interrupted, scripts referenced
 **Exit codes:**
 - Exits with code 1 on any of the four pre-engine guard failures: the `.dot` file is missing, DOT parsing fails, declared `Graph.inputs` are not satisfied by `--var` or resolved defaults, or the pipeline is marked headless-safe and no TTY is attached.
 - Exits with code 0 on engine success (all nodes advanced to an `exit` node without failure).
-- Exits with code 0 on engine failure as well — when a node's retry budget is exhausted the Ink renderer paints `fail`, a post-failure tip suggesting `ralph pipeline refine <name>` is emitted, and the process returns normally. This is a deliberate discoverability choice (see `specs/2026-04-17-refine-run-history-and-failure-tip-design.md`); scripts that need to detect run failure should parse the JSONL trace at `~/.ralph/<projectKey>/runs/<runId>/pipeline.jsonl` rather than rely on the exit code.
+- Exits with code 1 on engine failure (any node exhausts its retry budget). Scripts that need to detect run failure can parse the JSONL trace at `~/.ralph/<projectKey>/runs/<runId>/pipeline.jsonl`.
 
 **Tool-node `cwd`:** every `type="tool"` node must declare a `cwd=` attribute. The command executes with that directory as cwd.
 
@@ -176,28 +139,7 @@ Validates the structure of a DOT-graph pipeline without executing any handlers. 
 
 The validator checks: missing `start` or `exit` nodes; nodes using unknown shapes; edges referencing undeclared node ids; and `reaches_exit` — every non-exit node must have at least one path to an `exit` node (dead-end detection, added 2026-04-18).
 
-Exit 0 when the graph is valid; exit 1 on any structural error. When invoked internally by `ralph pipeline refine`, the same entry point also accepts a `previousGraph` argument and emits edge-label diff diagnostics via `diffEdgeLabels()`; this is not a user-facing flag.
-
-### `ralph pipeline refine <name> [--project <folder>] [--no-traces]`
-
-Opens an interactive Claude session to refine an existing pipeline. This command is a thin shim backed by the bundled `templates/pipeline-refine/` pipeline template. Requires the target `.dot` to already exist (inverse of `create`'s must-not-exist conflict check).
-
-**Behavior:**
-1. Resolves the target `.dot` path from `<pipelinesDir>/<name>.dot`; exits if not found.
-2. Reads the existing DOT content and parses it (saved as `previousGraph` for post-session diff).
-3. Optionally builds a `trace_digest` from up to three recent run traces via `listRecentTraces()` + `digestTraceFile()`.
-4. Calls `resolveBundledTemplate("pipeline-refine")` and delegates to `pipelineRunCommand(dotFile, { project, variables: { pipeline_name, dot_path, current_dot, trace_digest } })`.
-5. After the session, validates the refined graph and emits an edge-label diff against `previousGraph`.
-
-**Flags:**
-- `--project <folder>` — resolves the pipelines-dir and sets the project scope.
-- `--no-traces` — suppresses the recent-traces digest block (useful when trace noise is misleading the session).
-
-**Exit codes:**
-- Exits non-zero if the `.dot` file does not exist after the session completes.
-- Otherwise exits with the result of the final `pipelineValidateCommand` call (0 on valid, 1 on structural error).
-
-No post-failure `refine` tip is printed — `refine` is already the target of that tip. See `specs/2026-04-17-refine-run-history-and-failure-tip-design.md` for the shipping-event record.
+Exit 0 when the graph is valid; exit 1 on any structural error.
 
 ### `ralph pipeline trace <runId> [--node-receive <id>] [--full]`
 
@@ -208,10 +150,6 @@ Without flags, prints every node invocation with status and a summary of relevan
 **Exit codes:**
 - Exits 1 if the trace file at `~/.ralph/runs/<runId>/pipeline.jsonl` does not exist.
 - Exits 0 on success.
-
-### `ralph pipeline create <name>`
-
-Interactive session to create a new pipeline DOT file. This command is a thin shim backed by the bundled `templates/pipeline-create/` pipeline template. Delegates to `pipelineRunCommand` with the resolved template and passes `pipeline_name` as a variable.
 
 ## Git Push Behavior
 
@@ -225,7 +163,6 @@ After each loop iteration, `implement.ts` pushes changes:
 | Condition | Command | Behavior |
 |-----------|---------|----------|
 | Project folder missing | `implement`, `meditate` | Exit with error |
-| Project folder already exists | `new` | Warn and exit |
 | `claude` not in PATH | `implement` (via loop) | Throws error |
 | Claude exits non-zero | `implement` (via loop) | `log.warn()`, loop continues |
 | `git push` fails twice | `implement` (via loop) | `log.warn()`, loop continues |

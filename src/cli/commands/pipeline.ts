@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync, rmSync, statSync, lstatSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync, rmSync, lstatSync } from "fs";
 import { resolve, join, basename, dirname, relative } from "path";
 import { homedir } from "os";
 import { randomUUID, createHash } from "crypto";
@@ -18,11 +18,6 @@ import { AutoApproveInterviewer } from "../../attractor/interviewer/auto-approve
 import { getPipelinesDir, resolvePipelineArg, isNameShorthand } from "../lib/pipeline-resolver.js";
 import { PassThrough } from "stream";
 import { parseStreamJsonEvents, streamEvents } from "../lib/stream-formatter.js";
-import { resolveBundledTemplate } from "../lib/assets.js";
-// Self-namespace import lets test spies (`vi.spyOn(pipelineMod, "pipelineRunCommand")`)
-// intercept calls made from inside this file. ESM exports are read-only bindings, so
-// a plain `pipelineRunCommand(...)` call would bypass the spy.
-import * as self from "./pipeline.js";
 import * as output from "../lib/output.js";
 import { formatPipelineDiag } from "../lib/pipeline-diag-format.js";
 import type { Diagnostic } from "../../attractor/types.js";
@@ -239,13 +234,6 @@ export async function pipelineValidateCommand(dotFile: string, opts: PipelineVal
 }
 
 
-function printRefineTip(invokedAs: string): void {
-  const name = isNameShorthand(invokedAs) ? invokedAs : basename(invokedAs, ".dot");
-  console.log(
-    `Tip: ralph pipeline refine ${name} to improve this pipeline with agent assistance.`,
-  );
-}
-
 export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptions = {}): Promise<void> {
   const project = opts.project ? resolve(opts.project) : process.cwd();
   const absPath = isNameShorthand(dotFile)
@@ -263,7 +251,6 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
   try { validateOrRaise(graph); }
   catch (err) {
     await output.error((err as Error).message);
-    printRefineTip(dotFile);
     process.exit(1);
   }
 
@@ -293,7 +280,6 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
         invokedAs: dotFile,
       }),
     );
-    printRefineTip(dotFile);
     process.exit(1);
   }
 
@@ -318,7 +304,6 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
       `This pipeline has headless_safe=false and cannot run without a TTY.\n` +
       `Run it interactively: ralph pipeline run ${dotFile}`
     );
-    printRefineTip(dotFile);
     process.exit(1);
   }
 
@@ -592,7 +577,6 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
         process.stderr.write(`✗ pipeline failed at node ${lastFailedNodeId}: ${firstLine}\n`);
         process.stderr.write(`  trace: ${tracePath}\n`);
       }
-      printRefineTip(dotFile);
       process.exit(1);
     }
   }
@@ -637,12 +621,6 @@ export async function pipelineListCommand(opts: PipelineListOptions = {}): Promi
   }
 }
 
-export interface PipelineCreateOptions {
-  project?: string;
-}
-
-export const REFINE_TRACE_COUNT = 3;
-
 /**
  * Walk all project run-roots and return the set of directories. Used as the
  * default scan target when a project is not pinned. Each root has the shape
@@ -675,62 +653,6 @@ export function findRunAcrossProjects(runId: string): string | null {
     throw new Error(`[ralph] multiple projects own runId ${runId}: ${matches.join(", ")}`);
   }
   return matches[0];
-}
-
-/**
- * Return absolute paths to up to `limit` most recent trace files for pipeline `name`,
- * newest first. When `tracesRoot` is supplied, scans only that directory; otherwise
- * walks all project run-roots under each project's runs directory.
- */
-export function listRecentTraces(
-  name: string,
-  limit: number,
-  opts: { tracesRoot?: string } = {},
-): string[] {
-  const roots = opts.tracesRoot ? [opts.tracesRoot] : listAllProjectRunsRoots();
-  const entries: { path: string; mtime: number }[] = [];
-  for (const root of roots) {
-    if (!existsSync(root)) continue;
-    for (const entry of readdirSync(root)) {
-      const tracePath = join(root, entry, "pipeline.jsonl");
-      if (!existsSync(tracePath)) continue;
-      try {
-        const firstLine = readFileSync(tracePath, "utf8").split("\n", 1)[0];
-        if (!firstLine) continue;
-        const start = JSON.parse(firstLine) as Record<string, unknown>;
-        if (start.kind !== "pipeline-start") continue;
-        if (start.pipelineName !== name) continue;
-        entries.push({ path: tracePath, mtime: statSync(tracePath).mtimeMs });
-      } catch {
-        continue;
-      }
-    }
-  }
-  return entries.sort((a, b) => b.mtime - a.mtime).slice(0, limit).map(e => e.path);
-}
-
-/** Read a pipeline trace file and return a compact, human-readable digest string. */
-export function digestTraceFile(tracePath: string): string {
-  let raw: string;
-  try { raw = readFileSync(tracePath, "utf8"); }
-  catch { return `Trace: ${tracePath}\n(unreadable)`; }
-  const lines = raw.trim().split("\n").flatMap(l => {
-    try { return [JSON.parse(l) as Record<string, unknown>]; } catch { return []; }
-  });
-  const start = lines.find(l => l.kind === "pipeline-start") ?? {};
-  const end = lines.find(l => l.kind === "pipeline-end") ?? {};
-  const nodeEnds = lines.filter(l => l.kind === "node-end");
-  const succeeded = nodeEnds.filter(e => e.success === true).map(e => String(e.nodeId));
-  const failed    = nodeEnds.filter(e => e.success === false).map(e => String(e.nodeId));
-  const outcome = (end.outcome as string | undefined) ?? "in-progress";
-  const startedAt = (start.timestamp as string | undefined) ?? "unknown";
-  return [
-    `Trace: ${tracePath}`,
-    `Started: ${startedAt}`,
-    `Outcome: ${outcome}`,
-    `Succeeded (${succeeded.length}): ${succeeded.join(", ") || "none"}`,
-    failed.length > 0 ? `Failed (${failed.length}): ${failed.join(", ")}` : "",
-  ].filter(Boolean).join("\n");
 }
 
 export async function pipelineTraceCommand(
@@ -851,90 +773,6 @@ export async function pipelineTraceCommand(
     console.log(`  ${String(ns.nodeReceiveId).padEnd(20)} ${String(ns.nodeId).padEnd(12)} ${String(ns.nodeKind).padEnd(18)} ${status}  ctx: ${ctxDisplay}`);
   }
   console.log();
-}
-
-export async function pipelineCreateCommand(name: string, opts: PipelineCreateOptions = {}): Promise<void> {
-  if (!isNameShorthand(name)) {
-    await output.error(
-      `Invalid pipeline name "${name}": use only letters, numbers, hyphens, underscores`,
-    );
-    process.exit(1);
-  }
-  const project = resolve(opts.project ?? process.cwd());
-  const dotFile = resolveBundledTemplate("pipeline-create");
-  return self.pipelineRunCommand(dotFile, {
-    project,
-    variables: {
-      pipeline_name: name,
-      pipelines_dir: getPipelinesDir(project),
-    },
-  });
-}
-
-
-export interface PipelineRefineOptions {
-  project?: string;
-  /** When false, skip recent-trace injection. Default true. */
-  traces?: boolean;
-  /** Override the trace search root (default: `~/.ralph/runs`). */
-  tracesRoot?: string;
-}
-
-export async function pipelineRefineCommand(name: string, opts: PipelineRefineOptions = {}): Promise<void> {
-  const project = resolve(opts.project ?? process.cwd());
-  const pipelinesDir = getPipelinesDir(project);
-  const dotPath = join(pipelinesDir, `${name}.dot`);
-
-  try {
-    resolvePipelineArg(name, project);
-  } catch (err) {
-    await output.error((err as Error).message);
-    process.exit(1);
-  }
-
-  if (!existsSync(dotPath)) {
-    await output.error(
-      `Pipeline not found: ${dotPath}\n` +
-        `Use 'ralph pipeline create ${name}' to create it.`,
-    );
-    process.exit(1);
-  }
-
-  const existingContent = readFileSync(dotPath, "utf8");
-  let previousGraph: Graph | undefined;
-  try { previousGraph = parseDot(existingContent); } catch { /* unparsable — skip diff */ }
-
-  let traceDigest = "";
-  if (opts.traces !== false) {
-    const tracePaths = listRecentTraces(name, REFINE_TRACE_COUNT, { tracesRoot: opts.tracesRoot });
-    if (tracePaths.length > 0) {
-      traceDigest =
-        `Recent run traces for ${name}:\n\n` +
-        tracePaths.map(p => digestTraceFile(p)).join("\n\n");
-    }
-  }
-
-  await output.step(`Refining pipeline: ${name}`);
-  await output.step(`Target: ${dotPath}`);
-
-  const dotFile = resolveBundledTemplate("pipeline-refine");
-  await self.pipelineRunCommand(dotFile, {
-    project,
-    variables: {
-      pipeline_name: name,
-      dot_path: dotPath,
-      current_dot: existingContent,
-      trace_digest: traceDigest,
-    },
-  });
-
-  if (!existsSync(dotPath)) {
-    await output.warn(`Session ended but ${dotPath} was removed.`);
-    process.exit(1);
-  }
-  await output.step("Validating pipeline...");
-  const validateExit = await pipelineValidateCommand(dotPath, { previousGraph });
-  process.exit(validateExit);
 }
 
 export interface PipelineShowOptions {

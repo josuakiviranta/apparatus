@@ -1,15 +1,10 @@
 import { Command } from "commander";
-import { planCommand } from "./commands/plan";
 import { implementCommand } from "./commands/implement";
-import { newCommand } from "./commands/new";
 import { meditateCommand } from "./commands/meditate";
 import { registerHeartbeatCommand } from "./commands/heartbeat";
-import { meditateCreateCommand } from "./commands/meditate-create";
 import {
   pipelineRunCommand,
   pipelineValidateCommand,
-  pipelineCreateCommand,
-  pipelineRefineCommand,
   pipelineListCommand,
   pipelineTraceCommand,
   pipelineShowCommand,
@@ -29,8 +24,6 @@ export function createProgram(): Command {
     "after",
     `
 Getting started (typical workflow):
-  ralph new my-app                        Scaffold a new project in ./my-app/
-  ralph plan my-app                       Open an interactive planning session
   ralph implement my-app                  Run the agentic build loop (Ctrl-C to stop)
   ralph implement my-app --max 3          Run at most 3 iterations
 
@@ -46,8 +39,6 @@ Background scheduling (heartbeat):
   ralph heartbeat stop meditate:my-app                  Remove task and kill any running session
 
 Pipeline engine (DOT-graph workflows):
-  ralph pipeline create review --project my-app    Create a new workflow with Claude
-  ralph pipeline refine review --project my-app    Refine an existing workflow with Claude
   ralph pipeline list --project my-app             List workflows in a project
   ralph pipeline validate workflow.dot             Check a pipeline file for errors
   ralph pipeline validate review --project my-app  Validate by workflow name
@@ -81,21 +72,11 @@ Pipeline engine (DOT-graph workflows):
 
 Meditation (restricted insight sessions):
   ralph meditate my-app                   Run a one-shot meditation session
-  ralph meditate create my-app            Create a new meditation script
 
 Agent management:
   ralph agent list                        List all available agents
-  ralph agent show <name>                 Show details of a specific agent
-  ralph agent create                      Interactively create a new agent definition`
+  ralph agent show <name>                 Show details of a specific agent`
   );
-
-  program
-    .command("plan <project-folder>")
-    .description("Open an interactive Claude session to write specs, README, and build prompts")
-    .addHelpText("after", "\nExamples:\n  ralph plan my-app\n")
-    .action(async (projectFolder: string) => {
-      await planCommand(projectFolder);
-    });
 
   program
     .command("implement <project-folder>")
@@ -108,32 +89,13 @@ Agent management:
     });
 
   program
-    .command("new <project-name>")
-    .description("Create a new project folder with prompts, specs/, and a guided Claude kickoff session")
-    .addHelpText("after", "\nExamples:\n  ralph new my-app\n")
-    .action(async (projectName: string) => {
-      await newCommand(projectName);
-    });
-
-  const med = program
-    .command("meditate")
+    .command("meditate <project-folder>")
     .description("Run a restricted Claude session that writes insights to meditations/illuminations/")
-    .addHelpText("after", "\nExamples:\n  ralph meditate my-app\n");
-
-  med
-    .argument("<project-folder>")
+    .addHelpText("after", "\nExamples:\n  ralph meditate my-app\n")
     .option("--var <key=value>", "pass caller variable (repeatable, e.g. --var steer=...)", collectKV, {} as Record<string, string>)
     .action(async (projectFolder: string, opts: Record<string, unknown>) => {
       const variables = opts["var"] as Record<string, string> | undefined;
       await meditateCommand(projectFolder, { variables });
-    });
-
-  med
-    .command("create <project-folder>")
-    .description("Create a new meditation script with a guided Claude session")
-    .addHelpText("after", "\nExamples:\n  ralph meditate create my-app\n")
-    .action(async (projectFolder: string) => {
-      await meditateCreateCommand(projectFolder);
     });
 
   const pipeline = program.command("pipeline").description("Pipeline engine commands");
@@ -188,41 +150,6 @@ When a plain name is given (no path separators or .dot extension), resolves to
     .action(async (dotFile: string, opts: { project?: string }) => {
       const code = await pipelineValidateCommand(dotFile, opts);
       process.exit(code);
-    });
-
-  pipeline
-    .command("create <name>")
-    .description("Create a new pipeline workflow with an interactive Claude session")
-    .addHelpText("after", `
-Examples:
-  ralph pipeline create review --project my-app
-  ralph pipeline create deploy
-
-Creates <project>/pipelines/<name>.dot via an interactive Claude session.
-The attractor scheme is injected automatically. Validates the file on exit.
-`)
-    .option("--project <folder>", "Project folder (pipelines/ lives here, defaults to cwd)")
-    .action(async (name: string, opts: { project?: string }) => {
-      await pipelineCreateCommand(name, opts);
-    });
-
-  pipeline
-    .command("refine <name>")
-    .description("Refine an existing pipeline with an interactive Claude session")
-    .addHelpText("after", `
-Examples:
-  ralph pipeline refine review --project my-app
-  ralph pipeline refine deploy
-
-Loads <project>/pipelines/<name>.dot, opens an agent-assisted Claude session
-with the existing graph injected, then validates the edited file on exit.
-Use this for every change to an existing pipeline — hand-editing the .dot file
-bypasses the scheme guidance and validation loop.
-`)
-    .option("--project <folder>", "Project folder (pipelines/ lives here, defaults to cwd)")
-    .option("--no-traces", "Skip injecting recent run trace digests into the refine trigger")
-    .action(async (name: string, opts: { project?: string; traces?: boolean }) => {
-      await pipelineRefineCommand(name, opts);
     });
 
   pipeline

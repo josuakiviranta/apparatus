@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { findRunAcrossProjects, listRecentTraces, pipelineTraceCommand } from "../commands/pipeline.js";
+import { findRunAcrossProjects, pipelineTraceCommand } from "../commands/pipeline.js";
 
 function seedTrace(root: string, projectKey: string, runId: string, pipelineName: string): string {
   const dir = join(root, projectKey, "runs", runId);
@@ -41,34 +41,6 @@ describe("findRunAcrossProjects", () => {
     seedTrace(root, "alpha-aaaaaa", "deadbeef", "p");
     seedTrace(root, "beta-bbbbbb", "deadbeef", "p");
     expect(() => findRunAcrossProjects("deadbeef")).toThrow(/multiple/i);
-  });
-});
-
-describe("listRecentTraces (cross-project)", () => {
-  let root: string;
-  beforeEach(() => {
-    root = mkdtempSync(join(tmpdir(), "ralph-list-"));
-    process.env.RALPH_RUNS_ROOT = root;
-  });
-  afterEach(() => {
-    delete process.env.RALPH_RUNS_ROOT;
-    rmSync(root, { recursive: true, force: true });
-  });
-
-  it("walks ~/.ralph/*/runs when no tracesRoot is supplied", () => {
-    seedTrace(root, "alpha-aaaaaa", "11111111", "review");
-    seedTrace(root, "beta-bbbbbb", "22222222", "review");
-    seedTrace(root, "beta-bbbbbb", "33333333", "other");
-    const found = listRecentTraces("review", 10);
-    expect(found.length).toBe(2);
-    expect(found.every(p => p.endsWith("pipeline.jsonl"))).toBe(true);
-  });
-
-  it("project-scopes when tracesRoot is supplied", () => {
-    seedTrace(root, "alpha-aaaaaa", "11111111", "review");
-    seedTrace(root, "beta-bbbbbb", "22222222", "review");
-    const found = listRecentTraces("review", 10, { tracesRoot: join(root, "alpha-aaaaaa", "runs") });
-    expect(found.length).toBe(1);
   });
 });
 

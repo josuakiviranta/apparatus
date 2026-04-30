@@ -13,12 +13,6 @@ Requires: Node.js >=18, [`claude` CLI](https://www.npmjs.com/package/@anthropic-
 ## Commands
 
 ```bash
-ralph plan <project-folder>
-```
-Opens an interactive Claude session in the project folder for planning/spec writing.
-Backed by the bundled pipeline template `src/cli/templates/plan/`.
-
-```bash
 ralph implement <project-folder> [--max N] [--model <name>]
 ```
 Runs the agentic build loop. Claude iterates, commits, and pushes changes until done (or `N` iterations).
@@ -36,14 +30,9 @@ ralph <project-folder>
 Shorthand for `implement`.
 
 ```bash
-ralph new <project-name>
-```
-Scaffold a new ralph project in `./<project-name>/`. Creates `AGENTS.md`, `IMPLEMENTATION_PLAN.md`, `specs/`, and `src/` directories, runs `git init -b main`, then launches an interactive Claude kickoff session (backed by the bundled `new` pipeline template `src/cli/templates/new/`) to populate `README.md` and initial specs.
-
-```bash
 ralph meditate <project-folder> [--var steer=<text>]
 ```
-Runs a meditate session against the project's meditations. `--var steer=...` injects an initial steering message at session start. Backed by the bundled pipeline template `src/cli/templates/meditate/`.
+Runs a meditate session against the project's meditations. `--var steer=...` injects an initial steering message at session start. Backed by the bundled folder pipeline `pipelines/meditate/`.
 
 For unattended lifecycle reconciliation and doc-drift surfacing, schedule the bundled janitor pipeline:
 
@@ -70,23 +59,6 @@ Pass `--resume [runId]` to continue a pipeline after Ctrl-C, a node failure, or 
 ralph pipeline validate <pipeline.dot>
 ```
 Check a pipeline for structural errors and `portability_heuristic` warnings (hardcoded paths that would break when the pipeline runs in a different environment).
-
-```bash
-ralph pipeline create <project-folder>
-```
-Open an interactive Claude session to author a new pipeline. Backed by the bundled pipeline template `src/cli/templates/pipeline-create/`. The scaffolder agent inspects the project's existing `pipelines/<name>/` folders for reusable agent files.
-
-```bash
-ralph meditate-create <project-folder>
-```
-Open an interactive Claude session to author a new meditation stimulus. Backed by the bundled pipeline template `src/cli/templates/meditate-create/`.
-
-```bash
-ralph pipeline refine <name> [--project <folder>] [--no-traces]
-```
-Open an interactive Claude session to iterate on an existing `<project>/pipelines/<name>.dot`. The current graph is injected into the session so the agent can propose targeted edits rather than redesigning from scratch. Backed by the bundled pipeline template `src/cli/templates/pipeline-refine/`. Use this for every change to an existing pipeline — hand-editing the `.dot` file bypasses the scheme guidance and the post-session validate step. `create` is for new workflows; `refine` is for every subsequent change.
-
-By default, digests of up to 3 recent run traces for this pipeline are injected into the session so the agent can see how the graph has been executing. Pass `--no-traces` to suppress this when experimenting with a half-written pipeline.
 
 ```bash
 ralph pipeline list <project-folder>
