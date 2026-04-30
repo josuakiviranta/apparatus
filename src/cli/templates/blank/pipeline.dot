@@ -1,8 +1,0 @@
-digraph blank {
-  start [shape=Mdiamond];
-  end   [shape=Msquare];
-
-  first_step [shape=box, agent="first-step"];
-
-  start -> first_step -> end;
-}
