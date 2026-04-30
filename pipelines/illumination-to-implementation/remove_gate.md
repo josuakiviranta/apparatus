@@ -5,13 +5,13 @@ choices:
   - Keep
   - Chat
 inputs:
-  - illumination_path
-  - explanation
+  - verifier.illumination_path
+  - verifier.explanation
 ---
 Verifier recommends archiving.
 
-$illumination_path
+$verifier.illumination_path
 
-Reason: $explanation
+Reason: $verifier.explanation
 
 Choose: Archive (agree), Keep (override), or Chat (discuss).

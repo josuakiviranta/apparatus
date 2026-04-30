@@ -476,10 +476,13 @@ export function validateAgentConfig(
     throw new Error("maxIterations must be a non-negative integer");
   }
 
-  // Derive jsonSchema from outputs only when not explicitly provided. Explicit
-  // jsonSchema wins (legacy agents that hand-author the schema string).
-  const derivedJsonSchema = (config.outputs && !config.jsonSchema)
-    ? deriveJsonSchemaString(config.outputs)
+  // Derive jsonSchema from outputs only when at least one output key is
+  // declared and jsonSchema is not explicitly provided. Empty `outputs: {}`
+  // means "no structured output" — used by interactive agents that stream
+  // chat instead of producing JSON.
+  const hasDeclaredOutputs = !!config.outputs && Object.keys(config.outputs).length > 0;
+  const derivedJsonSchema = (hasDeclaredOutputs && !config.jsonSchema)
+    ? deriveJsonSchemaString(config.outputs!)
     : config.jsonSchema;
 
   return {

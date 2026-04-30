@@ -46,6 +46,35 @@ function makeGraphMulti(nodes: Node[], inputs?: string[]): Graph {
   } as unknown as Graph;
 }
 
+describe("expandVariables — qualified $-ref bare-key fallback", () => {
+  it("falls back to defaults[localKey] when qualified $node.key is missing from ctx", () => {
+    // Regression: gates and tool labels render `$chat_summarizer.refinements`
+    // against ctx + extractDefaults(node). extractDefaults strips the
+    // default_ prefix and qualifier → { refinements: "" }. Without the
+    // qualified→bare fallback, the renderer threw UndefinedVariableError
+    // for any qualified ref backed by default_<localKey>=.
+    const out = expandVariables(
+      "Refinements: $chat_summarizer.refinements",
+      {},
+      { refinements: "(none yet)" },
+    );
+    expect(out).toBe("Refinements: (none yet)");
+  });
+
+  it("prefers ctx value over default", () => {
+    const out = expandVariables(
+      "$verifier.summary",
+      { "verifier.summary": "auth bug" },
+      { summary: "(none)" },
+    );
+    expect(out).toBe("auth bug");
+  });
+
+  it("still throws when neither ctx nor any default has the key", () => {
+    expect(() => expandVariables("$missing.thing", {}, { other: "x" })).toThrow(UndefinedVariableError);
+  });
+});
+
 describe("scanUndeclaredCallerVars", () => {
   it("returns no missing when every $var is in initialContext", () => {
     const g = makeGraphMulti(

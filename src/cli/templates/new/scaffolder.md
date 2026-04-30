@@ -1,4 +1,5 @@
 ---
+name: scaffolder
 description: Initializes a new ralph project. Asks the user about the project, then writes README.md and specs/README.md with no code.
 interactive: true
 inputs:

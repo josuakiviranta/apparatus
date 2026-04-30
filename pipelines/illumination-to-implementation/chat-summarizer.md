@@ -4,7 +4,7 @@ description: Merge a chat round into a cumulative refinements log with attributi
 inputs:
   - illuminations_dir
   - run_id
-  - illumination_path
+  - verifier.illumination_path
   - verifier.summary
   - verifier.explanation
   - chat_summarizer.refinements
@@ -20,12 +20,12 @@ tools:
 # Mission
 
 Read `$illuminations_dir/.triage/$run_id/chat-notes.md` and the illumination at
-$illumination_path. Merge the latest chat round into the cumulative refinements
+$verifier_illumination_path. Merge the latest chat round into the cumulative refinements
 log so design_writer and plan_writer can judge whether to honor each refinement.
 
 ## Inputs you receive
 
-- $illumination_path — the illumination under triage
+- $verifier_illumination_path — the illumination under triage
 - $verifier_summary, $verifier_explanation — original verification verdict
 - $chat_summarizer_refinements — cumulative log from earlier rounds (empty
   string on first round)

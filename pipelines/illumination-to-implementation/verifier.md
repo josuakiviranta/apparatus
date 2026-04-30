@@ -18,7 +18,7 @@ mcp:
       - "{{PROJECT_ROOT}}"
 inputs:
   - illuminations_dir
-  - illumination_path
+  - verifier.illumination_path
   - chat_summarizer.refinements
   - run_id
 outputs:
@@ -56,7 +56,7 @@ A technically accurate illumination that fails project-fit is still a `false` �
 # Procedure
 
 1. **Enumerate or re-enter.** (See Hard rules above — MCP-only for this step.)
-   - If `$illumination_path` is non-empty in the injected context (re-entry after a scope-changing chat round), skip enumeration — that file has already been selected by an earlier verifier pass. Verify it directly against the current (refined) scope.
+   - If `$verifier_illumination_path` is non-empty in the injected context (re-entry after a scope-changing chat round), skip enumeration — that file has already been selected by an earlier verifier pass. Verify it directly against the current (refined) scope.
    - Otherwise: call `mcp__illumination__list_illuminations` with `status: "open"`. The tool returns one `<filename> — <description>` line per open illumination, or the literal string `No illuminations found.` when empty.
 2. **Pick one.** If the tool returned `No illuminations found.` → emit `preferred_label: empty`, empty paths, summary "No open illuminations found", explanation "All illuminations in the directory are dispatched, archived, or otherwise closed." (Skip on re-entry — the path is already set.) Otherwise pick one filename and construct `illumination_path` as `meditations/illuminations/<filename>`.
 3. **Read the chosen illumination in full.** Use `mcp__illumination__read_file` with just the bare `<filename>` (no directory prefix); the MCP server resolves the dir based on lifecycle status. Do NOT prepend `meditations/illuminations/` for the read — that path is only for the produced `illumination_path` field that downstream pipeline nodes consume.

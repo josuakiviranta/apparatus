@@ -133,7 +133,12 @@ export async function runPipeline(graph: Graph, opts: EngineOptions): Promise<Pi
   let currentNodeId = startNode.id;
   let completedNodes: string[] = [];
   let context: Record<string, unknown> = { "$goal": graph.goal ?? "" };
-  if (opts.project) context["$project"] = opts.project;
+  if (opts.project) {
+    // Store bare `project` so auto-inputs agents can declare it in inputs:.
+    // Keep `$project` for backward-compat with any legacy ctx readers.
+    context.project = opts.project;
+    context["$project"] = opts.project;
+  }
   if (opts.callerContext) context = { ...context, ...opts.callerContext };
   const runId = randomUUID();
   context["run_id"] = runId;

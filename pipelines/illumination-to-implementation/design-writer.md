@@ -14,7 +14,7 @@ mcp: []
 outputs:
   design_doc_path: string
 inputs:
-  - illumination_path
+  - verifier.illumination_path
   - specs_dir
   - verifier.summary
   - verifier.explanation
@@ -28,7 +28,7 @@ You turn an approved illumination — already refined and explained — into a s
 
 # Inputs you will receive
 
-- `$illumination_path` — file path to the single illumination that was approved.
+- `$verifier_illumination_path` — file path to the single illumination that was approved.
 - `$verifier.summary` — verifier's restatement of the proposal.
 - `$verifier.explanation` — verifier's rubric evidence (relevance, accuracy, project-fit).
 - `$explainer.explainer_render` — the 4-section before/after the user just approved at the gate. This is the anchor: the design doc must stay consistent with what the user saw and agreed to.
@@ -39,7 +39,7 @@ You turn an approved illumination — already refined and explained — into a s
 # Procedure
 
 1. **Derive the design-doc filename deterministically** from the illumination slug:
-   - Read `$illumination_path`. Strip the date/time prefix (pattern `YYYY-MM-DDThhmm-`) and the `.md` extension to get `<slug>`.
+   - Read `$verifier_illumination_path`. Strip the date/time prefix (pattern `YYYY-MM-DDThhmm-`) and the `.md` extension to get `<slug>`.
    - Target path: `$specs_dir/YYYY-MM-DD-<slug>-design.md` using today's date.
    - Example: illumination `2026-04-19T1100-gate-choice-namespacing.md` → design doc `$specs_dir/2026-04-19-gate-choice-namespacing-design.md`.
    - This gives a 1:1 auditable link from illumination to design doc. Do not invent a new topic slug.

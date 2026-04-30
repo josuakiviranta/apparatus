@@ -74,6 +74,51 @@ You are v.`,
     expect(written).not.toContain("$project");
   });
 
+  it("falls back to camelCased default_<key> attribute on the node when ctx is missing the input", async () => {
+    // Regression: DOT parser camelCases default_illumination_path → defaultIlluminationPath
+    // on the Node. inputs-resolver builds fallbackAttr=`default_illumination_path`
+    // (snake_case). AgentHandler must invert the camelCase before passing to renderInputsBlock,
+    // or the renderer throws "missing input" even when the default attribute is present.
+    const fakeAgent = {
+      run: vi.fn(async () => ({
+        exitCode: 0,
+        sessionId: "s1",
+        output: JSON.stringify({ result: "ok" }),
+      })),
+    };
+    const jsonSchema = JSON.stringify({ type: "object", properties: { result: { type: "string" } }, required: ["result"] });
+    const handler = new AgentHandler({
+      resolveAgent: () => ({
+        name: "v",
+        description: "t",
+        model: "opus",
+        permissionMode: "default",
+        tools: [],
+        mcp: [],
+        prompt: "# Mission",
+        inputs: ["v_node.illumination_path"],
+        jsonSchema,
+        outputs: { result: "string" },
+      }),
+      createAgent: () => fakeAgent as any,
+    });
+    const dotDir = mkdtempSync(join(tmpdir(), "default-camel-"));
+    // Simulate DOT-parsed node: default_illumination_path="" lands as camelCased key.
+    const node: Node = {
+      id: "v_node",
+      agent: "v",
+      label: "v_node",
+      defaultIlluminationPath: "",
+    } as any;
+    const ctx: PipelineContext = { values: {} };
+    const out = await handler.execute(node, ctx, {
+      logsRoot: dotDir, cwd: dotDir, dotDir, completedNodes: [], nodeRetries: {},
+    } as any);
+    expect(out.status).toBe("success");
+    const written = readFileSync(join(dotDir, "v_node", "prompt.md"), "utf-8");
+    expect(written).toContain("<v_node_illumination_path></v_node_illumination_path>");
+  });
+
   it("namespaces structured updates when auto_inputs: true", async () => {
     const fakeAgent = {
       run: vi.fn(async () => ({

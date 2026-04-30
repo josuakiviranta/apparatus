@@ -108,20 +108,17 @@ describe("validateAgentConfig — outputs", () => {
     expect(config.jsonSchema).toBeUndefined();
   });
 
-  it("treats outputs with zero keys as empty schema (degenerate but valid)", () => {
+  it("treats outputs with zero keys as no schema (interactive agents declare empty outputs)", () => {
+    // Empty `outputs: {}` means "no structured output" — used by interactive
+    // agents that stream chat. Deriving a schema from {} would conflict with
+    // interactive=true in agent-handler, blocking those agents from running.
     const config = validateAgentConfig({
       name: "x", description: "x agent",
       outputs: {},
       prompt: "",
     } as any);
     expect(config.outputs).toEqual({});
-    const parsed = JSON.parse(config.jsonSchema!);
-    expect(parsed).toEqual({
-      type: "object",
-      properties: {},
-      required: [],
-      additionalProperties: false,
-    });
+    expect(config.jsonSchema).toBeUndefined();
   });
 
   it("does NOT overwrite an explicit jsonSchema string when outputs is also set", () => {

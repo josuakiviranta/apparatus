@@ -60,7 +60,13 @@ function expandSegment(
     if (key === "goal" || key === "project") return match;
     const v = ctx[key];
     if (v === undefined) {
-      const fallback = defaults?.[key];
+      let fallback = defaults?.[key];
+      // Qualified $node.key falls back to bare-key default on the consumer
+      // node (extractDefaults strips the default_ prefix and qualifier).
+      if (fallback === undefined) {
+        const dot = key.indexOf(".");
+        if (dot !== -1) fallback = defaults?.[key.slice(dot + 1)];
+      }
       if (fallback !== undefined) return fallback;
       throw new UndefinedVariableError(key);
     }
@@ -181,10 +187,16 @@ export function scanUndeclaredCallerVars(
   }
 
   const ctxKeys = new Set(Object.keys(initialContext));
+  const nodeIds = new Set(graph.nodes.keys());
   const missing: MissingRef[] = [];
 
   for (const name of attrRefs) {
     if (ctxKeys.has(name) || producers.has(name)) continue;
+    // Qualified $node.key: if the source node exists, treat it as produced.
+    // Deeper validation (source_missing_output_key) belongs to validateGraph;
+    // the runtime preflight only flags clearly-undeclared caller vars.
+    const dot = name.indexOf(".");
+    if (dot !== -1 && nodeIds.has(name.slice(0, dot))) continue;
     missing.push({ name });
   }
   missing.sort((a, b) => a.name.localeCompare(b.name));

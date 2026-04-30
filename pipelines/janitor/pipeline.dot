@@ -10,7 +10,7 @@ digraph janitor {
                script_file="read-vision.mjs",
                produces_from_stdout=true]
 
-  janitor [agent="janitor"]
+  janitor [agent="janitor", default_vision=""]
   done [shape=Msquare]
 
   start -> read_vision -> janitor -> done

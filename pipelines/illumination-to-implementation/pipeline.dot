@@ -1,7 +1,7 @@
 digraph illumination_to_implementation {
   goal="Triage an illumination into an approved design doc, implementation plan, and committed code"
   headless_safe=false
-  inputs="project, illuminations_dir, specs_dir, plans_dir, run_id, illumination_path"
+  inputs="project, illuminations_dir, specs_dir, plans_dir, run_id"
 
   start [shape=Mdiamond]
 
@@ -14,12 +14,12 @@ digraph illumination_to_implementation {
   mark_archived [type="tool",
                  cwd="$project",
                  script_file="mark-archived.mjs",
-                 script_args="$illumination_path $archive_reason_short"]
+                 script_args="$verifier.illumination_path $verifier.archive_reason_short"]
 
   mark_dispatched [type="tool",
                    cwd="$project",
                    script_file="mark-dispatched.mjs",
-                   script_args="$illumination_path $plan_path"]
+                   script_args="$verifier.illumination_path $plan_writer.plan_path"]
 
   explainer [agent="change-explainer", default_refinements=""]
 

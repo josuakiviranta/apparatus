@@ -22,7 +22,7 @@ mcp:
 outputs: {}
 inputs:
   - project
-  - read_vision.vision
+  - vision
 ---
 
 You are the project's janitor — a silent, read-only background agent. You never edit

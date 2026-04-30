@@ -262,12 +262,30 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
       for (const varName of vars) {
         if (RESERVED_VARS.has(varName)) continue;
         if (callerInputs.has(varName)) continue;
-        if (hasDefault(consumer, varName)) continue;
 
-        // Find all producer nodes for this variable
+        // Resolve qualified $node.key into source/localKey pair to look up
+        // outputs declared on the named source node (auto_inputs convention).
+        // Pseudo-keys with dots (tool.output, store.path, chat.output) are
+        // stored verbatim in produced sets — caught by the verbatim match below.
+        let sourceFilter: string | undefined;
+        let lookupKey = varName;
+        const dotIdx = varName.indexOf(".");
+        if (dotIdx !== -1) {
+          sourceFilter = varName.slice(0, dotIdx);
+          lookupKey = varName.slice(dotIdx + 1);
+        }
+
+        if (hasDefault(consumer, lookupKey) || hasDefault(consumer, varName)) continue;
+
+        // Find all producer nodes for this variable. Verbatim match handles
+        // pseudo-keys + bare keys; qualified split handles `<node>.<key>` refs
+        // against the named source node's bare-key outputs.
         const producers = new Set<string>();
         for (const [nodeId, produced] of nodeProduces) {
-          if (produced.has(varName)) producers.add(nodeId);
+          if (produced.has(varName)) { producers.add(nodeId); continue; }
+          if (sourceFilter !== undefined && nodeId === sourceFilter && produced.has(lookupKey)) {
+            producers.add(nodeId);
+          }
         }
 
         // If no producers exist at all, warn
@@ -599,7 +617,12 @@ function checkOrphanOutput(
       let m: RegExpExecArray | null;
       const re = new RegExp(VAR_RE_LOCAL.source, VAR_RE_LOCAL.flags);
       while ((m = re.exec(field)) !== null) {
-        consumed.add(m[1].replace(/\.+$/, ""));
+        const ref = m[1].replace(/\.+$/, "");
+        consumed.add(ref);
+        // Qualified ref ($node.key) — also register the localKey so the
+        // producing node's bare-key output is recognized as consumed.
+        const dot = ref.indexOf(".");
+        if (dot !== -1) consumed.add(ref.slice(dot + 1));
       }
     }
   }
@@ -694,20 +717,39 @@ function checkRequiredCallerVars(
     for (const k of produced) internallyProduced.add(k);
   }
 
+  // Resolve qualified `<node>.<key>` against the named source node's outputs;
+  // bare keys against any internal producer.
+  function isProduced(k: string): boolean {
+    const dot = k.indexOf(".");
+    if (dot !== -1) {
+      const src = k.slice(0, dot);
+      const localKey = k.slice(dot + 1);
+      return nodeProduces.get(src)?.has(localKey) === true;
+    }
+    return internallyProduced.has(k);
+  }
+
   // Candidate set: callerInputs declared on the digraph header
   const required = new Set<string>();
   for (const v of graph.inputs ?? []) {
-    if (!RESERVED.has(v) && !internallyProduced.has(v)) required.add(v);
+    if (!RESERVED.has(v) && !isProduced(v)) required.add(v);
   }
 
   // Also include vars consumed via agent inputs: that are not produced internally
+  // (or covered by a default_<localKey>= on the consumer node).
   if (dotDir) {
     for (const node of graph.nodes.values()) {
       if (!node.agent) continue;
       const cfg = tryResolveAgent(node, dotDir);
       if (!cfg?.inputs) continue;
       for (const k of cfg.inputs) {
-        if (!RESERVED.has(k) && !internallyProduced.has(k)) required.add(k);
+        if (RESERVED.has(k)) continue;
+        if (isProduced(k)) continue;
+        let resolved;
+        try { resolved = resolveInputDecl(k); } catch { continue; }
+        const fallbackKey = toCamel("default_" + resolved.localKey);
+        if (node[fallbackKey] !== undefined) continue;
+        required.add(k);
       }
     }
   }

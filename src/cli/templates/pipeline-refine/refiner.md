@@ -1,4 +1,5 @@
 ---
+name: refiner
 description: Refines an existing ralph pipeline. Inspects the current `.dot` graph + recent run traces, proposes targeted edits with the user, and writes the updated graph back.
 interactive: true
 inputs:

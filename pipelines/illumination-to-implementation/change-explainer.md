@@ -10,7 +10,7 @@ tools:
   - Task
 mcp: []
 inputs:
-  - illumination_path
+  - verifier.illumination_path
   - verifier.summary
   - verifier.explanation
   - chat_summarizer.refinements
@@ -73,7 +73,7 @@ Bullet list of what's in and what's out. Maximum **4 bullets**. No prose.
 
 # Procedure
 
-1. Read the illumination at `$illumination_path` fully.
+1. Read the illumination at `$verifier_illumination_path` fully.
 2. Read `$verifier.summary` and `$verifier.explanation` from upstream verifier for the criteria evidence.
 3. If `$chat_summarizer.refinements` is non-empty, read them — they override the original scope. Render the before/after against the **refined** scope, not the illumination's original wording.
 4. Spawn parallel subagents (up to 10) to pull verbatim evidence:

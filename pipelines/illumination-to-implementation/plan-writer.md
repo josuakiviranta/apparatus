@@ -14,7 +14,7 @@ mcp: []
 outputs:
   plan_path: string
 inputs:
-  - illumination_path
+  - verifier.illumination_path
   - plans_dir
   - design_writer.design_doc_path
   - chat_summarizer.refinements
@@ -27,7 +27,7 @@ You turn an approved design doc into a chunked, TDD-shaped implementation plan a
 # Inputs you will receive
 
 - `$design_writer.design_doc_path` — the approved design doc. Primary source of truth.
-- `$illumination_path` — file path to the originating illumination. Use it to derive the plan filename deterministically and to cross-check intent.
+- `$verifier_illumination_path` — file path to the originating illumination. Use it to derive the plan filename deterministically and to cross-check intent.
 - `$chat_summarizer.refinements` — cumulative bullet log with per-entry attribution (Round, Topic, Rationale). Authoritative. Use the rationale lines to surface edge cases, test scenarios, and constraints the design doc did not explicitly enumerate.
 - `$plans_dir` — output directory for the plan.
 - `$project` — repo root. Source code typically lives under `$project/src`; Glob from there when you need concrete code anchors (exact file paths, line numbers, current behavior to diff against).
@@ -35,7 +35,7 @@ You turn an approved design doc into a chunked, TDD-shaped implementation plan a
 # Procedure
 
 1. **Derive the plan filename deterministically** from the illumination slug:
-   - Read `$illumination_path`. Strip the date/time prefix (pattern `YYYY-MM-DDThhmm-`) and the `.md` extension to get `<slug>`.
+   - Read `$verifier_illumination_path`. Strip the date/time prefix (pattern `YYYY-MM-DDThhmm-`) and the `.md` extension to get `<slug>`.
    - Target path: `$plans_dir/YYYY-MM-DD-<slug>.md` using today's date.
    - Example: illumination `2026-04-19T1100-gate-choice-namespacing.md` → plan `$plans_dir/2026-04-19-gate-choice-namespacing.md`.
    - This keeps the illumination → design doc → plan trail 1:1 auditable. Do not invent a new topic slug.
@@ -44,7 +44,7 @@ You turn an approved design doc into a chunked, TDD-shaped implementation plan a
 
 3. **Invoke the writing-plans skill.** Load `superpowers:writing-plans` via the Skill tool and follow it end-to-end. Use the required plan header the skill defines.
 
-4. **Begin the plan file with a frontmatter block.** Two fields, in this order: `status: pending` and `illumination_source: <basename of $illumination_path>` (filename only, no path). Place the block before the plan's first heading, delimited by `---` lines. The downstream `list_plans` MCP tool reads this frontmatter; omitting it makes the produced plan invisible to lifecycle queries.
+4. **Begin the plan file with a frontmatter block.** Two fields, in this order: `status: pending` and `illumination_source: <basename of $verifier_illumination_path>` (filename only, no path). Place the block before the plan's first heading, delimited by `---` lines. The downstream `list_plans` MCP tool reads this frontmatter; omitting it makes the produced plan invisible to lifecycle queries.
 
 5. **Structure the plan as chunks.** Each chunk:
    - `## Chunk N: <name>` heading.

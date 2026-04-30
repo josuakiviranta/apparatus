@@ -12,7 +12,7 @@ mcp: []
 inputs:
   - illuminations_dir
   - run_id
-  - illumination_path
+  - verifier.illumination_path
   - verifier.summary
   - verifier.explanation
   - chat_summarizer.refinements
@@ -24,7 +24,7 @@ You are talking with the user **about a single illumination**. The user wants to
 
 # Procedure
 
-1. **Read the illumination** at the path supplied via the prompt (`$illumination_path`).
+1. **Read the illumination** at the path supplied via the prompt (`$verifier_illumination_path`).
 2. **Read prior refinements** if present in the prompt (`$chat_summarizer.refinements`) — earlier chat rounds may have already established scope. Do not relitigate settled points.
 3. **Talk with the user.** Ask clarifying questions, confirm scope, surface constraints, push back where the verifier or explainer's read seems off. Use Read/Grep/Glob to ground the discussion in real code when needed.
 4. **Before ending the session**, write your **agreed conclusions** to the chat-notes path supplied in the prompt. Format the file so the downstream summarizer can attribute every conclusion back to *what the user said and why*:

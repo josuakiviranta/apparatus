@@ -24,7 +24,7 @@ inputs:
   - project
   - plan_writer.plan_path
   - design_writer.design_doc_path
-  - illumination_path
+  - verifier.illumination_path
   - tmux_tester.test_result
   - tmux_tester.test_summary
 ---
@@ -41,7 +41,7 @@ Memory files are reference documents for future sessions. Keep them dense, scann
 - `$run_id` — pipeline run identifier. Trace and checkpoint share the directory `~/.ralph/<projectKey>/runs/$run_id/` (`pipeline.jsonl` + `checkpoint.json` side by side).
 - `$plan_writer.plan_path` — the implementation plan just executed (use its slug to name the memory file).
 - `$design_writer.design_doc_path` — the design that drove the plan.
-- `$illumination_path` — the originating illumination.
+- `$verifier_illumination_path` — the originating illumination.
 - `$tmux_tester.test_result` / `$tmux_tester.test_summary` — empty if the session skipped tmux verification; otherwise the final outcome.
 
 # Procedure
@@ -58,7 +58,7 @@ Memory files are reference documents for future sessions. Keep them dense, scann
    If `pipeline.jsonl` is missing or empty, proceed with artifact-only evidence and note the gap in the `Learnings` section.
 
 3. **Read the relevant artifacts.**
-   - `$design_writer.design_doc_path`, `$plan_writer.plan_path`, `$illumination_path` — durable outputs this session produced.
+   - `$design_writer.design_doc_path`, `$plan_writer.plan_path`, `$verifier_illumination_path` — durable outputs this session produced.
    - `git log --oneline -20` and `git log --name-status <first-session-commit>..HEAD` in `$project` — commits this session made and which files they touched.
 
 4. **Write the memory file.** Structure it so future readers can skim:
@@ -129,7 +129,7 @@ Memory files are reference documents for future sessions. Keep them dense, scann
 
    **7a. Plan side.** If `$plan_writer.plan_path` is set and non-empty, call `mark_plan_implemented` with the basename of `$plan_writer.plan_path` (strip the directory portion — the tool resolves the file under `docs/superpowers/plans/`). On `success: true`, do nothing more — the tool auto-commits its own frontmatter rewrite. On `success: false` (orphan plan with no frontmatter, plan already `implemented`, plan file missing), append a single bullet to the memory file's `Learnings from the run` section quoting the `error` field verbatim, then continue. If `$plan_writer.plan_path` is empty or unset, skip 7a and append `- Plan lifecycle flip skipped: $plan_writer.plan_path was empty` to the memory file.
 
-   **7b. Illumination side.** If `$illumination_path` is set and non-empty, call `mark_implemented` with the basename of `$illumination_path` (strip the directory portion — the tool reads from `meditations/illuminations/` and physically moves the file to `meditations/implemented-illuminations/`, returning the new location as `new_path` in the response). On `success: true`, do nothing more — the tool auto-commits its own frontmatter rewrite and move. On `success: false` (already `implemented` / `archived`, no frontmatter, file missing), append a single bullet to the memory file's `Learnings from the run` section quoting the `error` field verbatim, then continue. If `$illumination_path` is empty or unset, skip 7b and append `- Illumination lifecycle flip skipped: $illumination_path was empty` to the memory file.
+   **7b. Illumination side.** If `$verifier_illumination_path` is set and non-empty, call `mark_implemented` with the basename of `$verifier_illumination_path` (strip the directory portion — the tool reads from `meditations/illuminations/` and physically moves the file to `meditations/implemented-illuminations/`, returning the new location as `new_path` in the response). On `success: true`, do nothing more — the tool auto-commits its own frontmatter rewrite and move. On `success: false` (already `implemented` / `archived`, no frontmatter, file missing), append a single bullet to the memory file's `Learnings from the run` section quoting the `error` field verbatim, then continue. If `$verifier_illumination_path` is empty or unset, skip 7b and append `- Illumination lifecycle flip skipped: $verifier_illumination_path was empty` to the memory file.
 
    Do **not** abort the node on either branch's failure. Push (step 6) and the structured-JSON emit (step 8) are non-negotiable; the lifecycle flips are opportunistic.
 

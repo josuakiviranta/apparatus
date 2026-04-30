@@ -4,8 +4,7 @@ digraph new_project {
   start [shape=Mdiamond];
   end   [shape=Msquare];
 
-  kickoff [shape=box, agent="scaffolder", interactive=true,
-           prompt="You are initializing project \"$project_name\". Follow the scaffolder agent's instructions."];
+  kickoff [shape=box, agent="scaffolder", interactive=true];
 
   start -> kickoff -> end;
 }

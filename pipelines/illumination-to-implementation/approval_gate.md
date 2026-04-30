@@ -5,19 +5,19 @@ choices:
   - Approve
   - Chat
 inputs:
-  - illumination_path
-  - summary
-  - explanation
-  - explainer_render
-  - refinements
+  - verifier.illumination_path
+  - verifier.summary
+  - verifier.explanation
+  - explainer.explainer_render
+  - chat_summarizer.refinements
 ---
 Proceed with plan?
 
-Illumination: $illumination_path
-Summary: $summary
-Verifier: $explanation
+Illumination: $verifier.illumination_path
+Summary: $verifier.summary
+Verifier: $verifier.explanation
 
-$explainer_render
+$explainer.explainer_render
 
 Refinements (cumulative; empty on first entry):
-$refinements
+$chat_summarizer.refinements

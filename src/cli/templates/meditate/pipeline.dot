@@ -4,7 +4,7 @@ digraph meditate {
   start [shape=Mdiamond];
   end   [shape=Msquare];
 
-  meditate [shape=box, agent="meditate", interactive=true];
+  meditate [shape=box, agent="meditate"];
 
   start -> meditate -> end;
 }

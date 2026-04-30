@@ -1,8 +1,11 @@
 ---
+name: meditate-create
 description: Interactive meditation creation session
 model: opus
 permissionMode: dangerouslySkipPermissions
 interactive: true
+inputs: []
+outputs: {}
 tools: []
 mcp: []
 ---

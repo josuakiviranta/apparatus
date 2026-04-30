@@ -8,6 +8,7 @@ import { resolveAgent as defaultResolveAgent } from "../../cli/lib/agent-registr
 import { getIlluminationServerPath, getMetaMeditationsDir } from "../../cli/lib/assets.js";
 import { buildPreamble } from "../transforms/preamble.js";
 import { renderInputsBlock } from "../transforms/inputs-renderer.js";
+import { extractDefaults } from "../transforms/variable-expansion.js";
 import { outputsToZod } from "../../cli/lib/outputs-to-zod.js";
 import { buildCorrectiveMessage } from "../../cli/lib/corrective-message.js";
 import { evaluateAgentOutput } from "./evaluate-agent-output.js";
@@ -97,7 +98,12 @@ export class AgentHandler implements NodeHandler {
     const agentInstructions = (config.prompt ?? "").trim();
 
     const declaredInputs = (config.inputs as string[] | undefined) ?? [];
-    const nodeAttrs = node as unknown as Record<string, unknown>;
+    // DOT parser camelCases `default_<key>` → `defaultKey` on the Node, but
+    // inputs-resolver builds `fallbackAttr = default_<localKey>` (snake_case).
+    // Invert via extractDefaults, then re-prefix so renderInputsBlock can find them.
+    const rawDefaults = extractDefaults(node as unknown as Record<string, unknown>);
+    const nodeAttrs: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(rawDefaults)) nodeAttrs[`default_${k}`] = v;
     const inputsBlock = renderInputsBlock(declaredInputs, ctx.values, nodeAttrs);
     const steeringRaw = (node.prompt ?? "").trim();
     const steeringBlock = steeringRaw
