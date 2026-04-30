@@ -1,6 +1,8 @@
 ---
 date: 2026-04-30
-status: open
+status: archived
+archived_at: 2026-04-30
+archive_reason: Superseded by opposite-direction consolidation; bundled pipelines now live under src/cli/pipelines/ rather than top-level pipelines/. See IMPLEMENTATION_PLAN.md "Bundle Pipelines Under src/cli/pipelines/" plan.
 description: All pipelines moved to top-level pipelines/ folder-form except implement, still alone in src/cli/pipelines/ — last splinter to consolidate.
 ---
 
