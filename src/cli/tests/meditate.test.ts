@@ -266,7 +266,7 @@ describe("meditateCommand (shim)", () => {
 });
 
 describe("meditate template agent prompt body — exploration scope", () => {
-  it("exploration step weights specs/ and src/ folders", () => {
+  it("exploration step weights $specs_dir and src/ folders", () => {
     const agentMd = readFileSync(
       join(__dirname, "..", "pipelines", "meditate", "meditate.md"),
       "utf-8",
@@ -275,7 +275,7 @@ describe("meditate template agent prompt body — exploration scope", () => {
     expect(frontmatterMatch).not.toBeNull();
     const body = agentMd.slice(frontmatterMatch![0].length);
 
-    expect(body).toMatch(/specs\/\*?\*?\/?\*?\.?md|specs\//);
+    expect(body).toMatch(/\$specs_dir/);
     expect(body).toContain("src/");
     expect(body.toLowerCase()).toContain("weighted focus");
   });
