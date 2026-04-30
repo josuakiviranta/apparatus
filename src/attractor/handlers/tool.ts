@@ -64,18 +64,17 @@ export class ToolHandler implements NodeHandler {
 
     // Build stdout-derived context updates. tool.output is always present;
     // when produces_from_stdout=true we additionally flatten the last-line JSON
-    // object's top-level keys (flat, no node-ID prefix — matches agent-handler).
+    // object's top-level keys, qualifying each as `${nodeId}.${key}` to match
+    // agent-handler's namespacing convention. Native types are preserved (unlike
+    // agent-handler which String()-coerces) so downstream conditions can compare
+    // numbers/booleans directly.
     const buildUpdates = (stdout: string): Record<string, unknown> => {
       const updates: Record<string, unknown> = { "tool.output": stdout };
       if (producesFromStdout) {
         const parsed = parseLastLineJson(stdout, node.id);
         if (parsed) {
-          // Native types preserved (numbers stay numbers, booleans stay booleans).
-          // Agent-handler coerces to String(); we intentionally diverge so tool nodes
-          // can emit typed values downstream. Consumers reading $key through
-          // expandVariables coerce back to string via template concatenation.
           for (const [k, v] of Object.entries(parsed)) {
-            updates[k] = v;
+            updates[`${node.id}.${k}`] = v;
           }
         }
       }

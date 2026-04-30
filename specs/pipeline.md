@@ -49,7 +49,7 @@ Each node carries a `type=` attribute that selects a handler and a set of handle
 | `tool_command` | tool nodes | Shell command to execute |
 | `script_file` | tool nodes | Path to external script under `pipelines/scripts/` |
 | `script_args` | tool nodes | Arguments appended to `script_file` invocation |
-| `produces_from_stdout` | tool nodes | Context key to populate from stdout |
+| `produces_from_stdout` | tool nodes | When `true`, parse last-line JSON from stdout and store each top-level key as `${node_id}.${key}` in `ctx.values` (native types preserved) |
 | `cwd` | tool nodes | Required working directory (`$project`, `$run_id` expanded) |
 | `agent` | agent nodes | Agent name — resolved via project-local, user, then bundled registry |
 | `headless_safe` | interactive nodes | Whether the node may run without a TTY |
@@ -223,10 +223,12 @@ mark_dispatched [type="tool",
                  cwd="$project",
                  script_file="pipelines/scripts/mark-dispatched.mjs",
                  script_args="--id $illumination_id",
-                 produces_from_stdout="dispatch_result"]
+                 produces_from_stdout=true]
+// emits ctx.values["mark_dispatched.dispatch_result"] — consumers must
+// declare `inputs: [mark_dispatched.dispatch_result]`
 ```
 
-`script_file` paths are resolved relative to the `.dot` file's directory. The script inherits the process environment, receives `script_args` (variable-expanded) on the command line, and runs in `cwd`. If `produces_from_stdout="key"` is declared, the script's stdout is assigned to `context[key]` after trimming. See `pipelines/scripts/mark-dispatched.mjs` for the canonical example.
+`script_file` paths are resolved relative to the `.dot` file's directory. The script inherits the process environment, receives `script_args` (variable-expanded) on the command line, and runs in `cwd`. If `produces_from_stdout=true` is declared, the script's last-line JSON is parsed and each top-level key is stored in `ctx.values` as `${node_id}.${key}`, preserving native JSON types. Consumers must declare these as qualified inputs (e.g. `inputs: [read_vision.vision]`); bare consumer keys are rejected by the validator. See `pipelines/scripts/mark-dispatched.mjs` for the canonical example.
 
 ## Portability Heuristic
 

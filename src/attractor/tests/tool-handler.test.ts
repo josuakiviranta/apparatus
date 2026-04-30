@@ -244,8 +244,8 @@ describe("ToolHandler — produces_from_stdout", () => {
     } as Node;
     const outcome = await h.execute(node, baseCtx(), makeContext({ dotDir }));
     expect(outcome.status).toBe("success");
-    expect(outcome.contextUpdates?.a).toBe(1);
-    expect(outcome.contextUpdates?.b).toBe(2);
+    expect(outcome.contextUpdates?.["t.a"]).toBe(1);
+    expect(outcome.contextUpdates?.["t.b"]).toBe(2);
     expect(outcome.contextUpdates?.["tool.output"]).toContain("hello");
     expect(outcome.contextUpdates?.["tool.output"]).toContain('{"a":1,"b":2}');
   });
@@ -260,8 +260,8 @@ describe("ToolHandler — produces_from_stdout", () => {
     } as unknown as Node;
     const outcome = await h.execute(node, baseCtx(), makeContext({ dotDir }));
     expect(outcome.status).toBe("success");
-    expect(outcome.contextUpdates?.a).toBe(1);
-    expect(outcome.contextUpdates?.b).toBe(2);
+    expect(outcome.contextUpdates?.["t.a"]).toBe(1);
+    expect(outcome.contextUpdates?.["t.b"]).toBe(2);
   });
 
   it("produces_from_stdout=true + invalid JSON on last line → warn, only tool.output set, status still success", async () => {
@@ -347,8 +347,50 @@ describe("ToolHandler — produces_from_stdout", () => {
     } as Node;
     const outcome = await h.execute(node, baseCtx(), makeContext({ dotDir }));
     expect(outcome.status).toBe("success");
-    expect(outcome.contextUpdates?.x).toBe(42);
-    expect(outcome.contextUpdates?.y).toBe("ok");
+    expect(outcome.contextUpdates?.["t.x"]).toBe(42);
+    expect(outcome.contextUpdates?.["t.y"]).toBe("ok");
     expect(outcome.contextUpdates?.["tool.output"]).toContain("prelude");
+  });
+
+  it("produces_from_stdout=true qualifies emitted keys with node.id", async () => {
+    const h = new ToolHandler();
+    const node: Node = {
+      id: "weather",
+      shape: "parallelogram",
+      scriptFile: "scripts/emit-json.mjs",
+      producesFromStdout: true,
+    } as Node;
+    const outcome = await h.execute(node, baseCtx(), makeContext({ dotDir }));
+    expect(outcome.status).toBe("success");
+    expect(outcome.contextUpdates?.["weather.a"]).toBe(1);
+    expect(outcome.contextUpdates?.["weather.b"]).toBe(2);
+    // Bare keys must NOT exist
+    expect(outcome.contextUpdates?.a).toBeUndefined();
+    expect(outcome.contextUpdates?.b).toBeUndefined();
+  });
+
+  it("two nodes emitting same JSON key produce non-colliding qualified keys", async () => {
+    const h = new ToolHandler();
+    const nodeA: Node = {
+      id: "weather",
+      shape: "parallelogram",
+      scriptFile: "scripts/emit-json.mjs",
+      producesFromStdout: true,
+    } as Node;
+    const nodeB: Node = {
+      id: "oven",
+      shape: "parallelogram",
+      scriptFile: "scripts/emit-json.mjs",
+      producesFromStdout: true,
+    } as Node;
+
+    const outA = await h.execute(nodeA, baseCtx(), makeContext({ dotDir }));
+    const outB = await h.execute(nodeB, baseCtx(), makeContext({ dotDir }));
+
+    expect(outA.contextUpdates?.["weather.a"]).toBe(1);
+    expect(outB.contextUpdates?.["oven.a"]).toBe(1);
+    // Cross-pollution is impossible: each outcome only knows its own node's keys
+    expect(outA.contextUpdates?.["oven.a"]).toBeUndefined();
+    expect(outB.contextUpdates?.["weather.a"]).toBeUndefined();
   });
 });
