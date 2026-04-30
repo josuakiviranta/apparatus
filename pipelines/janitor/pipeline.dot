@@ -1,7 +1,7 @@
 digraph janitor {
   goal="Reconcile illumination/plan lifecycle and surface doc drift / dead code"
   headless_safe=true
-  inputs="project"
+  inputs="project, specs_dir"
 
   start [shape=Mdiamond]
 
