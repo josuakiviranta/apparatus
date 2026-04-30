@@ -13,11 +13,19 @@ digraph implement {
 
   scenario_author [agent="scenario-author"]
 
+  implementation_tester [agent="implementation-tester"]
+
+  commit_push [type="tool",
+               cwd="$project",
+               tool_command="git push origin $(git branch --show-current)"]
+
   done [shape=Msquare]
 
-  start           -> record_base
-  record_base     -> implementer
-  implementer     -> scenario_author   [condition="scenarios_dir!=''"]
-  implementer     -> done              [condition="scenarios_dir=''"]
-  scenario_author -> done
+  start                 -> record_base
+  record_base           -> implementer
+  implementer           -> scenario_author        [condition="scenarios_dir!=''"]
+  implementer           -> done                   [condition="scenarios_dir=''"]
+  scenario_author       -> implementation_tester
+  implementation_tester -> commit_push
+  commit_push           -> done
 }

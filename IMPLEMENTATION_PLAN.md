@@ -599,7 +599,7 @@ If any criterion fails, fix before Chunk 4.
 
 ### Task 4.1: Failing tests for tester + commit_push wiring
 
-- [ ] **Step 1: Append tests to `src/cli/tests/pipeline-implement-folder.test.ts`**
+- [x] **Step 1: Append tests to `src/cli/tests/pipeline-implement-folder.test.ts`**
 
 ```ts
   it("implementation-tester.md exists with proper frontmatter", () => {
@@ -628,14 +628,14 @@ If any criterion fails, fix before Chunk 4.
   });
 ```
 
-- [ ] **Step 2: Run the test file, verify the 3 new tests fail**
+- [x] **Step 2: Run the test file, verify the 3 new tests fail**
 
 Run: `npx vitest run src/cli/tests/pipeline-implement-folder.test.ts`
 Expected: 3 new tests fail.
 
 ### Task 4.2: Author the `implementation-tester.md` agent
 
-- [ ] **Step 3: Create `src/cli/pipelines/implement/implementation-tester.md`**
+- [x] **Step 3: Create `src/cli/pipelines/implement/implementation-tester.md`**
 
 Write the file with this complete content:
 
@@ -885,7 +885,7 @@ Be specific. "Something didn't work" is not an issue; name the scenario, the fai
 
 ### Task 4.3: Final wiring in `pipeline.dot`
 
-- [ ] **Step 4: Replace `src/cli/pipelines/implement/pipeline.dot`** with the final shape:
+- [x] **Step 4: Replace `src/cli/pipelines/implement/pipeline.dot`** with the final shape:
 
 ```dot
 digraph implement {
@@ -921,22 +921,22 @@ digraph implement {
 }
 ```
 
-- [ ] **Step 5: Run the test file**
+- [x] **Step 5: Run the test file**
 
 Run: `npx vitest run src/cli/tests/pipeline-implement-folder.test.ts`
 Expected: all tests PASS (7 from previous chunks + 3 new = 10).
 
-- [ ] **Step 6: Run validate from CLI**
+- [x] **Step 6: Run validate from CLI**
 
 Run: `npx tsx src/cli/index.ts pipeline validate src/cli/pipelines/implement/pipeline.dot`
 Expected: zero error-level diagnostics. (Note: validator may surface info-level `required_caller_vars` mentioning `scenarios_dir` — acceptable.)
 
-- [ ] **Step 7: Run full test suite**
+- [x] **Step 7: Run full test suite**
 
 Run: `npm test`
 Expected: green.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/cli/pipelines/implement/implementation-tester.md src/cli/pipelines/implement/pipeline.dot src/cli/tests/pipeline-implement-folder.test.ts
@@ -945,7 +945,7 @@ git commit -m "feat(implement): add implementation-tester agent + commit_push, c
 
 ### Task 4.4: Plan review checkpoint
 
-- [ ] **Step 9: Verify Chunk 4 acceptance criteria**
+- [x] **Step 9: Verify Chunk 4 acceptance criteria**
 
 - All 4 new files (`scenario-author.md`, `implementation-tester.md`, the new test file, the rewritten `pipeline.dot`) are in place.
 - Graph topology: 7 nodes (`start`, `record_base`, `implementer`, `scenario_author`, `implementation_tester`, `commit_push`, `done`).

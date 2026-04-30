@@ -56,4 +56,29 @@ describe("src/cli/pipelines/implement/pipeline.dot — scenario branch", () => {
     expect(dot).toMatch(/implementer\s*->\s*scenario_author\s*\[[^\]]*condition="scenarios_dir!=''"/);
     expect(dot).toMatch(/implementer\s*->\s*done\s*\[[^\]]*condition="scenarios_dir=''"/);
   });
+
+  it("implementation-tester.md exists with proper frontmatter", () => {
+    const agentPath = join(REPO_ROOT, "src", "cli", "pipelines", "implement", "implementation-tester.md");
+    expect(existsSync(agentPath)).toBe(true);
+    const content = readFileSync(agentPath, "utf-8");
+    expect(content).toContain("name: implementation-tester");
+    expect(content).toContain("scenarios_dir");
+    expect(content).toMatch(/outputs:[\s\S]*test_result/);
+    expect(content).toMatch(/outputs:[\s\S]*test_summary/);
+    expect(content).toMatch(/outputs:[\s\S]*test_render/);
+  });
+
+  it("declares an implementation_tester node and a commit_push tool node", () => {
+    const dot = readFileSync(DOT_PATH, "utf-8");
+    expect(dot).toMatch(/implementation_tester\s*\[[^\]]*agent="implementation-tester"/);
+    expect(dot).toMatch(/commit_push\s*\[[^\]]*tool_command="git push origin/);
+  });
+
+  it("wires scenario_author -> implementation_tester -> commit_push -> done", () => {
+    const dot = readFileSync(DOT_PATH, "utf-8");
+    expect(dot).toMatch(/scenario_author\s*->\s*implementation_tester/);
+    expect(dot).toMatch(/implementation_tester\s*->\s*commit_push/);
+    expect(dot).toMatch(/commit_push\s*->\s*done/);
+    expect(dot).not.toMatch(/scenario_author\s*->\s*done/);
+  });
 });
