@@ -1,5 +1,5 @@
 digraph meditate {
-  inputs="steer,vision"
+  inputs="steer,vision,specs_dir"
 
   start [shape=Mdiamond];
   end   [shape=Msquare];
