@@ -971,11 +971,11 @@ If any criterion fails, fix before Chunk 5.
 
 ### Task 5.1: README extension
 
-- [ ] **Step 1: Locate the implement section in `README.md`**
+- [x] **Step 1: Locate the implement section in `README.md`**
 
 Read `README.md` lines 14–30 (the `ralph implement` block).
 
-- [ ] **Step 2: Extend the implement command listing**
+- [x] **Step 2: Extend the implement command listing**
 
 Modify the bash usage block to include `--scenarios`:
 
@@ -996,11 +996,11 @@ documented in `CONTEXT.md` and `docs/adr/0003-scenario-tests-in-implement-pipeli
 
 ### Task 5.2: commands.md extension
 
-- [ ] **Step 3: Open `docs/specs/commands.md`**
+- [x] **Step 3: Open `docs/specs/commands.md`**
 
 Read the `implement` section.
 
-- [ ] **Step 4: Extend the option list**
+- [x] **Step 4: Extend the option list**
 
 Add the new flag to the option table or list (matching whatever shape the existing file uses for `--max` and `--model`). Sample line in tabular form:
 
@@ -1012,12 +1012,12 @@ If the file uses prose rather than a table, add an equivalent paragraph.
 
 ### Task 5.3: Validate and commit
 
-- [ ] **Step 5: Run full test suite**
+- [x] **Step 5: Run full test suite**
 
 Run: `npm test`
 Expected: green.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add README.md docs/specs/commands.md
@@ -1026,7 +1026,7 @@ git commit -m "docs: --scenarios flag in README and commands spec"
 
 ### Task 5.4: Plan review checkpoint
 
-- [ ] **Step 7: Verify Chunk 5 acceptance criteria**
+- [x] **Step 7: Verify Chunk 5 acceptance criteria**
 
 - README's `ralph implement` section names the new flag and references the ADR.
 - `docs/specs/commands.md` lists `--scenarios` with the same shape as `--max` / `--model`.

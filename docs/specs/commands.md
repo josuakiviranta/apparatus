@@ -8,6 +8,8 @@ Runs the agentic implementation loop.
 
 **Options:**
 - `--max <n>` — cap the number of loop iterations (default: unlimited)
+- `--model <name>` — override the LLM model for the session
+- `--scenarios <path>` — relative path under `<project-folder>` for scenario tests. Enables the scenario-author + implementation-tester branch. Requires tmux. Default: branch skipped.
 
 **Behavior:**
 1. Resolves absolute path; exits if folder missing

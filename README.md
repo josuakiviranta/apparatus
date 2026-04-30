@@ -13,10 +13,17 @@ Requires: Node.js >=18, [`claude` CLI](https://www.npmjs.com/package/@anthropic-
 ## Commands
 
 ```bash
-ralph implement <project-folder> [--max N] [--model <name>]
+ralph implement <project-folder> [--max N] [--model <name>] [--scenarios <path>]
 ```
 Runs the agentic build loop. Claude iterates, commits, and pushes changes until done (or `N` iterations).
 `--model` overrides the LLM model for the session.
+
+`--scenarios <path>` enables an opt-in branch that authors operator-surface
+scenario tests in `<project>/<path>` after the implementer finishes, then
+drives them through a tmux harness — fixing code red-green until they pass
+or the agent judges itself stuck. The flag requires running inside a tmux
+session (preflight check). Scenario test format and discipline are
+documented in `CONTEXT.md` and `docs/adr/0003-scenario-tests-in-implement-pipeline.md`.
 
 Each agent turn is annotated with:
 - `→ [read] path`, `→ [write] path`, `→ [edit] path` — file operations
