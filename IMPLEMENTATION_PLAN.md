@@ -302,11 +302,11 @@ The repo's project-local `pipelines/` mirror is what self-development uses. `ill
 - **Do NOT modify:** `pipelines/illumination-to-implementation/verifier.md:65` ("Cited specs:" — concept-reference, English noun, not a filesystem path)
 - **Do NOT modify:** `pipelines/illumination-to-implementation/memory-writer.md:144` ("Do not touch source code, specs, or pipelines" — concept-reference, English noun)
 
-- [ ] **Step 1: For each path-ref line above, replace literal `specs/` → `$specs_dir/`. Skip the two concept-reference lines.**
+- [x] **Step 1: For each path-ref line above, replace literal `specs/` → `$specs_dir/`. Skip the two concept-reference lines.**
 
-- [ ] **Step 1b: Add empty-value fallback to each migrated agent rubric.** Since `$specs_dir` is read from the auto-injected Inputs block (Chunk 2 preamble), an unset value would yield an empty string and silently break globs like `$specs_dir/*.md` (becomes `/*.md`). Add a single sentence near the first use of `$specs_dir` in each rubric: "If `$specs_dir` is empty in the Inputs block, default to `docs/specs`." Apply to: `implement.md`, `verifier.md`. (`memory-writer.md` was a concept-ref — no fallback needed.)
+- [x] **Step 1b: Add empty-value fallback to each migrated agent rubric.** Since `$specs_dir` is read from the auto-injected Inputs block (Chunk 2 preamble), an unset value would yield an empty string and silently break globs like `$specs_dir/*.md` (becomes `/*.md`). Add a single sentence near the first use of `$specs_dir` in each rubric: "If `$specs_dir` is empty in the Inputs block, default to `docs/specs`." Apply to: `implement.md`, `verifier.md`. (`memory-writer.md` was a concept-ref — no fallback needed.)
 
-- [ ] **Step 2: Run portability validator**
+- [x] **Step 2: Run portability validator**
 
 ```bash
 npm run build
@@ -314,7 +314,7 @@ node dist/cli/index.js pipeline validate pipelines/illumination-to-implementatio
 ```
 Expected: no undeclared variables; `specs_dir` already in `inputs="..."`.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git commit -am "refactor(illumination-to-implementation): \$specs_dir in remaining rubrics"
@@ -326,17 +326,17 @@ git commit -am "refactor(illumination-to-implementation): \$specs_dir in remaini
 - Modify: `pipelines/janitor/janitor.md:56` — `specs/*.md` → `$specs_dir/*.md` (the only filesystem path-ref in janitor — illuminations and plans are MCP-resolved, not filesystem paths)
 - Modify: `pipelines/janitor/pipeline.dot:4` — current `inputs="project"` → `inputs="project, specs_dir"`
 
-- [ ] **Step 1: Apply rubric edit to `janitor.md:56`. Add the same empty-value fallback sentence used in Task 3.1 Step 1b.**
+- [x] **Step 1: Apply rubric edit to `janitor.md:56`. Add the same empty-value fallback sentence used in Task 3.1 Step 1b.**
 
-- [ ] **Step 2: Apply pipeline.dot edit — append `specs_dir` to inputs.**
+- [x] **Step 2: Apply pipeline.dot edit — append `specs_dir` to inputs.**
 
-- [ ] **Step 3: Validate**
+- [x] **Step 3: Validate**
 
 ```bash
 node dist/cli/index.js pipeline validate pipelines/janitor/pipeline.dot
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git commit -am "refactor(janitor): \$specs_dir variable for doc-drift scan"
@@ -344,7 +344,7 @@ git commit -am "refactor(janitor): \$specs_dir variable for doc-drift scan"
 
 ### Task 3.3: Plan-document review checkpoint (Chunk 3)
 
-- [ ] Dispatch reviewer; verify only path-references were converted, not the bare-word "specs" semantic uses.
+- [x] Dispatch reviewer; verify only path-references were converted, not the bare-word "specs" semantic uses.
 
 ---
 
