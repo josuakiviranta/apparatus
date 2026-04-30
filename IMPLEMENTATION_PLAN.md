@@ -425,7 +425,7 @@ This chunk reshapes the `illumination-to-implementation` pipeline: replaces `mar
 - Create: `pipelines/illumination-to-implementation/tests/consume.test.mjs`
 - Create: `pipelines/illumination-to-implementation/consume.mjs`
 
-- [ ] **Step 1: Author the failing test file**
+- [x] **Step 1: Author the failing test file**
 
 Create `pipelines/illumination-to-implementation/tests/consume.test.mjs`:
 
@@ -525,12 +525,12 @@ describe("consume.mjs", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test — confirm it fails because the script does not exist**
+- [x] **Step 2: Run the test — confirm it fails because the script does not exist**
 
 Run: `npx vitest run pipelines/illumination-to-implementation/tests/consume.test.mjs`
 Expected: FAIL — `consume.mjs` does not exist; spawnSync errors out.
 
-- [ ] **Step 3: Implement `consume.mjs`**
+- [x] **Step 3: Implement `consume.mjs`**
 
 Create `pipelines/illumination-to-implementation/consume.mjs`:
 
@@ -575,12 +575,12 @@ try {
 console.log(JSON.stringify({ success: true, filename, reason }));
 ```
 
-- [ ] **Step 4: Run the test — confirm it passes**
+- [x] **Step 4: Run the test — confirm it passes**
 
 Run: `npx vitest run pipelines/illumination-to-implementation/tests/consume.test.mjs`
 Expected: PASS, 7/7.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add pipelines/illumination-to-implementation/consume.mjs pipelines/illumination-to-implementation/tests/consume.test.mjs
@@ -595,12 +595,12 @@ git commit -m "feat(pipeline): add consume.mjs script + tests for decline path"
 - Delete: `pipelines/illumination-to-implementation/mark-dispatched.mjs`
 - Delete: `pipelines/illumination-to-implementation/tests/mark-dispatched.test.mjs`
 
-- [ ] **Step 1: Confirm no other code references these scripts**
+- [x] **Step 1: Confirm no other code references these scripts**
 
 Run: `grep -rn -E "mark-archived\.mjs|mark-dispatched\.mjs" --include="*.dot" --include="*.md" --include="*.ts" --include="*.mjs" --include="*.js" .`
 Expected: only references inside `pipeline.dot` (handled in Task 2.3), the scripts themselves, and their tests. Any other hit must be flagged before deletion.
 
-- [ ] **Step 2: Delete the four files**
+- [x] **Step 2: Delete the four files**
 
 ```bash
 git rm pipelines/illumination-to-implementation/mark-archived.mjs
@@ -609,12 +609,12 @@ git rm pipelines/illumination-to-implementation/mark-dispatched.mjs
 git rm pipelines/illumination-to-implementation/tests/mark-dispatched.test.mjs
 ```
 
-- [ ] **Step 3: Run the full pipeline test suite — confirm nothing else broke**
+- [x] **Step 3: Run the full pipeline test suite — confirm nothing else broke**
 
 Run: `npx vitest run pipelines/illumination-to-implementation/tests/`
 Expected: PASS (only `consume.test.mjs` and any other unrelated tests in that dir).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git commit -m "refactor(pipeline): delete mark-archived.mjs and mark-dispatched.mjs (replaced by consume.mjs)"
@@ -625,7 +625,7 @@ git commit -m "refactor(pipeline): delete mark-archived.mjs and mark-dispatched.
 **Files:**
 - Modify: `pipelines/illumination-to-implementation/pipeline.dot`
 
-- [ ] **Step 1: Replace the `mark_archived` node definition with `consume_declined`**
+- [x] **Step 1: Replace the `mark_archived` node definition with `consume_declined`**
 
 In `pipeline.dot` lines 14-17, replace:
 
@@ -645,11 +645,11 @@ with:
                     script_args="$verifier.illumination_path declined"]
 ```
 
-- [ ] **Step 2: Delete the `mark_dispatched` node definition**
+- [x] **Step 2: Delete the `mark_dispatched` node definition**
 
 In `pipeline.dot` lines 19-22, delete the entire `mark_dispatched [type="tool", …]` block (4 lines).
 
-- [ ] **Step 3: Rewire the routing edges**
+- [x] **Step 3: Rewire the routing edges**
 
 In `pipeline.dot` lines 59 and 65, change `mark_archived` to `consume_declined`:
 
@@ -674,17 +674,17 @@ In lines 83-86, replace the plan_writer → mark_dispatched → implement chain 
 
 Delete the now-orphan line `mark_dispatched -> implement` (currently line 86).
 
-- [ ] **Step 4: Validate the pipeline**
+- [x] **Step 4: Validate the pipeline**
 
 Run: `npx ralph pipeline validate pipelines/illumination-to-implementation/pipeline.dot`
 Expected: PASS — no structural errors, no portability_heuristic warnings (the script_file references a sibling file that exists).
 
-- [ ] **Step 5: Run the smoke pipeline test (if one exists for this pipeline)**
+- [x] **Step 5: Run the smoke pipeline test (if one exists for this pipeline)**
 
 Run: `grep -rln "illumination-to-implementation" pipelines/smoke/`
 If a smoke fixture exists, run its test. Otherwise, skip this step.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add pipelines/illumination-to-implementation/pipeline.dot
