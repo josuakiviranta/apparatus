@@ -16,7 +16,7 @@ Validates `projectRoot` exists; exits with code 1 if missing.
 - Version: `"1.0.0"`
 - Transport: `StdioServerTransport` (stdin/stdout)
 
-## MCP Tools (12)
+## MCP Tools (10)
 
 ### `write_illumination`
 
@@ -29,26 +29,17 @@ Writes a file to the illuminations output directory.
 - **Path:** `<projectRoot>/meditations/illuminations/<filename>`
 - **Creates** the directory if it doesn't exist
 - **Restricted** to that single output directory — no writes elsewhere
-- After lifecycle transitions, files may be moved by `mark_implemented` or `mark_archived` to sibling directories (see those tool sections).
+- The illumination is removed by `consume` (see below) when the work it represents is implemented or declined.
 
 ### `list_illuminations`
 
-Lists illuminations written to this project, with descriptions. Routes to a directory by `status`.
+Lists illuminations in `meditations/illuminations/`, with descriptions.
 
-- **Params:** `{ status?: "open" | "dispatched" | "archived" | "implemented" }`
-- **Reads from** (status determines source dir):
-
-  | `status` arg | Source dir | Inline frontmatter filter |
-  |---|---|---|
-  | `"open"` | `meditations/illuminations/` | `status: open` |
-  | `"dispatched"` | `meditations/illuminations/` | `status: dispatched` |
-  | `"archived"` | `meditations/archived-illuminations/` | none (whole dir is archived) |
-  | `"implemented"` | `meditations/implemented-illuminations/` | none (whole dir is implemented) |
-  | none / no filter | union of all three dirs | none |
-
+- **Params:** `{}` (no parameters)
+- **Reads from** `<projectRoot>/meditations/illuminations/` only
 - **Returns** one line per file: `<filename> — <description>` (sorted by filename)
 - Files without frontmatter show `(no description)`
-- Returns `"No illuminations found."` if matched directories are empty or missing
+- Returns `"No illuminations found."` if the directory is empty or missing
 
 ### `read_file`
 
@@ -98,39 +89,22 @@ Lists implementation plans in `docs/superpowers/plans/`, optionally filtered by 
 - Returns `"No plans found."` if the directory is empty or missing
 - Plans without frontmatter are skipped when `status` is provided
 
-### `mark_implemented`
+### `consume`
 
-Marks an illumination as implemented. Valid from status `open` or `dispatched`.
+Consumes an illumination — deletes the file from `meditations/illuminations/` and commits the deletion.
 
-- **Params:** `{ filename: string }`
-- **Modifies** frontmatter `status` field to `implemented`, adds `implemented_at` key
-- **Moves** file from `meditations/illuminations/<filename>` to `meditations/implemented-illuminations/<filename>`
-- **Auto-commits** with message `meditate: implement <filename>` (best-effort; non-fatal if git unavailable)
-- **Returns** `{ success, filename, previous_status, new_status, new_path }` where `new_path` is the post-move location
-
-### `mark_dispatched`
-
-Marks an illumination as dispatched after a plan has been generated. Valid only from status `open`.
-
-- **Params:** `{ filename: string, plan_path: string }`
-- **Modifies** frontmatter `status` and `plan_path` fields in the illumination file
-
-### `mark_archived`
-
-Archives an illumination. Valid from any status except `archived`.
-
-- **Params:** `{ filename: string, reason: string }`
-- **Modifies** frontmatter `status` field to `archived`, adds `archived_at` and `reason` keys
-- **Moves** file from `<projectRoot>/meditations/illuminations/<filename>` to `<projectRoot>/meditations/archived-illuminations/<filename>`
-- **Auto-commits** with message `meditate: archive <filename>` (best-effort; non-fatal if git unavailable)
-- **Returns** `{ success, filename, previous_status, new_status, archive_path }` where `archive_path` is the post-move location
+- **Params:** `{ filename: string, reason: "implemented" | "declined" }`
+- **Deletes** `<projectRoot>/meditations/illuminations/<filename>` from disk
+- **Auto-commits** with message `meditate: consume <filename> (<reason>)` (best-effort; non-fatal if git unavailable)
+- **Returns** `{ success: true, filename, reason }` on success, or `{ success: false, error }` if the file is missing
+- Use `reason: "implemented"` after a successful implement loop + memory-write. Use `reason: "declined"` when the operator rejects an illumination at the gate. The reason lives only in the commit message; recoverable via `git log --grep`.
 
 ### `mark_plan_implemented`
 
 Marks an implementation plan as implemented by flipping its frontmatter `status` from `pending` to `implemented`. Valid only from status `pending`. Used by the janitor agent and lifecycle-closing pipeline nodes.
 
 - **Params:** `{ plan_filename: string }` — basename only (e.g. `2026-04-27-foo.md`); resolves under `docs/superpowers/plans/`
-- **Modifies** frontmatter `status` field to `implemented` (only — no timestamp key is added; this is asymmetric with the illumination-side `mark_implemented` which does add `implemented_at`)
+- **Modifies** frontmatter `status` field to `implemented` (only — no timestamp key is added)
 - **Auto-commits** with message `meditate: mark plan <plan_filename> implemented` (best-effort; non-fatal if git unavailable)
 - **Returns** `{ success, plan_filename, previous_status, new_status }` on success, or `{ success: false, error }` on rejection
 
@@ -139,15 +113,13 @@ Marks an implementation plan as implemented by flipping its frontmatter `status`
 | Tool | Scope |
 |------|-------|
 | `write_illumination` | `<projectRoot>/meditations/illuminations/` only |
-| `list_illuminations` | `<projectRoot>/meditations/{illuminations,archived-illuminations,implemented-illuminations}/` (read-only) |
+| `list_illuminations` | `<projectRoot>/meditations/illuminations/` (read-only) |
 | `read_file` | Anywhere inside `projectRoot` |
 | `glob_files` | Anywhere inside `projectRoot` |
 | `project_tree` | Anywhere inside `projectRoot` |
 | `list_meta_meditations` | `meditationsDir` (read-only) |
 | `read_meta_meditation` | `meditationsDir` (read-only) |
-| `mark_implemented` | `<projectRoot>/meditations/illuminations/` → `implemented-illuminations/` (move) |
-| `mark_dispatched` | `<projectRoot>/meditations/illuminations/` (modify frontmatter) |
-| `mark_archived` | `<projectRoot>/meditations/illuminations/` → `archived-illuminations/` (move) |
+| `consume` | `<projectRoot>/meditations/illuminations/` (delete + commit) |
 | `list_plans` | `<projectRoot>/docs/superpowers/plans/` (read-only) |
 | `mark_plan_implemented` | `<projectRoot>/docs/superpowers/plans/` (modify frontmatter + commit) |
 
