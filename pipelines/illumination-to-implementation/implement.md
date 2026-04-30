@@ -13,7 +13,7 @@ outputs:
 ---
 
 0. **Skill invocation (mandatory, first action).** Before any reading, planning, or coding, invoke the `superpowers:subagent-driven-development` skill via the Skill tool. Invoke `superpowers:test-driven-development` before each chunk's implementation phase. These skills are the operating contract — not aspirational guidance. Skipping them is a procedure violation.
-0a. Study `specs/*` with up to 500 parallel Sonnet subagents to learn the application specifications.
+0a. Study `$specs_dir/*` with up to 500 parallel Sonnet subagents to learn the application specifications. If `$specs_dir` is empty in the Inputs block, default to `docs/specs`.
 0b. Study @IMPLEMENTATION_PLAN.md.
 0d. For reference, the application source code is in `src/*`.
 
@@ -34,7 +34,7 @@ outputs:
 9999999999. For any bugs you notice, resolve them or document them in @IMPLEMENTATION_PLAN.md using a subagent even if it is unrelated to the current piece of work.
 99999999999. Implement functionality completely. Placeholders and stubs waste efforts and time redoing the same work.
 999999999999. When @IMPLEMENTATION_PLAN.md becomes large periodically clean out the items that are completed from the file using a subagent.
-9999999999999. If you find inconsistencies in the specs/\* then use an Opus 4.5 subagent with 'ultrathink' requested to update the specs.
+9999999999999. If you find inconsistencies in the $specs_dir/\* then use an Opus 4.5 subagent with 'ultrathink' requested to update the specs.
 99999999999999. IMPORTANT: Keep @AGENTS.md operational only — status updates and progress notes belong in `IMPLEMENTATION_PLAN.md`. A bloated AGENTS.md pollutes every future loop's context.
 9999999999999999. Use tmux harnessing tools to verify output for terminal outputs and other terminal UI related implementations.
 

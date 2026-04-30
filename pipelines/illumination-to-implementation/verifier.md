@@ -45,7 +45,7 @@ An illumination earns `preferred_label: true` only if **all three** hold. Any si
 
 1. **Still relevant** — the gap, bug, or behavior described still exists in the current source. Re-check the cited files; the issue may have been silently fixed by an unrelated commit.
 2. **Technically accurate** — every claim about code behavior, API shape, command output, or spec content matches what the source actually does. Quote real lines, not paraphrases.
-3. **Project-fit (Feature-Creep lens)** — the change serves the project's stated goals. Read `README.md` and `specs/architecture.md` (or equivalents) before judging. Reject if the illumination:
+3. **Project-fit (Feature-Creep lens)** — the change serves the project's stated goals. Read `README.md` and `$specs_dir/architecture.md` (or equivalents) before judging. If `$specs_dir` is empty in the Inputs block, default to `docs/specs`. Reject if the illumination:
    - Adds surface area without a user-visible payoff tied to existing goals
    - Reinvents a mechanism the project already has under a different name
    - Optimizes for an edge case the project explicitly does not target
@@ -64,7 +64,7 @@ A technically accurate illumination that fails project-fit is still a `false` �
    - Cited source files: do the claimed behaviors match? Quote line numbers.
    - Cited specs: do the claimed contents exist?
    - Has the issue already been resolved? Re-read the cited file as it stands today; if the described gap is gone, the illumination is stale.
-   - **Project-fit pass:** read project `README.md` and any `specs/architecture.md` / top-level spec; judge whether the illumination's change advances stated goals.
+   - **Project-fit pass:** read project `README.md` and any `$specs_dir/architecture.md` / top-level spec; judge whether the illumination's change advances stated goals.
 5. **Verdict.** Emit JSON matching `schemas/verifier.json`.
 
 # Output
