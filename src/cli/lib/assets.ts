@@ -5,43 +5,47 @@ import { existsSync } from "fs";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /**
- * Resolves a path to a bundled asset.
- * In production (tsup bundle): __RALPH_PROD__ is defined → __dirname is dist/cli/
- * In dev (tsx): __RALPH_PROD__ is undefined → __dirname is src/cli/lib/
+ * In production (tsup bundle): __RALPH_PROD__ defined → __dirname is dist/cli/
+ * In dev (tsx): __RALPH_PROD__ undefined → __dirname is src/cli/lib/
  */
 function isProduction(): boolean {
   return typeof __RALPH_PROD__ !== "undefined";
 }
 
-export function getAssetPath(filename: string): string {
-  // prod: dist/cli/ → up one → dist/ (where templates/, agents/, pipelines/ live)
-  // dev:  src/cli/lib/ → up one → src/cli/ (where templates/, agents/, pipelines/ live in dev)
-  const base = join(__dirname, "..");
-  return join(base, filename);
+function getBundledRoot(): string {
+  // prod: dist/cli/ → up one → dist/  (tsup copies src/cli/pipelines → dist/pipelines)
+  // dev:  src/cli/lib/ → up one → src/cli/  (where pipelines/ lives in source)
+  return join(__dirname, "..");
 }
 
-export function getBundledAgentsDir(): string {
-  return getAssetPath("agents");
+export function getBundledPipelinesDir(): string {
+  return join(getBundledRoot(), "pipelines");
 }
 
-export function getBundledTemplatesDir(): string {
-  return getAssetPath("templates");
-}
-
-export function resolveBundledTemplate(name: string): string {
-  const dir = getBundledTemplatesDir();
-  const path = join(dir, name, "pipeline.dot");
+export function resolveBundledPipeline(name: string): string {
+  const path = join(getBundledPipelinesDir(), name, "pipeline.dot");
   if (!existsSync(path)) {
     throw new Error(
-      `Bundled template not found: "${name}" (expected ${path}). ` +
-        `Available templates ship under src/cli/templates/.`,
+      `Bundled pipeline not found: "${name}" (expected ${path}). ` +
+        `Available pipelines ship under pipelines/ at the ralph-cli repo root.`,
     );
   }
   return path;
 }
 
+export function getBundledAgentsDir(): string {
+  // prod: dist/cli/ → dist/agents/
+  // dev:  src/cli/lib/ → src/cli/agents/
+  return isProduction()
+    ? join(__dirname, "..", "agents")
+    : join(__dirname, "..", "agents");
+}
+
 export function getBundledPipelinePath(name: string): string {
-  return getAssetPath(join("pipelines", `${name}.dot`));
+  // Legacy flat-file lookup for src/cli/pipelines/<name>.dot (e.g. implement.dot).
+  return isProduction()
+    ? join(__dirname, "..", "pipelines", `${name}.dot`)
+    : join(__dirname, "..", "pipelines", `${name}.dot`);
 }
 
 export function getMetaMeditationsDir(): string {
@@ -55,10 +59,8 @@ export function getMetaMeditationsDir(): string {
 
 export function getIlluminationServerPath(): string {
   if (isProduction()) {
-    // prod: dist/cli/ → dist/cli/mcp/illumination-server.js
     return join(__dirname, "mcp", "illumination-server.js");
   } else {
-    // dev: src/cli/lib/ → src/cli/mcp/illumination-server.ts
     return join(__dirname, "..", "mcp", "illumination-server.ts");
   }
 }
