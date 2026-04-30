@@ -879,7 +879,7 @@ git commit -m "docs(pipeline): memory-writer step 7b now calls consume(reason=im
 **Files:**
 - Modify: `pipelines/illumination-to-implementation/memory-reflector.md` (line 41)
 
-- [ ] **Step 1: Replace the post-move fallback at line 41 (Inputs section bullet)**
+- [x] **Step 1: Replace the post-move fallback at line 41 (Inputs section bullet)**
 
 Line 41 currently reads:
 
@@ -893,7 +893,7 @@ Replace with:
 - `$verifier_illumination_path` — original illumination this session sprang from. Note: by the time you run, memory-writer's step 7b may have consumed (deleted) this file. If `$verifier_illumination_path` does not exist on disk, treat that as the expected post-consume state — skip the illumination read in procedure step 2 and proceed using only the memory file plus the design and plan artifacts.
 ```
 
-- [ ] **Step 2: Update the procedure cross-reference at line 47**
+- [x] **Step 2: Update the procedure cross-reference at line 47**
 
 Line 47 currently reads:
 
@@ -907,12 +907,12 @@ Change "(with the post-move fallback above)" to "(if it still exists on disk; if
 2. **Read the inputs.** Read `$memory_writer.memory_path` first — it is memory-writer's distillation of the session trace. Then read `$design_writer.design_doc_path`, `$plan_writer.plan_path`, and `$verifier_illumination_path` (if it still exists on disk; if memory-writer's step 7b consumed it, skip) for cross-reference context. …
 ```
 
-- [ ] **Step 3: Final sweep**
+- [x] **Step 3: Final sweep**
 
 Run: `grep -nE "archived-illuminations|implemented-illuminations|mark_implemented|mark_archived|status.*open|status.*dispatched" pipelines/illumination-to-implementation/memory-reflector.md`
 Expected: no matches. If any remain, edit them in context.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add pipelines/illumination-to-implementation/memory-reflector.md

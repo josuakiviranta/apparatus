@@ -38,13 +38,13 @@ You produce zero or one illumination per run. You are not a backlog generator �
 - `$memory_writer.memory_path` — absolute path to the memory file just written by memory-writer (primary input).
 - `$design_writer.design_doc_path` — design that drove this run.
 - `$plan_writer.plan_path` — implementation plan that drove this run.
-- `$verifier_illumination_path` — original illumination this session sprang from. Note: by the time you run, memory-writer's step 7b may have moved this file from `meditations/illuminations/` to `meditations/implemented-illuminations/`. If `$verifier_illumination_path` does not exist on disk, look up the basename under `meditations/implemented-illuminations/` instead.
+- `$verifier_illumination_path` — original illumination this session sprang from. Note: by the time you run, memory-writer's step 7b may have consumed (deleted) this file. If `$verifier_illumination_path` does not exist on disk, treat that as the expected post-consume state — skip the illumination read in procedure step 2 and proceed using only the memory file plus the design and plan artifacts.
 
 # Procedure
 
 1. **Idempotency check.** Glob `$project/meditations/illuminations/*.md` and grep each match for the line `Pipeline run id: $run_id`. If any file matches, this is a `--resume` re-run and a previous attempt already wrote the illumination. Emit structured JSON with `illumination_path` set to the existing match's absolute path. Exit. (You may state your reasoning as plain prose in the response above the JSON for trace observability — it will be captured in the run trace, but it is not a structured output field.)
 
-2. **Read the inputs.** Read `$memory_writer.memory_path` first — it is memory-writer's distillation of the session trace. Then read `$design_writer.design_doc_path`, `$plan_writer.plan_path`, and `$verifier_illumination_path` (with the post-move fallback above) for cross-reference context. Do not re-open the raw `pipeline.jsonl` trace; if the memory file lacks signal, that signal is gone for your purposes.
+2. **Read the inputs.** Read `$memory_writer.memory_path` first — it is memory-writer's distillation of the session trace. Then read `$design_writer.design_doc_path`, `$plan_writer.plan_path`, and `$verifier_illumination_path` (if it still exists on disk; if memory-writer's step 7b consumed it, skip) for cross-reference context. Do not re-open the raw `pipeline.jsonl` trace; if the memory file lacks signal, that signal is gone for your purposes.
 
 3. **Apply skip-fast signals.** Lean toward skipping when any of these hold:
    - The memory file has no `## Learnings from the run` section.
