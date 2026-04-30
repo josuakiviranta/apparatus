@@ -44,7 +44,7 @@ You turn an approved design doc into a chunked, TDD-shaped implementation plan a
 
 3. **Invoke the writing-plans skill.** Load `superpowers:writing-plans` via the Skill tool and follow it end-to-end. Use the required plan header the skill defines.
 
-4. **Begin the plan file with a frontmatter block.** Two fields, in this order: `status: pending` and `illumination_source: <basename of $verifier_illumination_path>` (filename only, no path). Place the block before the plan's first heading, delimited by `---` lines. The downstream `list_plans` MCP tool reads this frontmatter; omitting it makes the produced plan invisible to lifecycle queries.
+4. **Begin the plan file with a frontmatter block.** One field: `status: pending`. Place the block before the plan's first heading, delimited by `---` lines. The downstream `list_plans` MCP tool reads this frontmatter; omitting it makes the produced plan invisible to lifecycle queries.
 
 5. **Structure the plan as chunks.** Each chunk:
    - `## Chunk N: <name>` heading.

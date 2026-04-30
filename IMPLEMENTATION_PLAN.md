@@ -771,12 +771,12 @@ git commit -m "docs(pipeline): update verifier.md to single-folder list_illumina
 **Files:**
 - Modify: `pipelines/illumination-to-implementation/plan-writer.md:47`
 
-- [ ] **Step 1: Locate the frontmatter requirement**
+- [x] **Step 1: Locate the frontmatter requirement**
 
 Run: `grep -n "illumination_source" pipelines/illumination-to-implementation/plan-writer.md`
 Confirm the only hit is at the line directing the agent to write `illumination_source: <basename>` to plan frontmatter.
 
-- [ ] **Step 2: Edit the requirement**
+- [x] **Step 2: Edit the requirement**
 
 Around line 47, the prompt currently says:
 
@@ -790,7 +790,7 @@ Change to:
 4. **Begin the plan file with a frontmatter block.** One field: `status: pending`. Place the block before the plan's first heading, delimited by `---` lines. The downstream `list_plans` MCP tool reads this frontmatter; omitting it makes the produced plan invisible to lifecycle queries.
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add pipelines/illumination-to-implementation/plan-writer.md
