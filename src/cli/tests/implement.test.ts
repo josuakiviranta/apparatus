@@ -54,4 +54,58 @@ describe("implementCommand", () => {
       })
     );
   });
+
+  it("passes scenarios_dir='' by default (flag not set)", async () => {
+    await implementCommand("/my/project", {});
+    expect(mockPipeline).toHaveBeenCalledWith(
+      "implement",
+      expect.objectContaining({
+        variables: expect.objectContaining({ scenarios_dir: "" }),
+      })
+    );
+  });
+
+  it("passes scenarios_dir from --scenarios flag when in tmux", async () => {
+    const prev = process.env.TMUX;
+    process.env.TMUX = "/tmp/tmux-1000/default,1234,0";
+    try {
+      await implementCommand("/my/project", { scenarios: "src/tests/scenarios" });
+      expect(mockPipeline).toHaveBeenCalledWith(
+        "implement",
+        expect.objectContaining({
+          variables: expect.objectContaining({ scenarios_dir: "src/tests/scenarios" }),
+        })
+      );
+    } finally {
+      if (prev === undefined) delete process.env.TMUX; else process.env.TMUX = prev;
+    }
+  });
+
+  it("rejects --scenarios outside tmux with friendly error and exits", async () => {
+    const prev = process.env.TMUX;
+    delete process.env.TMUX;
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+      throw new Error(`process.exit(${code})`);
+    }) as never);
+    try {
+      await expect(
+        implementCommand("/my/project", { scenarios: "src/tests/scenarios" })
+      ).rejects.toThrow(/process\.exit\(1\)/);
+      expect(mockPipeline).not.toHaveBeenCalled();
+    } finally {
+      exitSpy.mockRestore();
+      if (prev !== undefined) process.env.TMUX = prev;
+    }
+  });
+
+  it("does not preflight tmux when --scenarios is absent", async () => {
+    const prev = process.env.TMUX;
+    delete process.env.TMUX;
+    try {
+      await implementCommand("/my/project", {});
+      expect(mockPipeline).toHaveBeenCalled();
+    } finally {
+      if (prev !== undefined) process.env.TMUX = prev;
+    }
+  });
 });

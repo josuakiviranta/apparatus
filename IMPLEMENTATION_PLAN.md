@@ -27,7 +27,7 @@
 
 ### Task 1.1: Failing tests for `--scenarios` plumbing
 
-- [ ] **Step 1: Add 4 failing tests to `src/cli/tests/implement.test.ts`**
+- [x] **Step 1: Add 4 failing tests to `src/cli/tests/implement.test.ts`**
 
 Append these tests to the existing `describe("implementCommand", ...)` block:
 
@@ -87,14 +87,14 @@ Append these tests to the existing `describe("implementCommand", ...)` block:
   });
 ```
 
-- [ ] **Step 2: Run the new tests, verify they fail**
+- [x] **Step 2: Run the new tests, verify they fail**
 
 Run: `npx vitest run src/cli/tests/implement.test.ts`
 Expected: 4 new tests fail (3 because `ImplementOptions.scenarios` is unknown / `scenarios_dir` not in variables; 1 because no preflight exists).
 
 ### Task 1.2: Implement the flag + preflight
 
-- [ ] **Step 3: Extend `ImplementOptions` and add preflight + variable** in `src/cli/commands/implement.ts`
+- [x] **Step 3: Extend `ImplementOptions` and add preflight + variable** in `src/cli/commands/implement.ts`
 
 Replace the file body with:
 
@@ -140,7 +140,7 @@ export async function implementCommand(
 }
 ```
 
-- [ ] **Step 4: Register the flag on the Commander command** in `src/cli/program.ts`
+- [x] **Step 4: Register the flag on the Commander command** in `src/cli/program.ts`
 
 Modify the `implement` command block:
 
@@ -157,19 +157,19 @@ Modify the `implement` command block:
     });
 ```
 
-- [ ] **Step 5: Run the new tests, verify they pass**
+- [x] **Step 5: Run the new tests, verify they pass**
 
 Run: `npx vitest run src/cli/tests/implement.test.ts`
 Expected: all tests in the file PASS (existing 4 + new 4 = 8).
 
-- [ ] **Step 6: Run full test suite, verify nothing broke**
+- [x] **Step 6: Run full test suite, verify nothing broke**
 
 Run: `npm test`
 Expected: green (or only pre-existing failures unrelated to this chunk).
 
 ### Task 1.3: Declare optional input on the pipeline graph
 
-- [ ] **Step 7: Extend pipeline.dot inputs declaration**
+- [x] **Step 7: Extend pipeline.dot inputs declaration**
 
 Modify `src/cli/pipelines/implement/pipeline.dot` line 3:
 
@@ -177,13 +177,13 @@ Modify `src/cli/pipelines/implement/pipeline.dot` line 3:
   inputs="specs_dir,max_iterations,llm_model,scenarios_dir"
 ```
 
-- [ ] **Step 8: Verify pipeline still validates**
+- [x] **Step 8: Verify pipeline still validates**
 
 Run: `node dist/cli/index.js pipeline validate src/cli/pipelines/implement/pipeline.dot`
 (or if not built: `npx tsx src/cli/index.ts pipeline validate src/cli/pipelines/implement/pipeline.dot`)
 Expected: validation passes (informational `required_caller_vars` diagnostic may now mention `scenarios_dir` — acceptable).
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add src/cli/program.ts src/cli/commands/implement.ts src/cli/tests/implement.test.ts src/cli/pipelines/implement/pipeline.dot
@@ -192,7 +192,7 @@ git commit -m "feat(implement): add --scenarios flag + tmux preflight, declare s
 
 ### Task 1.4: Plan review checkpoint
 
-- [ ] **Step 10: Verify Chunk 1 acceptance criteria**
+- [x] **Step 10: Verify Chunk 1 acceptance criteria**
 
 - `ralph implement <folder>` (no flag): unchanged — `scenarios_dir=""` in pipeline ctx; pipeline still 3-node; no tmux required.
 - `ralph implement <folder> --scenarios src/tests/scenarios` outside tmux: prints friendly error, exits 1, never calls pipeline.

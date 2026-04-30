@@ -76,10 +76,11 @@ Meditation (restricted insight sessions):
   program
     .command("implement <project-folder>")
     .description("Run the implement pipeline — Claude reads prompts, writes code, commits, and pushes")
-    .addHelpText("after", "\nExamples:\n  ralph implement my-app\n  ralph implement my-app --max 5\n  ralph implement my-app --max 0   # unlimited iterations\n\nThe pipeline can be overridden by placing pipelines/implement.dot in your project folder.\n")
+    .addHelpText("after", "\nExamples:\n  ralph implement my-app\n  ralph implement my-app --max 5\n  ralph implement my-app --max 0   # unlimited iterations\n  ralph implement my-app --scenarios src/tests/scenarios   # write & verify scenario tests (requires tmux)\n\nThe pipeline can be overridden by placing pipelines/implement.dot in your project folder.\n")
     .option("--max <n>", "Maximum iterations (0 = unlimited, default: 0)", parseInt)
     .option("--model <name>", "LLM model override (e.g. claude-opus-4-6)")
-    .action(async (projectFolder: string, options: { max?: number; model?: string }) => {
+    .option("--scenarios <path>", "Relative path under <project-folder> for scenario tests; enables scenario-author + tester branch (requires tmux)")
+    .action(async (projectFolder: string, options: { max?: number; model?: string; scenarios?: string }) => {
       await implementCommand(projectFolder, options);
     });
 

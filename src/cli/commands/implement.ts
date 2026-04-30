@@ -6,6 +6,7 @@ import * as output from "../lib/output.js";
 export interface ImplementOptions {
   max?: number;
   model?: string;
+  scenarios?: string;
 }
 
 export async function implementCommand(
@@ -19,11 +20,19 @@ export async function implementCommand(
     process.exit(1);
   }
 
+  if (options.scenarios && !process.env.TMUX) {
+    await output.error(
+      "Error: --scenarios requires running inside a tmux session. Start tmux first, then re-run.",
+    );
+    process.exit(1);
+  }
+
   await pipelineRunCommand("implement", {
     project: absPath,
     variables: {
       specs_dir: "docs/specs",
-      max_iterations: String(options.max ?? 0),  // 0 = unlimited
+      scenarios_dir: options.scenarios ?? "",
+      max_iterations: String(options.max ?? 0),
       ...(options.model ? { llm_model: options.model } : {}),
     },
   });
