@@ -24,7 +24,7 @@ Launches a meditation pipeline session. This command is a thin shim backed by th
 **Behavior:**
 1. Validates project folder exists.
 2. Checks for an already-running meditate session (PID lock at `<project-folder>/.meditate.pid`); exits early if alive.
-3. Ensures `meditations/{illuminations,archived-illuminations,implemented-illuminations}/` directories exist.
+3. Ensures `meditations/illuminations/` directory exists.
 4. Appends meditate-specific entries (`.meditate.json`, `.meditate.pid`, MCP config glob) to `.gitignore` if missing.
 5. Writes a PID lock file (`<project-folder>/.meditate.pid`).
 6. Calls `resolveBundledPipeline("meditate")` and delegates to `pipelineRunCommand(dotFile, { project, variables: { steer, vision } })`.

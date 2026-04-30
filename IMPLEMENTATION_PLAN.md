@@ -1386,7 +1386,7 @@ git commit -m "docs(specs): rewrite mcp-illumination spec for consume-only lifec
 **Files:**
 - Modify: `docs/specs/commands.md:27`
 
-- [ ] **Step 1: Replace the directory-list line**
+- [x] **Step 1: Replace the directory-list line**
 
 Line 27 currently reads:
 
@@ -1400,12 +1400,12 @@ Change to:
 3. Ensures `meditations/illuminations/` directory exists.
 ```
 
-- [ ] **Step 2: Final sweep**
+- [x] **Step 2: Final sweep**
 
 Run: `grep -nE "archived-illuminations|implemented-illuminations" docs/specs/commands.md`
 Expected: no matches.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add docs/specs/commands.md
