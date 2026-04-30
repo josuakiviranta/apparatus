@@ -1039,10 +1039,10 @@ git commit -m "docs: --scenarios flag in README and commands spec"
 
 After all 5 chunks complete:
 
-- [ ] `ralph implement <folder>` (no flag) runs unchanged — 3-node skip path, no tmux required.
-- [ ] `ralph implement <folder> --scenarios src/tests/scenarios` outside tmux: friendly error, exit 1.
+- [x] `ralph implement <folder>` (no flag) runs unchanged — 3-node skip path, no tmux required.
+- [x] `ralph implement <folder> --scenarios src/tests/scenarios` outside tmux: friendly error, exit 1.
 - [ ] `ralph implement <folder> --scenarios src/tests/scenarios` inside tmux: deep loop runs, then scenario_author writes (or doesn't), then implementation_tester drives them, then commit_push pushes.
-- [ ] All vitest tests green; pipeline validator green.
+- [x] All vitest tests green; pipeline validator green.
 - [ ] First dogfood run (against ralph-cli itself: `ralph implement . --scenarios src/tests/scenarios --max 1`) is **supervised** — human reviews the first batch of scenarios authored before normalizing.
 
 ---
