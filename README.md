@@ -153,14 +153,14 @@ Press `Ctrl+C`. Ralph cleanly terminates its own claude subprocess without affec
 | Directory | Purpose |
 |---|---|
 | `src/` | All TypeScript source: `cli/`, `attractor/`, `daemon/`, `lib/`, `types/` |
-| `specs/` | Behavioral specs per subsystem (current, authoritative) |
-| `docs/` | Harness docs + `superpowers/specs/` (design history, not authoritative specs) |
+| `docs/specs/` | Authoritative behavioral specs (what the system does) |
+| `docs/` | Harness docs + `superpowers/specs/` (design proposals & history — how decisions were reached) |
 | `pipelines/` | Project-local `.dot` pipelines for ralph-cli itself (illumination-to-implementation, janitor) + `smoke/` test fixtures. Bundled pipelines (meditate, implement) ship from `src/cli/pipelines/`. |
 | `src/cli/pipelines/` | Bundled pipelines shipped to npm consumers (`meditate`, `implement`). Folder-form: `<name>/pipeline.dot` + agent `.md` files. Copied to `dist/pipelines/` at build. |
 | `meditations/` | Curated lenses in `stimuli/` + three illumination status dirs: `illuminations/` (open + dispatched), `archived-illuminations/`, `implemented-illuminations/` |
 | `memory/` | Session memory written by Claude agents across conversations |
 
-> **specs/ vs docs/superpowers/specs/:** `specs/` holds current behavioral specifications that are authoritative. `docs/superpowers/specs/` holds historical design documents that motivated those specs.
+> **docs/specs/ vs docs/superpowers/specs/:** `docs/specs/` holds authoritative behavioral specifications (what the system does). `docs/superpowers/specs/` holds design proposals and history (how decisions were reached).
 
 ## Development
 
@@ -173,6 +173,6 @@ npm link           # test ralph binary locally
 
 ## Specs
 
-- [Architecture](specs/architecture.md)
-- [Commands](specs/commands.md)
-- [Loop Script](specs/loop.md)
+- [Architecture](docs/specs/architecture.md)
+- [Commands](docs/specs/commands.md)
+- [Loop Script](docs/specs/loop.md)
