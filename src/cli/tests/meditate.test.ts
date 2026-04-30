@@ -129,7 +129,7 @@ describe("isPidAlive", () => {
 });
 
 describe("meditate template agent tool whitelist", () => {
-  const templatePath = join(__dirname, "..", "templates", "meditate", "meditate.md");
+  const templatePath = join(__dirname, "..", "pipelines", "meditate", "meditate.md");
 
   it("includes list_illuminations in the tools list", () => {
     const agentMd = readFileSync(templatePath, "utf-8");
@@ -268,7 +268,7 @@ describe("meditateCommand (shim)", () => {
 describe("meditate template agent prompt body — exploration scope", () => {
   it("exploration step weights specs/ and src/ folders", () => {
     const agentMd = readFileSync(
-      join(__dirname, "..", "templates", "meditate", "meditate.md"),
+      join(__dirname, "..", "pipelines", "meditate", "meditate.md"),
       "utf-8",
     );
     const frontmatterMatch = agentMd.match(/^---\n[\s\S]+?\n---\n/);
@@ -284,7 +284,7 @@ describe("meditate template agent prompt body — exploration scope", () => {
 describe("meditate template agent prompt body — reflection brief", () => {
   it("reflection step asks for architect-mode lenses", () => {
     const agentMd = readFileSync(
-      join(__dirname, "..", "templates", "meditate", "meditate.md"),
+      join(__dirname, "..", "pipelines", "meditate", "meditate.md"),
       "utf-8",
     );
     const frontmatterMatch = agentMd.match(/^---\n[\s\S]+?\n---\n/);

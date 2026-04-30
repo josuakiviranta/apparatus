@@ -1,5 +1,5 @@
 import { defineConfig } from "tsup";
-import { copyFileSync, cpSync, mkdirSync, readdirSync } from "fs";
+import { cpSync } from "fs";
 
 export default defineConfig({
   entry: [
@@ -16,13 +16,9 @@ export default defineConfig({
     js: "#!/usr/bin/env node",
   },
   async onSuccess() {
-    // Copy bundled pipelines
-    mkdirSync("dist/pipelines", { recursive: true });
-    for (const file of readdirSync("src/cli/pipelines")) {
-      copyFileSync(`src/cli/pipelines/${file}`, `dist/pipelines/${file}`);
-    }
-    // Copy bundled templates (per-folder layout, recurse into subdirs).
-    cpSync("src/cli/templates", "dist/templates", { recursive: true });
+    // Copy entire src/cli/pipelines/ tree to dist/pipelines/.
+    // After Chunk 2, every bundled pipeline is folder-form there.
+    cpSync("src/cli/pipelines", "dist/pipelines", { recursive: true });
     console.log("Assets copied to dist/");
   },
 });
