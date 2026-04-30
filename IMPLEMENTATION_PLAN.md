@@ -964,7 +964,7 @@ The janitor pipeline graph (`pipelines/janitor/pipeline.dot`) is unchanged — s
 **Files:**
 - Modify: `src/cli/tests/janitor-agent.test.ts`
 
-- [ ] **Step 1: Replace the tool-list assertion with the new (smaller) surface**
+- [x] **Step 1: Replace the tool-list assertion with the new (smaller) surface**
 
 In `src/cli/tests/janitor-agent.test.ts:24-36`, replace the `it("whitelists exactly the lean tool surface…")` block with:
 
@@ -983,7 +983,7 @@ In `src/cli/tests/janitor-agent.test.ts:24-36`, replace the `it("whitelists exac
 
 (Drops `list_plans`, `mark_implemented`, `mark_plan_implemented` — all lifecycle tools.)
 
-- [ ] **Step 2: Update the forbidden-tools assertion**
+- [x] **Step 2: Update the forbidden-tools assertion**
 
 In the next test block (`it("does NOT whitelist destructive or escalation tools"…)`), replace the forbidden array with:
 
@@ -1001,7 +1001,7 @@ In the next test block (`it("does NOT whitelist destructive or escalation tools"
 
 (Janitor never consumes, never reconciles plans, never reaches into lifecycle.)
 
-- [ ] **Step 3: Replace lifecycle-procedure assertions with KISS-lens assertions**
+- [x] **Step 3: Replace lifecycle-procedure assertions with KISS-lens assertions**
 
 In the `describe("janitor.md — procedure body contract", …)` block, replace the existing tests with:
 
@@ -1040,12 +1040,12 @@ In the `describe("janitor.md — procedure body contract", …)` block, replace 
 
 Delete the existing `"encodes the lifecycle trigger condition…"` and `"encodes the three-prior-illuminations reading rule…"` tests entirely — both reference behavior the new janitor does not have.
 
-- [ ] **Step 4: Run the test — confirm it fails against the unchanged prompt**
+- [x] **Step 4: Run the test — confirm it fails against the unchanged prompt**
 
 Run: `npx vitest run src/cli/tests/janitor-agent.test.ts`
 Expected: FAIL — current `janitor.md` still has the 9-tool surface, lifecycle procedure, three-prior reading rule, and uses `mark_implemented` / `mark_plan_implemented` / `list_plans`. Several `it(...)` blocks fail.
 
-- [ ] **Step 5: Commit (test only — implementation in next task)**
+- [x] **Step 5: Commit (test only — implementation in next task)**
 
 ```bash
 git add src/cli/tests/janitor-agent.test.ts
@@ -1057,7 +1057,7 @@ git commit -m "test(janitor): assert new KISS-lens tool surface + procedure (red
 **Files:**
 - Rewrite: `pipelines/janitor/janitor.md` (entire content)
 
-- [ ] **Step 1: Replace the file contents**
+- [x] **Step 1: Replace the file contents**
 
 Overwrite `pipelines/janitor/janitor.md` with:
 
@@ -1138,17 +1138,17 @@ Bullets — prior illuminations you consulted from `list_illuminations`, each wi
 - Dedup: if `list_illuminations` shows a recent candidate covering the same area, do not write a second one — extend the existing one's scope by adding a new run, not a new file.
 ```
 
-- [ ] **Step 2: Run the test — confirm it passes**
+- [x] **Step 2: Run the test — confirm it passes**
 
 Run: `npx vitest run src/cli/tests/janitor-agent.test.ts`
 Expected: PASS, all assertions green.
 
-- [ ] **Step 3: Validate the janitor pipeline against the new agent**
+- [x] **Step 3: Validate the janitor pipeline against the new agent**
 
 Run: `npx ralph pipeline validate pipelines/janitor/pipeline.dot`
 Expected: PASS — agent file resolves, frontmatter validates.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add pipelines/janitor/janitor.md
@@ -1160,7 +1160,7 @@ git commit -m "feat(janitor): refocus on KISS workspace scanning, drop lifecycle
 **Files:**
 - Modify: `README.md:37-43`
 
-- [ ] **Step 1: Replace the janitor block**
+- [x] **Step 1: Replace the janitor block**
 
 Lines 37-43 of `README.md` currently read:
 
@@ -1188,7 +1188,7 @@ The janitor scans source/workspace through a KISS lens — bloat, YAGNI violatio
 
 (Note the path correction: `pipelines/janitor.dot` → `pipelines/janitor/pipeline.dot` — per-folder layout.)
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add README.md
@@ -1197,7 +1197,7 @@ git commit -m "docs(readme): janitor description matches the KISS-lens refocus"
 
 ### Chunk 3 verification
 
-- [ ] **Run the janitor agent test:**
+- [x] **Run the janitor agent test:**
 
 ```bash
 npx vitest run src/cli/tests/janitor-agent.test.ts
@@ -1205,7 +1205,7 @@ npx vitest run src/cli/tests/janitor-agent.test.ts
 
 Expected: PASS.
 
-- [ ] **Confirm the new agent's structural shape:**
+- [x] **Confirm the new agent's structural shape:**
 
 ```bash
 grep -nE "consume|mark_implemented|mark_plan_implemented|list_plans|dispatched" pipelines/janitor/janitor.md
