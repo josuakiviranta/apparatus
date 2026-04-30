@@ -286,7 +286,7 @@ git commit -am "refactor(implement): \$specs_dir variable + docs/specs default"
 
 ### Task 2.5: Plan-document review checkpoint (Chunk 2)
 
-- [ ] Dispatch plan-document-reviewer for Chunk 2 with focus on: TDD discipline preserved? Variable-threading correct? Rubric tokens consistent?
+- [x] Dispatch plan-document-reviewer for Chunk 2 with focus on: TDD discipline preserved? Variable-threading correct? Rubric tokens consistent?
 
 ---
 
