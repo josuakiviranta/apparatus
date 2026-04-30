@@ -1,1060 +1,462 @@
-# Scenario Tests in Implement Pipeline — Implementation Plan
+# Bundle Janitor Pipeline + Heartbeat Shorthand Implementation Plan
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Extend the bundled `implement` pipeline with an opt-in `--scenarios <path>` branch that authors operator-surface scenario tests after the deep-loop implementer finishes, then drives those scenarios via a tmux-harnessed tester until pass-or-stuck.
+**Goal:** Move `pipelines/janitor/` → `src/cli/pipelines/janitor/` so the janitor pipeline ships to npm consumers, after generalising its prompt to drop ralph-cli-private references and adding heartbeat-command shorthand support so consumers can run `ralph heartbeat pipeline janitor --project . --every 720` without typing the bundled-dist path.
 
-**Architecture:** Insert four new nodes after the existing `run` node: `record_base` (tool, captures pre-loop SHA) before the implementer; `scenario_author` (agent, writes prose markdown scenarios from diff); `implementation_tester` (agent, drives scenarios through tmux, fixes code red-green); `commit_push` (tool, single push at end). The `--scenarios` flag in `implement.ts` toggles the new branch; absent flag = current 3-node behavior preserved. Conditions on edges leaving `implementer` use `scenarios_dir!=''` / `scenarios_dir=''` empty-string compare.
+**Architecture:** Three-step migration. (1) Generalise `janitor.md` so its instruction body refers to project surfaces abstractly rather than naming ralph-cli internals. (2) Move the folder under `src/cli/pipelines/` — tsup already copies the whole tree to `dist/pipelines/`, and `pipeline-resolver.ts:45` already falls through to bundled lookup, so the move is mechanical. (3) Teach `heartbeat pipeline <arg>` to accept the same shorthand the `pipeline run` command accepts (route through `resolvePipelineArg`) when the arg is not a literal path — required so the README example stays usable for npm consumers who lack `dist/pipelines/janitor/pipeline.dot` typed by hand.
 
-**Tech Stack:** TypeScript, vitest, Graphviz `.dot`, Commander, ralph's attractor pipeline engine, tmux harness helpers.
+**Tech Stack:** TypeScript, tsup, vitest, ESM, Node.js >=18.
 
-**Reference docs:**
-- ADR: `docs/adr/0003-scenario-tests-in-implement-pipeline.md`
-- Glossary: `CONTEXT.md` (Scenario test entry)
-- Pipeline spec: `docs/specs/pipeline.md`
+**Decision context:**
+- A sibling plan `docs/superpowers/plans/2026-04-30-bundle-pipelines-under-src-cli.md:18` previously listed janitor as **out of scope** for bundling on the rationale that it was "ralph-cli-private". The user revised that decision: janitor's logic is generic (KISS-lens scanner of any codebase) and should ship. This plan supersedes that "out of scope" line, which must be revised in Chunk 3.
+- `heartbeat pipeline` (heartbeat.ts:155-171) currently takes a literal dotfile path (`resolve(dotfile)`). It does NOT route through `resolvePipelineArg`. Without Chunk 2's shorthand support, npm consumers would have to type `node_modules/ralph-cli/dist/pipelines/janitor/pipeline.dot`. Heartbeat shorthand is part of *this* move's scope precisely because the move's value (consumer accessibility) requires it.
+- `script_file` resolution (`tool.ts:248`) is relative to `dotDir` — moving `read-vision.mjs` alongside `pipeline.dot` keeps it findable. `agent="janitor"` resolution (`agent-loader.ts:11-16`) is also relative to the pipeline directory. Both confirmed by blast-radius probe — no resolver code change needed for paths.
 
 ---
 
-## Chunk 1: CLI flag + tmux preflight + variable plumbing
+## File Structure
 
-**Goal:** `--scenarios <path>` reaches the pipeline as `scenarios_dir` variable; tmux preflight rejects the flag outside tmux; pipeline.dot declares the optional input. No new nodes yet.
+**Files moved (3, via `git mv`):**
+```
+pipelines/janitor/janitor.md       → src/cli/pipelines/janitor/janitor.md
+pipelines/janitor/pipeline.dot     → src/cli/pipelines/janitor/pipeline.dot
+pipelines/janitor/read-vision.mjs  → src/cli/pipelines/janitor/read-vision.mjs
+```
+
+After move, `pipelines/janitor/` directory is removed (`rmdir`). `pipelines/` retains `smoke/`, `illumination-to-implementation/`, `janitor.svg`, `illumination-to-implementation.svg`.
+
+**Files modified (code, 1):**
+- `src/cli/commands/heartbeat.ts:145-189` — route `<dotfile>` arg through `resolvePipelineArg` when it is shorthand (not a literal path).
+
+**Files modified (tests, 4):**
+- `src/cli/tests/pipeline-janitor-folder.test.ts` — change expected path from `<repo>/pipelines/janitor/...` to `<repo>/src/cli/pipelines/janitor/...`.
+- `src/cli/tests/janitor-agent.test.ts:10` — `AGENT_PATH` constant uses `resolve(__dirname, "../../../pipelines/janitor/janitor.md")`. After move, `src/cli/pipelines/janitor/janitor.md` is reachable from `src/cli/tests/` with one `..` only: change to `resolve(__dirname, "../pipelines/janitor/janitor.md")`.
+- `src/cli/tests/tsup-templates-copy.test.ts` — add `it()` asserting janitor ships under `src/cli/pipelines/`.
+- `src/cli/tests/heartbeat.test.ts` (or new file if absent) — add tests for shorthand resolution.
+
+**Files modified (prompt body, 1):**
+- `src/cli/pipelines/janitor/janitor.md` (post-move) — replace the strategic-compass example "core CLI surfaces, pipeline engine" with a project-agnostic phrasing.
+
+**Files modified (docs, 9 active path refs + 1 supersession-note revision):**
+- `README.md:47` — switch heartbeat example to bundled shorthand `janitor`. (The blast-radius inventory cited "line 41" — actual current line is 47. Always locate by verbatim string match, not by line number.)
+- `CONTEXT.md:97` — path reference (active prose). Line 109 ("captured in pre-rewrite commits to `pipelines/janitor/janitor.md`") is a **historical reference** documenting where the file lived in earlier commits — leave alone.
+- `docs/adr/0002-consume-only-illumination-lifecycle.md:52` — path reference (active prose). Line 87 ("captured in pre-2026-04-30 commits to `pipelines/janitor/janitor.md`") is a **historical reference** — leave alone.
+- `docs/superpowers/plans/2026-04-30-bundle-pipelines-under-src-cli.md:13,38` — revise the line-13 "out of scope" sentence to record the supersession; update the line-38 directory listing.
+- `docs/superpowers/plans/2026-04-30-specs-to-docs-portability.md:326,327,336` — path references.
+- `docs/superpowers/plans/2026-04-30-consume-only-illumination-lifecycle.md:954,957,1056` — path references.
+
+**Files NOT touched (historical / incidental refs from blast radius):**
+- `memory/2026-04-30-specs-relocated-to-docs.md`, `memory/2026-04-25-meditate-prompt-is-write-only.md`, `memory/2026-04-25-janitor-lifecycle-orphan-plans.md`, `memory/2026-04-27-pipeline-show-two-open-seams.md`. Memory entries are point-in-time records; they document what was true when written.
+
+---
+
+## Chunk 1: Generalise janitor agent prompt
+
+This chunk runs *before* the move. The agent prompt currently names ralph-cli internals as examples ("core CLI surfaces, pipeline engine"). For npm consumers those phrases are noise. Generalise first, in place — that way the move in Chunk 2 carries the consumer-ready prompt with it, and a reviewer sees the prompt change isolated from path noise.
+
+### Task 1.1: Read and capture current strategic-compass section
 
 **Files:**
-- Modify: `src/cli/program.ts:80-83` (add `--scenarios` option + signature)
-- Modify: `src/cli/commands/implement.ts:6-29` (extend `ImplementOptions`, add tmux preflight, always supply `scenarios_dir`)
-- Modify: `src/cli/tests/implement.test.ts` (extend with 4 new test cases)
-- Modify: `src/cli/pipelines/implement/pipeline.dot:3` (extend `inputs="..."`)
+- Read: `pipelines/janitor/janitor.md:27-32`
 
-### Task 1.1: Failing tests for `--scenarios` plumbing
+- [x] **Step 1: Read the current strategic-compass section**
 
-- [x] **Step 1: Add 4 failing tests to `src/cli/tests/implement.test.ts`**
+Run: `sed -n '27,32p' pipelines/janitor/janitor.md`
 
-Append these tests to the existing `describe("implementCommand", ...)` block:
-
-```ts
-  it("passes scenarios_dir='' by default (flag not set)", async () => {
-    await implementCommand("/my/project", {});
-    expect(mockPipeline).toHaveBeenCalledWith(
-      "implement",
-      expect.objectContaining({
-        variables: expect.objectContaining({ scenarios_dir: "" }),
-      })
-    );
-  });
-
-  it("passes scenarios_dir from --scenarios flag when in tmux", async () => {
-    const prev = process.env.TMUX;
-    process.env.TMUX = "/tmp/tmux-1000/default,1234,0";
-    try {
-      await implementCommand("/my/project", { scenarios: "src/tests/scenarios" });
-      expect(mockPipeline).toHaveBeenCalledWith(
-        "implement",
-        expect.objectContaining({
-          variables: expect.objectContaining({ scenarios_dir: "src/tests/scenarios" }),
-        })
-      );
-    } finally {
-      if (prev === undefined) delete process.env.TMUX; else process.env.TMUX = prev;
-    }
-  });
-
-  it("rejects --scenarios outside tmux with friendly error and exits", async () => {
-    const prev = process.env.TMUX;
-    delete process.env.TMUX;
-    const exitSpy = vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
-      throw new Error(`process.exit(${code})`);
-    }) as never);
-    try {
-      await expect(
-        implementCommand("/my/project", { scenarios: "src/tests/scenarios" })
-      ).rejects.toThrow(/process\.exit\(1\)/);
-      expect(mockPipeline).not.toHaveBeenCalled();
-    } finally {
-      exitSpy.mockRestore();
-      if (prev !== undefined) process.env.TMUX = prev;
-    }
-  });
-
-  it("does not preflight tmux when --scenarios is absent", async () => {
-    const prev = process.env.TMUX;
-    delete process.env.TMUX;
-    try {
-      await implementCommand("/my/project", {});
-      expect(mockPipeline).toHaveBeenCalled();
-    } finally {
-      if (prev !== undefined) process.env.TMUX = prev;
-    }
-  });
+Expected current content (line 31 is the example to revise):
+```
+Treat the vision as the strategic filter: refactor opportunities and YAGNI violations in vision-load-bearing areas (core CLI surfaces, pipeline engine) deserve sharper findings than peripheral ones. If `<read_vision_vision>` is empty, no project vision exists yet; consider flagging that as itself a candidate.
 ```
 
-- [x] **Step 2: Run the new tests, verify they fail**
+### Task 1.2: Generalise the example phrasing
 
-Run: `npx vitest run src/cli/tests/implement.test.ts`
-Expected: 4 new tests fail (3 because `ImplementOptions.scenarios` is unknown / `scenarios_dir` not in variables; 1 because no preflight exists).
+**Files:**
+- Modify: `pipelines/janitor/janitor.md:31`
 
-### Task 1.2: Implement the flag + preflight
+- [x] **Step 1: Replace the ralph-cli-specific example**
 
-- [x] **Step 3: Extend `ImplementOptions` and add preflight + variable** in `src/cli/commands/implement.ts`
+Change the parenthetical "(core CLI surfaces, pipeline engine)" to "(modules the vision identifies as core)". Full revised sentence:
 
-Replace the file body with:
-
-```ts
-import { existsSync } from "fs";
-import { resolve } from "path";
-import { pipelineRunCommand } from "./pipeline.js";
-import * as output from "../lib/output.js";
-
-export interface ImplementOptions {
-  max?: number;
-  model?: string;
-  scenarios?: string;
-}
-
-export async function implementCommand(
-  projectFolder: string,
-  options: ImplementOptions
-): Promise<void> {
-  const absPath = resolve(projectFolder);
-
-  if (!existsSync(absPath)) {
-    await output.error(`Error: project folder not found: ${absPath}`);
-    process.exit(1);
-  }
-
-  if (options.scenarios && !process.env.TMUX) {
-    await output.error(
-      "Error: --scenarios requires running inside a tmux session. Start tmux first, then re-run.",
-    );
-    process.exit(1);
-  }
-
-  await pipelineRunCommand("implement", {
-    project: absPath,
-    variables: {
-      specs_dir: "docs/specs",
-      scenarios_dir: options.scenarios ?? "",
-      max_iterations: String(options.max ?? 0),
-      ...(options.model ? { llm_model: options.model } : {}),
-    },
-  });
-}
+```
+Treat the vision as the strategic filter: refactor opportunities and YAGNI violations in vision-load-bearing areas (modules the vision identifies as core) deserve sharper findings than peripheral ones. If `<read_vision_vision>` is empty, no project vision exists yet; consider flagging that as itself a candidate.
 ```
 
-- [x] **Step 4: Register the flag on the Commander command** in `src/cli/program.ts`
+- [x] **Step 2: Verify no other ralph-cli-specific phrasing remains**
 
-Modify the `implement` command block:
+Run: `grep -nE "ralph|cli surface|pipeline engine|attractor" pipelines/janitor/janitor.md`
+Expected: no matches.
 
-```ts
-  program
-    .command("implement <project-folder>")
-    .description("Run the implement pipeline — Claude reads prompts, writes code, commits, and pushes")
-    .addHelpText("after", "\nExamples:\n  ralph implement my-app\n  ralph implement my-app --max 5\n  ralph implement my-app --max 0   # unlimited iterations\n  ralph implement my-app --scenarios src/tests/scenarios   # write & verify scenario tests (requires tmux)\n\nThe pipeline can be overridden by placing pipelines/implement.dot in your project folder.\n")
-    .option("--max <n>", "Maximum iterations (0 = unlimited, default: 0)", parseInt)
-    .option("--model <name>", "LLM model override (e.g. claude-opus-4-6)")
-    .option("--scenarios <path>", "Relative path under <project-folder> for scenario tests; enables scenario-author + tester branch (requires tmux)")
-    .action(async (projectFolder: string, options: { max?: number; model?: string; scenarios?: string }) => {
-      await implementCommand(projectFolder, options);
-    });
-```
+If matches appear, revise each one to a project-agnostic equivalent before proceeding.
 
-- [x] **Step 5: Run the new tests, verify they pass**
+### Task 1.3: Commit prompt generalisation
 
-Run: `npx vitest run src/cli/tests/implement.test.ts`
-Expected: all tests in the file PASS (existing 4 + new 4 = 8).
-
-- [x] **Step 6: Run full test suite, verify nothing broke**
-
-Run: `npm test`
-Expected: green (or only pre-existing failures unrelated to this chunk).
-
-### Task 1.3: Declare optional input on the pipeline graph
-
-- [x] **Step 7: Extend pipeline.dot inputs declaration**
-
-Modify `src/cli/pipelines/implement/pipeline.dot` line 3:
-
-```dot
-  inputs="specs_dir,max_iterations,llm_model,scenarios_dir"
-```
-
-- [x] **Step 8: Verify pipeline still validates**
-
-Run: `node dist/cli/index.js pipeline validate src/cli/pipelines/implement/pipeline.dot`
-(or if not built: `npx tsx src/cli/index.ts pipeline validate src/cli/pipelines/implement/pipeline.dot`)
-Expected: validation passes (informational `required_caller_vars` diagnostic may now mention `scenarios_dir` — acceptable).
-
-- [x] **Step 9: Commit**
+- [x] **Step 1: Commit**
 
 ```bash
-git add src/cli/program.ts src/cli/commands/implement.ts src/cli/tests/implement.test.ts src/cli/pipelines/implement/pipeline.dot
-git commit -m "feat(implement): add --scenarios flag + tmux preflight, declare scenarios_dir input"
+git add pipelines/janitor/janitor.md
+git commit -m "refactor(janitor): generalise prompt for non-ralph-cli consumers"
 ```
-
-### Task 1.4: Plan review checkpoint
-
-- [x] **Step 10: Verify Chunk 1 acceptance criteria**
-
-- `ralph implement <folder>` (no flag): unchanged — `scenarios_dir=""` in pipeline ctx; pipeline still 3-node; no tmux required.
-- `ralph implement <folder> --scenarios src/tests/scenarios` outside tmux: prints friendly error, exits 1, never calls pipeline.
-- `ralph implement <folder> --scenarios src/tests/scenarios` inside tmux: passes through, pipeline runs (still 3-node, scenarios_dir unused — that's fine for this chunk).
-- All vitest tests green.
-
-If any criterion fails, fix before proceeding to Chunk 2.
 
 ---
 
-## Chunk 2: `record_base` tool node + rename `run` → `implementer`
+## Chunk 2: Move janitor folder and add heartbeat shorthand
 
-**Goal:** Add the `record_base` tool node before the implementer to capture `git rev-parse HEAD`; rename the `run` node for self-documenting clarity. Pipeline still has only the existing skip path; new branch comes in Chunk 3.
+This chunk performs the load-bearing change: physical move + heartbeat shorthand routing. TDD on the heartbeat shorthand because that is the only behavioural change.
+
+### Task 2.1: Red — write failing test for janitor folder location
 
 **Files:**
-- Modify: `src/cli/pipelines/implement/pipeline.dot` (rename node + add `record_base`)
-- Create: `src/cli/tests/pipeline-implement-folder.test.ts` (new test file modeled on `pipeline-smoke-agent-implement-folder.test.ts`)
+- Modify: `src/cli/tests/pipeline-janitor-folder.test.ts:7,11,17,23`
 
-### Task 2.1: Failing test for new pipeline shape
+- [ ] **Step 1: Update path expectations in existing test**
 
-- [x] **Step 1: Create test file `src/cli/tests/pipeline-implement-folder.test.ts`**
+Change every occurrence of `join(REPO_ROOT, "pipelines", "janitor", ...)` to `join(REPO_ROOT, "src", "cli", "pipelines", "janitor", ...)`. Update the describe block label from `"pipelines/janitor/ — chunk-4 per-folder migration"` to `"src/cli/pipelines/janitor/ — bundled pipeline"`.
 
-```ts
+The test on line 13 (`resolvePipelineArg("janitor", REPO_ROOT)`) still asserts equality against the same `expected` variable, so updating `expected`'s path is sufficient.
+
+- [ ] **Step 2: Run test to verify it fails (because files have not moved yet)**
+
+Run: `npx vitest run src/cli/tests/pipeline-janitor-folder.test.ts`
+Expected: FAIL — `existsSync(<src/cli/pipelines/janitor/pipeline.dot>)` returns false.
+
+### Task 2.2: Green — move the janitor folder
+
+**Files:**
+- Move: `pipelines/janitor/{janitor.md, pipeline.dot, read-vision.mjs}` → `src/cli/pipelines/janitor/`
+
+- [ ] **Step 1: Move files via `git mv`**
+
+```bash
+mkdir -p src/cli/pipelines/janitor
+git mv pipelines/janitor/janitor.md src/cli/pipelines/janitor/janitor.md
+git mv pipelines/janitor/pipeline.dot src/cli/pipelines/janitor/pipeline.dot
+git mv pipelines/janitor/read-vision.mjs src/cli/pipelines/janitor/read-vision.mjs
+rmdir pipelines/janitor
+```
+
+- [ ] **Step 2: Confirm directory removal**
+
+Run: `[ ! -d pipelines/janitor ] && echo "removed" || echo "still exists"`
+Expected: `removed`.
+
+- [ ] **Step 3: Update `janitor-agent.test.ts` AGENT_PATH constant**
+
+`src/cli/tests/janitor-agent.test.ts:10` currently has:
+
+```typescript
+const AGENT_PATH = resolve(__dirname, "../../../pipelines/janitor/janitor.md");
+```
+
+`__dirname` resolves to `src/cli/tests/`, so the existing three `..` segments climb to repo root and re-enter via `pipelines/`. The new bundled location lives one directory up at `src/cli/pipelines/janitor/janitor.md`. Replace with a single `..`:
+
+```typescript
+const AGENT_PATH = resolve(__dirname, "../pipelines/janitor/janitor.md");
+```
+
+- [ ] **Step 4: Run pipeline-janitor-folder test to verify it passes**
+
+Run: `npx vitest run src/cli/tests/pipeline-janitor-folder.test.ts`
+Expected: PASS — all 3 cases green.
+
+- [ ] **Step 5: Run janitor-agent test to verify the AGENT_PATH update**
+
+Run: `npx vitest run src/cli/tests/janitor-agent.test.ts`
+Expected: PASS.
+
+- [ ] **Step 6: Sanity-check pipeline validates from new location**
+
+Run: `npx tsx src/cli/index.ts pipeline validate src/cli/pipelines/janitor/pipeline.dot`
+Expected: exit 0, no error-level diagnostics.
+
+### Task 2.3: Add tsup-templates-copy assertion for janitor
+
+**Files:**
+- Modify: `src/cli/tests/tsup-templates-copy.test.ts:6-15`
+
+- [ ] **Step 1: Add a third `it()` block asserting janitor ships**
+
+Insert after the `implement` assertion:
+
+```typescript
+  it("ships janitor as a folder pipeline under src/cli/pipelines/", () => {
+    expect(existsSync(join(root, "src/cli/pipelines/janitor/pipeline.dot"))).toBe(true);
+    expect(existsSync(join(root, "src/cli/pipelines/janitor/janitor.md"))).toBe(true);
+    expect(existsSync(join(root, "src/cli/pipelines/janitor/read-vision.mjs"))).toBe(true);
+  });
+```
+
+- [ ] **Step 2: Run test to verify it passes**
+
+Run: `npx vitest run src/cli/tests/tsup-templates-copy.test.ts`
+Expected: PASS — three `it()` blocks all green.
+
+### Task 2.4: Red — write failing test for heartbeat shorthand
+
+**Files:**
+- Look for: `src/cli/tests/heartbeat.test.ts` — if absent, create.
+
+- [ ] **Step 1: Locate or create the heartbeat test file**
+
+Run: `ls src/cli/tests/ | grep -i heartbeat`
+
+If a file exists, append the new `describe`. If not, create `src/cli/tests/heartbeat.test.ts` with imports modelled after `pipeline-janitor-folder.test.ts`.
+
+- [ ] **Step 2: Write the failing test against an export that does not yet exist**
+
+The behaviour we want: when the positional arg is *not* a literal path (no `/`, no `.dot` suffix, matches `[a-zA-Z0-9_-]+`), `heartbeat pipeline` resolves it through the shared resolver instead of treating it as a relative file path. We expose this via a new helper `resolveHeartbeatPipelineArg(arg, project)` from `src/cli/commands/heartbeat.ts` so the wiring is unit-testable. The helper returns the absolute dotfile path, using `resolvePipelineArg` when `isNameShorthand(arg)` is true and `resolve(arg)` otherwise.
+
+Add this single test block (no preamble unit test on `isNameShorthand` — it already exists in `pipeline-resolver.test.ts`, retesting it here is noise):
+
+```typescript
 import { describe, it, expect } from "vitest";
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { parseDot, validateGraph } from "../../attractor/core/graph.js";
+import { resolveHeartbeatPipelineArg } from "../commands/heartbeat.js";
+import { resolve } from "node:path";
 
-const REPO_ROOT = resolve(__dirname, "../../..");
-const DOT_PATH = join(REPO_ROOT, "src", "cli", "pipelines", "implement", "pipeline.dot");
+describe("resolveHeartbeatPipelineArg", () => {
+  const repoRoot = resolve(__dirname, "../../..");
 
-describe("src/cli/pipelines/implement/pipeline.dot — scenario branch", () => {
-  it("declares an `implementer` node bound to agent='implement'", () => {
-    const dot = readFileSync(DOT_PATH, "utf-8");
-    expect(dot).toMatch(/implementer\s*\[[^\]]*agent="implement"/);
+  it("routes shorthand `janitor` through the resolver to the bundled dotfile", () => {
+    const dotPath = resolveHeartbeatPipelineArg("janitor", repoRoot);
+    expect(dotPath.endsWith("janitor/pipeline.dot")).toBe(true);
   });
 
-  it("declares a `record_base` tool node that captures git HEAD as JSON", () => {
-    const dot = readFileSync(DOT_PATH, "utf-8");
-    expect(dot).toMatch(/record_base\s*\[/);
-    // tool_command must emit a single JSON-object line so produces_from_stdout
-    // can flatten {sha: "..."} into ctx as record_base.sha (see tool.ts:31-50).
-    expect(dot).toMatch(/tool_command="printf .*\\"sha\\":\\".*git rev-parse HEAD/);
-    expect(dot).toMatch(/produces_from_stdout="true"/);
-  });
-
-  it("wires start -> record_base -> implementer", () => {
-    const dot = readFileSync(DOT_PATH, "utf-8");
-    expect(dot).toMatch(/start\s*->\s*record_base/);
-    expect(dot).toMatch(/record_base\s*->\s*implementer/);
-  });
-
-  it("validateGraph emits zero error-level diagnostics", () => {
-    const graph = parseDot(readFileSync(DOT_PATH, "utf-8"));
-    const diags = validateGraph(graph, dirname(DOT_PATH));
-    const errors = diags.filter((d) => d.severity === "error");
-    expect(errors).toEqual([]);
+  it("treats `./my.dot` as a literal path", () => {
+    const cwd = process.cwd();
+    expect(resolveHeartbeatPipelineArg("./my.dot", cwd)).toBe(resolve(cwd, "./my.dot"));
   });
 });
 ```
 
-- [x] **Step 2: Run the new test file, verify it fails**
+- [ ] **Step 3: Run test to verify it fails for the right reason**
 
-Run: `npx vitest run src/cli/tests/pipeline-implement-folder.test.ts`
-Expected: 3 of 4 tests fail (the `validateGraph` test currently passes since the existing graph is valid; the structural ones all fail because `implementer` and `record_base` don't yet exist).
+Run: `npx vitest run src/cli/tests/heartbeat.test.ts`
+Expected: FAIL — TypeScript or vitest error reporting that `resolveHeartbeatPipelineArg` is not exported from `../commands/heartbeat.js`. This is the red signal we want.
 
-### Task 2.2: Modify `pipeline.dot`
-
-- [x] **Step 3: Rewrite `src/cli/pipelines/implement/pipeline.dot`**
-
-Replace the entire file with:
-
-```dot
-digraph implement {
-  goal="Autonomous implementation loop"
-  inputs="specs_dir,max_iterations,llm_model,scenarios_dir"
-
-  start [shape=Mdiamond]
-
-  record_base [type="tool",
-               cwd="$project",
-               tool_command="printf '{\"sha\":\"%s\"}\n' \"$(git rev-parse HEAD)\"",
-               produces_from_stdout="true"]
-
-  implementer [agent="implement", max_iterations="$max_iterations"]
-
-  done [shape=Msquare]
-
-  start       -> record_base
-  record_base -> implementer
-  implementer -> done
-}
-```
-
-(Note: `produces_from_stdout="true"` is a boolean flag — when truthy, the engine parses the **last non-empty stdout line as a JSON object** and exposes its top-level keys as `<nodeId>.<key>`. Implementation: `src/attractor/handlers/tool.ts:31-79`. We therefore emit `{"sha":"<hash>"}` from `git rev-parse HEAD` so downstream agents can consume `$record_base.sha`.)
-
-- [x] **Step 4: Run the new test file, verify it passes**
-
-Run: `npx vitest run src/cli/tests/pipeline-implement-folder.test.ts`
-Expected: all 4 tests PASS.
-
-- [x] **Step 5: Run full test suite**
-
-Run: `npm test`
-Expected: green (or only pre-existing failures).
-
-- [x] **Step 6: Verify pipeline-validate from CLI still passes**
-
-Run: `npx tsx src/cli/index.ts pipeline validate src/cli/pipelines/implement/pipeline.dot`
-Expected: zero error-level diagnostics.
-
-- [x] **Step 7: Commit**
-
-```bash
-git add src/cli/pipelines/implement/pipeline.dot src/cli/tests/pipeline-implement-folder.test.ts
-git commit -m "refactor(implement): rename run→implementer, add record_base tool node"
-```
-
-### Task 2.3: Plan review checkpoint
-
-- [x] **Step 8: Verify Chunk 2 acceptance criteria**
-
-- Pipeline graph has 4 nodes: `start`, `record_base`, `implementer`, `done`.
-- `record_base.sha` will be in ctx after the tool node runs (verifiable via trace later, not in unit tests).
-- Existing `ralph implement <folder>` still produces same outward behavior (deep-loop implementer ticks plan, exits).
-- New test file green.
-
-If any criterion fails, fix before Chunk 3.
-
----
-
-## Chunk 3: `scenario_author` agent + skip-branch routing
-
-**Goal:** Add the new `scenario_author` agent file with full prompt; add the conditional edges from `implementer` so empty `scenarios_dir` skips to `done` and populated `scenarios_dir` flows to `scenario_author`. Tester is not yet wired — `scenario_author` ends at `done` for this chunk so the graph is valid.
+### Task 2.5: Green — implement heartbeat shorthand
 
 **Files:**
-- Create: `src/cli/pipelines/implement/scenario-author.md`
-- Modify: `src/cli/pipelines/implement/pipeline.dot` (add node + conditional edges; provisionally point `scenario_author -> done`)
-- Modify: `src/cli/tests/pipeline-implement-folder.test.ts` (add 3 new tests)
+- Modify: `src/cli/commands/heartbeat.ts:145-189`
 
-### Task 3.1: Failing tests for scenario_author wiring
+- [ ] **Step 1: Extract resolution helper at top of heartbeat.ts**
 
-- [x] **Step 1: Append tests to `src/cli/tests/pipeline-implement-folder.test.ts`**
+Add the export above the `hb.command(...)` block (alongside the existing imports — note `resolvePipelineArg` and `isNameShorthand` already live in `src/cli/lib/pipeline-resolver.ts`):
 
-Add inside the existing `describe`:
+```typescript
+import { resolvePipelineArg, isNameShorthand } from "../lib/pipeline-resolver.js";
 
-```ts
-  it("scenario-author.md exists with proper frontmatter", () => {
-    const agentPath = join(REPO_ROOT, "src", "cli", "pipelines", "implement", "scenario-author.md");
-    expect(existsSync(agentPath)).toBe(true);
-    const content = readFileSync(agentPath, "utf-8");
-    expect(content).toContain("name: scenario-author");
-    expect(content).toMatch(/inputs:\s*\n(\s*-\s*\w+\s*\n){2,}/);
-    expect(content).toContain("scenarios_dir");
-    expect(content).toContain("specs_dir");
-    expect(content).toContain("record_base.sha");
-    expect(content).toMatch(/outputs:[\s\S]*tests_written:\s*boolean/);
-    expect(content).toMatch(/outputs:[\s\S]*scenario_paths/);
-  });
-
-  it("declares a scenario_author agent node", () => {
-    const dot = readFileSync(DOT_PATH, "utf-8");
-    expect(dot).toMatch(/scenario_author\s*\[[^\]]*agent="scenario-author"/);
-  });
-
-  it("routes implementer on scenarios_dir presence: skip to done when empty, scenario_author when populated", () => {
-    const dot = readFileSync(DOT_PATH, "utf-8");
-    expect(dot).toMatch(/implementer\s*->\s*scenario_author\s*\[[^\]]*condition="scenarios_dir!=''"/);
-    expect(dot).toMatch(/implementer\s*->\s*done\s*\[[^\]]*condition="scenarios_dir=''"/);
-  });
-```
-
-- [x] **Step 2: Run the test file, verify the 3 new tests fail**
-
-Run: `npx vitest run src/cli/tests/pipeline-implement-folder.test.ts`
-Expected: 3 new tests fail (no agent file yet, no node, no conditional edges).
-
-### Task 3.2: Author the `scenario-author.md` agent
-
-- [x] **Step 3: Create `src/cli/pipelines/implement/scenario-author.md`**
-
-Write the file with this complete content:
-
-```markdown
----
-name: scenario-author
-description: Read the diff produced by the implementer; decide whether existing scenario tests cover the just-shipped behavior; write feasible new ones if not
-model: opus
-permissionMode: dangerouslySkipPermissions
-tools:
-  - Read
-  - Write
-  - Edit
-  - Grep
-  - Glob
-  - Bash
-mcp: []
-inputs:
-  - scenarios_dir
-  - specs_dir
-  - record_base.sha
-outputs:
-  tests_written: boolean
-  scenario_paths: string[]
-  summary: string
----
-
-# Mission
-
-You are the **scenario test author**. The implementer just finished a deep loop of work, committing chunk-by-chunk against `IMPLEMENTATION_PLAN.md` and pushing per iteration. Your job: decide whether the existing scenario tests under `$scenarios_dir` already cover the operator-visible surface of what was just shipped. If yes, do nothing. If no, write the missing scenarios — concise, feasible, non-duplicative — so the downstream `implementation-tester` can verify them.
-
-You are NOT writing tests for everything that could exist; only for behavior produced or modified by the diff between `$record_base.sha` and `HEAD`. Refactors with no observable surface change yield zero new scenarios — that is correct, not lazy.
-
-# What is a scenario test (read this carefully)
-
-A scenario test is a markdown file under `$scenarios_dir/` that describes one observable behavior of the system from the operator's seat. It is consumed by an agent (`implementation-tester`), not by a human, and is reduced by that agent to concrete shell actions plus observable checks. The file shape is fixed:
-
-```markdown
-# Scenario: <one-line description>
-
-## Setup
-<commands or state required before the action; may be empty>
-
-## Action
-<the single command invocation under test>
-
-## Expect
-- <observable claim 1 — exit code, file existence, output substring, etc.>
-- <observable claim 2>
-- ...
-```
-
-Authoritative rule: **scenarios are authoritative; code is mutable**. When the tester finds a clause failing, it fixes the code, never the scenario. Your scenarios must therefore be precise enough that "fixing the code to match" is unambiguous.
-
-# Procedure
-
-## Phase 0 — Prepare workspace
-
-If `$scenarios_dir` does not exist, create it: `mkdir -p $scenarios_dir`. (Use `$project` as `cwd`.)
-
-## Phase 1 — Inventory existing scenarios
-
-`ls $scenarios_dir/*.md 2>/dev/null` and read each file. Build a mental list of:
-- Which commands are already exercised (e.g. "`ralph pipeline run` is covered by 2 files").
-- Which observable surfaces (flags, outputs, file effects) are already asserted.
-
-Keep this in working memory; you will use it for the subsumption check below.
-
-## Phase 2 — Read the diff
-
-Run, in `$project`:
-
-```bash
-git log $record_base.sha..HEAD --oneline
-git diff $record_base.sha..HEAD --stat
-git diff $record_base.sha..HEAD
-```
-
-If the diff is empty (no commits), emit zero scenarios and finish — there's nothing to verify.
-
-Group the changes into **clusters**. A cluster is a coherent set of changes that produce or modify ONE observable behavior. A new CLI flag = one cluster. A refactor that splits a function across files = zero clusters (no observable change). A multi-flag rollout = multiple clusters, one per flag.
-
-## Phase 3 — For each cluster, decide
-
-For each cluster:
-
-1. **Is this behavior-affecting?** Can an operator running the binary observe a difference? If no (pure refactor, internal rename, dead-code removal), skip.
-2. **Subsumption check.** Is the cluster's surface already covered by an existing scenario? If yes, skip (or, if existing coverage is partial and you can sharpen it, plan an UPDATE to the existing file rather than a new one).
-3. **Feasibility check.** Can you write a `## Action` that is one concrete shell command and `## Expect` bullets that are each one observable claim (exit code, file existence, output substring, captured tmux frame)? If you find yourself wanting to write "code is cleaner" or "architecture is more modular", drop the cluster — those aren't testable.
-
-Survivors of all three checks become scenarios to write or update.
-
-## Phase 4 — Write or update scenarios
-
-For each survivor, choose a slug (kebab-case, descriptive, unique within `$scenarios_dir`) and write a file at `$scenarios_dir/<slug>.md` following the fixed shape.
-
-When updating an existing file (subsumption-partial case), preserve the heading and merge new `## Expect` bullets — don't duplicate existing claims.
-
-Rules of thumb:
-- One scenario per behavior. Don't bundle.
-- `## Action` is ONE command. If verifying a flow needs multiple commands, the supporting ones go in `## Setup`.
-- `## Expect` bullets are atomic and observable. "produces correct output" is not a bullet; "stdout contains 'AGENTS.md'" is.
-- If `$specs_dir` documents the behavior under test, use the spec wording as the source of truth — don't invent new vocabulary.
-
-## Phase 5 — Commit
-
-Stage and commit only the files you wrote or modified under `$scenarios_dir`:
-
-```bash
-git -C $project add $scenarios_dir
-git -C $project commit -m "test: <verb> scenarios for <area>"
-```
-
-Use `add` if any new scenarios; `update` if only modifications; `add` if mixed.
-
-**Do NOT push.** `commit_push` is a separate node and is the only surface that pushes.
-
-If you wrote nothing (no clusters survived the three checks), make no commit.
-
-## Phase 6 — Emit JSON
-
-Final text response (NOT inside a thinking block) is one JSON object matching the output schema:
-
-```json
-{
-  "tests_written": true,
-  "scenario_paths": ["src/tests/scenarios/implement-with-scenarios-flag.md"],
-  "summary": "considered 3 candidates from 8 commits; wrote 1 new (implement --scenarios flag), skipped 2 (1 subsumed by ralph-implement-baseline.md, 1 infeasible — pure refactor of agent-loader)."
+export function resolveHeartbeatPipelineArg(arg: string, project: string): string {
+  if (isNameShorthand(arg)) {
+    return resolvePipelineArg(arg, project);
+  }
+  return resolve(arg);
 }
 ```
 
-`tests_written` is `true` iff `scenario_paths` is non-empty (added OR modified files).
-`summary` is one sentence covering: candidates considered, written, skipped + brief reasons. Keep dense; it surfaces in trace logs.
+- [ ] **Step 2: Use the helper in the action handler**
 
-# Hard rules
+Replace `const absDotFile = resolve(dotfile);` (heartbeat.ts:156) with:
 
-- **Operator-visible surface only.** Internal refactors, code-quality wins, and architecture niceties are NOT scenarios.
-- **Scenarios are authoritative.** Once written, the tester treats them as truth and fixes code to match. Be precise.
-- **No duplication.** Read existing scenarios first; subsumption check is mandatory.
-- **No padding.** If the diff is purely internal, write zero scenarios. That is the correct answer.
-- **One commit at most this round.** Either a single `test: …` commit covering all your additions/edits, or no commit.
-- **Do NOT push.**
-- Output MUST be valid JSON matching the schema. No markdown around the JSON, no preamble.
-
-Take your time. The tester depends on your precision.
+```typescript
+const projectForResolver = opts.project ? resolve(opts.project) : process.cwd();
+const absDotFile = resolveHeartbeatPipelineArg(dotfile, projectForResolver);
 ```
 
-### Task 3.3: Wire scenario_author into the graph (provisional `done` exit)
+The `validatePathArg(dotfile, absDotFile, "file", "Pipeline dotfile")` call on line 157 stays. It is now redundant on the shorthand branch (`resolvePipelineArg` only returns paths that exist or throws) but harmless, and still load-bearing on the literal-path branch (`resolve(arg)` does not check existence). Keeping it is the simpler, less-surprising choice.
 
-- [x] **Step 4: Modify `src/cli/pipelines/implement/pipeline.dot`**
+`opts.project` is optional. When omitted, `projectForResolver` defaults to `process.cwd()`. With shorthand input, the resolver's tier 1 (`<cwd>/pipelines/<name>/pipeline.dot`) misses if cwd has no `pipelines/` directory and falls through to tier 5 (bundled). So `ralph heartbeat pipeline janitor --every 720` (no `--project`) works for an npm consumer running from any directory: bundled `dist/pipelines/janitor/pipeline.dot` is found regardless of cwd. Document this in the help text in step 3.
 
-Replace the file with:
+The `parseDot(readFileSync(absDotFile, "utf8"))` call on line 161 is unchanged. Shorthand resolution always returns an existing dotfile, so the `readFileSync` succeeds.
 
-```dot
-digraph implement {
-  goal="Autonomous implementation loop"
-  inputs="specs_dir,max_iterations,llm_model,scenarios_dir"
+- [ ] **Step 3: Update the help-text example**
 
-  start [shape=Mdiamond]
-
-  record_base [type="tool",
-               cwd="$project",
-               tool_command="printf '{\"sha\":\"%s\"}\n' \"$(git rev-parse HEAD)\"",
-               produces_from_stdout="true"]
-
-  implementer [agent="implement", max_iterations="$max_iterations"]
-
-  scenario_author [agent="scenario-author"]
-
-  done [shape=Msquare]
-
-  start           -> record_base
-  record_base     -> implementer
-  implementer     -> scenario_author   [condition="scenarios_dir!=''"]
-  implementer     -> done              [condition="scenarios_dir=''"]
-  scenario_author -> done
-}
+Change the `addHelpText` line (heartbeat.ts:148) example from:
+```
+ralph heartbeat pipeline workflow.dot --project my-app --every 60
+```
+to include both forms:
+```
+ralph heartbeat pipeline workflow.dot --project my-app --every 60
+ralph heartbeat pipeline janitor      --project my-app --every 720
 ```
 
-(Provisional `scenario_author -> done` will become `scenario_author -> implementation_tester` in Chunk 4. We use `done` here so the graph remains valid mid-plan.)
+- [ ] **Step 4: Run all heartbeat tests**
 
-- [x] **Step 5: Run the test file**
+Run: `npx vitest run src/cli/tests/heartbeat.test.ts`
+Expected: PASS.
 
-Run: `npx vitest run src/cli/tests/pipeline-implement-folder.test.ts`
-Expected: all tests in this file PASS (4 from Chunk 2 + 3 new = 7).
-
-- [x] **Step 6: Run validate from CLI**
-
-Run: `npx tsx src/cli/index.ts pipeline validate src/cli/pipelines/implement/pipeline.dot`
-Expected: zero error-level diagnostics.
-
-- [x] **Step 7: Run full test suite**
+- [ ] **Step 5: Run the full test suite to catch regressions**
 
 Run: `npm test`
-Expected: green.
+Expected: PASS. If anything is red, fix before commit.
 
-- [x] **Step 8: Commit**
+### Task 2.6: Verify dev-mode and prod-mode resolution
 
+- [ ] **Step 1: Verify dev-mode shorthand resolution (no build)**
+
+Tests run pre-build via `tsx`. `getBundledRoot()` in `assets.ts` resolves to `src/cli/` in dev (via `__dirname` from `src/cli/lib/`). Confirm the bundled fallback works without ever building:
+
+Run: `npx tsx src/cli/index.ts pipeline validate janitor`
+Expected: exit 0, no error-level diagnostics. The `validate` subcommand routes through `resolvePipelineArg`, so a green run here proves the dev-mode tier-5 fallback finds `src/cli/pipelines/janitor/pipeline.dot`.
+
+- [ ] **Step 2: Build and confirm janitor lands in dist**
+
+Run:
 ```bash
-git add src/cli/pipelines/implement/scenario-author.md src/cli/pipelines/implement/pipeline.dot src/cli/tests/pipeline-implement-folder.test.ts
-git commit -m "feat(implement): add scenario-author agent and conditional skip branch"
+npm run build
+ls dist/pipelines/janitor/
+```
+Expected output:
+```
+janitor.md
+pipeline.dot
+read-vision.mjs
 ```
 
-### Task 3.4: Plan review checkpoint
+- [ ] **Step 3: Verify prod-mode shorthand resolution (against dist)**
 
-- [x] **Step 9: Verify Chunk 3 acceptance criteria**
+Run: `node dist/cli/index.js pipeline validate janitor`
+Expected: exit 0. Confirms `getBundledRoot()` resolving from `dist/cli/` finds `dist/pipelines/janitor/pipeline.dot`.
 
-- `scenario-author.md` exists at `src/cli/pipelines/implement/scenario-author.md` with full frontmatter (`inputs`, `outputs`).
-- Pipeline graph routes correctly: empty `scenarios_dir` → `implementer -> done`; populated → `implementer -> scenario_author -> done` (provisional).
-- Validator green; test suite green.
+### Task 2.7: Commit chunk 2
 
-If any criterion fails, fix before Chunk 4.
+- [ ] **Step 1: Commit**
+
+```bash
+git add -A
+git commit -m "feat(janitor): bundle as src/cli/pipelines/janitor + heartbeat shorthand
+
+- move pipelines/janitor/ → src/cli/pipelines/janitor/
+- heartbeat pipeline now accepts shorthand (routes through resolvePipelineArg)
+- npm consumers can run: ralph heartbeat pipeline janitor --project . --every 720"
+```
 
 ---
 
-## Chunk 4: `implementation_tester` agent + `commit_push` + final wiring
+## Chunk 3: Update docs and revise sibling plan
 
-**Goal:** Author the `implementation-tester` agent (full prompt with tmux harness + scenario phases), add the `commit_push` tool node, finalize edge wiring `scenario_author -> implementation_tester -> commit_push -> done`. The end-to-end branch is now functional.
+This chunk has no behavioural change. Pure docs sweep over the 11 path refs the blast radius found, plus the parent plan's now-stale "out of scope" line.
+
+### Task 3.1: Update README
 
 **Files:**
-- Create: `src/cli/pipelines/implement/implementation-tester.md`
-- Modify: `src/cli/pipelines/implement/pipeline.dot` (add tester node + commit_push + rewire)
-- Modify: `src/cli/tests/pipeline-implement-folder.test.ts` (add 3 new tests)
+- Modify: `README.md` — locate by verbatim string, not line number.
 
-### Task 4.1: Failing tests for tester + commit_push wiring
+- [ ] **Step 1: Replace the heartbeat example**
 
-- [x] **Step 1: Append tests to `src/cli/tests/pipeline-implement-folder.test.ts`**
-
-```ts
-  it("implementation-tester.md exists with proper frontmatter", () => {
-    const agentPath = join(REPO_ROOT, "src", "cli", "pipelines", "implement", "implementation-tester.md");
-    expect(existsSync(agentPath)).toBe(true);
-    const content = readFileSync(agentPath, "utf-8");
-    expect(content).toContain("name: implementation-tester");
-    expect(content).toContain("scenarios_dir");
-    expect(content).toMatch(/outputs:[\s\S]*test_result/);
-    expect(content).toMatch(/outputs:[\s\S]*test_summary/);
-    expect(content).toMatch(/outputs:[\s\S]*test_render/);
-  });
-
-  it("declares an implementation_tester node and a commit_push tool node", () => {
-    const dot = readFileSync(DOT_PATH, "utf-8");
-    expect(dot).toMatch(/implementation_tester\s*\[[^\]]*agent="implementation-tester"/);
-    expect(dot).toMatch(/commit_push\s*\[[^\]]*tool_command="git push origin/);
-  });
-
-  it("wires scenario_author -> implementation_tester -> commit_push -> done", () => {
-    const dot = readFileSync(DOT_PATH, "utf-8");
-    expect(dot).toMatch(/scenario_author\s*->\s*implementation_tester/);
-    expect(dot).toMatch(/implementation_tester\s*->\s*commit_push/);
-    expect(dot).toMatch(/commit_push\s*->\s*done/);
-    expect(dot).not.toMatch(/scenario_author\s*->\s*done/);
-  });
+Find the line containing:
+```
+ralph heartbeat pipeline pipelines/janitor/pipeline.dot --project . --every 720
 ```
 
-- [x] **Step 2: Run the test file, verify the 3 new tests fail**
-
-Run: `npx vitest run src/cli/tests/pipeline-implement-folder.test.ts`
-Expected: 3 new tests fail.
-
-### Task 4.2: Author the `implementation-tester.md` agent
-
-- [x] **Step 3: Create `src/cli/pipelines/implement/implementation-tester.md`**
-
-Write the file with this complete content:
-
-````markdown
----
-name: implementation-tester
-description: Drive scenario tests through a tmux window — read each scenario .md, execute its Action, verify each Expect bullet, fix code red-green on failure, commit fixes, loop until pass or stuck
-model: opus
-permissionMode: dangerouslySkipPermissions
-tools:
-  - Read
-  - Write
-  - Edit
-  - Grep
-  - Glob
-  - Bash
-  - Task
-mcp: []
-inputs:
-  - project
-  - run_id
-  - scenarios_dir
-outputs:
-  test_result: {enum: [pass, fail]}
-  test_summary: string
-  test_render: string
----
-
-# Mission
-
-You are the **scenario verifier and code-fixer**. `scenario-author` just wrote (or kept) a set of scenario tests under `$scenarios_dir`. Your job: drive each scenario through a dedicated tmux window, observe whether the project's actual behavior matches the `## Expect` bullets, and when it does not, **fix the code via red-green TDD until it does**, committing each passing fix.
-
-You stop when (a) every scenario passes, OR (b) you genuinely cannot make further progress on a remaining scenario. Context, not a counter, decides.
-
-# Why this node exists
-
-Unit and integration tests pass while operator-surface behavior breaks: missing wire-ups, wrong copy, broken edges between commands, regressions a human would notice in the first thirty seconds of using the binary. Scenarios are the human's checklist made executable by you.
-
-# Hard rules (read first)
-
-- **Scenarios are authoritative.** When a clause fails, fix the **code**. Never edit a scenario `.md` file as a way out.
-- **Commit each passing fix.** One commit per fix. Follow project commit-message style.
-- **Do NOT push.** `commit_push` is a separate node and is the only surface that pushes.
-- **Do NOT cleanup or kill the test window.** The pipeline owns its lifecycle.
-- **No fixed iteration cap.** Stop when scenarios are healthy or you cannot make progress.
-- **Output MUST be valid JSON** matching the schema. No markdown around the JSON, no preamble, no trailing prose.
-
-# Context (injected at runtime)
-
-- Project folder: `$project`
-- Run id: `$run_id`
-- Scenarios dir: `$scenarios_dir`
-- Target tmux window name: `test-$run_id`
-- Current tmux session: discoverable via `tmux display-message -p '#S'`
-
-You own this window's lifecycle for the duration of this node — open in Phase 0, drive through the cycles, leave in place when you exit.
-
-# Harness
-
-Source the following bash block in your shell **before** calling any helper. Bind session and window by exact match on the run id:
-
-```bash
-SESSION=$(tmux display-message -p '#S')
-WIN="test-$run_id"
-RUN_ID="implementation-tester-$(date +%s)-$$"
-RUN_DIR="$HOME/.ralph/harness/$RUN_ID"
-CAPTURE_INDEX=0
-mkdir -p "$RUN_DIR"
+Replace with:
+```
+ralph heartbeat pipeline janitor --project . --every 720
 ```
 
-Helpers (paste verbatim — they define `wait_stable`, `capture`, `wait_for_string`, `send_input`):
+- [ ] **Step 2: Confirm the surrounding paragraph still scans**
 
-```bash
-now_ns() {
-  perl -MTime::HiRes=time -e 'printf "%d", time()*1000000000'
-}
+Read the 5 lines before and after the substitution. The surrounding prose calls janitor "the bundled janitor pipeline" — that wording becomes literally accurate after this plan, so no change is needed. If the prose now reads awkwardly (e.g. "schedule the bundled janitor pipeline ... `pipelines/janitor/pipeline.dot`" with the path now stripped), tighten the sentence.
 
-wait_stable() {
-  local budget_ms=${1:-10000}
-  local start_ns deadline_ns t
-  start_ns=$(now_ns)
-  deadline_ns=$((start_ns + budget_ms * 1000000))
-  local prev=$'\x01'
-  while : ; do
-    t=$(now_ns)
-    if [ "$t" -ge "$deadline_ns" ]; then
-      return 1
-    fi
-    local now
-    now=$(tmux capture-pane -p -t "$SESSION:$WIN")
-    if [ "$prev" != $'\x01' ] && [ "$prev" = "$now" ]; then
-      return 0
-    fi
-    prev="$now"
-    sleep 0.2
-  done
-}
-
-capture() {
-  CAPTURE_INDEX=$((CAPTURE_INDEX + 1))
-  local n
-  n=$(printf "%03d" "$CAPTURE_INDEX")
-  tmux capture-pane -p -t "$SESSION:$WIN" > "$RUN_DIR/capture-$n.txt"
-  cp "$RUN_DIR/capture-$n.txt" "$RUN_DIR/current.txt"
-  tmux capture-pane -e -p -t "$SESSION:$WIN" > "$RUN_DIR/capture-$n.ansi"
-  cp "$RUN_DIR/capture-$n.ansi" "$RUN_DIR/current.ansi"
-}
-
-wait_for_string() {
-  local needle=$1
-  local budget_ms=${2:-10000}
-  if [ -z "$needle" ]; then return 2; fi
-  local start_ns deadline_ns t
-  start_ns=$(now_ns)
-  deadline_ns=$((start_ns + budget_ms * 1000000))
-  while : ; do
-    t=$(now_ns)
-    if [ "$t" -ge "$deadline_ns" ]; then return 1; fi
-    if tmux capture-pane -p -t "$SESSION:$WIN" | grep -qF -- "$needle"; then return 0; fi
-    sleep 0.2
-  done
-}
-
-send_input() {
-  local text=$1
-  wait_stable 3000 || true
-  tmux send-keys -t "$SESSION:$WIN" -l "$text"
-  tmux send-keys -t "$SESSION:$WIN" Enter
-  wait_stable 3000 || true
-}
-```
-
-Harness gotchas:
-- Always `wait_stable` before `capture` (otherwise you read half-rendered frames).
-- `send_input` already calls `wait_stable` before and after.
-- Long/quoted payloads send via `-l` (literal mode); `Enter` is a separate keystroke.
-- `current.txt` is ANSI-stripped, easier to read.
-- Reap any backgrounded bash before emitting Phase 4 (`jobs -p | xargs -r kill 2>/dev/null; wait 2>/dev/null`).
-
-# Procedure
-
-## Phase 0 — Open or reuse the test window
-
-```bash
-if tmux list-windows -t "$SESSION" -F '#W' | grep -qx "test-$run_id"; then
-  : # resume case — reuse existing window
-else
-  tmux new-window -t "$SESSION:" -c "$project" -n "test-$run_id"
-fi
-```
-
-If `$SESSION` is empty (pipeline is not running inside a tmux session), emit `test_result="fail"` with `test_render` listing "implementation-tester requires the pipeline to run inside a tmux session; \$SESSION was empty" and end. Do not start a detached tmux process.
-
-## Phase 1 — Enumerate scenarios
-
-In your shell (NOT the tmux window):
-
-```bash
-ls $project/$scenarios_dir/*.md 2>/dev/null
-```
-
-Read each file with the Read tool. Parse the four sections:
-- `# Scenario: <description>`
-- `## Setup` (commands or "")
-- `## Action` (single command)
-- `## Expect` (bulleted observable claims)
-
-If there are zero scenarios, emit `test_result="pass"` with `test_summary="no scenarios to run"` and end.
-
-## Phase 2 — Drive each scenario
-
-For each scenario file:
-
-1. **Setup.** If `## Setup` is non-empty, send each setup command via `send_input`, `wait_stable`, `capture`. Read `current.txt` to confirm setup completed cleanly (no error markers).
-2. **Action.** Send the `## Action` command via `send_input`. `wait_stable 60000` (or a reasonable budget for the command — `ralph implement` short runs are fast; `npm test` may need 5 minutes). `capture`.
-3. **Expect.** For each `## Expect` bullet, evaluate it against observed reality:
-   - "exit code 0" → check `$?` via a follow-up `send_input` of `echo "exit=$?"`, capture, grep.
-   - "<file> exists" → run `[ -e <path> ] && echo OK || echo MISSING` in the window or as a host-side `Bash` call.
-   - "stdout contains '<string>'" → grep `current.txt`.
-   - "<command> output matches <regex>" → host-side regex check on captured output.
-   - Be literal. If the bullet says "exit code 0", anything other than 0 is a fail.
-4. **Decide.** If every bullet is satisfied, scenario passes — move on. If any bullet fails, enter the **Fix step**.
-
-## Fix step — red/green TDD on the code
-
-For each failing bullet:
-
-1. **Reproduce.** Re-run the scenario action; confirm the failure is deterministic. Flake → log in `test_render` Remaining Issues, move on.
-2. **Write a failing unit/integration test** that captures the specific failure (red). Place in the appropriate test file under `src/cli/tests/` or wherever the project's existing test layout puts it.
-3. **Implement the fix** in the corresponding source file (green). Keep minimal — no drive-by refactors.
-4. **Run the new test in isolation** (`npx vitest run <file>` or equivalent) → confirm green.
-5. **Re-run the full suite** (`npm test`) via the tmux window → confirm no regressions.
-6. **Re-drive the scenario** that failed → confirm the bullet now passes.
-7. **Commit** the fix: `git -C $project add ...; git -C $project commit -m "fix: <subject>"`. Do NOT push.
-
-After fixing all bullets for the current scenario, re-drive that scenario from Phase 2 step 1 to confirm fully green, then move to the next scenario.
-
-If you cannot fix a particular bullet after multiple genuine attempts (different diagnoses, different fixes), record it in `test_render`'s Remaining issues section and move on.
-
-## Phase 3 — Reap and report
-
-Reap any background jobs:
-
-```bash
-jobs -p | xargs -r kill 2>/dev/null; wait 2>/dev/null
-```
-
-Emit JSON matching the schema:
-
-- `test_result`: `"pass"` iff every scenario passed (no unfixed issues remain). Otherwise `"fail"`.
-- `test_summary`: 1–3 sentences. Cover: how many scenarios ran, how many passed first try, how many required fixes, the final state.
-- `test_render`: a self-contained markdown block with this exact structure:
-
-```markdown
-## Verification: **PASS** | **FAIL**
-
-<one-line summary matching test_summary>
-
-### Scenarios run
-1. <slug-1> — pass | fail
-2. <slug-2> — pass | fail
-...
-
-### Fixes applied (N commits)
-- `<short-hash>` <commit subject>
-- ...
-(or "No fixes were needed." if every scenario passed first try.)
-
-### Remaining issues
-- <scenario slug — bullet that failed — what was tried — why it could not be fixed>
-- ...
-(or "No unfixed issues." when nothing remains.)
-```
-
-Be specific. "Something didn't work" is not an issue; name the scenario, the failing bullet, the symptom.
-
-# Output schema (final reminder)
-
-```json
-{
-  "test_result": "pass",
-  "test_summary": "3 scenarios ran; 2 passed first try; 1 required a fix to ralph implement --scenarios preflight; final state green.",
-  "test_render": "## Verification: **PASS**\n..."
-}
-```
-````
-
-### Task 4.3: Final wiring in `pipeline.dot`
-
-- [x] **Step 4: Replace `src/cli/pipelines/implement/pipeline.dot`** with the final shape:
-
-```dot
-digraph implement {
-  goal="Autonomous implementation loop"
-  inputs="specs_dir,max_iterations,llm_model,scenarios_dir"
-
-  start [shape=Mdiamond]
-
-  record_base [type="tool",
-               cwd="$project",
-               tool_command="printf '{\"sha\":\"%s\"}\n' \"$(git rev-parse HEAD)\"",
-               produces_from_stdout="true"]
-
-  implementer [agent="implement", max_iterations="$max_iterations"]
-
-  scenario_author [agent="scenario-author"]
-
-  implementation_tester [agent="implementation-tester"]
-
-  commit_push [type="tool",
-               cwd="$project",
-               tool_command="git push origin $(git branch --show-current)"]
-
-  done [shape=Msquare]
-
-  start                 -> record_base
-  record_base           -> implementer
-  implementer           -> scenario_author        [condition="scenarios_dir!=''"]
-  implementer           -> done                   [condition="scenarios_dir=''"]
-  scenario_author       -> implementation_tester
-  implementation_tester -> commit_push
-  commit_push           -> done
-}
-```
-
-- [x] **Step 5: Run the test file**
-
-Run: `npx vitest run src/cli/tests/pipeline-implement-folder.test.ts`
-Expected: all tests PASS (7 from previous chunks + 3 new = 10).
-
-- [x] **Step 6: Run validate from CLI**
-
-Run: `npx tsx src/cli/index.ts pipeline validate src/cli/pipelines/implement/pipeline.dot`
-Expected: zero error-level diagnostics. (Note: validator may surface info-level `required_caller_vars` mentioning `scenarios_dir` — acceptable.)
-
-- [x] **Step 7: Run full test suite**
-
-Run: `npm test`
-Expected: green.
-
-- [x] **Step 8: Commit**
-
-```bash
-git add src/cli/pipelines/implement/implementation-tester.md src/cli/pipelines/implement/pipeline.dot src/cli/tests/pipeline-implement-folder.test.ts
-git commit -m "feat(implement): add implementation-tester agent + commit_push, complete scenario branch"
-```
-
-### Task 4.4: Plan review checkpoint
-
-- [x] **Step 9: Verify Chunk 4 acceptance criteria**
-
-- All 4 new files (`scenario-author.md`, `implementation-tester.md`, the new test file, the rewritten `pipeline.dot`) are in place.
-- Graph topology: 7 nodes (`start`, `record_base`, `implementer`, `scenario_author`, `implementation_tester`, `commit_push`, `done`).
-- All 10 tests in `pipeline-implement-folder.test.ts` green.
-- `npm test` green.
-- Pipeline validator zero **error-level** diagnostics. Info-level diagnostics tolerated, including:
-  - `required_caller_vars` mentioning `scenarios_dir` (caller-supplied optional var, supplied by `implement.ts` as empty string when flag absent).
-  - Any informational note about `record_base.sha` being a runtime-discovered key — the engine can't statically verify keys produced via `produces_from_stdout`.
-- `commit_push` precondition: the target branch must have an upstream tracking ref (set up by an earlier `git push` from the deep-loop implementer's per-iteration push, per `implement.md` step 4). On a fresh project with no prior push, `commit_push` will fail. Document in commands.md (Chunk 5) and accept as a known precondition.
-
-If any criterion fails, fix before Chunk 5.
-
----
-
-## Chunk 5: Documentation updates
-
-**Goal:** README and `commands.md` reflect the new flag and the scenario test concept. CONTEXT.md is already updated (during the grilling session); ADR is already written. This chunk closes the loop on user-facing documentation.
+### Task 3.2: Update CONTEXT.md
 
 **Files:**
-- Modify: `README.md` (extend the `ralph implement` section)
-- Modify: `docs/specs/commands.md` (extend the implement command spec)
-- Optional: `docs/specs/architecture.md` (only if the chunk-4 review surfaces any architectural section that becomes stale)
+- Modify: `CONTEXT.md:97` only.
 
-### Task 5.1: README extension
+- [ ] **Step 1: Update the active prose path ref on line 97**
 
-- [x] **Step 1: Locate the implement section in `README.md`**
+Line 97 currently contains `\`pipelines/janitor/pipeline.dot\`` in active prose describing janitor's location. Change to `\`src/cli/pipelines/janitor/pipeline.dot\``.
 
-Read `README.md` lines 14–30 (the `ralph implement` block).
+- [ ] **Step 2: Leave line 109 alone (historical reference)**
 
-- [x] **Step 2: Extend the implement command listing**
+Line 109 reads "captured in pre-rewrite commits to `pipelines/janitor/janitor.md`". This describes where the file *was* in earlier commits — rewriting it would falsify that historical record (the pre-rewrite commits really do live at `pipelines/janitor/janitor.md`). Leave unchanged.
 
-Modify the bash usage block to include `--scenarios`:
+- [ ] **Step 3: Confirm surrounding prose remains accurate**
 
-```bash
-ralph implement <project-folder> [--max N] [--model <name>] [--scenarios <path>]
+If line 97's surrounding paragraph describes janitor as project-local, revise to reflect that janitor now ships bundled. Read 5 lines before and after to judge.
+
+### Task 3.3: Update ADR-0002
+
+**Files:**
+- Modify: `docs/adr/0002-consume-only-illumination-lifecycle.md:52` only.
+
+- [ ] **Step 1: Update the active prose path ref on line 52**
+
+Change `\`pipelines/janitor/pipeline.dot\`` to `\`src/cli/pipelines/janitor/pipeline.dot\``. The ADR's *decision* is unchanged — only the path string changes.
+
+- [ ] **Step 2: Leave line 87 alone (historical reference)**
+
+Line 87 reads "captured in pre-2026-04-30 commits to `pipelines/janitor/janitor.md`" — same historical-reference reasoning as CONTEXT.md:109. Leave unchanged.
+
+### Task 3.4: Revise sibling plan's out-of-scope line
+
+**Files:**
+- Modify: `docs/superpowers/plans/2026-04-30-bundle-pipelines-under-src-cli.md:13,38`
+
+- [ ] **Step 1: Mark the out-of-scope decision as superseded**
+
+Find line 13. Verbatim current text:
+```
+- Out of scope (option A in brainstorm): bundling `illumination-to-implementation`, `janitor`, `smoke` — these are ralph-cli-private (reference `meditations/`, `docs/superpowers/`, etc.) and would ship dead weight to npm consumers. They stay at repo root.
 ```
 
-Add a paragraph after the existing description, before "Each agent turn is annotated with":
-
-```markdown
-`--scenarios <path>` enables an opt-in branch that authors operator-surface
-scenario tests in `<project>/<path>` after the implementer finishes, then
-drives them through a tmux harness — fixing code red-green until they pass
-or the agent judges itself stuck. The flag requires running inside a tmux
-session (preflight check). Scenario test format and discipline are
-documented in `CONTEXT.md` and `docs/adr/0003-scenario-tests-in-implement-pipeline.md`.
+Replace with:
+```
+- Out of scope (option A in brainstorm): bundling `illumination-to-implementation` and `smoke` — these are ralph-cli-private (reference `meditations/`, `docs/superpowers/`, etc.) and would ship dead weight to npm consumers. They stay at repo root. (`janitor` was originally listed here too; superseded 2026-04-30 by `2026-04-30-bundle-janitor-pipeline.md` after the prompt was generalised for consumer use.)
 ```
 
-### Task 5.2: commands.md extension
+The `meditations/`, `docs/superpowers/` parenthetical is preserved verbatim from the original — the supersession note is additive, not a rewrite of the rationale.
 
-- [x] **Step 3: Open `docs/specs/commands.md`**
+- [ ] **Step 2: Update the directory-listing reference at line 38**
 
-Read the `implement` section.
+Line 38 currently reads `- \`pipelines/janitor/\``. Change to `- \`src/cli/pipelines/janitor/\``.
 
-- [x] **Step 4: Extend the option list**
+### Task 3.5: Update the two other plan docs
 
-Add the new flag to the option table or list (matching whatever shape the existing file uses for `--max` and `--model`). Sample line in tabular form:
+**Files:**
+- Modify: `docs/superpowers/plans/2026-04-30-specs-to-docs-portability.md:326,327,336`
+- Modify: `docs/superpowers/plans/2026-04-30-consume-only-illumination-lifecycle.md:954,957,1056`
 
-```markdown
-| `--scenarios <path>` | Relative path under `<project-folder>` for scenario tests. Enables the scenario-author + implementation-tester branch. Requires tmux. Default: branch skipped. |
-```
+- [ ] **Step 1: Apply the path substitution at each cited line**
 
-If the file uses prose rather than a table, add an equivalent paragraph.
+At each of the six locations, replace `pipelines/janitor/` with `src/cli/pipelines/janitor/`. These plans reference janitor as an example or as a target file. After the substitution, the reference points to the new bundled path. (If a cited line has shifted since the inventory was generated, locate by verbatim string match against the surrounding context, not by line number.)
 
-### Task 5.3: Validate and commit
+### Task 3.6: Run the full test suite + verify no remaining stale paths
 
-- [x] **Step 5: Run full test suite**
+- [ ] **Step 1: Full grep sweep for any missed `pipelines/janitor` ref**
+
+Run: `grep -rn "pipelines/janitor" --include="*.md" --include="*.ts" --include="*.mjs" --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=memory .`
+
+Expected matches (these are intentional, leave them alone):
+- `CONTEXT.md:109` — historical reference to pre-rewrite commits.
+- `docs/adr/0002-consume-only-illumination-lifecycle.md:87` — historical reference to pre-2026-04-30 commits.
+
+Any other match indicates a missed substitution — fix each before committing.
+
+- [ ] **Step 2: Run tests**
 
 Run: `npm test`
-Expected: green.
+Expected: PASS.
 
-- [x] **Step 6: Commit**
+### Task 3.7: Commit chunk 3
+
+- [ ] **Step 1: Commit**
 
 ```bash
-git add README.md docs/specs/commands.md
-git commit -m "docs: --scenarios flag in README and commands spec"
+git add -A
+git commit -m "docs: update janitor refs to src/cli/pipelines/janitor + revise sibling plan
+
+- README, CONTEXT, ADR-0002 path updates
+- sibling plan 'out of scope' line marked superseded
+- two other plan docs receive same path substitution"
 ```
 
-### Task 5.4: Plan review checkpoint
-
-- [x] **Step 7: Verify Chunk 5 acceptance criteria**
-
-- README's `ralph implement` section names the new flag and references the ADR.
-- `docs/specs/commands.md` lists `--scenarios` with the same shape as `--max` / `--model`.
-- ADR (`0003`) and CONTEXT.md (Scenario test entry) already in place from the grilling session.
-- Test suite green.
-
 ---
 
-## Final acceptance gate
+## Verification (after all chunks)
 
-After all 5 chunks complete:
-
-- [x] `ralph implement <folder>` (no flag) runs unchanged — 3-node skip path, no tmux required.
-- [x] `ralph implement <folder> --scenarios src/tests/scenarios` outside tmux: friendly error, exit 1.
-- [ ] `ralph implement <folder> --scenarios src/tests/scenarios` inside tmux: deep loop runs, then scenario_author writes (or doesn't), then implementation_tester drives them, then commit_push pushes.
-- [x] All vitest tests green; pipeline validator green.
-- [ ] First dogfood run (against ralph-cli itself: `ralph implement . --scenarios src/tests/scenarios --max 1`) is **supervised** — human reviews the first batch of scenarios authored before normalizing.
-
----
-
-## Skills referenced
-
-- @superpowers:test-driven-development — every code change starts with a failing test.
-- @superpowers:subagent-driven-development — the executing harness dispatches a fresh subagent per task; main agent orchestrates.
-- @superpowers:verification-before-completion — never claim "done" without running the verification commands and seeing the expected output.
-
-## Out of scope (deferred)
-
-- **Scenario consolidation/cleanup.** If `$scenarios_dir` accumulates stale files across many runs, that's a separate concern. A future ADR can introduce a janitor-like reaper. Not here.
-- **Hand-authored starter scenarios.** Per the grilling decision, ralph-cli starts empty; first dogfood run populates. No pre-seeded scenarios shipped.
-- **i2i pipeline updates.** `pipelines/illumination-to-implementation/tmux-tester.md` is untouched. The i2i pipeline keeps its existing tester.
+- [ ] `npm test` — full suite green.
+- [ ] `npm run build && ls dist/pipelines/janitor/` — three files present.
+- [ ] `npx tsx src/cli/index.ts pipeline validate janitor` — validates the bundled pipeline by shorthand.
+- [ ] `grep -rn "pipelines/janitor" --include="*.md" --include="*.ts" --exclude-dir=node_modules --exclude-dir=memory .` — no matches.
+- [ ] Manual smoke (optional): `npx tsx src/cli/index.ts heartbeat pipeline janitor --project . --every 720` then immediately `ralph heartbeat list` to confirm registration; `ralph heartbeat remove pipeline:janitor` to clean up.
