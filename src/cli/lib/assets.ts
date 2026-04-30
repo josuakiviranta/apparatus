@@ -41,13 +41,6 @@ export function getBundledAgentsDir(): string {
     : join(__dirname, "..", "agents");
 }
 
-export function getBundledPipelinePath(name: string): string {
-  // Legacy flat-file lookup for src/cli/pipelines/<name>.dot (e.g. implement.dot).
-  return isProduction()
-    ? join(__dirname, "..", "pipelines", `${name}.dot`)
-    : join(__dirname, "..", "pipelines", `${name}.dot`);
-}
-
 export function getMetaMeditationsDir(): string {
   // prod: dist/cli/ → up two → package root
   // dev:  src/cli/lib/ → up three → package root

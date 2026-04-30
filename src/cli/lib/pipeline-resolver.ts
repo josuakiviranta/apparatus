@@ -1,7 +1,7 @@
 import { resolve, join, sep } from "path";
 import { existsSync } from "fs";
 import { homedir } from "os";
-import { getBundledPipelinePath } from "./assets.js";
+import { resolveBundledPipeline } from "./assets.js";
 
 const VALID_NAME = /^[a-zA-Z0-9_-]+$/;
 
@@ -42,5 +42,5 @@ export function resolvePipelineArg(arg: string, project: string): string {
   if (existsSync(userPath)) return userPath;
 
   // 5. Bundled
-  return getBundledPipelinePath(arg);
+  return resolveBundledPipeline(arg);
 }
