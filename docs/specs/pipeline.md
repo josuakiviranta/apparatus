@@ -219,16 +219,16 @@ This format applies to both validator output and runtime errors whose cause can 
 Tool nodes can externalise logic to `pipelines/scripts/<name>.<ext>`:
 
 ```dot
-mark_dispatched [type="tool",
-                 cwd="$project",
-                 script_file="pipelines/scripts/mark-dispatched.mjs",
-                 script_args="--id $illumination_id",
-                 produces_from_stdout=true]
-// emits ctx.values["mark_dispatched.dispatch_result"] — consumers must
-// declare `inputs: [mark_dispatched.dispatch_result]`
+consume [type="tool",
+         cwd="$project",
+         script_file="pipelines/scripts/consume.mjs",
+         script_args="--file $illumination_path --reason declined",
+         produces_from_stdout=true]
+// emits ctx.values["consume.result"] — consumers must
+// declare `inputs: [consume.result]`
 ```
 
-`script_file` paths are resolved relative to the `.dot` file's directory. The script inherits the process environment, receives `script_args` (variable-expanded) on the command line, and runs in `cwd`. If `produces_from_stdout=true` is declared, the script's last-line JSON is parsed and each top-level key is stored in `ctx.values` as `${node_id}.${key}`, preserving native JSON types. Consumers must declare these as qualified inputs (e.g. `inputs: [read_vision.vision]`); bare consumer keys are rejected by the validator. See `pipelines/scripts/mark-dispatched.mjs` for the canonical example.
+`script_file` paths are resolved relative to the `.dot` file's directory. The script inherits the process environment, receives `script_args` (variable-expanded) on the command line, and runs in `cwd`. If `produces_from_stdout=true` is declared, the script's last-line JSON is parsed and each top-level key is stored in `ctx.values` as `${node_id}.${key}`, preserving native JSON types. Consumers must declare these as qualified inputs (e.g. `inputs: [read_vision.vision]`); bare consumer keys are rejected by the validator. See `pipelines/illumination-to-implementation/consume.mjs` for the canonical example.
 
 ## Portability Heuristic
 

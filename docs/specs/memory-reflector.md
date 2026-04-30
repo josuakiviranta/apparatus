@@ -14,7 +14,7 @@ The downstream verifier + human review gate already filter for "is this worth im
 - `$project` — repo root
 - `$memory_path` — memory-writer output
 - `$design_doc_path`, `$plan_path` — upstream artifacts
-- `$illumination_path` — may have been moved to `meditations/implemented-illuminations/` by memory-writer step 7b; reflector falls back to that directory if the original path is missing
+- `$illumination_path` — original path of the illumination file (deleted by `consume` on implement; reflector records path as provenance even after deletion)
 
 ## Output
 
@@ -26,7 +26,7 @@ Reflector globs `meditations/illuminations/*.md` and greps each body for `Pipeli
 
 ## Provenance
 
-Reflector-written illuminations carry provenance in a final `## Provenance` body section listing the source memory, run id, and writer. Frontmatter shape is identical to meditate-written illuminations (date, status: open, description) so downstream tooling cannot distinguish writers structurally.
+Reflector-written illuminations carry provenance in a final `## Provenance` body section listing the source memory, run id, and writer. Frontmatter shape is identical to meditate-written illuminations (date, description) so downstream tooling cannot distinguish writers structurally.
 
 ## Failure mode
 

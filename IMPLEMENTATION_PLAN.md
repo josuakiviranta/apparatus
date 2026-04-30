@@ -1551,7 +1551,7 @@ git commit -m "chore: remove side-folder illuminations + orphan test fixtures"
 
 ### Chunk 4 verification
 
-- [ ] **Run the full test suite + build:**
+- [x] **Run the full test suite + build:**
 
 ```bash
 npx vitest run
@@ -1561,7 +1561,7 @@ npm run build
 
 Expected: all PASS, build artifacts in `dist/` reflect the new MCP surface.
 
-- [ ] **Confirm the meditations directory shape:**
+- [x] **Confirm the meditations directory shape:**
 
 ```bash
 ls meditations/
@@ -1570,7 +1570,7 @@ ls meditations/illuminations/
 
 Expected: only `illuminations/` and `stimuli/` subdirectories under `meditations/`. No `archived-illuminations/`, no `implemented-illuminations/`. Surviving files in `illuminations/` retain `date` + `description` frontmatter only.
 
-- [ ] **Confirm no stale lifecycle vocabulary remains in code or docs:**
+- [x] **Confirm no stale lifecycle vocabulary remains in code or docs:**
 
 ```bash
 grep -rnE "mark_implemented|mark_dispatched|mark_archived|archived-illuminations|implemented-illuminations" \
