@@ -157,7 +157,7 @@ Press `Ctrl+C`. Ralph cleanly terminates its own claude subprocess without affec
 | `docs/` | Harness docs + `superpowers/specs/` (design proposals & history — how decisions were reached) |
 | `pipelines/` | Project-local `.dot` pipelines for ralph-cli itself (illumination-to-implementation, janitor) + `smoke/` test fixtures. Bundled pipelines (meditate, implement) ship from `src/cli/pipelines/`. |
 | `src/cli/pipelines/` | Bundled pipelines shipped to npm consumers (`meditate`, `implement`). Folder-form: `<name>/pipeline.dot` + agent `.md` files. Copied to `dist/pipelines/` at build. |
-| `meditations/` | Curated lenses in `stimuli/` + three illumination status dirs: `illuminations/` (open + dispatched), `archived-illuminations/`, `implemented-illuminations/` |
+| `meditations/` | Curated lenses in `stimuli/` + `illuminations/` (alive on disk; deleted on consume — see `docs/adr/0002-consume-only-illumination-lifecycle.md`) |
 | `memory/` | Session memory written by Claude agents across conversations |
 
 > **docs/specs/ vs docs/superpowers/specs/:** `docs/specs/` holds authoritative behavioral specifications (what the system does). `docs/superpowers/specs/` holds design proposals and history (how decisions were reached).

@@ -1417,7 +1417,7 @@ git commit -m "docs(specs): drop side-folder mention from commands spec"
 **Files:**
 - Modify: `README.md:160`
 
-- [ ] **Step 1: Replace the `meditations/` row**
+- [x] **Step 1: Replace the `meditations/` row**
 
 Line 160 currently reads:
 
@@ -1431,7 +1431,7 @@ Change to:
 | `meditations/` | Curated lenses in `stimuli/` + `illuminations/` (alive on disk; deleted on consume — see `docs/adr/0002-consume-only-illumination-lifecycle.md`) |
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add README.md
