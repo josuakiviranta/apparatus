@@ -6,21 +6,21 @@ import { parseDot, validateGraph } from "../../attractor/core/graph.js";
 
 const REPO_ROOT = resolve(__dirname, "../../..");
 
-describe("pipelines/janitor/ — chunk-4 per-folder migration", () => {
-  it("resolves the bare name `janitor` to <repo>/pipelines/janitor/pipeline.dot", () => {
-    const expected = join(REPO_ROOT, "pipelines", "janitor", "pipeline.dot");
+describe("src/cli/pipelines/janitor/ — bundled pipeline", () => {
+  it("resolves the bare name `janitor` to <repo>/src/cli/pipelines/janitor/pipeline.dot", () => {
+    const expected = join(REPO_ROOT, "src", "cli", "pipelines", "janitor", "pipeline.dot");
     expect(existsSync(expected)).toBe(true);
     expect(resolvePipelineArg("janitor", REPO_ROOT)).toBe(expected);
   });
 
   it("ships janitor.md alongside pipeline.dot for project-local agent resolution", () => {
-    const agentPath = join(REPO_ROOT, "pipelines", "janitor", "janitor.md");
+    const agentPath = join(REPO_ROOT, "src", "cli", "pipelines", "janitor", "janitor.md");
     expect(existsSync(agentPath)).toBe(true);
     expect(readFileSync(agentPath, "utf-8")).toContain("name: janitor");
   });
 
   it("validateGraph emits zero error-level diagnostics for the migrated pipeline", () => {
-    const dotPath = join(REPO_ROOT, "pipelines", "janitor", "pipeline.dot");
+    const dotPath = join(REPO_ROOT, "src", "cli", "pipelines", "janitor", "pipeline.dot");
     const graph = parseDot(readFileSync(dotPath, "utf-8"));
     const diags = validateGraph(graph, dirname(dotPath));
     const errors = diags.filter((d) => d.severity === "error");

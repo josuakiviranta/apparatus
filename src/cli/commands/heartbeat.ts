@@ -2,6 +2,14 @@
 import { Command } from "commander";
 import { resolve, basename } from "path";
 import { statSync, Stats, readFileSync } from "fs";
+import { resolvePipelineArg, isNameShorthand } from "../lib/pipeline-resolver.js";
+
+export function resolveHeartbeatPipelineArg(arg: string, project: string): string {
+  if (isNameShorthand(arg)) {
+    return resolvePipelineArg(arg, project);
+  }
+  return resolve(arg);
+}
 import { request, stream } from "../../lib/daemon-client";
 import { parseDot } from "../../attractor/core/graph.js";
 import type { Task } from "../../daemon/state";
@@ -145,7 +153,7 @@ Examples:
   hb
     .command("pipeline <dotfile>")
     .description("Schedule a DOT-graph pipeline to run at a fixed interval")
-    .addHelpText("after", "\nExamples:\n  ralph heartbeat pipeline workflow.dot --project my-app --every 60\n")
+    .addHelpText("after", "\nExamples:\n  ralph heartbeat pipeline workflow.dot --project my-app --every 60\n  ralph heartbeat pipeline janitor      --project my-app --every 720\n")
     .option("--project <folder>", "project folder passed to the pipeline")
     .requiredOption("--every <n>", "interval in minutes", (v) => {
       const n = parseInt(v, 10);
@@ -153,7 +161,8 @@ Examples:
       return n;
     })
     .action(async (dotfile: string, opts: { project?: string; every: number }) => {
-      const absDotFile = resolve(dotfile);
+      const projectForResolver = opts.project ? resolve(opts.project) : process.cwd();
+      const absDotFile = resolveHeartbeatPipelineArg(dotfile, projectForResolver);
       validatePathArg(dotfile, absDotFile, "file", "Pipeline dotfile");
 
       // Warn if pipeline is marked as headless-unsafe

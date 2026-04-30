@@ -12,4 +12,9 @@ describe("bundled pipelines source layout", () => {
     expect(existsSync(join(root, "src/cli/pipelines/implement/pipeline.dot"))).toBe(true);
     expect(existsSync(join(root, "src/cli/pipelines/implement/implement.md"))).toBe(true);
   });
+  it("ships janitor as a folder pipeline under src/cli/pipelines/", () => {
+    expect(existsSync(join(root, "src/cli/pipelines/janitor/pipeline.dot"))).toBe(true);
+    expect(existsSync(join(root, "src/cli/pipelines/janitor/janitor.md"))).toBe(true);
+    expect(existsSync(join(root, "src/cli/pipelines/janitor/read-vision.mjs"))).toBe(true);
+  });
 });

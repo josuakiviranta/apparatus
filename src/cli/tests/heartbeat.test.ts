@@ -1,5 +1,6 @@
 // src/cli/tests/heartbeat.test.ts
 import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
+import { resolveHeartbeatPipelineArg } from "../commands/heartbeat.js";
 import { Command } from "commander";
 import { mkdtempSync, writeFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
@@ -271,5 +272,19 @@ describe("ralph heartbeat pipeline", () => {
     const combined = s.errSpy.mock.calls.flat().join(" ");
     expect(combined).toContain(bogus);
     s.restore();
+  });
+});
+
+describe("resolveHeartbeatPipelineArg", () => {
+  const repoRoot = resolveFn(__dirname, "../../..");
+
+  it("routes shorthand `janitor` through the resolver to the bundled dotfile", () => {
+    const dotPath = resolveHeartbeatPipelineArg("janitor", repoRoot);
+    expect(dotPath.endsWith("janitor/pipeline.dot")).toBe(true);
+  });
+
+  it("treats `./my.dot` as a literal path", () => {
+    const cwd = process.cwd();
+    expect(resolveHeartbeatPipelineArg("./my.dot", cwd)).toBe(resolveFn(cwd, "./my.dot"));
   });
 });
