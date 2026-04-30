@@ -182,7 +182,6 @@ describe("verifier migration — preserves verifier.json contract", () => {
     const schema = JSON.parse(config.jsonSchema!);
 
     expect([...schema.required].sort()).toEqual([
-      "archive_reason_short",
       "explanation",
       "illumination_path",
       "preferred_label",
@@ -194,7 +193,6 @@ describe("verifier migration — preserves verifier.json contract", () => {
     expect(schema.properties.illumination_path.type).toBe("string");
     expect(schema.properties.summary.type).toBe("string");
     expect(schema.properties.explanation.type).toBe("string");
-    expect(schema.properties.archive_reason_short.type).toBe("string");
     expect(schema.additionalProperties).toBe(false);
   });
 });

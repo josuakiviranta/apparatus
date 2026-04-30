@@ -26,7 +26,6 @@ outputs:
   illumination_path: string
   summary: string
   explanation: string
-  archive_reason_short: {type: string, maxLength: 100}
 ---
 
 # Mission
@@ -35,7 +34,7 @@ You verify a single illumination (a proposed change captured during a meditation
 
 # Hard rules (read first)
 
-- **Illumination discovery MUST go through `mcp__illumination__list_illuminations`.** Never Glob, Grep, `ls`, `find`, or Read against `meditations/illuminations/`, `meditations/archived-illuminations/`, or `meditations/implemented-illuminations/` to enumerate or filter illuminations by status. The MCP server is the single source of truth for lifecycle status — globbing the dir bypasses status routing and produces wrong results when the layout changes.
+- **Illumination discovery MUST go through `mcp__illumination__list_illuminations`.** Never Glob, Grep, `ls`, `find`, or Read against `meditations/illuminations/` to enumerate or filter illuminations. Always go through `mcp__illumination__list_illuminations` so the tool's interpretation is the single source of truth.
 - **Illumination file reads MUST go through `mcp__illumination__read_file`** with the bare `<filename>` (no directory prefix). Native `Read` on an absolute path under `meditations/**` is forbidden — the MCP server resolves the dir based on the file's lifecycle status, and that resolution is the contract downstream pipeline nodes depend on.
 - **Glob, Grep, and native Read remain allowed everywhere else** — they are the right tools for verifying claims against `src/`, `specs/`, `docs/`, `pipelines/`, `README.md`, and any non-meditation project files. Verification subagents should use them freely on those paths.
 
@@ -57,8 +56,8 @@ A technically accurate illumination that fails project-fit is still a `false` �
 
 1. **Enumerate or re-enter.** (See Hard rules above — MCP-only for this step.)
    - If `$verifier_illumination_path` is non-empty in the injected context (re-entry after a scope-changing chat round), skip enumeration — that file has already been selected by an earlier verifier pass. Verify it directly against the current (refined) scope.
-   - Otherwise: call `mcp__illumination__list_illuminations` with `status: "open"`. The tool returns one `<filename> — <description>` line per open illumination, or the literal string `No illuminations found.` when empty.
-2. **Pick one.** If the tool returned `No illuminations found.` → emit `preferred_label: empty`, empty paths, summary "No open illuminations found", explanation "All illuminations in the directory are dispatched, archived, or otherwise closed." (Skip on re-entry — the path is already set.) Otherwise pick one filename and construct `illumination_path` as `meditations/illuminations/<filename>`.
+   - Otherwise: call `mcp__illumination__list_illuminations` (no parameters). The tool returns one `<filename> — <description>` line per illumination in `meditations/illuminations/`, or the literal string `No illuminations found.` when empty.
+2. **Pick one.** If the tool returned `No illuminations found.` → emit `preferred_label: empty`, empty paths, summary "No illuminations found", explanation "No illuminations remain in `meditations/illuminations/`." (Skip on re-entry — the path is already set.) Otherwise pick one filename and construct `illumination_path` as `meditations/illuminations/<filename>`.
 3. **Read the chosen illumination in full.** Use `mcp__illumination__read_file` with just the bare `<filename>` (no directory prefix); the MCP server resolves the dir based on lifecycle status. Do NOT prepend `meditations/illuminations/` for the read — that path is only for the produced `illumination_path` field that downstream pipeline nodes consume.
 4. **Investigate.** Spawn parallel subagents (up to 50) to verify against current code:
    - Cited source files: do the claimed behaviors match? Quote line numbers.
@@ -75,10 +74,6 @@ Structured JSON only. No prose preamble. Fields:
 - `illumination_path`: chosen file path, or empty string when label is `empty`
 - `summary`: one paragraph stating what the illumination proposes (verbatim intent, no editorializing)
 - `explanation`: verification findings. On `false`, lead with which criterion failed and quote the contradicting evidence (file:line or spec excerpt). On `true`, summarize what each criterion check confirmed.
-- `archive_reason_short`: ALWAYS emit. One sentence, ≤100 chars, no newlines, no shell metacharacters. The illumination's archive frontmatter reads this verbatim.
-  - On `preferred_label: "false"`: the verification reason. Example: `Feature already implemented at src/bar.ts:42` — not `This illumination is stale because…`.
-  - On `preferred_label: "true"`: emit the literal placeholder `Declined at approval gate`. The value is only consumed downstream if the user declines the illumination at the later approval gate; until then it is inert.
-  - On `preferred_label: "empty"`: emit empty string `""`.
 - Emit JSON as your final TEXT response. Never inside a thinking block.
 
 # Hard rules (output discipline)
@@ -87,4 +82,3 @@ Structured JSON only. No prose preamble. Fields:
 - Do not paraphrase code claims — quote with file:line citations.
 - Do not assume; if a claim cannot be verified from source, mark the illumination `false` and say so in `explanation`.
 - Do not run the project (no `npm test`, no pipeline execution). Verification is static.
-- You MUST emit `archive_reason_short` on every verdict (`true`, `false`, `empty`). The mark_archived script consumes it verbatim as the illumination's archived frontmatter `reason:` value on whichever path triggers archiving (remove_gate on `false`, approval_gate decline on `true`). Treat the shape constraints (one sentence, ≤100 chars, shell-safe) as strict. Use `Declined at approval gate` on `true` and empty string on `empty`.
