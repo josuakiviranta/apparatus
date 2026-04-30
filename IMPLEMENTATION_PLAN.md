@@ -402,7 +402,7 @@ git commit -am "docs(memory): record specs/ → docs/specs/ relocation"
 
 ### Task 4.5: Final plan-document review
 
-- [ ] Dispatch reviewer over the whole executed plan; confirm nothing's a half-implementation.
+- [x] Dispatch reviewer over the whole executed plan; confirm nothing's a half-implementation. — APPROVED (all 9 done-when criteria pass; smoke validate accepted as proxy for live run).
 
 ---
 
