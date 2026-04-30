@@ -1,617 +1,422 @@
-# Bundle Pipelines Under `src/cli/pipelines/` Implementation Plan
+# Move `specs/` → `docs/specs/` with Pipeline Variable Portability
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Consolidate ralph-cli's *bundled* pipelines (`meditate`, `implement`) under `src/cli/pipelines/<name>/` so they ship with the npm package via a single tsup copy rule. `pipelines/{illumination-to-implementation,janitor,smoke}/` stay at repo root as ralph-cli-self-targeting / test fixtures.
+**Goal:** Relocate authoritative specs from repo root to `docs/specs/`, and convert hard-coded `specs/` paths in pipeline agent rubrics to a `$specs_dir` variable so future relocations are caller-config only.
 
-**Architecture:** One canonical bundled-pipeline root: `src/cli/pipelines/`. tsup copies that whole tree to `dist/pipelines/`. `assets.ts` resolves bundled root via `__dirname/..` in *both* dev (from `src/cli/lib/`) and prod (from `dist/cli/`). The legacy flat-form (`<name>.dot`) bundled lookup is deleted; folder-form (`<name>/pipeline.dot`) is the only bundled shape. Resolver tier-5 fallback unifies onto `resolveBundledPipeline`.
+**Architecture:** Two-tier change. (1) Physical `git mv` of 11 spec files + README/docs link rewrites. (2) Refactor: agent rubrics that hard-code `specs/` (`implement`, `meditate`, `janitor`, `illumination-to-implementation`) become portable by templating `$specs_dir`. Pipelines declare `specs_dir` in their `inputs` field; CLI commands (`implement`, `meditate`) pass the default `docs/specs`. The `illumination-to-implementation` pipeline already wires `$specs_dir` correctly — only literal-path holdouts in its rubrics need rewriting.
 
-**Tech Stack:** TypeScript, tsup, vitest, ESM, Node.js >=18.
+**Tech Stack:** TypeScript, vitest, Markdown agent rubrics, Graphviz `.dot` pipeline configs, the existing pipeline runtime in `src/attractor/` and `src/cli/lib/pipeline.ts`.
 
-**Decision context:**
-- Current state: `meditate` lives at repo-root `pipelines/meditate/` (folder); `implement` lives at `src/cli/pipelines/implement.{dot,md}` (flat). Two layouts, two tsup copy rules, two `assets.ts` getters.
-- Out of scope (option A in brainstorm): bundling `illumination-to-implementation`, `janitor`, `smoke` — these are ralph-cli-private (reference `meditations/`, `docs/superpowers/`, etc.) and would ship dead weight to npm consumers. They stay at repo root.
-- Stale illumination `meditations/illuminations/2026-04-30T1550-implement-pipeline-stranded-in-src-cli.md` proposed the inverse direction (move `implement` UP to `pipelines/`); it must be archived as superseded.
-
----
-
-## File Structure
-
-**New / modified locations:**
-```
-src/cli/pipelines/
-├── implement/
-│   ├── pipeline.dot          # MOVED from src/cli/pipelines/implement.dot
-│   └── implement.md          # MOVED from src/cli/pipelines/implement.md
-└── meditate/
-    ├── pipeline.dot          # MOVED from pipelines/meditate/pipeline.dot
-    └── meditate.md           # MOVED from pipelines/meditate/meditate.md
-```
-
-**Removed:**
-- `pipelines/meditate/` (after files move)
-- `src/cli/pipelines/implement.dot` (flat)
-- `src/cli/pipelines/implement.md` (flat)
-
-**Unchanged:**
-- `pipelines/illumination-to-implementation/`
-- `pipelines/janitor/`
-- `pipelines/smoke/`
-
-**Modified code (4 files):**
-- `tsup.config.ts` — single `cpSync("src/cli/pipelines", "dist/pipelines", {recursive:true})`.
-- `src/cli/lib/assets.ts` — flip dev path of `getBundledRoot` to `join(__dirname, "..")`. Delete `getBundledPipelinePath` (legacy flat-form).
-- `src/cli/lib/pipeline-resolver.ts` — tier-5 swaps `getBundledPipelinePath` → `resolveBundledPipeline`.
-- `src/cli/program.ts` — only doc-text touches (override path message); behavior unchanged.
-
-**Modified tests (6 files):** `assets.test.ts`, `assets-templates.test.ts`, `tsup-templates-copy.test.ts`, `pipeline-resolver.test.ts`, `pipeline.test.ts`, `tests/smoke/implement-pipeline-smoke.dot`.
-
-**Modified docs (~5):** `README.md`, `specs/architecture.md`, `specs/commands.md`, `AGENTS.md`, `docs/orientation/directory-inventory.md`.
-
-**Lifecycle:** Archive `meditations/illuminations/2026-04-30T1550-implement-pipeline-stranded-in-src-cli.md`.
+**Pre-flight context to read once:**
+- `specs/README.md` — table of current authoritative specs
+- `pipelines/illumination-to-implementation/design-writer.md` — reference impl of `$specs_dir` usage
+- `src/cli/commands/implement.ts` and `src/cli/commands/meditate.ts` — caller variable wiring
+- `src/cli/tests/pipeline.test.ts:184–187` — pattern for `variables` round-trip assertion
 
 ---
 
-## Chunk 1: Move `meditate` to `src/cli/pipelines/meditate/`
+## Chunk 1: Move the folder + repoint authoritative links
 
-This chunk validates the load-bearing change in isolation: dev-mode `__dirname` flip in `assets.ts`. `meditate` is already folder-form, so the only change is its location. After this chunk, `meditate` resolves identically in dev and prod via the unified bundled root.
+Pure relocation chunk. No code logic changes. The point: get specs to their new home, fix every direct link, leave portability work to chunks 2–4. README's "current vs historical" semantic block (specs/ vs docs/superpowers/specs/) gets rewritten in this chunk too.
 
-### Task 1.1: Red — update test fixtures to assert new meditate location
+### Task 1.1: Move spec files with `git mv`
 
 **Files:**
-- Modify: `src/cli/tests/tsup-templates-copy.test.ts`
-- Modify: `src/cli/tests/assets-templates.test.ts` (no path change in body, but verify after move)
+- Move: all of `specs/*` → `docs/specs/*`
 
-- [x] **Step 1: Update `tsup-templates-copy.test.ts` to point at the new source location**
-
-Replace the body of the file. The `implement` assertion is gated on `it.skip` until Chunk 2 unskips it — keeps the suite green between chunks.
-
-```ts
-import { describe, it, expect } from "vitest";
-import { existsSync } from "fs";
-import { join } from "path";
-
-describe("bundled pipelines source layout", () => {
-  const root = process.cwd();
-  it("ships meditate as a folder pipeline under src/cli/pipelines/", () => {
-    expect(existsSync(join(root, "src/cli/pipelines/meditate/pipeline.dot"))).toBe(true);
-    expect(existsSync(join(root, "src/cli/pipelines/meditate/meditate.md"))).toBe(true);
-  });
-  it.skip("ships implement as a folder pipeline under src/cli/pipelines/ (unskipped in Chunk 2)", () => {
-    expect(existsSync(join(root, "src/cli/pipelines/implement/pipeline.dot"))).toBe(true);
-    expect(existsSync(join(root, "src/cli/pipelines/implement/implement.md"))).toBe(true);
-  });
-});
-```
-
-- [x] **Step 2: Confirm `assets-templates.test.ts` body needs no edit**
-
-`assets-templates.test.ts:14` only asserts `path.endsWith("meditate/pipeline.dot")` — independent of the directory above `meditate/`. After Chunk 1 the assertion still holds; no edit required. (Confirmation step — keeps executor from second-guessing.)
-
-- [x] **Step 3: Run tests — meditate assertion FAILS, implement skipped**
-
-Run: `npx vitest run src/cli/tests/tsup-templates-copy.test.ts`
-Expected: meditate test FAILS (file at `pipelines/meditate/...` not at `src/cli/pipelines/meditate/...`); implement test SKIPPED.
-
-- [x] **Step 4: Commit (red)**
+- [x] **Step 1: Verify no untracked files in `specs/`**
 
 ```bash
-git add src/cli/tests/tsup-templates-copy.test.ts
-git commit -m "test: assert bundled pipelines under src/cli/pipelines/ (red)"
+git status specs/
 ```
+Expected: nothing untracked (all 11 .md files tracked).
 
-### Task 1.2: Green — move meditate files
-
-**Files:**
-- Create dir: `src/cli/pipelines/meditate/`
-- Move: `pipelines/meditate/pipeline.dot` → `src/cli/pipelines/meditate/pipeline.dot`
-- Move: `pipelines/meditate/meditate.md` → `src/cli/pipelines/meditate/meditate.md`
-- Delete dir: `pipelines/meditate/`
-
-- [x] **Step 1: Move files via `git mv` (preserves history)**
+- [x] **Step 2: `git mv` the folder**
 
 ```bash
-mkdir -p src/cli/pipelines/meditate
-git mv pipelines/meditate/pipeline.dot src/cli/pipelines/meditate/pipeline.dot
-git mv pipelines/meditate/meditate.md src/cli/pipelines/meditate/meditate.md
-rmdir pipelines/meditate
+git mv specs docs/specs
 ```
 
-- [x] **Step 2: Verify directory state**
-
-Run: `ls src/cli/pipelines/meditate/ && ls pipelines/`
-Expected:
-- `src/cli/pipelines/meditate/` contains `pipeline.dot` and `meditate.md`.
-- `pipelines/` contains `illumination-to-implementation/`, `janitor/`, `smoke/` (no `meditate/`).
-
-- [x] **Step 3: Run tests — meditate assertion now PASSES; resolver / assets tests likely BREAK because dev path still points at repo root**
-
-Run: `npx vitest run src/cli/tests/tsup-templates-copy.test.ts src/cli/tests/assets-templates.test.ts src/cli/tests/assets.test.ts`
-Expected: `tsup-templates-copy` meditate test PASSES. `assets-templates.test.ts::resolveBundledPipeline → meditate` likely FAILS in dev (path resolves to old `pipelines/meditate/...` which no longer exists).
-
-This is the failing state that motivates Task 1.3.
-
-### Task 1.3: Green — flip dev path in `assets.ts`
-
-**Files:**
-- Modify: `src/cli/lib/assets.ts:15-19` (`getBundledRoot`)
-
-- [x] **Step 1: Edit `getBundledRoot`**
-
-Old (`src/cli/lib/assets.ts:15-19`):
-```ts
-function getBundledRoot(): string {
-  // prod: dist/cli/ → up one → dist/ (where pipelines/ lives after tsup copy)
-  // dev:  src/cli/lib/ → up three → repo root (where pipelines/ lives in source)
-  return isProduction() ? join(__dirname, "..") : join(__dirname, "../../..");
-}
-```
-
-New:
-```ts
-function getBundledRoot(): string {
-  // prod: dist/cli/ → up one → dist/  (tsup copies src/cli/pipelines → dist/pipelines)
-  // dev:  src/cli/lib/ → up one → src/cli/  (where pipelines/ lives in source)
-  return join(__dirname, "..");
-}
-```
-
-The `isProduction()` branch is removed *only inside `getBundledRoot`*. Keep the `isProduction` function and its import — `getMetaMeditationsDir`, `getIlluminationServerPath`, and `getBundledPipelinePath` (the latter deleted in Chunk 2) still use it. **Do not delete `isProduction()` itself.**
-
-No other getter changes in Chunk 1: `getBundledAgentsDir`, `getMetaMeditationsDir`, `getIlluminationServerPath` are unaffected by the bundled-root flip. Skip those.
-
-- [x] **Step 2: Run tests**
-
-Run: `npx vitest run src/cli/tests/assets-templates.test.ts src/cli/tests/assets.test.ts src/cli/tests/tsup-templates-copy.test.ts`
-Expected: all green; implement assertion in `tsup-templates-copy.test.ts` is `it.skip`'d.
-
-> **Note:** Do NOT run `npm run build` here. tsup still has the old copy rules (`pipelines/meditate/` was just deleted in Task 1.2; the old `cpSync("pipelines/meditate", ...)` will fail to find the source). The prod-build smoke is deferred to Task 1.4 Step 2 after the tsup config is updated.
-
-- [x] **Step 3: Commit (green for Chunk 1)**
+- [x] **Step 3: Fix internal cross-links inside `docs/specs/*.md`**
 
 ```bash
-git add src/cli/pipelines/meditate src/cli/lib/assets.ts
-git commit -m "refactor: bundle meditate pipeline under src/cli/pipelines/
-
-Flips assets.ts dev-mode bundled root from <repo>/pipelines/ to
-<repo>/src/cli/pipelines/, matching prod layout (dist/pipelines/).
-First half of consolidating bundled pipelines under one root."
+grep -rn "specs/" docs/specs/ || true
+grep -rn "\.\./" docs/specs/ || true
 ```
 
-### Task 1.4: Update tsup config
+Apply these concrete edits — they are known broken after the move:
 
-**Files:**
-- Modify: `tsup.config.ts:18-27`
+a. `docs/specs/architecture.md:102` — link target `../docs/superpowers/specs/2026-04-17-pipeline-script-files-design.md` resolved at the old root; from `docs/specs/` it now needs to be `../superpowers/specs/2026-04-17-pipeline-script-files-design.md`. Edit the path depth.
 
-- [x] **Step 1: Replace dual-copy block with single `cpSync`**
+b. `docs/specs/pipeline.md` lines 15, 177, 264 — bare-word references like `specs/architecture.md` and `specs/commands.md` should become sibling-file links (`architecture.md`, `commands.md`) since they're now in the same folder.
 
-Old (`tsup.config.ts:18-27`):
-```ts
-async onSuccess() {
-  // Copy flat-file pipelines (src/cli/pipelines/*.dot, e.g. implement.dot)
-  mkdirSync("dist/pipelines", { recursive: true });
-  for (const file of readdirSync("src/cli/pipelines")) {
-    copyFileSync(`src/cli/pipelines/${file}`, `dist/pipelines/${file}`);
-  }
-  // Copy bundled folder pipelines (pipelines/<name>/<files>) — currently meditate.
-  cpSync("pipelines/meditate", "dist/pipelines/meditate", { recursive: true });
-  console.log("Assets copied to dist/");
-},
-```
+Then re-run the greps; both should return only intentional matches (e.g., `$specs_dir` introduced in later chunks isn't here yet, so `specs/` should be empty).
 
-New:
-```ts
-async onSuccess() {
-  // Copy entire src/cli/pipelines/ tree to dist/pipelines/.
-  // After Chunk 2, every bundled pipeline is folder-form there.
-  cpSync("src/cli/pipelines", "dist/pipelines", { recursive: true });
-  console.log("Assets copied to dist/");
-},
-```
+**Out of scope (don't touch in this chunk):** `IMPLEMENTATION_PLAN.md` at repo root is gitignored and historical — references inside it to `specs/architecture.md` etc. are not part of this migration.
 
-Also remove now-unused imports: `copyFileSync`, `mkdirSync`, `readdirSync` from the top-of-file `import { ... } from "fs"`.
-
-- [x] **Step 2: Build and verify dist layout + prod-mode meditate smoke**
-
-Run: `npm run build && ls dist/pipelines/`
-Expected: `meditate/` folder present with `pipeline.dot` and `meditate.md`. `implement.dot` still copied as flat file (Chunk 2 fixes this).
-
-Then: `node dist/cli/index.js meditate --help`
-Expected: help text prints; no errors about missing pipeline. Confirms prod-mode `resolveBundledPipeline("meditate")` resolves correctly.
-
-- [x] **Step 3: Run full test suite — sanity check no regressions**
-
-Run: `npx vitest run`
-Expected: failures only in tests Chunk 2 will touch (`pipeline-resolver`, `tsup-templates-copy::implement`, `implement-pipeline-smoke`).
-
-- [x] **Step 4: Commit**
+- [x] **Step 4: Commit (move only, no other edits yet — leaves bisect clean)**
 
 ```bash
-git add tsup.config.ts
-git commit -m "refactor(tsup): single recursive copy of src/cli/pipelines → dist/pipelines"
+git add -A
+git commit -m "refactor: move specs/ to docs/specs/ (relocation only)"
 ```
 
----
-
-## Chunk 2: Migrate `implement` to folder form
-
-After this chunk, every bundled pipeline is folder-form. The legacy `getBundledPipelinePath` (flat-file lookup) is deleted; resolver tier-5 fallback uses `resolveBundledPipeline`.
-
-### Task 2.1: Red — update resolver tests for folder-form bundled fallback
+### Task 1.2: Rewrite README.md links and semantic block
 
 **Files:**
-- Modify: `src/cli/tests/pipeline-resolver.test.ts:5-7,62-82,133-139`
+- Modify: `README.md` (lines 53, 156–157, 163, 176–178)
 
-- [x] **Step 1: Replace the assets mock**
-
-Old (lines 5-7):
-```ts
-vi.mock("../lib/assets.js", () => ({
-  getBundledPipelinePath: (name: string) => `/dist/pipelines/${name}.dot`,
-}));
-```
-
-New:
-```ts
-vi.mock("../lib/assets.js", () => ({
-  resolveBundledPipeline: (name: string) => `/dist/pipelines/${name}/pipeline.dot`,
-}));
-```
-
-- [x] **Step 2: Update bundled-fallback test expectations**
-
-Lines 62-82:
-```ts
-describe("resolvePipelineArg bundled fallback", () => {
-  beforeEach(() => mockExists.mockReturnValue(false));
-
-  it("returns folder-form bundled path when project and user paths do not exist", () => {
-    const result = resolvePipelineArg("implement", "/my/project");
-    expect(result).toBe("/dist/pipelines/implement/pipeline.dot");
-  });
-
-  it("prefers project-local pipeline when it exists", () => {
-    mockExists.mockImplementation((p: unknown) =>
-      typeof p === "string" && p.includes("/my/project/pipelines/implement.dot")
-    );
-    const result = resolvePipelineArg("implement", "/my/project");
-    expect(result).toContain("/my/project/pipelines/implement.dot");
-  });
-
-  it("returns absolute path unchanged for non-shorthand args", () => {
-    const result = resolvePipelineArg("/absolute/path/to/pipeline.dot", "/my/project");
-    expect(result).toBe("/absolute/path/to/pipeline.dot");
-  });
-});
-```
-
-- [x] **Step 3: Delete the legacy `getBundledPipelinePath` describe block**
-
-Remove lines 133-139 entirely (`describe("getBundledPipelinePath (assets.ts)", ...)`).
-
-- [x] **Step 4: Verify no other callers of `getBundledPipelinePath` in `pipeline.test.ts`**
-
-Run via Grep tool: `pattern="getBundledPipelinePath"` against `src/cli/tests/pipeline.test.ts`.
-Expected: only line 43 matches (the mock declaration itself). If any other line matches, surface to user before continuing.
-
-- [x] **Step 5: Update `pipeline.test.ts` mock**
-
-In `src/cli/tests/pipeline.test.ts:43-44`, drop the `getBundledPipelinePath` mock line (line 43) — keep only `resolveBundledPipeline`.
-
-- [x] **Step 6: Unskip the implement assertion in `tsup-templates-copy.test.ts`**
-
-Edit `src/cli/tests/tsup-templates-copy.test.ts`: change `it.skip("ships implement as a folder pipeline...` → `it("ships implement as a folder pipeline...`. The Chunk 2 file moves (Task 2.2) will satisfy the assertion.
-
-- [x] **Step 7: Run resolver tests — they FAIL (mock no longer exports `getBundledPipelinePath` but resolver still calls it)**
-
-Run: `npx vitest run src/cli/tests/pipeline-resolver.test.ts`
-Expected: FAIL — TypeError or similar from missing export when tier-5 fires.
-
-- [x] **Step 8: Commit (red)**
+- [x] **Step 1: Read current state**
 
 ```bash
-git add src/cli/tests/pipeline-resolver.test.ts src/cli/tests/pipeline.test.ts src/cli/tests/tsup-templates-copy.test.ts
-git commit -m "test: bundled fallback resolves to folder-form pipeline.dot (red)"
+sed -n '50,60p;150,180p' README.md
 ```
 
-### Task 2.2: Green — move implement to folder form
+- [x] **Step 2: Edit nav links (lines ~176–178)**
 
-**Files:**
-- Create dir: `src/cli/pipelines/implement/`
-- Move: `src/cli/pipelines/implement.dot` → `src/cli/pipelines/implement/pipeline.dot`
-- Move: `src/cli/pipelines/implement.md` → `src/cli/pipelines/implement/implement.md`
+Change:
+```markdown
+[Architecture](specs/architecture.md)
+[Commands](specs/commands.md)
+[Loop Script](specs/loop.md)
+```
+To:
+```markdown
+[Architecture](docs/specs/architecture.md)
+[Commands](docs/specs/commands.md)
+[Loop Script](docs/specs/loop.md)
+```
 
-- [x] **Step 1: Move files**
+- [x] **Step 3: Edit example var (line ~53)**
+
+If the line reads `--var specs_dir=docs/specs`, leave as-is — it already matches the new location. Only act if it reads `specs/`.
+
+- [x] **Step 4: Rewrite the "specs/ vs docs/superpowers/specs/" distinction (Directory Map row at lines ~156–157, plus the callout block at line ~163)**
+
+The old text contrasts root `specs/` (authoritative, current) against `docs/superpowers/specs/` (design history). Rewrite to:
+- `docs/specs/` — authoritative behavioral specs (what the system does)
+- `docs/superpowers/specs/` — design proposals & history (how decisions were reached)
+
+Keep both pointers; do not delete the historical-design pointer.
+
+- [x] **Step 5: Verify links resolve**
 
 ```bash
-mkdir -p src/cli/pipelines/implement
-git mv src/cli/pipelines/implement.dot src/cli/pipelines/implement/pipeline.dot
-git mv src/cli/pipelines/implement.md src/cli/pipelines/implement/implement.md
+grep -nE "\(specs/" README.md
 ```
-
-- [x] **Step 2: Verify**
-
-Run: `ls src/cli/pipelines/implement/ && ls src/cli/pipelines/`
-Expected:
-- `src/cli/pipelines/implement/` contains `pipeline.dot` and `implement.md`.
-- `src/cli/pipelines/` contains only `implement/` and `meditate/` directories (no flat files).
-
-### Task 2.3: Green — swap resolver + drop legacy asset getter
-
-**Files:**
-- Modify: `src/cli/lib/pipeline-resolver.ts:4,45`
-- Modify: `src/cli/lib/assets.ts:44-49` (delete `getBundledPipelinePath`)
-
-- [x] **Step 1: Update resolver import + tier-5 call**
-
-Line 4:
-```ts
-import { resolveBundledPipeline } from "./assets.js";
-```
-
-Line 45 (tier-5 fallback):
-```ts
-return resolveBundledPipeline(arg);
-```
-
-- [x] **Step 2: Delete `getBundledPipelinePath` from `assets.ts`**
-
-Remove lines 44-49 entirely. (Function body, JSDoc comment, and the legacy "flat-file lookup" note all go.)
-
-- [x] **Step 3: Verify no remaining callers**
-
-Run via Grep tool: `pattern="getBundledPipelinePath"` across `src/`.
 Expected: zero matches.
 
-- [x] **Step 4: Run resolver + assets tests**
-
-Run: `npx vitest run src/cli/tests/pipeline-resolver.test.ts src/cli/tests/assets-templates.test.ts src/cli/tests/assets.test.ts src/cli/tests/pipeline.test.ts`
-Expected: all green. (`tsup-templates-copy.test.ts` implement assertion now also passes since the folder exists.)
-
-- [x] **Step 5: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
-git add src/cli/pipelines/implement src/cli/lib/pipeline-resolver.ts src/cli/lib/assets.ts
-git commit -m "refactor: migrate implement pipeline to folder form
-
-Drops getBundledPipelinePath (flat-file lookup). Resolver tier-5
-fallback unifies on resolveBundledPipeline (folder-form). Bundled
-pipelines now share one shape: <root>/<name>/pipeline.dot."
+git add README.md
+git commit -m "docs: repoint README links after specs/ relocation"
 ```
 
-### Task 2.4: Update implement-pipeline-smoke fixture
+### Task 1.3: Update directory inventory
 
 **Files:**
-- Modify: `src/cli/tests/smoke/implement-pipeline-smoke.dot:8-12,17-21,24-28,38-41`
+- Modify: `docs/orientation/directory-inventory.md` (lines ~11–12, 30, 38)
 
-- [x] **Step 1: Update hardcoded paths**
+- [x] **Step 1: Read inventory entries that mention `specs/`**
 
-Replace every occurrence of `src/cli/pipelines/implement.dot` with `src/cli/pipelines/implement/pipeline.dot`. Also update the comments on lines 8-9 to describe the new resolver path:
-
-```dot
-  // 1. Verify the bundled implement pipeline exists at the expected source path.
-  // resolveBundledPipeline("implement") → src/cli/pipelines/implement/pipeline.dot in dev
-  // (assets.ts: __dirname = src/cli/lib/ → up one → src/cli/ → pipelines/implement/pipeline.dot)
-  check_bundled_exists [
-    shape=parallelogram,
-    tool_command="test -f /Users/josu/Documents/projects/ralph-cli/src/cli/pipelines/implement/pipeline.dot && echo 'bundled-pipeline-exists: ok'"
-  ]
+```bash
+grep -n "specs" docs/orientation/directory-inventory.md
 ```
 
-Apply the same path swap to nodes `check_var_expansion` (line 21) and `check_agent_node` (line 27).
+- [x] **Step 2: Edit each entry**
 
-**Node 4 (`check_project_local_override`, line 35) is unchanged.** It tests the *absence* of a project-local flat-form override at `$project/pipelines/implement.dot` — flat-form is still a valid tier-2 lookup in the resolver (`pipeline-resolver.ts:33-34`), so the assertion remains semantically correct.
-
-For node 5 (`check_bundled_fallback`, line 41), change `$project/dist/pipelines/implement.dot` → `$project/dist/pipelines/implement/pipeline.dot`.
-
-- [x] **Step 2: Run the smoke pipeline (project-local)**
-
-Run: `npm run build && node dist/cli/index.js pipeline run src/cli/tests/smoke/implement-pipeline-smoke.dot --project /Users/josu/Documents/projects/ralph-cli`
-Expected: all 5 nodes report `: ok`.
+Replace each `specs/` row with the `docs/specs/` path. Where the inventory contrasts root `specs/` vs `docs/superpowers/specs/`, mirror the README rewrite.
 
 - [x] **Step 3: Commit**
 
 ```bash
-git add src/cli/tests/smoke/implement-pipeline-smoke.dot
-git commit -m "test: implement-pipeline-smoke fixture follows folder-form layout"
+git add docs/orientation/directory-inventory.md
+git commit -m "docs: update directory inventory for docs/specs/"
 ```
 
-### Task 2.5: Final regression sweep
+### Task 1.4: Plan-document review checkpoint (Chunk 1)
 
-- [x] **Step 1: Full test suite**
+- [x] **Step 1: Dispatch plan-document-reviewer subagent**
 
-Run: `npx vitest run`
-Expected: all green. Pay attention to:
-- `pipeline.test.ts` (uses both mocks)
-- `attractor/tests/dual-parser.test.ts` (scans `pipelines/` + `pipelines/smoke/`; `meditate.dot` no longer in those roots — confirm the fixture set is still non-empty and asserts pass)
-- `pipeline-show.test.ts` (uses resolver indirectly)
+Provide: this chunk's content + path to this plan file. Reviewer checks for: missing files, broken-link risk, unaddressed README blocks.
 
-- [x] **Step 2: Build verification**
-
-Run: `npm run build && ls dist/pipelines/`
-Expected: `dist/pipelines/implement/pipeline.dot`, `dist/pipelines/implement/implement.md`, `dist/pipelines/meditate/pipeline.dot`, `dist/pipelines/meditate/meditate.md`. No flat `.dot` files.
-
-- [x] **Step 3: Manual end-to-end of meditate (small sanity check)**
-
-Run: `node dist/cli/index.js meditate --help`
-Expected: help text renders without errors; `resolveBundledPipeline("meditate")` is exercised internally.
-
-If you have a project handy:
-```bash
-node dist/cli/index.js meditate <some-project> --help
-```
-Same expectation.
-
-- [x] **Step 4: Commit only if regression sweep produced any small fixes (otherwise skip)**
+- [x] **Step 2: Apply fixes if ❌, re-dispatch until ✅** — main-agent inline verification confirmed: 11 files at docs/specs/, zero `(specs/` matches in README, only intentional `docs/superpowers/specs/` reference remains in architecture.md.
 
 ---
 
-## Chunk 3: Documentation + lifecycle
+## Chunk 2: Make bundled pipelines portable (`implement`, `meditate`)
 
-### Task 3.1: Update directory maps and prose references
+Both bundled pipelines hard-code `specs/` in their agent rubric. This chunk threads a `specs_dir` variable through pipeline.dot → agent rubric → CLI caller, using TDD. After this chunk, `ralph implement` and `ralph meditate` resolve specs via a variable that defaults to `docs/specs` but can be overridden by `--var specs_dir=...`.
+
+**Important — variable-substitution semantics:** `$specs_dir` in the rubric body is **NOT** runtime-substituted. The runtime expands `$varname` only in `toolCommand`, `cwd`, and `maxIterations` (see `src/attractor/transforms/variable-expansion.ts`). The agent body is delivered verbatim. Instead, declaring `specs_dir` in the pipeline.dot `inputs="..."` causes the runtime to auto-inject an `## Inputs` block containing `<specs_dir>docs/specs</specs_dir>`; the LLM reads the value from there. The literal `$specs_dir` token in the rubric is a **convention** that signals to the agent "look up `specs_dir` in the Inputs block." Reference impl: `pipelines/illumination-to-implementation/design-writer.md`.
+
+### Task 2.1: Update meditate test for new rubric
 
 **Files:**
-- Modify: `README.md` lines 35, 152-160 (directory map)
-- Modify: `specs/architecture.md` lines 60-66 (file structure), 124-126 (Asset Bundling), 128-141 (Bundled Pipeline Resolution)
-- Modify: `specs/commands.md` line 22
-- Modify: `AGENTS.md` line 28
-- Modify: `docs/orientation/directory-inventory.md` (verify via grep — may have no hits)
+- Modify: `src/cli/tests/meditate.test.ts:269–281` (test name + regex)
 
-- [x] **Step 1: Grep for stale references**
-
-Run via Grep tool: `pattern="pipelines/meditate"` across repo root, scope `*.md`.
-Expected: list of all docs needing updates. For each, swap to `src/cli/pipelines/meditate/` (or remove path-specific phrasing entirely if the path adds no value).
-
-- [x] **Step 2: Update README.md line 35**
-
-Old:
-```
-Backed by the bundled folder pipeline `pipelines/meditate/`.
-```
-
-New:
-```
-Backed by the bundled folder pipeline `src/cli/pipelines/meditate/`.
-```
-
-- [x] **Step 3: Update README.md directory map (lines 152-160)**
-
-Adjust the table row for `pipelines/`:
-
-```
-| `pipelines/` | Project-local `.dot` pipelines for ralph-cli itself (illumination-to-implementation, janitor) + `smoke/` test fixtures. Bundled pipelines (meditate, implement) ship from `src/cli/pipelines/`. |
-```
-
-Add new row above `specs/`:
-```
-| `src/cli/pipelines/` | Bundled pipelines shipped to npm consumers (`meditate`, `implement`). Folder-form: `<name>/pipeline.dot` + agent `.md` files. Copied to `dist/pipelines/` at build. |
-```
-
-- [x] **Step 4: Update `specs/architecture.md` file-structure block (lines 63-64)**
-
-Replace:
-```
-│   ├── pipelines/                       # bundled folder pipelines (repo root)
-│   │   └── meditate/                   # backs `ralph meditate`
-```
-
-With:
-```
-│   ├── pipelines/                       # bundled folder pipelines (shipped to npm)
-│   │   ├── implement/                   # backs `ralph implement`
-│   │   └── meditate/                    # backs `ralph meditate`
-```
-
-Remove any line in this block that places `pipelines/meditate/` at repo root.
-
-- [x] **Step 5: Update `specs/architecture.md` Asset Bundling section (line 126)**
-
-Replace the line:
-```
-`tsup.config.ts` copies flat-file pipelines from `src/cli/pipelines/*.dot` and the folder pipeline at `pipelines/meditate/` into `dist/` via an `onSuccess` hook. ...
-```
-
-With:
-```
-`tsup.config.ts` recursively copies `src/cli/pipelines/` (every bundled pipeline as folder-form `<name>/pipeline.dot` + agent `.md`) into `dist/pipelines/` via an `onSuccess` hook. ...
-```
-
-Keep the rest of that paragraph (about `meditations/` and `__RALPH_PROD__`) unchanged.
-
-- [x] **Step 6: Update `specs/architecture.md` Bundled Pipeline Resolution section (lines 130, 135, 141)**
-
-- Line 130: change `bundled `pipelines/meditate/` folder pipeline` → `bundled `src/cli/pipelines/meditate/` folder pipeline`.
-- Line 135: change `(dev: repo-root `pipelines/<name>/pipeline.dot`)` → `(dev: `src/cli/pipelines/<name>/pipeline.dot`)`.
-- Line 141 (table row): change `pipelines/meditate/pipeline.dot` → `src/cli/pipelines/meditate/pipeline.dot`. Add a new row for `ralph implement` | `implement` | `src/cli/pipelines/implement/pipeline.dot`.
-
-- [x] **Step 7: Update `specs/commands.md:22` and `AGENTS.md:28`**
-
-For both files, replace `pipelines/meditate/` with `src/cli/pipelines/meditate/`. (Use the Read tool first to confirm the exact surrounding context before edit.)
-
-- [x] **Step 8: Verify `docs/orientation/directory-inventory.md`**
-
-Run via Grep tool: `pattern="pipelines/meditate|src/cli/pipelines/implement"` against `docs/orientation/directory-inventory.md`.
-- If hits: update each occurrence to the new layout.
-- If zero hits: skip — the file already describes structure abstractly.
-
-- [x] **Step 9: Commit**
+- [ ] **Step 1: Read current test**
 
 ```bash
-git add README.md specs/architecture.md specs/commands.md AGENTS.md docs/orientation/directory-inventory.md
-git commit -m "docs: bundled pipelines now live under src/cli/pipelines/"
+sed -n '268,282p' src/cli/tests/meditate.test.ts
 ```
 
-### Task 3.2: Archive the superseded illumination
+- [ ] **Step 2: Replace assertion to expect `$specs_dir` token**
+
+```ts
+it("exploration step weights $specs_dir and src/ folders", () => {
+  const agentMd = readFileSync(
+    join(__dirname, "..", "pipelines", "meditate", "meditate.md"),
+    "utf-8",
+  );
+  const frontmatterMatch = agentMd.match(/^---\n[\s\S]+?\n---\n/);
+  expect(frontmatterMatch).not.toBeNull();
+  const body = agentMd.slice(frontmatterMatch![0].length);
+
+  expect(body).toMatch(/\$specs_dir/);
+  expect(body).toContain("src/");
+  expect(body.toLowerCase()).toContain("weighted focus");
+});
+```
+
+- [ ] **Step 3: Run test, confirm RED**
+
+```bash
+npx vitest run src/cli/tests/meditate.test.ts -t "weights"
+```
+Expected: FAIL — current rubric still has literal `specs/`, not `$specs_dir`.
+
+- [ ] **Step 4: Edit rubric** — `src/cli/pipelines/meditate/meditate.md:69`
+
+Change `specs/*.md` → `$specs_dir/*.md`. Add a sentence near the first use: "If `$specs_dir` in the Inputs block is empty, default to `docs/specs`." (Belt-and-braces: the CLI command always passes a default in Task 2.3, but invocation via `pipeline run` directly bypasses that.)
+
+- [ ] **Step 5: Run test, confirm GREEN**
+
+```bash
+npx vitest run src/cli/tests/meditate.test.ts -t "weights"
+```
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add src/cli/tests/meditate.test.ts src/cli/pipelines/meditate/meditate.md
+git commit -m "refactor(meditate): use \$specs_dir variable in rubric"
+```
+
+### Task 2.2: Add `specs_dir` to meditate pipeline.dot inputs
 
 **Files:**
-- Modify: `meditations/illuminations/2026-04-30T1550-implement-pipeline-stranded-in-src-cli.md` frontmatter
-- Move: file → `meditations/archived-illuminations/2026-04-30T1550-implement-pipeline-stranded-in-src-cli.md`
+- Modify: `src/cli/pipelines/meditate/pipeline.dot:2`
 
-- [x] **Step 1: Update frontmatter**
+- [ ] **Step 1: Edit**
 
-Edit lines 1-5 in place. **Field name is `archive_reason` (singular), not `archive_reason_short`** — the latter is the agent output schema; the persisted frontmatter field per `src/cli/mcp/illumination-server.ts:238` is `archive_reason`.
-
-```yaml
----
-date: 2026-04-30
-status: archived
-archived_at: 2026-04-30
-archive_reason: Superseded by opposite-direction consolidation; bundled pipelines now live under src/cli/pipelines/ rather than top-level pipelines/. See docs/superpowers/plans/2026-04-30-bundle-pipelines-under-src-cli.md.
-description: All pipelines moved to top-level pipelines/ folder-form except implement, still alone in src/cli/pipelines/ — last splinter to consolidate.
----
+```
+inputs="steer,vision,specs_dir"
 ```
 
-- [x] **Step 2: Move to archived-illuminations/**
+- [ ] **Step 2: Run pipeline validator (sanity)**
 
 ```bash
-git mv meditations/illuminations/2026-04-30T1550-implement-pipeline-stranded-in-src-cli.md meditations/archived-illuminations/2026-04-30T1550-implement-pipeline-stranded-in-src-cli.md
+npm run build
+node dist/cli/index.js pipeline validate src/cli/pipelines/meditate/pipeline.dot
 ```
+Expected: PASS, `specs_dir` listed as declared input.
 
-- [x] **Step 3: Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
-git add meditations/archived-illuminations/2026-04-30T1550-implement-pipeline-stranded-in-src-cli.md
-git commit -m "meditate: archive stranded-implement illumination (superseded)"
+git add src/cli/pipelines/meditate/pipeline.dot
+git commit -m "refactor(meditate): declare specs_dir as pipeline input"
 ```
 
-### Task 3.3: Final verification
+### Task 2.3: Wire default in `meditate.ts` command
 
-- [x] **Step 1: Full vitest**
+**Files:**
+- Modify: `src/cli/commands/meditate.ts` (the `variables:` block in the `pipelineRunCommand` call)
 
-Run: `npx vitest run`
-Expected: all green.
+- [ ] **Step 1: Write a failing test in `src/cli/tests/meditate.test.ts`** (use `vi.spyOn` to match the existing pattern at meditate.test.ts:212–220)
 
-- [x] **Step 2: tsc / typecheck if configured**
+```ts
+it("passes specs_dir default of docs/specs to pipeline runtime", async () => {
+  const calls: Array<{ dotFile: string; opts: any }> = [];
+  vi.spyOn(pipelineMod, "pipelineRunCommand").mockImplementation(
+    async (dotFile, opts) => {
+      calls.push({ dotFile, opts });
+    },
+  );
+  await meditateCommand(tmpDir);
+  expect(calls[0].opts.variables.specs_dir).toBe("docs/specs");
+});
+```
 
-Run: `npx tsc --noEmit` (skip if not in package scripts).
-Expected: no errors.
+- [ ] **Step 2: Run test, confirm RED**
 
-- [x] **Step 3: Build**
+- [ ] **Step 3: Implement — add `specs_dir: "docs/specs"` (or honor `--specs-dir` flag if exposed) into the `variables` map**
 
-Run: `npm run build`
-Expected: `dist/pipelines/{implement,meditate}/pipeline.dot` exist; no `dist/pipelines/*.dot` flat files.
+- [ ] **Step 4: Run test, confirm GREEN**
 
-- [x] **Step 4: Smoke run (against ralph-cli itself)**
+- [ ] **Step 5: Commit**
 
-Run: `node dist/cli/index.js pipeline list .`
-Expected: based on `pipeline.ts:598` (`readdirSync(pipelinesDir).filter(f => f.endsWith(".dot"))`), `pipeline list` enumerates only flat `.dot` files at the top level of `<project>/pipelines/`. Since ralph-cli's `pipelines/` now contains only subfolders (`illumination-to-implementation/`, `janitor/`, `smoke/`), the command will print "No workflows found in ..." — that's the expected output. (This is a pre-existing bug/limitation of `pipeline list`, not introduced by this plan; surface as a separate illumination if desired.)
+```bash
+git commit -am "feat(meditate): default specs_dir to docs/specs"
+```
 
-Run: `node dist/cli/index.js meditate --help`
-Expected: help renders without errors. Confirms bundled-pipeline resolution works in prod build.
+### Task 2.4: Same triplet for `implement` pipeline
 
-- [x] **Step 5: No final commit (sweep should produce zero diff)**
+**Files:**
+- Modify: `src/cli/pipelines/implement/implement.md:14,35` (replace `specs/*` → `$specs_dir/*`)
+- Modify: `src/cli/pipelines/implement/pipeline.dot` (add `inputs="specs_dir,max_iterations,llm_model"` — the latter two were previously implicit; declaring them is good hygiene but if scope creep, add `specs_dir` only)
+- Modify: `src/cli/commands/implement.ts:24–27` (add `specs_dir: "docs/specs"` to `variables`)
 
-If `git status` is clean, you're done.
+- [ ] **Step 1: Add a rubric assertion test** (new test in `src/cli/tests/implement.test.ts` or wherever implement contract tests live; mirror Task 2.1 pattern). Assert rubric contains `$specs_dir`, not literal `specs/`.
+
+- [ ] **Step 2: RED**
+
+- [ ] **Step 3: Apply edits — rubric, dot, command. Include the same empty-value fallback sentence used in Task 2.1 Step 4.**
+
+- [ ] **Step 4: GREEN**
+
+- [ ] **Step 5: Commit**
+
+```bash
+git commit -am "refactor(implement): \$specs_dir variable + docs/specs default"
+```
+
+### Task 2.5: Plan-document review checkpoint (Chunk 2)
+
+- [ ] Dispatch plan-document-reviewer for Chunk 2 with focus on: TDD discipline preserved? Variable-threading correct? Rubric tokens consistent?
 
 ---
 
-## Risks & Rollback
+## Chunk 3: Project-local pipeline portability (`pipelines/`)
 
-**Risk surface (in priority order):**
-1. **`assets.ts` dev-path flip** — load-bearing. Wrong off-by-one breaks every dev-mode pipeline resolution. Validated by `assets-templates.test.ts::resolveBundledPipeline` and end-to-end run in Task 1.3 / Task 2.5.
-2. **tsup copy semantics** — `cpSync(..., {recursive:true})` on a directory containing only folders should produce an identical tree. Validated by Task 1.4 step 2 + `tsup-templates-copy.test.ts`.
-3. **Resolver tier-5 swap** — flat-form bundled lookup is deleted entirely. Any caller still expecting `<name>.dot` will break. Grep in Task 2.3 step 3 catches this.
+The repo's project-local `pipelines/` mirror is what self-development uses. `illumination-to-implementation/design-writer.md` already uses `$specs_dir` — good. Hold-outs: `implement.md`, `verifier.md`, `memory-writer.md` (in same pipeline) and standalone `janitor/janitor.md`. These don't have unit tests, so verification is via portability validator + smoke pipeline runs.
 
-**Rollback:** `git revert <range>` of the chunk commits restores everything; pipelines are pure data, no DB / external state.
+### Task 3.1: Rewrite literal `specs/` in illumination-to-implementation rubrics
 
-**No worktree used:** Brainstorming was conversational; user accepted the plan inline. If the executing harness prefers worktree isolation, create one before Chunk 1 via superpowers:using-git-worktrees.
+**Files:**
+- Modify: `pipelines/illumination-to-implementation/implement.md:16,37` (path-refs)
+- Modify: `pipelines/illumination-to-implementation/verifier.md:40,48,67` (path-refs)
+- **Do NOT modify:** `pipelines/illumination-to-implementation/verifier.md:65` ("Cited specs:" — concept-reference, English noun, not a filesystem path)
+- **Do NOT modify:** `pipelines/illumination-to-implementation/memory-writer.md:144` ("Do not touch source code, specs, or pipelines" — concept-reference, English noun)
+
+- [ ] **Step 1: For each path-ref line above, replace literal `specs/` → `$specs_dir/`. Skip the two concept-reference lines.**
+
+- [ ] **Step 1b: Add empty-value fallback to each migrated agent rubric.** Since `$specs_dir` is read from the auto-injected Inputs block (Chunk 2 preamble), an unset value would yield an empty string and silently break globs like `$specs_dir/*.md` (becomes `/*.md`). Add a single sentence near the first use of `$specs_dir` in each rubric: "If `$specs_dir` is empty in the Inputs block, default to `docs/specs`." Apply to: `implement.md`, `verifier.md`. (`memory-writer.md` was a concept-ref — no fallback needed.)
+
+- [ ] **Step 2: Run portability validator**
+
+```bash
+npm run build
+node dist/cli/index.js pipeline validate pipelines/illumination-to-implementation/pipeline.dot
+```
+Expected: no undeclared variables; `specs_dir` already in `inputs="..."`.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git commit -am "refactor(illumination-to-implementation): \$specs_dir in remaining rubrics"
+```
+
+### Task 3.2: Make janitor portable
+
+**Files:**
+- Modify: `pipelines/janitor/janitor.md:56` — `specs/*.md` → `$specs_dir/*.md` (the only filesystem path-ref in janitor — illuminations and plans are MCP-resolved, not filesystem paths)
+- Modify: `pipelines/janitor/pipeline.dot:4` — current `inputs="project"` → `inputs="project, specs_dir"`
+
+- [ ] **Step 1: Apply rubric edit to `janitor.md:56`. Add the same empty-value fallback sentence used in Task 3.1 Step 1b.**
+
+- [ ] **Step 2: Apply pipeline.dot edit — append `specs_dir` to inputs.**
+
+- [ ] **Step 3: Validate**
+
+```bash
+node dist/cli/index.js pipeline validate pipelines/janitor/pipeline.dot
+```
+
+- [ ] **Step 4: Commit**
+
+```bash
+git commit -am "refactor(janitor): \$specs_dir variable for doc-drift scan"
+```
+
+### Task 3.3: Plan-document review checkpoint (Chunk 3)
+
+- [ ] Dispatch reviewer; verify only path-references were converted, not the bare-word "specs" semantic uses.
+
+---
+
+## Chunk 4: Verification + smoke
+
+### Task 4.1: Run full test suite
+
+- [ ] **Step 1:**
+
+```bash
+npm test
+```
+Expected: green. If meditate or pipeline tests fail, root-cause before continuing.
+
+### Task 4.2: Run smoke pipelines
+
+Smoke pipelines are folder-form. The CLI requires a `.dot` file path, not the folder.
+
+- [ ] **Step 1: Run all 14 smoke pipelines in a loop**
+
+```bash
+for d in pipelines/smoke/*/; do
+  echo "=== $d ===" && node dist/cli/index.js pipeline run "$d/pipeline.dot" || break
+done
+```
+Expected: every smoke folder runs to completion. Halt + investigate on first failure.
+
+### Task 4.3: Manual sanity — `ralph implement` default + override
+
+- [ ] **Step 1: Default path (no override)**
+
+```bash
+ralph <scratch> implement --max 1
+```
+Confirm: agent's Inputs block shows `<specs_dir>docs/specs</specs_dir>` and the rubric scans `docs/specs/`.
+
+- [ ] **Step 2: Override path (the whole point of Chunk 2 refactor — verify positive case)**
+
+```bash
+ralph <scratch> implement --max 1 --var specs_dir=custom/path/specs
+```
+Confirm: agent's Inputs block shows `<specs_dir>custom/path/specs</specs_dir>` and the rubric scans `custom/path/specs/`.
+
+### Task 4.4: Update memory
+
+The repo's `memory/` folder contains dated standalone files; there is no project-level `MEMORY.md` index (the user's auto-memory `MEMORY.md` lives elsewhere and is auto-managed).
+
+- [ ] **Step 1: Write `memory/2026-04-30-specs-relocated-to-docs.md`** — short note: specs lives at `docs/specs/` now; agent rubrics use `$specs_dir` convention (read from auto-injected Inputs block, not template substitution); default is `docs/specs`; CLI commands `implement` and `meditate` thread the default; portable across any folder via `--var specs_dir=...`.
+
+- [ ] **Step 2: Commit**
+
+```bash
+git commit -am "docs(memory): record specs/ → docs/specs/ relocation"
+```
+
+### Task 4.5: Final plan-document review
+
+- [ ] Dispatch reviewer over the whole executed plan; confirm nothing's a half-implementation.
+
+---
+
+## Out of scope
+
+- Renaming `docs/superpowers/specs/` (design-history dir). Keep as-is to preserve git history of design docs.
+- Renaming the `specs_dir` variable. Name stays — only its default value moves.
+- Adding a `--specs-dir` CLI flag. The pipeline already accepts `--var specs_dir=...`; a dedicated flag is YAGNI until a user asks.
+
+## Done when
+
+1. `specs/` no longer exists at repo root.
+2. `docs/specs/` contains all 11 spec files with cross-links intact.
+3. `npm test` is green.
+4. All bundled and project-local pipelines that previously hard-coded `specs/` now use `$specs_dir`.
+5. Smoke pipelines pass.
+6. Memory entry written.
