@@ -3,7 +3,7 @@ import { join } from "path";
 
 vi.mock("fs", () => ({ existsSync: vi.fn() }));
 vi.mock("../lib/assets.js", () => ({
-  getBundledPipelinePath: (name: string) => `/dist/pipelines/${name}.dot`,
+  resolveBundledPipeline: (name: string) => `/dist/pipelines/${name}/pipeline.dot`,
 }));
 
 import { existsSync } from "fs";
@@ -62,9 +62,9 @@ describe("resolvePipelineArg", () => {
 describe("resolvePipelineArg bundled fallback", () => {
   beforeEach(() => mockExists.mockReturnValue(false));
 
-  it("returns bundled path when project and user paths do not exist", () => {
+  it("returns folder-form bundled path when project and user paths do not exist", () => {
     const result = resolvePipelineArg("implement", "/my/project");
-    expect(result).toBe("/dist/pipelines/implement.dot");
+    expect(result).toBe("/dist/pipelines/implement/pipeline.dot");
   });
 
   it("prefers project-local pipeline when it exists", () => {
@@ -127,13 +127,5 @@ describe("resolvePipelineArg folder-form lookup (Chunk 4: per-pipeline folder)",
 describe("getPipelinesDir", () => {
   it("returns pipelines subfolder of project", () => {
     expect(getPipelinesDir("/my-app")).toBe(join("/my-app", "pipelines"));
-  });
-});
-
-describe("getBundledPipelinePath (assets.ts)", () => {
-  it("resolves implement name to a .dot path", async () => {
-    const { getBundledPipelinePath } = await import("../lib/assets.js");
-    const result = getBundledPipelinePath("implement");
-    expect(result).toContain("implement.dot");
   });
 });

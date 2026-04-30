@@ -40,7 +40,6 @@ vi.mock("../components/PipelineApp.js", () => ({
   })),
 }));
 vi.mock("../lib/assets.js", () => ({
-  getBundledPipelinePath: vi.fn((name: string) => `/fake/pipelines/${name}.dot`),
   resolveBundledPipeline: vi.fn((name: string) => `/fake/pipelines/${name}/pipeline.dot`),
 }));
 vi.mock("../lib/stream-formatter.js", () => ({

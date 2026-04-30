@@ -8,7 +8,7 @@ describe("bundled pipelines source layout", () => {
     expect(existsSync(join(root, "src/cli/pipelines/meditate/pipeline.dot"))).toBe(true);
     expect(existsSync(join(root, "src/cli/pipelines/meditate/meditate.md"))).toBe(true);
   });
-  it.skip("ships implement as a folder pipeline under src/cli/pipelines/ (unskipped in Chunk 2)", () => {
+  it("ships implement as a folder pipeline under src/cli/pipelines/", () => {
     expect(existsSync(join(root, "src/cli/pipelines/implement/pipeline.dot"))).toBe(true);
     expect(existsSync(join(root, "src/cli/pipelines/implement/implement.md"))).toBe(true);
   });
