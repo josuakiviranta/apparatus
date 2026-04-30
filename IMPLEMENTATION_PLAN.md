@@ -277,7 +277,7 @@ git commit -m "feat(illumination): register consume MCP tool, drop status param 
 - Modify: `src/cli/mcp/illumination-server.ts:48` (frontmatter template)
 - Modify: `src/cli/tests/illumination-server.test.ts:134-137` (frontmatter regex assertions)
 
-- [ ] **Step 1: Update the failing test first**
+- [x] **Step 1: Update the failing test first**
 
 Find the existing assertions in `src/cli/tests/illumination-server.test.ts` around line 134:
 
@@ -293,12 +293,12 @@ expect(written).toMatch(new RegExp(`^---\\ndate: ${today}\\ndescription: My core
 
 Find the test `"includes status: open in frontmatter"` (line 137) and DELETE it entirely — no `status:` field is written anymore.
 
-- [ ] **Step 2: Run test — confirm it fails**
+- [x] **Step 2: Run test — confirm it fails**
 
 Run: `npx vitest run src/cli/tests/illumination-server.test.ts -t writeIllumination`
 Expected: FAIL — implementation still emits `status: open`.
 
-- [ ] **Step 3: Update `writeIllumination` to drop `status: open`**
+- [x] **Step 3: Update `writeIllumination` to drop `status: open`**
 
 In `src/cli/mcp/illumination-server.ts:48`, change:
 
@@ -312,7 +312,7 @@ to:
 const frontmatter = `---\ndate: ${date}\ndescription: ${description.trim()}\n---\n\n`;
 ```
 
-- [ ] **Step 4: Update the `write_illumination` MCP tool description**
+- [x] **Step 4: Update the `write_illumination` MCP tool description**
 
 In `src/cli/mcp/illumination-server.ts` around line 567-571 (the description string passed to `server.tool("write_illumination", …)`), replace the trailing sentence about `mark_implemented` / `mark_archived` moving the file. New description:
 
@@ -325,12 +325,12 @@ In `src/cli/mcp/illumination-server.ts` around line 567-571 (the description str
         "Use the `consume` tool with reason='implemented' or 'declined' to remove an illumination after the work it represents is done.",
 ```
 
-- [ ] **Step 5: Run tests — confirm they pass**
+- [x] **Step 5: Run tests — confirm they pass**
 
 Run: `npx vitest run src/cli/tests/illumination-server.test.ts -t writeIllumination`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/cli/mcp/illumination-server.ts src/cli/tests/illumination-server.test.ts

@@ -127,21 +127,11 @@ describe("writeIllumination", () => {
     expect(() => writeIllumination(tmpDir, "bad/name.md", "A description", "content")).toThrow();
   });
 
-  it("prepends YAML frontmatter with date, status, and description", () => {
+  it("prepends YAML frontmatter with date and description", () => {
     writeIllumination(tmpDir, "test.md", "My core insight", "# Body");
     const written = readFileSync(join(tmpDir, "meditations", "illuminations", "test.md"), "utf8");
     const today = new Date().toISOString().slice(0, 10);
-    expect(written).toMatch(new RegExp(`^---\\ndate: ${today}\\nstatus: open\\ndescription: My core insight\\n---\\n`));
-  });
-
-  it("includes status: open in frontmatter", () => {
-    writeIllumination(tmpDir, "T1200-status-test.md", "Status test", "Body");
-    const content = readFileSync(
-      join(tmpDir, "meditations", "illuminations", "T1200-status-test.md"),
-      "utf-8"
-    );
-    expect(content).toMatch(/^---\n/);
-    expect(content).toMatch(/status: open/);
+    expect(written).toMatch(new RegExp(`^---\\ndate: ${today}\\ndescription: My core insight\\n---\\n`));
   });
 
   it("places the content body after the frontmatter separator", () => {

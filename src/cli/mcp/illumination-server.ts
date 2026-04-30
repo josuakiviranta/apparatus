@@ -45,7 +45,7 @@ export function writeIllumination(
   if (err) throw new Error(err);
   if (!description || !description.trim()) throw new Error("description is required");
   const date = new Date().toISOString().slice(0, 10);
-  const frontmatter = `---\ndate: ${date}\nstatus: open\ndescription: ${description.trim()}\n---\n\n`;
+  const frontmatter = `---\ndate: ${date}\ndescription: ${description.trim()}\n---\n\n`;
   const dir = join(projectRoot, "meditations", "illuminations");
   mkdirSync(dir, { recursive: true });
   const filePath = join(dir, filename);
@@ -574,7 +574,8 @@ if (!isTestEnv) {
         "Provide a kebab-case `slug` (lowercase alphanumeric + hyphens, e.g. `janitor-doc-drift` or `my-insight`); " +
         "the server prepends the current YYYY-MM-DDTHHMM- timestamp and appends .md — do not include either yourself. " +
         "Provide a one-sentence `description` summarizing the core insight — this is required. " +
-        "After lifecycle transitions, mark_implemented or mark_archived will physically move the file to meditations/implemented-illuminations/ or meditations/archived-illuminations/ respectively.",
+        "Frontmatter is auto-generated as `date` + `description` only — no status field. " +
+        "Use the `consume` tool with reason='implemented' or 'declined' to remove an illumination after the work it represents is done.",
       {
         slug: z.string(),
         description: z.string(),
