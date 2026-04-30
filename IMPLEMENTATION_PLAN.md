@@ -802,7 +802,7 @@ git commit -m "docs(pipeline): drop illumination_source from plan frontmatter"
 **Files:**
 - Modify: `pipelines/illumination-to-implementation/memory-writer.md` (lines 12-13 tools, line 56 trace bullet, lines 128-134 step 7, line 145 hard rules, line 97 example)
 
-- [ ] **Step 1: Update the `tools:` list**
+- [x] **Step 1: Update the `tools:` list**
 
 Lines 12-13 currently list:
 
@@ -818,7 +818,7 @@ Replace with:
   - mcp__illumination__consume
 ```
 
-- [ ] **Step 2: Update the trace-reading bullet at line 56**
+- [x] **Step 2: Update the trace-reading bullet at line 56**
 
 Line 56 currently mentions `mark_archived, mark_dispatched`. Change to:
 
@@ -826,7 +826,7 @@ Line 56 currently mentions `mark_archived, mark_dispatched`. Change to:
    - Tool-node failures (consume, push).
 ```
 
-- [ ] **Step 3: Rewrite step 7b (the illumination-side lifecycle call)**
+- [x] **Step 3: Rewrite step 7b (the illumination-side lifecycle call)**
 
 The current step 7 framing — "closes BOTH halves of the open/close pair that `mark_dispatched` opened upstream" — is obsolete. Rewrite the entire step 7 (lines ~128-134) as:
 
@@ -840,7 +840,7 @@ The current step 7 framing — "closes BOTH halves of the open/close pair that `
    Do **not** abort the node on either branch's failure. Push (step 6) and the structured-JSON emit (step 8) are non-negotiable; the lifecycle calls are opportunistic.
 ```
 
-- [ ] **Step 4: Update the example in the Learnings template (line 97)**
+- [x] **Step 4: Update the example in the Learnings template (line 97)**
 
 Line 97 currently reads:
 
@@ -854,7 +854,7 @@ Change to:
    - Tool node `consume` failed once due to <…>
 ```
 
-- [ ] **Step 5: Update the hard rules (line 145)**
+- [x] **Step 5: Update the hard rules (line 145)**
 
 Line 145 currently lists `mark_implemented (step 7b)` as one of the best-effort calls. Update to:
 
@@ -862,12 +862,12 @@ Line 145 currently lists `mark_implemented (step 7b)` as one of the best-effort 
 - Both lifecycle calls — `mark_plan_implemented` (step 7a) and `consume` (step 7b) — are **best-effort**. Never abort the node on `success: false` from either. Push (step 6) and the structured-JSON emit (step 8) are non-negotiable; both lifecycle calls in step 7 are opportunistic. A frontmatter-less, already-`implemented`, or missing plan/illumination must not block finalization.
 ```
 
-- [ ] **Step 6: Final sweep**
+- [x] **Step 6: Final sweep**
 
 Run: `grep -nE "mark_implemented|mark_archived|mark_dispatched" pipelines/illumination-to-implementation/memory-writer.md`
 Expected: no matches. If any remain, edit them in context.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add pipelines/illumination-to-implementation/memory-writer.md
