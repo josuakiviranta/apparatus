@@ -10,7 +10,7 @@ tools:
   - Glob
   - Bash
   - mcp__illumination__mark_plan_implemented
-  - mcp__illumination__mark_implemented
+  - mcp__illumination__consume
 mcp:
   - name: illumination
     command: node
@@ -53,7 +53,7 @@ Memory files are reference documents for future sessions. Keep them dense, scann
    - **Retry events** — when a node failed and re-ran. Biggest learning signal.
    - `agent.success=false` loops on the implement node (unbounded by design). Count them. If the agent repeatedly hit the same error before succeeding, that is a learning.
    - **tmux-tester fix cycles** — how many cycles, what commits the tester made, what remained unfixed.
-   - Tool-node failures (mark_archived, mark_dispatched, push).
+   - Tool-node failures (consume, push).
 
    If `pipeline.jsonl` is missing or empty, proceed with artifact-only evidence and note the gap in the `Learnings` section.
 
@@ -94,7 +94,7 @@ Memory files are reference documents for future sessions. Keep them dense, scann
    policy work. Examples:
    - Node `implement` retried N times before succeeding — root cause: <…>
    - tmux-tester needed M fix cycles; persistent issue was <…>
-   - Tool node `mark_dispatched` failed once due to <…>
+   - Tool node `consume` failed once due to <…>
 
    If the run went cleanly, omit this section entirely. Padding with
    "nothing to report" corrodes signal.
@@ -125,13 +125,13 @@ Memory files are reference documents for future sessions. Keep them dense, scann
 
    Even if step 5 staged nothing, prior commits from `implement` and `tmux-tester` may not have been pushed yet. Push is idempotent — already-pushed refs are a no-op at the remote.
 
-7. **Mark the lifecycle artifacts implemented (best-effort, both halves).** This step closes BOTH halves of the open/close pair that `mark_dispatched` opened upstream — the plan frontmatter AND the illumination frontmatter. Run them in this order:
+7. **Mark the lifecycle artifacts complete (best-effort, both halves).** Run them in this order:
 
    **7a. Plan side.** If `$plan_writer.plan_path` is set and non-empty, call `mark_plan_implemented` with the basename of `$plan_writer.plan_path` (strip the directory portion — the tool resolves the file under `docs/superpowers/plans/`). On `success: true`, do nothing more — the tool auto-commits its own frontmatter rewrite. On `success: false` (orphan plan with no frontmatter, plan already `implemented`, plan file missing), append a single bullet to the memory file's `Learnings from the run` section quoting the `error` field verbatim, then continue. If `$plan_writer.plan_path` is empty or unset, skip 7a and append `- Plan lifecycle flip skipped: $plan_writer.plan_path was empty` to the memory file.
 
-   **7b. Illumination side.** If `$verifier_illumination_path` is set and non-empty, call `mark_implemented` with the basename of `$verifier_illumination_path` (strip the directory portion — the tool reads from `meditations/illuminations/` and physically moves the file to `meditations/implemented-illuminations/`, returning the new location as `new_path` in the response). On `success: true`, do nothing more — the tool auto-commits its own frontmatter rewrite and move. On `success: false` (already `implemented` / `archived`, no frontmatter, file missing), append a single bullet to the memory file's `Learnings from the run` section quoting the `error` field verbatim, then continue. If `$verifier_illumination_path` is empty or unset, skip 7b and append `- Illumination lifecycle flip skipped: $verifier_illumination_path was empty` to the memory file.
+   **7b. Illumination side.** If `$verifier_illumination_path` is set and non-empty, call `consume` with `filename = basename of $verifier_illumination_path` and `reason = "implemented"` (strip the directory portion — the tool deletes the file from `meditations/illuminations/` and commits `meditate: consume <filename> (implemented)`). On `success: true`, do nothing more. On `success: false` (file missing), append a single bullet to the memory file's `Learnings from the run` section quoting the `error` field verbatim, then continue. If `$verifier_illumination_path` is empty or unset, skip 7b and append `- Illumination consume skipped: $verifier_illumination_path was empty` to the memory file.
 
-   Do **not** abort the node on either branch's failure. Push (step 6) and the structured-JSON emit (step 8) are non-negotiable; the lifecycle flips are opportunistic.
+   Do **not** abort the node on either branch's failure. Push (step 6) and the structured-JSON emit (step 8) are non-negotiable; the lifecycle calls are opportunistic.
 
 8. **Emit structured JSON** with `memory_path` set to the final memory file's absolute path.
 
@@ -142,4 +142,4 @@ Memory files are reference documents for future sessions. Keep them dense, scann
 - Commit exactly **once** at the end of the node (or skip the commit if nothing is staged). Do not split into multiple commits. `implement` and `tmux-tester` already made per-chunk / per-fix commits earlier.
 - **Push is unconditional.** Prior session commits must reach `origin` even if this node staged nothing new.
 - No writes outside `$project/memory/` and git operations. Do not touch source code, specs, or pipelines from this node.
-- Both lifecycle calls — `mark_plan_implemented` (step 7a) and `mark_implemented` (step 7b) — are **best-effort**. Never abort the node on `success: false` from either. Push (step 6) and the structured-JSON emit (step 8) are non-negotiable; both lifecycle flips in step 7 are opportunistic. A frontmatter-less, already-`implemented`, or missing plan/illumination must not block finalization.
+- Both lifecycle calls — `mark_plan_implemented` (step 7a) and `consume` (step 7b) — are **best-effort**. Never abort the node on `success: false` from either. Push (step 6) and the structured-JSON emit (step 8) are non-negotiable; both lifecycle calls in step 7 are opportunistic. A frontmatter-less, already-`implemented`, or missing plan/illumination must not block finalization.
