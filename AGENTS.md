@@ -14,7 +14,7 @@
 ## Operational Notes
 
 - Commands use `Agent` class from `src/cli/lib/agent.ts` to spawn Claude sessions
-- Agent definitions are markdown files with YAML frontmatter, owned per-pipeline under `pipelines/<name>/<agent>.md`. User-level overrides live in `~/.ralph/agents/`.
+- Agent definitions are markdown files with YAML frontmatter, owned per-pipeline under `pipelines/<name>/<agent>.md`. There is no global registry — see `docs/adr/0001-agents-live-next-to-pipeline.md`.
 - Pipeline engine uses `AgentHandler` for all agent/codergen nodes — `loop.ts` and `CodergenHandler` have been removed
 - All command output goes through `src/cli/lib/output.ts` — unified Ink output API (`step`, `info`, `warn`, `error`, `success`, `header`, `spinner`, `stream`)
 - Prod/dev detection uses `__RALPH_PROD__` constant injected by tsup `define` at build time. Ambient type in `src/types/globals.d.ts`.
@@ -22,8 +22,8 @@
 ### Codebase Patterns
 
 - CLI entry: `src/cli/index.ts` → commander setup
-- Commands: `src/cli/commands/{implement,meditate,agent,pipeline}.ts`
-- Lib: `src/cli/lib/{agent,agent-registry,assets,frontmatter,output,stream-formatter}.ts`
+- Commands: `src/cli/commands/{implement,meditate,pipeline}.ts`
+- Lib: `src/cli/lib/{agent,agent-loader,assets,frontmatter,output,stream-formatter}.ts`
 - Tests: `src/cli/tests/*.test.ts` (vitest)
 - Bundled folder pipelines: `src/cli/pipelines/{meditate,implement}/` (copied to `dist/pipelines/` by tsup)
 - Daemon: `src/daemon/{state,scheduler,runner,socket,index}.ts`
