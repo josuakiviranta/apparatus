@@ -210,13 +210,13 @@ git commit -m "refactor(meditate): use \$specs_dir variable in rubric"
 **Files:**
 - Modify: `src/cli/pipelines/meditate/pipeline.dot:2`
 
-- [ ] **Step 1: Edit**
+- [x] **Step 1: Edit**
 
 ```
 inputs="steer,vision,specs_dir"
 ```
 
-- [ ] **Step 2: Run pipeline validator (sanity)**
+- [x] **Step 2: Run pipeline validator (sanity)**
 
 ```bash
 npm run build
@@ -224,7 +224,7 @@ node dist/cli/index.js pipeline validate src/cli/pipelines/meditate/pipeline.dot
 ```
 Expected: PASS, `specs_dir` listed as declared input.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/cli/pipelines/meditate/pipeline.dot
