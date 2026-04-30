@@ -504,132 +504,6 @@ describe("listIlluminations", () => {
     );
   });
 
-  it("filters by status when status parameter provided", () => {
-    const illumDir = join(tmpDir, "meditations", "illuminations");
-    mkdirSync(illumDir, { recursive: true });
-    writeFileSync(
-      join(illumDir, "T1000-open.md"),
-      "---\ndate: 2026-04-12\nstatus: open\ndescription: Open one\n---\n\nBody"
-    );
-    writeFileSync(
-      join(illumDir, "T1100-dispatched.md"),
-      "---\ndate: 2026-04-12\nstatus: dispatched\ndescription: Dispatched one\n---\n\nBody"
-    );
-    const result = listIlluminations(tmpDir, "open");
-    expect(result).toContain("T1000-open.md");
-    expect(result).not.toContain("T1100-dispatched.md");
-  });
-
-  it("treats files without status field as open", () => {
-    const illumDir = join(tmpDir, "meditations", "illuminations");
-    mkdirSync(illumDir, { recursive: true });
-    writeFileSync(
-      join(illumDir, "T0900-legacy.md"),
-      "---\ndate: 2026-04-12\ndescription: Legacy file\n---\n\nBody"
-    );
-    const result = listIlluminations(tmpDir, "open");
-    expect(result).toContain("T0900-legacy.md");
-  });
-
-  it("returns all illuminations when status omitted", () => {
-    const illumDir = join(tmpDir, "meditations", "illuminations");
-    mkdirSync(illumDir, { recursive: true });
-    writeFileSync(
-      join(illumDir, "T1000-open.md"),
-      "---\ndate: 2026-04-12\nstatus: open\ndescription: Open\n---\n\nBody"
-    );
-    writeFileSync(
-      join(illumDir, "T1100-dispatched.md"),
-      "---\ndate: 2026-04-12\nstatus: dispatched\ndescription: Dispatched\n---\n\nBody"
-    );
-    const result = listIlluminations(tmpDir);
-    expect(result).toContain("T1000-open.md");
-    expect(result).toContain("T1100-dispatched.md");
-  });
-
-  it("status=archived reads from meditations/archived-illuminations/", () => {
-    const archivedDir = join(tmpDir, "meditations", "archived-illuminations");
-    mkdirSync(archivedDir, { recursive: true });
-    writeFileSync(
-      join(archivedDir, "T3000-archived.md"),
-      "---\ndate: 2026-04-12\nstatus: archived\ndescription: Archived insight\n---\n\nBody"
-    );
-    const topDir = join(tmpDir, "meditations", "illuminations");
-    mkdirSync(topDir, { recursive: true });
-    writeFileSync(
-      join(topDir, "T3001-open.md"),
-      "---\ndate: 2026-04-12\nstatus: open\ndescription: Open one\n---\n\nBody"
-    );
-    const result = listIlluminations(tmpDir, "archived");
-    expect(result).toContain("T3000-archived.md");
-    expect(result).toContain("Archived insight");
-    expect(result).not.toContain("T3001-open.md");
-  });
-
-  it("status=implemented reads from meditations/implemented-illuminations/", () => {
-    const implDir = join(tmpDir, "meditations", "implemented-illuminations");
-    mkdirSync(implDir, { recursive: true });
-    writeFileSync(
-      join(implDir, "T4000-impl.md"),
-      "---\ndate: 2026-04-12\nstatus: implemented\ndescription: Done thing\n---\n\nBody"
-    );
-    const topDir = join(tmpDir, "meditations", "illuminations");
-    mkdirSync(topDir, { recursive: true });
-    writeFileSync(
-      join(topDir, "T4001-open.md"),
-      "---\ndate: 2026-04-12\nstatus: open\ndescription: Open one\n---\n\nBody"
-    );
-    const result = listIlluminations(tmpDir, "implemented");
-    expect(result).toContain("T4000-impl.md");
-    expect(result).not.toContain("T4001-open.md");
-  });
-
-  it("returns no-illuminations message when archived-illuminations dir is missing", () => {
-    mkdirSync(join(tmpDir, "meditations", "illuminations"), { recursive: true });
-    expect(listIlluminations(tmpDir, "archived")).toBe("No illuminations found.");
-  });
-
-  it("returns no-illuminations message when implemented-illuminations dir is missing", () => {
-    mkdirSync(join(tmpDir, "meditations", "illuminations"), { recursive: true });
-    expect(listIlluminations(tmpDir, "implemented")).toBe("No illuminations found.");
-  });
-
-  it("status=open continues to read top-level dir, ignoring sibling dirs", () => {
-    const archivedDir = join(tmpDir, "meditations", "archived-illuminations");
-    mkdirSync(archivedDir, { recursive: true });
-    writeFileSync(
-      join(archivedDir, "T3100-archived.md"),
-      "---\ndate: 2026-04-12\nstatus: archived\ndescription: Archived\n---\n\nBody"
-    );
-    const topDir = join(tmpDir, "meditations", "illuminations");
-    mkdirSync(topDir, { recursive: true });
-    writeFileSync(
-      join(topDir, "T3101-open.md"),
-      "---\ndate: 2026-04-12\nstatus: open\ndescription: Open\n---\n\nBody"
-    );
-    const result = listIlluminations(tmpDir, "open");
-    expect(result).toContain("T3101-open.md");
-    expect(result).not.toContain("T3100-archived.md");
-  });
-
-  it("no filter returns union across three dirs", () => {
-    const topDir = join(tmpDir, "meditations", "illuminations");
-    const archivedDir = join(tmpDir, "meditations", "archived-illuminations");
-    const implDir = join(tmpDir, "meditations", "implemented-illuminations");
-    mkdirSync(topDir, { recursive: true });
-    mkdirSync(archivedDir, { recursive: true });
-    mkdirSync(implDir, { recursive: true });
-    writeFileSync(join(topDir, "T5000-open.md"),
-      "---\ndate: 2026-04-12\nstatus: open\ndescription: Open\n---\n\nBody");
-    writeFileSync(join(archivedDir, "T5001-archived.md"),
-      "---\ndate: 2026-04-12\nstatus: archived\ndescription: Archived\n---\n\nBody");
-    writeFileSync(join(implDir, "T5002-impl.md"),
-      "---\ndate: 2026-04-12\nstatus: implemented\ndescription: Implemented\n---\n\nBody");
-    const result = listIlluminations(tmpDir);
-    expect(result).toContain("T5000-open.md");
-    expect(result).toContain("T5001-archived.md");
-    expect(result).toContain("T5002-impl.md");
-  });
 });
 
 describe("markImplemented", () => {
@@ -1359,5 +1233,26 @@ describe("consume", () => {
   it("returns failure when file does not exist", () => {
     const result = consume(tmpDir, "2026-04-30T1200-missing.md", "implemented");
     expect(result).toEqual({ success: false, error: "Illumination file not found" });
+  });
+});
+
+describe("listIlluminations — single-folder semantics", () => {
+  it("returns only files in meditations/illuminations/ (does not union side folders)", () => {
+    const aliveDir = join(tmpDir, "meditations", "illuminations");
+    const archivedDir = join(tmpDir, "meditations", "archived-illuminations");
+    mkdirSync(aliveDir, { recursive: true });
+    mkdirSync(archivedDir, { recursive: true });
+    writeFileSync(join(aliveDir, "alive.md"), `---\ndate: 2026-04-30\ndescription: alive one\n---\n`);
+    writeFileSync(join(archivedDir, "ghost.md"), `---\ndate: 2026-04-30\ndescription: should not appear\n---\n`);
+
+    const result = listIlluminations(tmpDir);
+
+    expect(result).toContain("alive.md");
+    expect(result).not.toContain("ghost.md");
+    expect(result).not.toContain("should not appear");
+  });
+
+  it("returns the no-illuminations sentinel when folder is empty", () => {
+    expect(listIlluminations(tmpDir)).toMatch(/no illuminations found/i);
   });
 });

@@ -365,46 +365,18 @@ function parseIlluminationDescription(filePath: string): string {
   }
 }
 
-export function listIlluminations(projectRoot: string, status?: string): string {
-  const baseDir = join(projectRoot, "meditations", "illuminations");
-  const archivedDir = join(projectRoot, "meditations", "archived-illuminations");
-  const implementedDir = join(projectRoot, "meditations", "implemented-illuminations");
-
-  function readDir(dir: string): string[] {
-    try {
-      return readdirSync(dir).filter((f) => f.endsWith(".md")).sort();
-    } catch {
-      return [];
-    }
+export function listIlluminations(projectRoot: string): string {
+  const dir = join(projectRoot, "meditations", "illuminations");
+  let files: string[];
+  try {
+    files = readdirSync(dir).filter((f) => f.endsWith(".md")).sort();
+  } catch {
+    files = [];
   }
-
-  let files: { name: string; dir: string }[];
-  if (status === "archived") {
-    files = readDir(archivedDir).map((name) => ({ name, dir: archivedDir }));
-  } else if (status === "implemented") {
-    files = readDir(implementedDir).map((name) => ({ name, dir: implementedDir }));
-  } else if (status === "open" || status === "dispatched") {
-    files = readDir(baseDir)
-      .map((name) => ({ name, dir: baseDir }))
-      .filter(({ name }) => {
-        const content = readFileSync(join(baseDir, name), "utf-8");
-        const fmMatch = content.match(/^---\n([\s\S]*?)\n---\n/);
-        if (!fmMatch) return status === "open"; // no frontmatter = open
-        const statusMatch = fmMatch[1].match(/^status:\s*(.+)$/m);
-        const fileStatus = statusMatch ? statusMatch[1].trim() : "open";
-        return fileStatus === status;
-      });
-  } else {
-    files = [
-      ...readDir(baseDir).map((name) => ({ name, dir: baseDir })),
-      ...readDir(archivedDir).map((name) => ({ name, dir: archivedDir })),
-      ...readDir(implementedDir).map((name) => ({ name, dir: implementedDir })),
-    ];
-    files.sort((a, b) => a.name.localeCompare(b.name));
-  }
-
   if (files.length === 0) return NO_ILLUMINATIONS_MESSAGE;
-  return files.map(({ name, dir }) => `${name} — ${parseIlluminationDescription(join(dir, name))}`).join("\n");
+  return files
+    .map((name) => `${name} — ${parseIlluminationDescription(join(dir, name))}`)
+    .join("\n");
 }
 
 const NO_PLANS_MESSAGE = "No plans found.";
@@ -693,15 +665,31 @@ if (!isTestEnv) {
 
     server.tool(
       "list_illuminations",
-      "List illuminations written to this project, with descriptions. " +
+      "List illuminations in meditations/illuminations/, with descriptions. " +
         "Call this at the start of a session to orient yourself before writing new insights. " +
-        "Optionally filter by lifecycle status.",
-      {
-        status: z.enum(["open", "dispatched", "implemented", "archived"]).optional(),
-      },
-      async ({ status }: { status?: string }) => {
-        const result = listIlluminations(projectRoot, status);
+        "No filters — every file in the folder is alive.",
+      {},
+      async () => {
+        const result = listIlluminations(projectRoot);
         return { content: [{ type: "text" as const, text: result }] };
+      },
+    );
+
+    server.tool(
+      "consume",
+      "Consume an illumination — delete the file from meditations/illuminations/ and commit the deletion. " +
+        "Use reason='implemented' after the implement loop succeeds and a memory file has been written. " +
+        "Use reason='declined' when the operator rejects an illumination at the gate. " +
+        "Commit message format: 'meditate: consume <filename> (<reason>)' — searchable via git log --grep.",
+      {
+        filename: z.string(),
+        reason: z.enum(["implemented", "declined"]),
+      },
+      async ({ filename, reason }: { filename: string; reason: "implemented" | "declined" }) => {
+        const result = consume(projectRoot, filename, reason);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
       },
     );
 

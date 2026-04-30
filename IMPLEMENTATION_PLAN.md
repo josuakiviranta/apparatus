@@ -158,7 +158,7 @@ git commit -m "feat(illumination): add consume(filename, reason) pure helper + t
 **Files:**
 - Modify: `src/cli/mcp/illumination-server.ts` (lines 660-672 — `list_illuminations` registration; add new `consume` tool registration)
 
-- [ ] **Step 1: Add failing test that proves side-folders are no longer read**
+- [x] **Step 1: Add failing test that proves side-folders are no longer read**
 
 Append a new describe block to `src/cli/tests/illumination-server.test.ts`:
 
@@ -185,12 +185,12 @@ describe("listIlluminations — single-folder semantics", () => {
 });
 ```
 
-- [ ] **Step 2: Run test — confirm it fails against the current implementation**
+- [x] **Step 2: Run test — confirm it fails against the current implementation**
 
 Run: `npx vitest run src/cli/tests/illumination-server.test.ts -t "single-folder semantics"`
 Expected: FAIL — current `listIlluminations` (no-status branch, lines 363-370) unions all three directories, so `ghost.md` shows up in the result.
 
-- [ ] **Step 3: Simplify `listIlluminations`**
+- [x] **Step 3: Simplify `listIlluminations`**
 
 Replace lines 334-374 of `src/cli/mcp/illumination-server.ts` with:
 
@@ -210,14 +210,14 @@ export function listIlluminations(projectRoot: string): string {
 }
 ```
 
-- [ ] **Step 4: Delete the six side-folder `listIlluminations` tests**
+- [x] **Step 4: Delete the six side-folder `listIlluminations` tests**
 
 The simplified function no longer reads from `meditations/archived-illuminations/` or `meditations/implemented-illuminations/`, so the existing tests asserting status-filtered side-folder reads will fail. Find and delete them.
 
 Run: `grep -nE "status.*archived|status.*implemented|archived-illuminations|implemented-illuminations" src/cli/tests/illumination-server.test.ts`
 Note every `it(...)` test case that hits one of those strings inside a `listIlluminations` describe block. Delete each one (the entire `it(...)` block, not just the assertion). Approximate range: lines 550-632 — verify current line numbers via the grep output before editing.
 
-- [ ] **Step 5: Update `list_illuminations` MCP registration**
+- [x] **Step 5: Update `list_illuminations` MCP registration**
 
 Replace lines 660-672 of `src/cli/mcp/illumination-server.ts` with:
 
@@ -235,7 +235,7 @@ Replace lines 660-672 of `src/cli/mcp/illumination-server.ts` with:
     );
 ```
 
-- [ ] **Step 6: Add `consume` MCP tool registration**
+- [x] **Step 6: Add `consume` MCP tool registration**
 
 Insert immediately after the `list_illuminations` registration (replacing the old `mark_implemented`, `mark_dispatched`, `mark_archived` blocks at lines 674-716):
 
@@ -259,12 +259,12 @@ Insert immediately after the `list_illuminations` registration (replacing the ol
     );
 ```
 
-- [ ] **Step 7: Run all illumination-server tests**
+- [x] **Step 7: Run all illumination-server tests**
 
 Run: `npx vitest run src/cli/tests/illumination-server.test.ts`
 Expected: PASS — single-folder test passes; side-folder tests have been deleted; the three `mark_*` describe blocks still exist and still pass against unchanged implementations (cleaned up in Task 1.4).
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/cli/mcp/illumination-server.ts src/cli/tests/illumination-server.test.ts
