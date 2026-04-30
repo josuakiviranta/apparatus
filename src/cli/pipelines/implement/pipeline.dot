@@ -3,9 +3,17 @@ digraph implement {
   inputs="specs_dir,max_iterations,llm_model,scenarios_dir"
 
   start [shape=Mdiamond]
-  run   [agent="implement", max_iterations="$max_iterations"]
-  done  [shape=Msquare]
 
-  start -> run
-  run   -> done
+  record_base [type="tool",
+               cwd="$project",
+               tool_command="printf '{\"sha\":\"%s\"}\n' \"$(git rev-parse HEAD)\"",
+               produces_from_stdout="true"]
+
+  implementer [agent="implement", max_iterations="$max_iterations"]
+
+  done [shape=Msquare]
+
+  start       -> record_base
+  record_base -> implementer
+  implementer -> done
 }
