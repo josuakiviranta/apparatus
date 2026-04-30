@@ -60,8 +60,9 @@ ralph-cli/
 │   │   │   ├── meditate.md
 │   │   │   ├── chat.md
 │   │   │   └── ...
-│   ├── pipelines/                       # bundled folder pipelines (repo root)
-│   │   └── meditate/                   # backs `ralph meditate`
+│   │   ├── pipelines/                       # bundled folder pipelines (shipped to npm)
+│   │   │   ├── implement/                   # backs `ralph implement`
+│   │   │   └── meditate/                    # backs `ralph meditate`
 │   ├── attractor/                       # Pipeline execution engine
 │   │   ├── types.ts                    # Pipeline type definitions
 │   │   ├── checkpoint.ts              # Pipeline checkpoint/resume support
@@ -123,22 +124,23 @@ tsup compiles 4 entries:
 
 ## Asset Bundling
 
-`tsup.config.ts` copies flat-file pipelines from `src/cli/pipelines/*.dot` and the folder pipeline at `pipelines/meditate/` into `dist/` via an `onSuccess` hook. The `meditations/` directory at the repo root is not rewritten into `dist/` — it is published directly by npm via the `files` entry in `package.json`, so installed copies of the package carry `meditations/` next to `dist/`. At runtime, `assets.ts` resolves paths relative to the compiled entry point using a prod/dev detection constant (`__RALPH_PROD__`) injected by tsup's `define` config.
+`tsup.config.ts` recursively copies `src/cli/pipelines/` (every bundled pipeline as folder-form `<name>/pipeline.dot` + agent `.md`) into `dist/pipelines/` via an `onSuccess` hook. The `meditations/` directory at the repo root is not rewritten into `dist/` — it is published directly by npm via the `files` entry in `package.json`, so installed copies of the package carry `meditations/` next to `dist/`. At runtime, `assets.ts` resolves paths relative to the compiled entry point using a prod/dev detection constant (`__RALPH_PROD__`) injected by tsup's `define` config.
 
 ## Bundled Pipeline Resolution
 
-`ralph meditate` is a thin shim that delegates to the bundled `pipelines/meditate/` folder pipeline rather than spawning Claude directly.
+`ralph meditate` is a thin shim that delegates to the bundled `src/cli/pipelines/meditate/` folder pipeline rather than spawning Claude directly.
 
 The resolution flow is:
 
 1. The shim calls `resolveBundledPipeline(name)` (in `src/cli/lib/assets.ts`).
-2. `resolveBundledPipeline` returns the absolute path to `dist/pipelines/<name>/pipeline.dot` (dev: repo-root `pipelines/<name>/pipeline.dot`).
+2. `resolveBundledPipeline` returns the absolute path to `dist/pipelines/<name>/pipeline.dot` (dev: `src/cli/pipelines/<name>/pipeline.dot`).
 3. The shim calls `pipelineRunCommand(dotFile, opts)`, passing the resolved dot path and any command-specific options (e.g. `project`, `variables`).
 4. The pipeline runtime executes the bundled graph; its agent nodes are resolved via the standard per-folder + bundled-fallback chain (see the Agent resolution section below).
 
 | Command | Pipeline name | Bundled path |
 |---------|--------------|---------------|
-| `ralph meditate` | `meditate` | `pipelines/meditate/pipeline.dot` |
+| `ralph meditate` | `meditate` | `src/cli/pipelines/meditate/pipeline.dot` |
+| `ralph implement` | `implement` | `src/cli/pipelines/implement/pipeline.dot` |
 
 ## Checkpoint and Resume
 

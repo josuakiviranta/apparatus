@@ -32,7 +32,7 @@ Shorthand for `implement`.
 ```bash
 ralph meditate <project-folder> [--var steer=<text>]
 ```
-Runs a meditate session against the project's meditations. `--var steer=...` injects an initial steering message at session start. Backed by the bundled folder pipeline `pipelines/meditate/`.
+Runs a meditate session against the project's meditations. `--var steer=...` injects an initial steering message at session start. Backed by the bundled folder pipeline `src/cli/pipelines/meditate/`.
 
 For unattended lifecycle reconciliation and doc-drift surfacing, schedule the bundled janitor pipeline:
 
@@ -155,7 +155,8 @@ Press `Ctrl+C`. Ralph cleanly terminates its own claude subprocess without affec
 | `src/` | All TypeScript source: `cli/`, `attractor/`, `daemon/`, `lib/`, `types/` |
 | `specs/` | Behavioral specs per subsystem (current, authoritative) |
 | `docs/` | Harness docs + `superpowers/specs/` (design history, not authoritative specs) |
-| `pipelines/` | `.dot` pipeline definitions + JSON schemas; `smoke/` for smoke tests |
+| `pipelines/` | Project-local `.dot` pipelines for ralph-cli itself (illumination-to-implementation, janitor) + `smoke/` test fixtures. Bundled pipelines (meditate, implement) ship from `src/cli/pipelines/`. |
+| `src/cli/pipelines/` | Bundled pipelines shipped to npm consumers (`meditate`, `implement`). Folder-form: `<name>/pipeline.dot` + agent `.md` files. Copied to `dist/pipelines/` at build. |
 | `meditations/` | Curated lenses in `stimuli/` + three illumination status dirs: `illuminations/` (open + dispatched), `archived-illuminations/`, `implemented-illuminations/` |
 | `memory/` | Session memory written by Claude agents across conversations |
 

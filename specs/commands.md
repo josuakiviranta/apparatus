@@ -19,7 +19,7 @@ See [loop.md](loop.md) for iteration details, signal handling, and git push beha
 
 ## `ralph meditate <project-folder>`
 
-Launches a meditation pipeline session. This command is a thin shim backed by the bundled `pipelines/meditate/` folder pipeline.
+Launches a meditation pipeline session. This command is a thin shim backed by the bundled `src/cli/pipelines/meditate/` folder pipeline.
 
 **Behavior:**
 1. Validates project folder exists.

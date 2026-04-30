@@ -25,7 +25,7 @@
 - Commands: `src/cli/commands/{implement,meditate,agent,pipeline}.ts`
 - Lib: `src/cli/lib/{agent,agent-registry,assets,frontmatter,output,stream-formatter}.ts`
 - Tests: `src/cli/tests/*.test.ts` (vitest)
-- Bundled folder pipeline: `pipelines/meditate/{pipeline.dot,meditate.md}` (copied to `dist/pipelines/meditate/` by tsup)
+- Bundled folder pipelines: `src/cli/pipelines/{meditate,implement}/` (copied to `dist/pipelines/` by tsup)
 - Daemon: `src/daemon/{state,scheduler,runner,socket,index}.ts`
 - Shared lib: `src/lib/daemon-client.ts`
 - Ink UI components: `src/cli/components/ui.tsx` (Step, Info, Warn, Error, Success, Header, StreamLine, StreamOutput, SpinnerLine)
