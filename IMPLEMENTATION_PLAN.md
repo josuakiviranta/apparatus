@@ -1501,12 +1501,12 @@ git commit -m "chore(illumination): strip status:open from surviving illuminatio
 - Delete: `pipelines/illumination-to-implementation/tests/fixtures/no-frontmatter.md`
 - Delete: `pipelines/illumination-to-implementation/tests/fixtures/open.md`
 
-- [ ] **Step 1: Verify no test or script still references any orphan fixture**
+- [x] **Step 1: Verify no test or script still references any orphan fixture**
 
 Run: `grep -rln "fixtures/" pipelines/ src/ docs/ | xargs grep -nE "dispatched|mark-archived|mark-dispatched|no-frontmatter|fixtures/open\.md"`
 Expected: no matches outside of files already scheduled for deletion. If a match surfaces in a surviving file, stop and resolve before continuing.
 
-- [ ] **Step 2: Remove the side folders and the surviving archived file**
+- [x] **Step 2: Remove the side folders and the surviving archived file**
 
 ```bash
 git rm meditations/archived-illuminations/2026-04-30T1550-implement-pipeline-stranded-in-src-cli.md
@@ -1516,7 +1516,7 @@ rmdir meditations/implemented-illuminations 2>/dev/null || true
 
 (`rmdir` errors quietly if the directory is empty + already untracked. The `git rm` removes the one tracked file; the directory is then empty and `rmdir` cleans up.)
 
-- [ ] **Step 3: Remove the orphan test fixtures**
+- [x] **Step 3: Remove the orphan test fixtures**
 
 ```bash
 git rm pipelines/illumination-to-implementation/tests/fixtures/dispatched.md \
@@ -1535,7 +1535,7 @@ If the `fixtures/` directory becomes empty, also remove it:
 rmdir pipelines/illumination-to-implementation/tests/fixtures 2>/dev/null || true
 ```
 
-- [ ] **Step 4: Run the full test suite**
+- [x] **Step 4: Run the full test suite**
 
 ```bash
 npx vitest run
@@ -1543,7 +1543,7 @@ npx vitest run
 
 Expected: PASS — no surviving test references any deleted fixture or directory.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit -m "chore: remove side-folder illuminations + orphan test fixtures"
