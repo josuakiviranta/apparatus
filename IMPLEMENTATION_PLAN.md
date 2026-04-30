@@ -1296,7 +1296,7 @@ git commit -m "refactor(meditate): drop side-folder mkdirs from init flow"
 **Files:**
 - Modify: `docs/specs/mcp-illumination.md` (entire `## MCP Tools (12)` section + path-restrictions table at end)
 
-- [ ] **Step 1: Replace the tool count and write_illumination section**
+- [x] **Step 1: Replace the tool count and write_illumination section**
 
 Line 19 currently says `## MCP Tools (12)`. After removing `mark_dispatched`, `mark_implemented`, `mark_archived`, adding `consume`, the count is 10. Replace heading text:
 
@@ -1316,7 +1316,7 @@ Replace with:
 - The illumination is removed by `consume` (see below) when the work it represents is implemented or declined.
 ```
 
-- [ ] **Step 2: Rewrite `### list_illuminations`**
+- [x] **Step 2: Rewrite `### list_illuminations`**
 
 Replace lines 34-51 entirely:
 
@@ -1332,7 +1332,7 @@ Lists illuminations in `meditations/illuminations/`, with descriptions.
 - Returns `"No illuminations found."` if the directory is empty or missing
 ```
 
-- [ ] **Step 3: Replace the three lifecycle sections with `consume`**
+- [x] **Step 3: Replace the three lifecycle sections with `consume`**
 
 Delete `### mark_implemented` (lines 101-109), `### mark_dispatched` (lines 111-116), `### mark_archived` (lines 118-126) entirely. Insert in their place:
 
@@ -1348,7 +1348,7 @@ Consumes an illumination — deletes the file from `meditations/illuminations/` 
 - Use `reason: "implemented"` after a successful implement loop + memory-write. Use `reason: "declined"` when the operator rejects an illumination at the gate. The reason lives only in the commit message; recoverable via `git log --grep`.
 ```
 
-- [ ] **Step 4: Rewrite the path-restrictions table**
+- [x] **Step 4: Rewrite the path-restrictions table**
 
 Lines 137-153 currently include rows for `mark_implemented`, `mark_dispatched`, `mark_archived`, and a `list_illuminations` row that mentions all three folders. Replace the affected rows. The new table:
 
@@ -1369,12 +1369,12 @@ Lines 137-153 currently include rows for `mark_implemented`, `mark_dispatched`, 
 | `mark_plan_implemented` | `<projectRoot>/docs/superpowers/plans/` (modify frontmatter + commit) |
 ```
 
-- [ ] **Step 5: Final sweep**
+- [x] **Step 5: Final sweep**
 
 Run: `grep -nE "archived-illuminations|implemented-illuminations|mark_implemented|mark_dispatched|mark_archived|status.*open|status.*dispatched" docs/specs/mcp-illumination.md`
 Expected: no matches.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add docs/specs/mcp-illumination.md
