@@ -1237,7 +1237,7 @@ This chunk strips the side-folder mkdirs from the `meditate` command init flow, 
 - Modify: `src/cli/tests/meditate.test.ts:51-57`
 - Modify: `src/cli/commands/meditate.ts:46-47`
 
-- [ ] **Step 1: Update the failing test first**
+- [x] **Step 1: Update the failing test first**
 
 In `src/cli/tests/meditate.test.ts:51-57`, the existing test asserts both side folders are created. Replace the `it(...)` block:
 
@@ -1263,12 +1263,12 @@ with:
 
 (Read the existing test's setup block carefully and copy the unchanged setup lines into the new test — only the assertions change.)
 
-- [ ] **Step 2: Run the test — confirm it fails**
+- [x] **Step 2: Run the test — confirm it fails**
 
 Run: `npx vitest run src/cli/tests/meditate.test.ts -t "no side folders"`
 Expected: FAIL — `meditate.ts` still calls `mkdirSync` for both side folders, so they exist.
 
-- [ ] **Step 3: Remove the two `mkdirSync` calls**
+- [x] **Step 3: Remove the two `mkdirSync` calls**
 
 In `src/cli/commands/meditate.ts:46-47`, delete:
 
@@ -1279,12 +1279,12 @@ In `src/cli/commands/meditate.ts:46-47`, delete:
 
 Keep the `mkdirSync` for `meditations/illuminations/` (the one alive folder).
 
-- [ ] **Step 4: Run the test — confirm it passes**
+- [x] **Step 4: Run the test — confirm it passes**
 
 Run: `npx vitest run src/cli/tests/meditate.test.ts -t "no side folders"`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/cli/commands/meditate.ts src/cli/tests/meditate.test.ts
