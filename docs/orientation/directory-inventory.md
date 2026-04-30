@@ -19,7 +19,7 @@
 
 | Sub-root | Contents |
 |---|---|
-| `cli/` | `commands/`, `components/`, `lib/`, `mcp/`, `agents/`, `prompts/`, `tests/` |
+| `cli/` | `commands/`, `components/`, `lib/`, `mcp/`, `templates/`, `pipelines/`, `tests/` |
 | `attractor/` | `handlers/`, `core/`, `transforms/`, `interviewer/`, `tests/` |
 | `daemon/` | Background scheduler + socket server |
 | `lib/` | Shared utilities used across cli, attractor, and daemon |
@@ -29,7 +29,7 @@
 
 1. **New feature:** Check `specs/` first -- the spec likely already exists.
 2. **New pipeline:** Place `.dot` files under `pipelines/smoke/` (CI fixtures) or `pipelines/` root (production workflows); add output schemas to `pipelines/schemas/`.
-3. **New CLI command:** Touch `src/cli/commands/`, register in `src/cli/program.ts`, add agent prompt to `src/cli/agents/`, write tests in `src/cli/tests/`.
+3. **New CLI command:** Touch `src/cli/commands/`, register in `src/cli/program.ts`, write tests in `src/cli/tests/`. If the command is a pipeline shim, scaffold the workflow under `src/cli/templates/<name>/`.
 4. **New attractor handler:** Place implementation in `src/attractor/handlers/`, register in `registry.ts`, add tests in `src/attractor/tests/`.
 5. **Debugging Ink TUI:** Consult `docs/harness/tmux-drive.md` before writing any tmux commands.
 

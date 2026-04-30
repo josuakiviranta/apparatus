@@ -58,7 +58,7 @@ export class AgentHandler implements NodeHandler {
     try {
       // Per-folder layout (Chunk 4): the pipeline directory holds its agent
       // files. No bundled fallback for project pipelines — a missing agent
-      // must surface as an error, not silently resolve via src/cli/agents/.
+      // must surface as an error.
       config = this.resolve(agentName, { projectDir: meta.dotDir, allowBundledFallback: false });
     } catch (err) {
       return { status: "fail", failureReason: `Failed to resolve agent "${agentName}": ${(err as Error).message}` };

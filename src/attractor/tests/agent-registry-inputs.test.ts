@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { writeFileSync, mkdtempSync, rmSync } from "fs";
 import { tmpdir } from "os";
-import { join, resolve } from "path";
+import { join } from "path";
 import { resolveAgent } from "../../cli/lib/agent-registry.js";
 
 describe("resolveAgent — inputs end-to-end", () => {
@@ -35,11 +35,20 @@ prompt body
   it("throws when allowBundledFallback=false and no project-local/user agent exists", () => {
     const projectDir = mkdtempSync(join(tmpdir(), "ralph-resolve-no-fallback-"));
     const userDir = mkdtempSync(join(tmpdir(), "ralph-resolve-user-"));
-    const bundledDir = resolve(__dirname, "../../cli/agents");
+    const bundledDir = mkdtempSync(join(tmpdir(), "ralph-resolve-bundled-"));
     try {
-      // Bundled "verifier" exists, but allowBundledFallback=false must skip it.
+      // Synthetic bundled agent exists, but allowBundledFallback=false must skip it.
+      writeFileSync(
+        join(bundledDir, "synthetic.md"),
+        `---
+name: synthetic
+description: bundled fixture
+---
+body
+`,
+      );
       expect(() =>
-        resolveAgent("verifier", {
+        resolveAgent("synthetic", {
           projectDir,
           userDir,
           bundledDir,
@@ -49,6 +58,7 @@ prompt body
     } finally {
       rmSync(projectDir, { recursive: true, force: true });
       rmSync(userDir, { recursive: true, force: true });
+      rmSync(bundledDir, { recursive: true, force: true });
     }
   });
 

@@ -107,7 +107,7 @@ Tool nodes (handled by `attractor/handlers/tool.ts`) may externalise their logic
 
 `attractor/handlers/parallel.ts` exports two handlers: `ParallelHandler` executes a fan-out node, gathering per-branch outcomes from `meta.branchOutcomes` and serialising them into the `parallel.results` context key; `FanInHandler` (registered as `parallel.fan_in`) reads that key back, parses the per-branch outcomes, and rolls them up into a single `success` / `partial_success` / `fail` status depending on whether all, some, or none of the branches succeeded.
 
-Agent nodes resolve their agent name with a precedence rule: `attractor/handlers/agent-handler.ts` first looks in the project-local `<projectDir>/.ralph/agents/` directory, then falls back to the user-level `~/.ralph/agents/` registry, and finally to the agents bundled under `src/cli/agents/`. Projects can therefore override any bundled agent by dropping a same-named markdown file into `.ralph/agents/`.
+Agent nodes resolve their agent name against the **pipeline directory** first: `attractor/handlers/agent-handler.ts` calls `resolveAgent(name, { projectDir: meta.dotDir, allowBundledFallback: false })`, so for a pipeline at `pipelines/<name>/pipeline.dot` the handler reads `pipelines/<name>/<agent>.md`. If the file is absent, the user-level `~/.ralph/agents/` registry is consulted; missing in both, the run fails. There is no bundled-agents fallback for pipeline runtime — every pipeline owns its agents.
 
 ## Build Entry Points
 
@@ -122,7 +122,7 @@ tsup compiles 4 entries:
 
 ## Asset Bundling
 
-`tsup.config.ts` copies agent definitions from `src/cli/agents/`, bundled pipeline templates from `src/cli/templates/`, and pipeline `.dot` files from `src/cli/pipelines/` into `dist/` via an `onSuccess` hook. The `meditations/` directory at the repo root is not rewritten into `dist/` — it is published directly by npm via the `files` entry in `package.json`, so installed copies of the package carry `meditations/` next to `dist/`. At runtime, `assets.ts` resolves paths relative to the compiled entry point using a prod/dev detection constant (`__RALPH_PROD__`) injected by tsup's `define` config.
+`tsup.config.ts` copies bundled pipeline templates from `src/cli/templates/` and pipeline `.dot` files from `src/cli/pipelines/` into `dist/` via an `onSuccess` hook. The `meditations/` directory at the repo root is not rewritten into `dist/` — it is published directly by npm via the `files` entry in `package.json`, so installed copies of the package carry `meditations/` next to `dist/`. At runtime, `assets.ts` resolves paths relative to the compiled entry point using a prod/dev detection constant (`__RALPH_PROD__`) injected by tsup's `define` config.
 
 ## Bundled Template Resolution
 

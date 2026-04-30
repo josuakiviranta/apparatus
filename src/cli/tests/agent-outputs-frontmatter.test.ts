@@ -165,14 +165,15 @@ prompt body
 });
 
 describe("verifier migration — preserves verifier.json contract", () => {
-  // Asserts the bundled verifier.md outputs: block produces a JSON Schema that
+  // Asserts the per-folder verifier.md outputs: block produces a JSON Schema that
   // satisfies the runtime contract previously held by pipelines/schemas/verifier.json:
   // same required keys, same preferred_label enum members, all string-typed fields.
-  // Bypasses resolveAgent so a stale user-dir cache (~/.ralph/agents/verifier.md)
-  // can't mask an authoring slip in the bundled source file.
   it("derives a jsonSchema with the same required keys and preferred_label enum", () => {
     const { readFileSync } = require("fs");
-    const bundledPath = join(__dirname, "..", "agents", "verifier.md");
+    const bundledPath = join(
+      __dirname, "..", "..", "..",
+      "pipelines", "illumination-to-implementation", "verifier.md",
+    );
     const { attributes, body } = parseFrontmatter(readFileSync(bundledPath, "utf-8"));
     const config = validateAgentConfig({ ...attributes, prompt: body } as any);
 

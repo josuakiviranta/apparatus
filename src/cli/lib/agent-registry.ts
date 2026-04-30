@@ -19,7 +19,7 @@ export interface RegistryOptions {
   /**
    * When false, skips the bundled-agents fallback (and the copy-on-read into
    * userDir). Pipeline runtime passes false so a missing per-folder agent
-   * errors out instead of silently using `src/cli/agents/`. Default: true.
+   * errors out instead of silently resolving via the bundled dir. Default: true.
    */
   allowBundledFallback?: boolean;
 }
