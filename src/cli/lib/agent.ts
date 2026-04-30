@@ -103,7 +103,6 @@ export const MCP_CONFIG_GLOB = ".mcp-*-*.json";
 
 export class Agent {
   private _mcpConfigPath: string | null = null;
-  private _child: ChildProcess | null = null;
 
   constructor(public readonly config: AgentConfig) {}
 
@@ -227,7 +226,6 @@ export class Agent {
       }
 
       const child = spawn("claude", args, spawnOptions);
-      this._child = child;
 
       // Kill child immediately when the caller aborts (e.g. Ctrl+C).
       // The child is spawned with detached:true so it won't receive the
@@ -334,7 +332,6 @@ export class Agent {
       };
     } finally {
       this.cleanupMcpConfig();
-      this._child = null;
     }
   }
 
@@ -372,7 +369,6 @@ export class Agent {
       cwd: opts.cwd,
       stdio: ["pipe", "pipe", "pipe"],
     });
-    this._child = child;
 
     // Capture stderr into a rolling tail so crashes are visible to the UI.
     // Without this, errors like "Claude Code cannot be launched inside another
@@ -398,7 +394,6 @@ export class Agent {
     const closePromise = new Promise<number>((resolve) => {
       child.on("close", (code, signal) => {
         ended = true;
-        this._child = null;
         this.cleanupMcpConfig();
         exitResult = { code: code ?? null, signal: signal ?? null, stderrTail };
         resolveExited!(exitResult);
@@ -447,15 +442,6 @@ export class Agent {
     };
   }
 
-  kill(): void {
-    if (this._child?.pid) {
-      try {
-        process.kill(-this._child.pid, "SIGTERM");
-      } catch {
-        // Process may already be dead
-      }
-    }
-  }
 }
 
 export function validateAgentConfig(
