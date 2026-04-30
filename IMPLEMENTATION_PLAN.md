@@ -157,13 +157,13 @@ Both bundled pipelines hard-code `specs/` in their agent rubric. This chunk thre
 **Files:**
 - Modify: `src/cli/tests/meditate.test.ts:269–281` (test name + regex)
 
-- [ ] **Step 1: Read current test**
+- [x] **Step 1: Read current test**
 
 ```bash
 sed -n '268,282p' src/cli/tests/meditate.test.ts
 ```
 
-- [ ] **Step 2: Replace assertion to expect `$specs_dir` token**
+- [x] **Step 2: Replace assertion to expect `$specs_dir` token**
 
 ```ts
 it("exploration step weights $specs_dir and src/ folders", () => {
@@ -181,24 +181,24 @@ it("exploration step weights $specs_dir and src/ folders", () => {
 });
 ```
 
-- [ ] **Step 3: Run test, confirm RED**
+- [x] **Step 3: Run test, confirm RED**
 
 ```bash
 npx vitest run src/cli/tests/meditate.test.ts -t "weights"
 ```
 Expected: FAIL — current rubric still has literal `specs/`, not `$specs_dir`.
 
-- [ ] **Step 4: Edit rubric** — `src/cli/pipelines/meditate/meditate.md:69`
+- [x] **Step 4: Edit rubric** — `src/cli/pipelines/meditate/meditate.md:69`
 
 Change `specs/*.md` → `$specs_dir/*.md`. Add a sentence near the first use: "If `$specs_dir` in the Inputs block is empty, default to `docs/specs`." (Belt-and-braces: the CLI command always passes a default in Task 2.3, but invocation via `pipeline run` directly bypasses that.)
 
-- [ ] **Step 5: Run test, confirm GREEN**
+- [x] **Step 5: Run test, confirm GREEN**
 
 ```bash
 npx vitest run src/cli/tests/meditate.test.ts -t "weights"
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/cli/tests/meditate.test.ts src/cli/pipelines/meditate/meditate.md
