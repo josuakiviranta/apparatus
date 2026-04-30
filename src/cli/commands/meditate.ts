@@ -43,8 +43,6 @@ export function readVisionIfPresent(projectFolder: string): string {
 
 export function ensureMeditationDirs(projectFolder: string): void {
   mkdirSync(join(projectFolder, "meditations", "illuminations"), { recursive: true });
-  mkdirSync(join(projectFolder, "meditations", "archived-illuminations"), { recursive: true });
-  mkdirSync(join(projectFolder, "meditations", "implemented-illuminations"), { recursive: true });
 }
 
 export function appendMeditateGitignore(projectFolder: string): void {

@@ -48,13 +48,13 @@ describe("ensureMeditationDirs", () => {
     expect(() => ensureMeditationDirs(tmpDir)).not.toThrow();
   });
 
-  it("creates archived-illuminations and implemented-illuminations alongside illuminations", () => {
+  it("creates only the meditations/illuminations/ directory (no side folders)", () => {
     const tmp = mkdtempSync(join(tmpdir(), "ralph-meditate-dirs-"));
     try {
       ensureMeditationDirs(tmp);
       expect(existsSync(join(tmp, "meditations", "illuminations"))).toBe(true);
-      expect(existsSync(join(tmp, "meditations", "archived-illuminations"))).toBe(true);
-      expect(existsSync(join(tmp, "meditations", "implemented-illuminations"))).toBe(true);
+      expect(existsSync(join(tmp, "meditations", "archived-illuminations"))).toBe(false);
+      expect(existsSync(join(tmp, "meditations", "implemented-illuminations"))).toBe(false);
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }
