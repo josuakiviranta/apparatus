@@ -8,8 +8,8 @@
 | Directory | Role |
 |---|---|
 | `src/` | All TypeScript source. Five sub-roots: `cli/`, `attractor/`, `daemon/`, `lib/`, `types/`. |
-| `docs/` | Design specs (`superpowers/specs/`), code-review records (`superpowers/reviews/`), implementation plans (`superpowers/plans/`), orientation docs (`orientation/`), and the tmux harness guide (`harness/`). |
-| `specs/` | Authoritative feature specs (`architecture.md`, `commands.md`, `meditate.md`, etc.). Source of truth for what each subsystem is supposed to do. |
+| `docs/` | Authoritative behavioral specs (`specs/`), design proposals & history (`superpowers/specs/`), code-review records (`superpowers/reviews/`), implementation plans (`superpowers/plans/`), orientation docs (`orientation/`), and the tmux harness guide (`harness/`). |
+| `docs/specs/` | Authoritative behavioral specs (`architecture.md`, `commands.md`, `meditate.md`, etc.). Source of truth for what each subsystem is supposed to do. |
 | `pipelines/` | `.dot` pipeline definitions, JSON output schemas (`schemas/`), and `smoke/` sub-folder for CI-level pipeline fixtures. |
 | `meditations/` | Two subfolders: `stimuli/` (meta-meditation lenses — `.md` pattern files used as reflection input) and `illuminations/` (LLM-generated insights — output of meditate sessions). |
 | `memory/` | Claude auto-memory files persisted across sessions. Session logs and architectural decisions. |
@@ -27,7 +27,7 @@
 
 ## Where to Put Things
 
-1. **New feature:** Check `specs/` first -- the spec likely already exists.
+1. **New feature:** Check `docs/specs/` first -- the spec likely already exists.
 2. **New pipeline:** Place `.dot` files under `pipelines/smoke/` (CI fixtures) or `pipelines/` root (production workflows); add output schemas to `pipelines/schemas/`.
 3. **New CLI command:** Touch `src/cli/commands/`, register in `src/cli/program.ts`, write tests in `src/cli/tests/`. If the command is a pipeline shim, scaffold the workflow under `src/cli/templates/<name>/`.
 4. **New attractor handler:** Place implementation in `src/attractor/handlers/`, register in `registry.ts`, add tests in `src/attractor/tests/`.
@@ -35,5 +35,5 @@
 
 ## Clarifications
 
-- **specs/ vs docs/superpowers/specs/:** `specs/` holds current authoritative behavioral specs. `docs/superpowers/specs/` holds historical design documents that motivated those specs.
+- **docs/specs/ vs docs/superpowers/specs/:** `docs/specs/` holds authoritative behavioral specs (what the system does). `docs/superpowers/specs/` holds design proposals and history (how decisions were reached).
 - **src/ has five sub-roots, not three:** Earlier references to "three sub-roots" (cli, attractor, daemon) are outdated. `lib/` and `types/` are first-class sub-roots.
