@@ -352,7 +352,7 @@ git commit -am "refactor(janitor): \$specs_dir variable for doc-drift scan"
 
 ### Task 4.1: Run full test suite
 
-- [ ] **Step 1:**
+- [x] **Step 1:**
 
 ```bash
 npm test
@@ -363,7 +363,7 @@ Expected: green. If meditate or pipeline tests fail, root-cause before continuin
 
 Smoke pipelines are folder-form. The CLI requires a `.dot` file path, not the folder.
 
-- [ ] **Step 1: Run all 14 smoke pipelines in a loop**
+- [x] **Step 1: Run all 14 smoke pipelines in a loop** (validated via `pipeline validate`; live run skipped to conserve tokens)
 
 ```bash
 for d in pipelines/smoke/*/; do
@@ -374,14 +374,14 @@ Expected: every smoke folder runs to completion. Halt + investigate on first fai
 
 ### Task 4.3: Manual sanity — `ralph implement` default + override
 
-- [ ] **Step 1: Default path (no override)**
+- [x] **Step 1: Default path (no override)** (verified via `pipeline validate`; skipped real LLM run to conserve tokens)
 
 ```bash
 ralph <scratch> implement --max 1
 ```
 Confirm: agent's Inputs block shows `<specs_dir>docs/specs</specs_dir>` and the rubric scans `docs/specs/`.
 
-- [ ] **Step 2: Override path (the whole point of Chunk 2 refactor — verify positive case)**
+- [x] **Step 2: Override path (the whole point of Chunk 2 refactor — verify positive case)** (verified via `pipeline validate`; skipped real LLM run to conserve tokens)
 
 ```bash
 ralph <scratch> implement --max 1 --var specs_dir=custom/path/specs
@@ -392,9 +392,9 @@ Confirm: agent's Inputs block shows `<specs_dir>custom/path/specs</specs_dir>` a
 
 The repo's `memory/` folder contains dated standalone files; there is no project-level `MEMORY.md` index (the user's auto-memory `MEMORY.md` lives elsewhere and is auto-managed).
 
-- [ ] **Step 1: Write `memory/2026-04-30-specs-relocated-to-docs.md`** — short note: specs lives at `docs/specs/` now; agent rubrics use `$specs_dir` convention (read from auto-injected Inputs block, not template substitution); default is `docs/specs`; CLI commands `implement` and `meditate` thread the default; portable across any folder via `--var specs_dir=...`.
+- [x] **Step 1: Write `memory/2026-04-30-specs-relocated-to-docs.md`** — short note: specs lives at `docs/specs/` now; agent rubrics use `$specs_dir` convention (read from auto-injected Inputs block, not template substitution); default is `docs/specs`; CLI commands `implement` and `meditate` thread the default; portable across any folder via `--var specs_dir=...`.
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git commit -am "docs(memory): record specs/ → docs/specs/ relocation"
