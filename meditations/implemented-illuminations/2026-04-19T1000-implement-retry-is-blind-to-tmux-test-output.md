@@ -1,9 +1,10 @@
 ---
 date: 2026-04-18
-status: dispatched
+status: implemented
 description: When tmux_confirm_gate routes "Retry" back to the implement node, the agent receives only $plan_path — $test_result and $summary produced by tmux_tester are in the engine context but absent from the implement prompt, so the agent must rediscover failures from scratch.
 dispatched_at: 2026-04-18
 plan_path: docs/superpowers/plans/2026-04-18-implement-retry-tmux-context.md
+implemented_at: 2026-04-30
 ---
 
 ## Core Idea
