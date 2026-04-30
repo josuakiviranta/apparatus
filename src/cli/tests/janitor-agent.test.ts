@@ -21,14 +21,11 @@ describe("janitor.md — frontmatter contract", () => {
     expect(config.description).toMatch(/janitor/i);
   });
 
-  it("whitelists exactly the lean tool surface from the spec", () => {
+  it("whitelists exactly the lean read-only tool surface", () => {
     expect([...config.tools].sort()).toEqual([
       "Grep",
       "mcp__illumination__glob_files",
       "mcp__illumination__list_illuminations",
-      "mcp__illumination__list_plans",
-      "mcp__illumination__mark_implemented",
-      "mcp__illumination__mark_plan_implemented",
       "mcp__illumination__project_tree",
       "mcp__illumination__read_file",
       "mcp__illumination__write_illumination",
@@ -38,8 +35,12 @@ describe("janitor.md — frontmatter contract", () => {
   it("does NOT whitelist destructive or escalation tools", () => {
     const forbidden = [
       "Bash", "Edit", "Write", "Read", "Task",
+      "mcp__illumination__consume",
       "mcp__illumination__mark_archived",
       "mcp__illumination__mark_dispatched",
+      "mcp__illumination__mark_implemented",
+      "mcp__illumination__mark_plan_implemented",
+      "mcp__illumination__list_plans",
     ];
     for (const t of forbidden) expect(config.tools).not.toContain(t);
   });
@@ -64,27 +65,28 @@ describe("janitor.md — procedure body contract", () => {
     expect(fileText).toMatch(/never edit|do not edit|cannot edit/i);
   });
 
-  it("encodes the lifecycle trigger condition (plan status=implemented)", () => {
-    expect(fileText).toMatch(/status:\s*implemented/);
-    expect(fileText).toMatch(/mark_implemented/);
+  it("encodes the KISS-lens scan focus", () => {
+    expect(fileText).toMatch(/bloat|yagni|refactor/i);
+    expect(fileText).toMatch(/kiss/i);
   });
 
   it("encodes the one-illumination-per-run cap", () => {
     expect(fileText).toMatch(/at most one illumination|one illumination per run/i);
   });
 
-  it("encodes the three-prior-illuminations reading rule with fresh-project fallback", () => {
-    expect(fileText).toMatch(/three prior illuminations/i);
-    expect(fileText).toMatch(/fewer than three|all of them/i);
+  it("requires calling list_illuminations before writing (dedup)", () => {
+    expect(fileText).toMatch(/list_illuminations/);
+    expect(fileText).toMatch(/dedup|duplicate|already raised|already known/i);
   });
 
-  it("encodes the body rubric headings", () => {
-    expect(fileText).toMatch(/^## Findings/m);
-    expect(fileText).toMatch(/^## Lifecycle changes this run/m);
-    expect(fileText).toMatch(/^## Reading thread/m);
+  it("does NOT mention deleted lifecycle tools or states", () => {
+    expect(fileText).not.toMatch(/mark_implemented/);
+    expect(fileText).not.toMatch(/mark_plan_implemented/);
+    expect(fileText).not.toMatch(/list_plans/);
+    expect(fileText).not.toMatch(/dispatched/);
   });
 
-  it("encodes the slug convention with the janitor- prefix", () => {
+  it("preserves the janitor- slug convention", () => {
     expect(fileText).toMatch(/slug = "janitor-<area>"/);
     expect(fileText).toMatch(/kebab-case/i);
   });
