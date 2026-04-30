@@ -236,7 +236,7 @@ git commit -m "refactor(meditate): declare specs_dir as pipeline input"
 **Files:**
 - Modify: `src/cli/commands/meditate.ts` (the `variables:` block in the `pipelineRunCommand` call)
 
-- [ ] **Step 1: Write a failing test in `src/cli/tests/meditate.test.ts`** (use `vi.spyOn` to match the existing pattern at meditate.test.ts:212–220)
+- [x] **Step 1: Write a failing test in `src/cli/tests/meditate.test.ts`** (use `vi.spyOn` to match the existing pattern at meditate.test.ts:212–220)
 
 ```ts
 it("passes specs_dir default of docs/specs to pipeline runtime", async () => {
@@ -251,13 +251,13 @@ it("passes specs_dir default of docs/specs to pipeline runtime", async () => {
 });
 ```
 
-- [ ] **Step 2: Run test, confirm RED**
+- [x] **Step 2: Run test, confirm RED**
 
-- [ ] **Step 3: Implement — add `specs_dir: "docs/specs"` (or honor `--specs-dir` flag if exposed) into the `variables` map**
+- [x] **Step 3: Implement — add `specs_dir: "docs/specs"` (or honor `--specs-dir` flag if exposed) into the `variables` map**
 
-- [ ] **Step 4: Run test, confirm GREEN**
+- [x] **Step 4: Run test, confirm GREEN**
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit -am "feat(meditate): default specs_dir to docs/specs"

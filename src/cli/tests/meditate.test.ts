@@ -263,6 +263,17 @@ describe("meditateCommand (shim)", () => {
     expect(calls).toHaveLength(1);
     expect(calls[0].opts.variables.vision).toBe("");
   });
+
+  it("passes specs_dir default of docs/specs to pipeline runtime", async () => {
+    const calls: Array<{ dotFile: string; opts: any }> = [];
+    vi.spyOn(pipelineMod, "pipelineRunCommand").mockImplementation(
+      async (dotFile, opts) => {
+        calls.push({ dotFile, opts });
+      },
+    );
+    await meditateCommand(tmpDir);
+    expect(calls[0].opts.variables.specs_dir).toBe("docs/specs");
+  });
 });
 
 describe("meditate template agent prompt body — exploration scope", () => {
