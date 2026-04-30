@@ -11,15 +11,10 @@ digraph illumination_to_implementation {
 
   remove_gate [shape=hexagon]
 
-  mark_archived [type="tool",
-                 cwd="$project",
-                 script_file="mark-archived.mjs",
-                 script_args="$verifier.illumination_path $verifier.archive_reason_short"]
-
-  mark_dispatched [type="tool",
-                   cwd="$project",
-                   script_file="mark-dispatched.mjs",
-                   script_args="$verifier.illumination_path $plan_writer.plan_path"]
+  consume_declined [type="tool",
+                    cwd="$project",
+                    script_file="consume.mjs",
+                    script_args="$verifier.illumination_path declined"]
 
   explainer [agent="change-explainer", default_refinements=""]
 
@@ -56,13 +51,13 @@ digraph illumination_to_implementation {
   verifier -> done             [condition="verifier.preferred_label=empty"]
 
   // False path
-  remove_gate -> mark_archived  [label="Archive"]
+  remove_gate -> consume_declined  [label="Archive"]
   remove_gate -> done           [label="Keep"]
   remove_gate -> chat_session   [label="Chat"]
 
   // True path
   explainer -> approval_gate
-  approval_gate -> mark_archived  [label="Decline"]
+  approval_gate -> consume_declined  [label="Decline"]
   approval_gate -> design_writer  [label="Approve"]
   approval_gate -> chat_session   [label="Chat"]
 
@@ -76,14 +71,12 @@ digraph illumination_to_implementation {
   chat_summarizer -> explainer [condition="chat_summarizer.scope_changed=false"]
 
   // Decline branch terminator
-  mark_archived -> done
+  consume_declined -> done
 
-  // Plan writing — plan_writer must run before mark_dispatched so the
-  // illumination frontmatter can record the resulting $plan_path.
-  design_writer -> plan_writer -> mark_dispatched
+  // Plan writing — plan_writer hands its plan_path directly to implement.
+  design_writer -> plan_writer -> implement
 
   // ── Routing: Phase 2 ─────────────────────────────────────────────────────
-  mark_dispatched -> implement
 
   implement -> implement           [condition="implement.success=false"]
   implement -> review_gate
