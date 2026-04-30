@@ -363,12 +363,12 @@ This chunk adds a hard-error validator rule so future authors cannot ship the sa
 **Files:**
 - Modify: `src/attractor/tests/graph-validator-inputs.test.ts`
 
-- [ ] **Step 1: Read existing test file structure**
+- [x] **Step 1: Read existing test file structure**
 
 Run: `head -50 src/attractor/tests/graph-validator-inputs.test.ts`
 Confirm the test pattern (loadGraph helper or buildGraph fixture).
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 Add a new test (location: end of the existing `describe` block, or new `describe("bare_input_from_qualified_producer", ...)` block):
 
@@ -399,7 +399,7 @@ describe("bare_input_from_qualified_producer", () => {
 
 (Adapt fixture-creation idiom to whatever the existing tests in this file use — e.g. `mkdtempSync` + `writeFileSync` for the agent .md file.)
 
-- [ ] **Step 3: Run test to verify it fails**
+- [x] **Step 3: Run test to verify it fails**
 
 Run: `npx vitest run src/attractor/tests/graph-validator-inputs.test.ts -t "bare_input_from_qualified_producer"`
 Expected: FAIL — current validator either allows the bare input (because `default_*` could silence it, or because no rule of this name exists yet).
@@ -409,7 +409,7 @@ Expected: FAIL — current validator either allows the bare input (because `defa
 **Files:**
 - Modify: `src/attractor/tests/graph-validator-inputs.test.ts`
 
-- [ ] **Step 1: Write the test**
+- [x] **Step 1: Write the test**
 
 ```ts
 it("default_* attribute does NOT silence bare_input_from_qualified_producer", async () => {
@@ -431,7 +431,7 @@ it("default_* attribute does NOT silence bare_input_from_qualified_producer", as
 });
 ```
 
-- [ ] **Step 2: Run — expect FAIL**
+- [x] **Step 2: Run — expect FAIL**
 
 Run: `npx vitest run src/attractor/tests/graph-validator-inputs.test.ts -t "default_\\* attribute does NOT silence"`
 Expected: FAIL.
@@ -441,12 +441,12 @@ Expected: FAIL.
 **Files:**
 - Modify: `src/attractor/core/graph.ts` (the bare-input handling block around lines 484-497)
 
-- [ ] **Step 1: Read the current rule block**
+- [x] **Step 1: Read the current rule block**
 
 Run: `npx vitest run src/attractor/core/graph.ts` ← n/a, just open the file.
 Read lines 460-510 to confirm the `resolveInputDecl` flow and the existing `bare_input_not_in_caller_inputs_or_system` rule.
 
-- [ ] **Step 2: Add the new rule logic INSIDE the existing caller-vars/reserved short-circuit**
+- [x] **Step 2: Add the new rule logic INSIDE the existing caller-vars/reserved short-circuit**
 
 The existing block at `graph.ts:484-497` is structured:
 
@@ -500,7 +500,7 @@ if (resolved.sourceNode === undefined) {
 }
 ```
 
-- [ ] **Step 3: Add the helper function `findQualifiedProducer`**
+- [x] **Step 3: Add the helper function `findQualifiedProducer`**
 
 Add the helper inside the same scope where `nodeProduces` and `reachableWithout` are defined (search for `function reachableWithout` at `graph.ts:224` — place this helper immediately after it):
 
@@ -536,7 +536,7 @@ function findQualifiedProducer(
 
 **Conservative-on-key-match note:** The helper does NOT verify that the consumer's specific `localKey` matches an actual key the producer's script emits. We have no static manifest of which JSON keys a `produces_from_stdout` script writes. This is intentional — forcing authors to declare qualified inputs is always safer than allowing bare. If false positives appear in real pipelines, refine by adding a `produces_keys=` attribute to tool nodes (out of scope for this plan).
 
-- [ ] **Step 3: Run the two failing tests**
+- [x] **Step 3: Run the two failing tests**
 
 Run: `npx vitest run src/attractor/tests/graph-validator-inputs.test.ts -t "bare_input_from_qualified_producer"`
 Expected: both tests PASS.
@@ -546,7 +546,7 @@ Expected: both tests PASS.
 **Files:**
 - Modify: `src/attractor/tests/graph-validator-inputs.test.ts`
 
-- [ ] **Step 1: Write tests**
+- [x] **Step 1: Write tests**
 
 ```ts
 it("bare input from caller-var (declared on digraph) does NOT trigger the rule", async () => {
@@ -580,7 +580,7 @@ it("bare input from reserved system var does NOT trigger the rule", async () => 
 });
 ```
 
-- [ ] **Step 2: Run**
+- [x] **Step 2: Run**
 
 Run: `npx vitest run src/attractor/tests/graph-validator-inputs.test.ts -t "caller-var\\|reserved system var"`
 Expected: PASS.
@@ -590,7 +590,7 @@ Expected: PASS.
 **Files:**
 - Modify: `src/attractor/tests/graph-validator-inputs.test.ts`
 
-- [ ] **Step 1: Write the test**
+- [x] **Step 1: Write the test**
 
 ```ts
 it("qualified input from produces_from_stdout source passes validation", async () => {
@@ -611,14 +611,14 @@ it("qualified input from produces_from_stdout source passes validation", async (
 });
 ```
 
-- [ ] **Step 2: Run**
+- [x] **Step 2: Run**
 
 Run: `npx vitest run src/attractor/tests/graph-validator-inputs.test.ts -t "qualified input"`
 Expected: PASS.
 
 ### Task 2.6: Validate live janitor pipeline still clean
 
-- [ ] **Step 1: Run validator against janitor**
+- [x] **Step 1: Run validator against janitor**
 
 Run: `npx ralph pipeline validate pipelines/janitor/pipeline.dot`
 (or `node dist/cli/index.js pipeline validate pipelines/janitor/pipeline.dot` if not built)
@@ -627,14 +627,14 @@ Expected: clean — Chunk 1 already migrated `inputs: [read_vision.vision]`, so 
 
 ### Task 2.7: Run full test suite
 
-- [ ] **Step 1: Run all tests**
+- [x] **Step 1: Run all tests**
 
 Run: `npm test`
 Expected: all tests pass — including pre-existing graph-validator tests (the new rule must not regress them).
 
 ### Task 2.8: Commit Chunk 2
 
-- [ ] **Step 1: Stage files**
+- [x] **Step 1: Stage files**
 
 ```bash
 git add \
@@ -642,7 +642,7 @@ git add \
   src/attractor/tests/graph-validator-inputs.test.ts
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git commit -m "$(cat <<'EOF'
@@ -659,7 +659,7 @@ EOF
 )"
 ```
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 Run: `git log --oneline -2`
 Expected: both Chunk 1 and Chunk 2 commits visible.

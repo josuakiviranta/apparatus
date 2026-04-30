@@ -237,6 +237,18 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
     return false;
   }
 
+  // Find an upstream produces_from_stdout tool node that can reach consumerId.
+  function findQualifiedProducer(consumerId: string): string | undefined {
+    for (const [id, node] of nodes) {
+      if (id === consumerId) continue;
+      if (resolveHandlerType(node) !== "tool") continue;
+      if (!node.producesFromStdout) continue;
+      if (!reachableWithout(id, consumerId, new Set())) continue;
+      return id;
+    }
+    return undefined;
+  }
+
   if (startNodes.length === 1) {
     const startId = startNodes[0].id;
     for (const [consumerId, consumer] of nodes) {
@@ -482,10 +494,29 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
             continue;
           }
           if (resolved.sourceNode === undefined) {
-            // bare_input_not_in_caller_inputs_or_system — bare input must be either declared
-            // in the digraph's inputs="..." attribute, be a system-injected var, or the
-            // consumer node declares a default_<localKey> attribute (optionality mechanism, spec D8).
-            if (!callerInputs.has(resolved.localKey) && !SYSTEM_VARS.has(resolved.localKey) && !hasDefault(node, resolved.localKey)) {
+            // Short-circuit legitimate bare inputs (caller-vars, reserved) — these
+            // never trigger the qualified-producer rule.
+            if (callerInputs.has(resolved.localKey) || SYSTEM_VARS.has(resolved.localKey)) {
+              continue;
+            }
+
+            // bare_input_from_qualified_producer — bare input is not caller/reserved
+            // and an upstream produces_from_stdout tool node exists on the path.
+            // The bare key cannot resolve (producer writes `${nodeId}.key`).
+            // default_* does NOT silence this — bare keys cannot read qualified outputs.
+            const qualifiedProducer = findQualifiedProducer(node.id);
+            if (qualifiedProducer !== undefined) {
+              diags.push({
+                rule: "bare_input_from_qualified_producer",
+                severity: "error",
+                message: `Input "${resolved.localKey}" at "${node.id}" is bare but its only upstream producer "${qualifiedProducer}" emits qualified keys via produces_from_stdout. Declare as "${qualifiedProducer}.${resolved.localKey}". The default_${resolved.localKey} attribute does not silence this error — bare keys cannot read qualified producer outputs.`,
+                location: node.sourceLocation,
+              });
+              continue;
+            }
+
+            // bare_input_not_in_caller_inputs_or_system — fallback existing rule
+            if (!hasDefault(node, resolved.localKey)) {
               diags.push({
                 rule: "bare_input_not_in_caller_inputs_or_system",
                 severity: "error",

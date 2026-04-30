@@ -658,3 +658,109 @@ body`,
     expect(() => validateGraph(graph, dir)).not.toThrow();
   });
 });
+
+describe("validator — bare_input_from_qualified_producer", () => {
+  it("errors when consumer declares bare input whose source is produces_from_stdout tool node", () => {
+    const dir = join(tmpdir(), `rule-bipq-${Date.now()}`);
+    setup(dir, {
+      "consumer.md": `---
+name: consumer
+description: x
+inputs: [vision]
+outputs: { foo: string }
+---
+body`,
+    });
+    const dot = `digraph g {
+      inputs="project"
+      start [shape=Mdiamond]
+      read_vision [type="tool", cwd="$project", tool_command="echo {}", produces_from_stdout=true]
+      consumer [agent="consumer"]
+      done [shape=Msquare]
+      start -> read_vision -> consumer -> done
+    }`;
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    const d = diags.find(d => d.rule === "bare_input_from_qualified_producer");
+    expect(d).toBeDefined();
+    expect(d!.severity).toBe("error");
+    expect(d!.message).toContain("vision");
+    expect(d!.message).toContain("read_vision.vision");
+  });
+
+  it("default_* attribute does NOT silence bare_input_from_qualified_producer", () => {
+    const dir = join(tmpdir(), `rule-bipq-default-${Date.now()}`);
+    setup(dir, {
+      "consumer.md": `---
+name: consumer
+description: x
+inputs: [vision]
+outputs: { foo: string }
+---
+body`,
+    });
+    const dot = `digraph g {
+      inputs="project"
+      start [shape=Mdiamond]
+      read_vision [type="tool", cwd="$project", tool_command="echo {}", produces_from_stdout=true]
+      consumer [agent="consumer", default_vision=""]
+      done [shape=Msquare]
+      start -> read_vision -> consumer -> done
+    }`;
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    expect(diags.some(d => d.rule === "bare_input_from_qualified_producer")).toBe(true);
+  });
+
+  it("bare input from caller-var (declared on digraph) does NOT trigger the rule", () => {
+    const dir = join(tmpdir(), `rule-bipq-caller-${Date.now()}`);
+    setup(dir, {
+      "consumer.md": `---\nname: consumer\ndescription: x\ninputs: [vision]\noutputs: { foo: string }\n---\nbody`,
+    });
+    const dot = `digraph g {
+      inputs="project,vision"
+      start [shape=Mdiamond]
+      consumer [agent="consumer"]
+      done [shape=Msquare]
+      start -> consumer -> done
+    }`;
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    expect(diags.some(d => d.rule === "bare_input_from_qualified_producer")).toBe(false);
+  });
+
+  it("bare input from reserved system var does NOT trigger the rule", () => {
+    const dir = join(tmpdir(), `rule-bipq-reserved-${Date.now()}`);
+    setup(dir, {
+      "consumer.md": `---\nname: consumer\ndescription: x\ninputs: [project]\noutputs: { foo: string }\n---\nbody`,
+    });
+    const dot = `digraph g {
+      inputs="project"
+      start [shape=Mdiamond]
+      consumer [agent="consumer"]
+      done [shape=Msquare]
+      start -> consumer -> done
+    }`;
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    expect(diags.some(d => d.rule === "bare_input_from_qualified_producer")).toBe(false);
+  });
+
+  it("qualified input from produces_from_stdout source passes validation", () => {
+    const dir = join(tmpdir(), `rule-bipq-qualified-${Date.now()}`);
+    setup(dir, {
+      "consumer.md": `---\nname: consumer\ndescription: x\ninputs: [read_vision.vision]\noutputs: { foo: string }\n---\nbody`,
+    });
+    const dot = `digraph g {
+      inputs="project"
+      start [shape=Mdiamond]
+      read_vision [type="tool", cwd="$project", tool_command="echo {}", produces_from_stdout=true]
+      consumer [agent="consumer"]
+      done [shape=Msquare]
+      start -> read_vision -> consumer -> done
+    }`;
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    expect(diags.some(d => d.rule === "bare_input_from_qualified_producer")).toBe(false);
+  });
+});
