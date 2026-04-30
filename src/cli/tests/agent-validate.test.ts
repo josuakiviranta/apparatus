@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { validateAgentConfig } from "../lib/agent.js";
-import { parseAgentFile } from "../lib/agent-registry.js";
+import { parseAgentFile } from "../lib/agent-loader.js";
 
 describe("validateAgentConfig — deep loop fields", () => {
   it("propagates loop:true into the returned config", () => {

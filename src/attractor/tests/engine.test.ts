@@ -12,8 +12,8 @@ import { join } from "path";
 // Mock the agent modules so AgentHandler works without real agent files
 const mockAgentRun = vi.fn().mockResolvedValue({ exitCode: 0, sessionId: "s1", stdout: null });
 
-vi.mock("../../cli/lib/agent-registry.js", () => ({
-  resolveAgent: vi.fn(() => ({
+vi.mock("../../cli/lib/agent-loader.js", () => ({
+  loadAgent: vi.fn(() => ({
     name: "implement",
     description: "test",
     model: "sonnet",

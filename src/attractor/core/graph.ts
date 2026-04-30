@@ -7,7 +7,7 @@ import { parseDotV2 } from "./graph-ast.js";
 import {
   toCamel,
 } from "./dot-common.js";
-import { resolveAgent } from "../../cli/lib/agent-registry.js";
+import { loadAgent } from "../../cli/lib/agent-loader.js";
 import type { AgentConfig } from "../../cli/lib/agent.js";
 import { computeVarsInScope, computeVarsInAnyScope } from "./flow-analyzer.js";
 import { parseConditionClauses } from "./conditions.js";
@@ -198,7 +198,7 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
     // Derive produces from agent file's outputs block when dotDir is available
     if (node.agent && dotDir) {
       try {
-        const agentConfig = resolveAgent(node.agent as string, { projectDir: dotDir, allowBundledFallback: false });
+        const agentConfig = loadAgent(node.agent as string, dotDir);
         if (agentConfig.outputs) {
           for (const key of Object.keys(agentConfig.outputs)) {
             produced.add(key);
@@ -570,7 +570,7 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
     }
   }
 
-  // resolveAgent needs projectDir to locate project-local agents; without dotDir we can't fetch agent configs.
+  // loadAgent needs the pipeline directory to locate sibling agent files; without dotDir we can't fetch agent configs.
   if (dotDir) {
     checkMissingInputProducer(graph, nodeProduces, dotDir, diags);
     checkInputTypeMismatch(graph, dotDir, diags);
@@ -726,9 +726,9 @@ function checkInputTypeMismatch(
 }
 
 function tryResolveAgent(node: Node, dotDir: string | undefined): AgentConfig | undefined {
-  if (!node.agent) return undefined;
+  if (!node.agent || !dotDir) return undefined;
   try {
-    return resolveAgent(node.agent as string, { projectDir: dotDir, allowBundledFallback: false });
+    return loadAgent(node.agent as string, dotDir);
   } catch {
     return undefined;
   }
@@ -913,9 +913,8 @@ function checkAgentOutputsConflict(
 ): void {
   if (!node.agent) return;
 
-  // When dotDir is undefined, resolveAgent skips project-local lookup and will
-  // throw "Unknown agent" for any non-bundled agent. tryResolveAgent absorbs that
-  // gracefully — the third test case relies on this path.
+  // When dotDir is undefined we cannot locate a sibling agent file;
+  // tryResolveAgent returns undefined and this rule skips.
   const agentConfig = tryResolveAgent(node, dotDir);
   if (!agentConfig) return; // unresolvable agent — handled by other rules
   if (!agentConfig.outputs) return;

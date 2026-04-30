@@ -33,14 +33,6 @@ export function resolveBundledPipeline(name: string): string {
   return path;
 }
 
-export function getBundledAgentsDir(): string {
-  // prod: dist/cli/ → dist/agents/
-  // dev:  src/cli/lib/ → src/cli/agents/
-  return isProduction()
-    ? join(__dirname, "..", "agents")
-    : join(__dirname, "..", "agents");
-}
-
 export function getMetaMeditationsDir(): string {
   // prod: dist/cli/ → up two → package root
   // dev:  src/cli/lib/ → up three → package root

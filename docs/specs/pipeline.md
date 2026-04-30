@@ -12,7 +12,7 @@ Pipelines are the preferred extension surface for new ralph behaviours. `ralph i
 
 ## Commands
 
-All pipeline commands register in `src/cli/commands/pipeline.ts`. See `specs/commands.md` for flag surface.
+All pipeline commands register in `src/cli/commands/pipeline.ts`. See `commands.md` for flag surface.
 
 | Command | Purpose |
 |---------|---------|
@@ -174,7 +174,7 @@ Nodes that declare `headless_safe="false"` raise an error when dispatched agains
 
 ## Checkpoint and Resume
 
-Covered in `specs/architecture.md` under "Checkpoint and Resume". In short:
+Covered in `architecture.md` under "Checkpoint and Resume". In short:
 
 - `src/attractor/checkpoint.ts` persists a `CheckpointState = { timestamp, currentNode, completedNodes, nodeRetries, context }` to `<logsRoot>/checkpoint.json`, where `<logsRoot>` defaults to `~/.ralph/<projectKey>/runs/<runId>/`. Tests can override the parent root via the `RALPH_RUNS_ROOT` env var.
 - The engine writes the checkpoint at every state transition.
@@ -261,4 +261,4 @@ There is no direct tmux integration in `src/attractor/`. Tmux-based debugging of
 - **New node type:** add handler, register in engine, add zod schema, document in Node Types table.
 - **New interviewer backend:** implement `Interviewer` interface in `interviewer/`, wire selection logic in `interviewer/index.ts`.
 - **New attribute:** add to the relevant zod schema; if variable-expanded, add to the expander's attribute allowlist; if validator-relevant, teach `validateGraph` the rule.
-- **New pipeline command:** register in `src/cli/commands/pipeline.ts`; document in `specs/commands.md`.
+- **New pipeline command:** register in `src/cli/commands/pipeline.ts`; document in `commands.md`.

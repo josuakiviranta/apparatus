@@ -10,7 +10,6 @@ import {
   pipelineShowCommand,
 } from "./commands/pipeline";
 import { collectKV } from "./lib/collect-kv.js";
-import { agentListAction, agentShowAction } from "./commands/agent";
 
 export function createProgram(): Command {
   const program = new Command();
@@ -71,11 +70,7 @@ Pipeline engine (DOT-graph workflows):
     diamond    Conditional — branches without human input (condition= on edges)
 
 Meditation (restricted insight sessions):
-  ralph meditate my-app                   Run a one-shot meditation session
-
-Agent management:
-  ralph agent list                        List all available agents
-  ralph agent show <name>                 Show details of a specific agent`
+  ralph meditate my-app                   Run a one-shot meditation session`
   );
 
   program
@@ -194,22 +189,6 @@ file:line:col diagnostics and writes nothing.
     .action(async (dotFile: string, opts: { project?: string }) => {
       const code = await pipelineShowCommand(dotFile, opts);
       process.exit(code);
-    });
-
-  const agent = program.command("agent").description("Manage agent definitions");
-
-  agent
-    .command("list")
-    .description("List all available agents")
-    .action(async () => {
-      await agentListAction();
-    });
-
-  agent
-    .command("show <name>")
-    .description("Show details of a specific agent")
-    .action(async (name: string) => {
-      await agentShowAction(name);
     });
 
   registerHeartbeatCommand(program);

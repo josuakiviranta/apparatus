@@ -95,7 +95,7 @@ describe("AgentHandler — interactive branch", () => {
       run: legacyRun,
     };
     const handler = new AgentHandler({
-      resolveAgent: () => agent.config,
+      loadAgent: () => agent.config,
       createAgent: () => agent,
     });
     const tmp = mkdtempSync(join(tmpdir(), "ralph-handler-"));
@@ -113,7 +113,7 @@ describe("AgentHandler — interactive branch", () => {
     const agent = makeFakeAgent(() => {});
     const configWithSchema = { ...agent.config, jsonSchema: "{}" };
     const handler = new AgentHandler({
-      resolveAgent: () => configWithSchema,
+      loadAgent: () => configWithSchema,
       createAgent: () => agent,
     });
     const tmp = mkdtempSync(join(tmpdir(), "ralph-handler-"));
@@ -146,7 +146,7 @@ describe("AgentHandler — interactive branch", () => {
     });
 
     const handler = new AgentHandler({
-      resolveAgent: () => agent.config,
+      loadAgent: () => agent.config,
       createAgent: () => agent,
     });
 
@@ -179,7 +179,7 @@ describe("AgentHandler — interactive branch", () => {
     const agent = makeFakeAgent(() => {});
 
     const handler = new AgentHandler({
-      resolveAgent: () => agent.config,
+      loadAgent: () => agent.config,
       createAgent: () => agent,
     });
 
@@ -199,7 +199,7 @@ describe("AgentHandler — interactive branch", () => {
     const agent = makeFakeAgent(() => {});
 
     const handler = new AgentHandler({
-      resolveAgent: () => agent.config,
+      loadAgent: () => agent.config,
       createAgent: () => agent,
     });
 
@@ -219,7 +219,7 @@ describe("AgentHandler — interactive branch", () => {
     const agent = makeFakeAgent(() => {});
 
     const handler = new AgentHandler({
-      resolveAgent: () => agent.config,
+      loadAgent: () => agent.config,
       createAgent: () => agent,
     });
 

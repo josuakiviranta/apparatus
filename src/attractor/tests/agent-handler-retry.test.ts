@@ -47,7 +47,7 @@ describe("AgentHandler — validation retry loop", () => {
       { raw: '{"foo":"bar"}', sessionId: "s-1" },
     ]);
     const handler = new AgentHandler({
-      resolveAgent: () => config() as any,
+      loadAgent: () => config() as any,
       createAgent: () => fakeAgent as any,
     });
     const meta = makeMeta();
@@ -72,7 +72,7 @@ describe("AgentHandler — validation retry loop", () => {
       { raw: '{"foo":"x"}', sessionId: "s-2" },
     ]);
     const handler = new AgentHandler({
-      resolveAgent: () => config() as any,
+      loadAgent: () => config() as any,
       createAgent: () => fakeAgent as any,
     });
     const meta = makeMeta();
@@ -92,7 +92,7 @@ describe("AgentHandler — validation retry loop", () => {
     ]);
     const onValidationFailure = vi.fn();
     const handler = new AgentHandler({
-      resolveAgent: () => config() as any,
+      loadAgent: () => config() as any,
       createAgent: () => fakeAgent as any,
     });
     const meta = makeMeta({ onValidationFailure });
@@ -114,7 +114,7 @@ describe("AgentHandler — validation retry loop", () => {
       { raw: '{"wrong":"a"}', sessionId: "s-4" },
     ]);
     const handler = new AgentHandler({
-      resolveAgent: () => config() as any,
+      loadAgent: () => config() as any,
       createAgent: () => fakeAgent as any,
     });
     const outcome = await handler.execute(

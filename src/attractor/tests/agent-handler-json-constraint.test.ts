@@ -61,7 +61,7 @@ describe("AgentHandler – JSON constraint injection", () => {
 
     let capturedConfig: any = null;
     const handler = new AgentHandler({
-      resolveAgent: mockResolve,
+      loadAgent: mockResolve,
       createAgent: (config) => { capturedConfig = config; return { run: mockAgentRun, kill: mockAgentKill, config } as any; },
     });
 
@@ -92,7 +92,7 @@ describe("AgentHandler – JSON constraint injection", () => {
 
     let capturedConfig: any = null;
     const handler = new AgentHandler({
-      resolveAgent: mockResolve,
+      loadAgent: mockResolve,
       createAgent: (config) => { capturedConfig = config; return { run: mockAgentRun, kill: mockAgentKill, config } as any; },
     });
 
@@ -118,7 +118,7 @@ describe("AgentHandler – JSON constraint injection", () => {
 
     let capturedConfig: any = null;
     const handler = new AgentHandler({
-      resolveAgent: mockResolve,
+      loadAgent: mockResolve,
       createAgent: (config) => { capturedConfig = config; return { run: mockAgentRun, kill: mockAgentKill, config } as any; },
     });
 
@@ -154,7 +154,7 @@ describe("AgentHandler – JSON constraint injection", () => {
     });
 
     const handler = new AgentHandler({
-      resolveAgent: mockResolve,
+      loadAgent: mockResolve,
       createAgent: () => ({ run: mockAgentRun, kill: mockAgentKill, config: {} } as any),
     });
 
@@ -187,7 +187,7 @@ describe("AgentHandler – JSON constraint injection", () => {
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: jsonArray });
 
     const handler = new AgentHandler({
-      resolveAgent: mockResolve,
+      loadAgent: mockResolve,
       createAgent: () => ({ run: mockAgentRun, kill: mockAgentKill, config: {} } as any),
     });
 
@@ -219,7 +219,7 @@ describe("AgentHandler – JSON constraint injection", () => {
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: jsonArray });
 
     const handler = new AgentHandler({
-      resolveAgent: mockResolve,
+      loadAgent: mockResolve,
       createAgent: () => ({ run: mockAgentRun, kill: mockAgentKill, config: {} } as any),
     });
 
@@ -250,7 +250,7 @@ describe("AgentHandler – JSON constraint injection", () => {
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: jsonArray });
 
     const handler = new AgentHandler({
-      resolveAgent: mockResolve,
+      loadAgent: mockResolve,
       createAgent: () => ({ run: mockAgentRun, kill: mockAgentKill, config: {} } as any),
     });
 
@@ -279,7 +279,7 @@ describe("AgentHandler – JSON constraint injection", () => {
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: jsonArray });
 
     const handler = new AgentHandler({
-      resolveAgent: mockResolve,
+      loadAgent: mockResolve,
       createAgent: () => ({ run: mockAgentRun, kill: mockAgentKill, config: {} } as any),
     });
 
@@ -310,7 +310,7 @@ describe("AgentHandler – JSON constraint injection", () => {
     });
 
     const handler = new AgentHandler({
-      resolveAgent: mockResolve,
+      loadAgent: mockResolve,
       createAgent: () => ({ run: mockAgentRun, kill: mockAgentKill, config: {} } as any),
     });
 
@@ -337,7 +337,7 @@ describe("AgentHandler – JSON constraint injection", () => {
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: undefined });
 
     const handler = new AgentHandler({
-      resolveAgent: mockResolve,
+      loadAgent: mockResolve,
       createAgent: () => ({ run: mockAgentRun, kill: mockAgentKill, config: {} } as any),
     });
 

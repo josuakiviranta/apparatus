@@ -14,7 +14,7 @@ describe("AgentHandler — frontmatter outputs activates parse path", () => {
       }),
     };
     const handler = new AgentHandler({
-      resolveAgent: () => ({
+      loadAgent: () => ({
         name: "a", description: "d", model: "opus",
         permissionMode: "default", tools: [], mcp: [], prompt: "",
 

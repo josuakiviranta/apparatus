@@ -25,12 +25,11 @@ ralph-cli/
 │   │   │   ├── new.ts                  # ralph new
 │   │   │   ├── meditate.ts             # ralph meditate
 │   │   │   ├── meditate-create.ts      # ralph meditate create
-│   │   │   ├── agent.ts                # ralph agent (list, show, create)
 │   │   │   ├── pipeline.ts             # ralph pipeline (run, list, create)
 │   │   │   └── heartbeat.ts            # ralph heartbeat (subcommands)
 │   │   ├── lib/
 │   │   │   ├── agent.ts                # Agent class — config to claude spawn, stream, result
-│   │   │   ├── agent-registry.ts       # Resolves agent names to AgentConfig from ~/.ralph/agents/
+│   │   │   ├── agent-loader.ts         # Loads AgentConfig from <pipelineDir>/<name>.md (no global registry)
 │   │   │   ├── assets.ts               # asset path resolution (dev vs prod)
 │   │   │   ├── classifyNode.ts         # DOT node → handler type classification
 │   │   │   ├── claudeTracePath.ts      # Claude session trace path resolution
@@ -55,11 +54,6 @@ ralph-cli/
 │   │   │   └── TextInput.tsx           # Text input component
 │   │   ├── mcp/
 │   │   │   └── illumination-server.ts  # MCP server for meditate write access (10 tools)
-│   │   ├── agents/                     # bundled agent definition files (fallback for project-local agents)
-│   │   │   ├── implement.md
-│   │   │   ├── meditate.md
-│   │   │   ├── chat.md
-│   │   │   └── ...
 │   │   ├── pipelines/                       # bundled folder pipelines (shipped to npm)
 │   │   │   ├── implement/                   # backs `ralph implement`
 │   │   │   └── meditate/                    # backs `ralph meditate`
@@ -105,11 +99,11 @@ ralph-cli/
 └── dist/                               # published artifact (not committed)
 ```
 
-Tool nodes (handled by `attractor/handlers/tool.ts`) may externalise their logic to a script on disk via the `script_file=` DOT attribute (resolved relative to the pipeline file, conventionally under `pipelines/scripts/`) — see [`docs/superpowers/specs/2026-04-17-pipeline-script-files-design.md`](../docs/superpowers/specs/2026-04-17-pipeline-script-files-design.md).
+Tool nodes (handled by `attractor/handlers/tool.ts`) may externalise their logic to a script on disk via the `script_file=` DOT attribute (resolved relative to the pipeline file, conventionally under `pipelines/scripts/`) — see [`docs/superpowers/specs/2026-04-17-pipeline-script-files-design.md`](../superpowers/specs/2026-04-17-pipeline-script-files-design.md).
 
 `attractor/handlers/parallel.ts` exports two handlers: `ParallelHandler` executes a fan-out node, gathering per-branch outcomes from `meta.branchOutcomes` and serialising them into the `parallel.results` context key; `FanInHandler` (registered as `parallel.fan_in`) reads that key back, parses the per-branch outcomes, and rolls them up into a single `success` / `partial_success` / `fail` status depending on whether all, some, or none of the branches succeeded.
 
-Agent nodes resolve their agent name against the **pipeline directory** first: `attractor/handlers/agent-handler.ts` calls `resolveAgent(name, { projectDir: meta.dotDir, allowBundledFallback: false })`, so for a pipeline at `pipelines/<name>/pipeline.dot` the handler reads `pipelines/<name>/<agent>.md`. If the file is absent, the user-level `~/.ralph/agents/` registry is consulted; missing in both, the run fails. There is no bundled-agents fallback for pipeline runtime — every pipeline owns its agents.
+Agent nodes resolve their agent name against the **pipeline directory**: `attractor/handlers/agent-handler.ts` calls `loadAgent(name, meta.dotDir)`, so for a pipeline at `pipelines/<name>/pipeline.dot` the handler reads `pipelines/<name>/<agent>.md`. If the file is absent, the run fails with `Agent file not found: <path>`. There is no global registry and no bundled fallback — every pipeline owns its agents (see `docs/adr/0001-agents-live-next-to-pipeline.md`).
 
 ## Build Entry Points
 

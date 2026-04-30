@@ -137,9 +137,9 @@ describe("validateAgentConfig — outputs", () => {
 import { writeFileSync, mkdirSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { resolveAgent } from "../lib/agent-registry.js";
+import { loadAgent } from "../lib/agent-loader.js";
 
-describe("resolveAgent — outputs end-to-end", () => {
+describe("loadAgent — outputs end-to-end", () => {
   it("loads outputs from frontmatter and exposes them on AgentConfig", () => {
     const dir = join(tmpdir(), `resolve-outputs-${Date.now()}`);
     mkdirSync(dir, { recursive: true });
@@ -153,7 +153,7 @@ outputs:
 prompt body
 `);
 
-    const config = resolveAgent("demo-agent", { projectDir: dir });
+    const config = loadAgent("demo-agent", dir);
 
     expect(config.outputs).toEqual({
       foo: "string",

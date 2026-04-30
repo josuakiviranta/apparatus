@@ -1,5 +1,5 @@
 import { parse, stringify } from "@ts-graphviz/ast";
-import { resolveAgent } from "./agent-registry.js";
+import { loadAgent } from "./agent-loader.js";
 
 interface AgentMeta {
   inputs: string[];
@@ -62,10 +62,7 @@ export function annotateDotForShow(src: string, dotDir: string): string {
     const agentName = agentAttr.value?.value;
     if (!agentName) continue;
     try {
-      const cfg = resolveAgent(agentName, {
-        projectDir: dotDir,
-        allowBundledFallback: false,
-      });
+      const cfg = loadAgent(agentName, dotDir);
       const inputs = Array.isArray(cfg.inputs) ? cfg.inputs : [];
       const outputs = cfg.outputs ? Object.keys(cfg.outputs) : [];
       agentMeta.set(child.id.value, { inputs, outputs });

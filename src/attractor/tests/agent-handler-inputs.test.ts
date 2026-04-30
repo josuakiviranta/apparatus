@@ -33,7 +33,7 @@ You are v.`,
     };
     const jsonSchema1 = JSON.stringify({ type: "object", properties: { result: { type: "string" } }, required: ["result"] });
     const handler = new AgentHandler({
-      resolveAgent: () => ({
+      loadAgent: () => ({
         name: "v",
         description: "t",
         model: "opus",
@@ -88,7 +88,7 @@ You are v.`,
     };
     const jsonSchema = JSON.stringify({ type: "object", properties: { result: { type: "string" } }, required: ["result"] });
     const handler = new AgentHandler({
-      resolveAgent: () => ({
+      loadAgent: () => ({
         name: "v",
         description: "t",
         model: "opus",
@@ -129,7 +129,7 @@ You are v.`,
     };
     const jsonSchema2 = JSON.stringify({ type: "object", properties: { result: { type: "string" } }, required: ["result"] });
     const handler = new AgentHandler({
-      resolveAgent: () => ({
+      loadAgent: () => ({
         name: "v",
         description: "t",
         model: "opus",

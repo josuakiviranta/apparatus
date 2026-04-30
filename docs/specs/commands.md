@@ -78,22 +78,6 @@ Shows logs for a heartbeat task. `--follow` streams new log lines in real-time.
 
 Real-time TUI dashboard of all heartbeat tasks.
 
-## `ralph agent` (subcommands)
-
-Manages agent definitions — markdown files with YAML frontmatter that configure how Claude sessions are spawned.
-
-### `ralph agent list`
-
-Lists all available agents from both user directory (`~/.ralph/agents/`) and bundled defaults. Shows name, model, description, and source (built-in vs custom).
-
-### `ralph agent show <name>`
-
-Displays the full configuration of a named agent including model, permissions, tools, MCP servers, and prompt body.
-
-### `ralph agent create`
-
-Interactive session to collaboratively design a new agent definition. Launches the `agent-creator` agent which guides the user through agent configuration and writes the result to `~/.ralph/agents/<name>.md`.
-
 ## `ralph pipeline` (subcommands)
 
 Manages DOT-graph pipelines for multi-step workflows.

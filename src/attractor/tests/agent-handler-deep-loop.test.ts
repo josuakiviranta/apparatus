@@ -38,7 +38,7 @@ describe("AgentHandler deep loop — done break", () => {
 
   function makeHandler() {
     return new AgentHandler({
-      resolveAgent: mockResolve,
+      loadAgent: mockResolve,
       createAgent: () => ({ run: mockAgentRun, kill: vi.fn(), config: {} } as any),
     });
   }
@@ -113,7 +113,7 @@ describe("AgentHandler deep loop — crash mid-iteration", () => {
 
   function makeHandler() {
     return new AgentHandler({
-      resolveAgent: mockResolve,
+      loadAgent: mockResolve,
       createAgent: () => ({ run: mockAgentRun, kill: vi.fn(), config: {} } as any),
     });
   }
@@ -172,7 +172,7 @@ describe("AgentHandler deep loop — chunk-2 retry composition", () => {
 
   function makeHandler() {
     return new AgentHandler({
-      resolveAgent: mockResolve,
+      loadAgent: mockResolve,
       createAgent: () => ({ run: mockAgentRun, kill: vi.fn(), config: {} } as any),
     });
   }
@@ -275,7 +275,7 @@ describe("AgentHandler deep loop — $prev_note carry-over", () => {
   const mockAgentRun = vi.fn();
   function makeHandler() {
     return new AgentHandler({
-      resolveAgent: mockResolve,
+      loadAgent: mockResolve,
       createAgent: () => ({ run: mockAgentRun, kill: vi.fn(), config: {} } as any),
     });
   }

@@ -4,7 +4,7 @@ import { randomUUID } from "crypto";
 import type { NodeHandler, HandlerExecutionContext } from "./registry.js";
 import type { Node, Outcome, PipelineContext, CheckpointState } from "../types.js";
 import { Agent, type AgentConfig, type ChildHandle } from "../../cli/lib/agent.js";
-import { resolveAgent as defaultResolveAgent } from "../../cli/lib/agent-registry.js";
+import { loadAgent as defaultLoadAgent } from "../../cli/lib/agent-loader.js";
 import { getIlluminationServerPath, getMetaMeditationsDir } from "../../cli/lib/assets.js";
 import { buildPreamble } from "../transforms/preamble.js";
 import { renderInputsBlock } from "../transforms/inputs-renderer.js";
@@ -35,16 +35,16 @@ function buildSystemInjectedVars(projectRoot: string): Record<(typeof SYSTEM_INJ
 }
 
 export interface AgentHandlerDeps {
-  resolveAgent?: (name: string, opts?: import("../../cli/lib/agent-registry.js").RegistryOptions) => AgentConfig;
+  loadAgent?: (name: string, pipelineDir: string) => AgentConfig;
   createAgent?: (config: AgentConfig) => Agent;
 }
 
 export class AgentHandler implements NodeHandler {
-  private resolve: (name: string, opts?: import("../../cli/lib/agent-registry.js").RegistryOptions) => AgentConfig;
+  private load: (name: string, pipelineDir: string) => AgentConfig;
   private create: (config: AgentConfig) => Agent;
 
   constructor(deps?: AgentHandlerDeps) {
-    this.resolve = deps?.resolveAgent ?? defaultResolveAgent;
+    this.load = deps?.loadAgent ?? defaultLoadAgent;
     this.create = deps?.createAgent ?? ((c) => new Agent(c));
   }
 
@@ -56,10 +56,7 @@ export class AgentHandler implements NodeHandler {
 
     let config: AgentConfig;
     try {
-      // Per-folder layout (Chunk 4): the pipeline directory holds its agent
-      // files. No bundled fallback for project pipelines — a missing agent
-      // must surface as an error.
-      config = this.resolve(agentName, { projectDir: meta.dotDir, allowBundledFallback: false });
+      config = this.load(agentName, meta.dotDir);
     } catch (err) {
       return { status: "fail", failureReason: `Failed to resolve agent "${agentName}": ${(err as Error).message}` };
     }

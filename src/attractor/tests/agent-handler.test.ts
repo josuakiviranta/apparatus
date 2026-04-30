@@ -33,7 +33,7 @@ describe("AgentHandler", () => {
 
   function makeHandler() {
     return new AgentHandler({
-      resolveAgent: mockResolve,
+      loadAgent: mockResolve,
       createAgent: () => ({ run: mockAgentRun, kill: mockAgentKill, config: {} } as any),
     });
   }
@@ -139,10 +139,7 @@ describe("AgentHandler", () => {
     );
 
     expect(outcome.status).toBe("success");
-    expect(mockResolve).toHaveBeenCalledWith(
-      "implement",
-      expect.objectContaining({ allowBundledFallback: false }),
-    );
+    expect(mockResolve).toHaveBeenCalledWith("implement", expect.any(String));
   });
 
   it("returns fail when agent resolution fails", async () => {
@@ -247,7 +244,7 @@ describe("AgentHandler", () => {
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null });
 
     const handler = new AgentHandler({
-      resolveAgent: mockResolve,
+      loadAgent: mockResolve,
       createAgent: (config) => {
         capturedConfig = config;
         return { run: mockAgentRun, kill: mockAgentKill, config } as any;
@@ -271,7 +268,7 @@ describe("AgentHandler", () => {
 
     let capturedConfig: any = null;
     const handler = new AgentHandler({
-      resolveAgent: mockResolve,
+      loadAgent: mockResolve,
       createAgent: (config) => { capturedConfig = config; return { run: mockAgentRun, kill: mockAgentKill, config } as any; },
     });
 
@@ -305,7 +302,7 @@ describe("AgentHandler", () => {
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null });
 
     const handler = new AgentHandler({
-      resolveAgent: mockResolve,
+      loadAgent: mockResolve,
       createAgent: (config) => ({ run: mockAgentRun, kill: mockAgentKill, config } as any),
     });
 
@@ -349,7 +346,7 @@ describe("AgentHandler", () => {
 
     let capturedConfig: any = null;
     const handler = new AgentHandler({
-      resolveAgent: mockResolve,
+      loadAgent: mockResolve,
       createAgent: (config) => { capturedConfig = config; return { run: mockAgentRun, kill: mockAgentKill, config } as any; },
     });
 
@@ -403,7 +400,7 @@ describe("AgentHandler", () => {
     });
 
     const handler = new AgentHandler({
-      resolveAgent: mockResolve,
+      loadAgent: mockResolve,
       createAgent: () => ({ run: mockAgentRun, kill: mockAgentKill, config: {}, runInteractive: mockRunInteractive } as any),
     } as any);
     await handler.execute(
@@ -422,7 +419,7 @@ describe("AgentHandler", () => {
 
     let capturedConfig: any = null;
     const handler = new AgentHandler({
-      resolveAgent: mockResolve,
+      loadAgent: mockResolve,
       createAgent: (config) => { capturedConfig = config; return { run: mockAgentRun, kill: mockAgentKill, config } as any; },
     });
 
@@ -452,7 +449,7 @@ describe("AgentHandler", () => {
 
     let capturedConfig: any = null;
     const handler = new AgentHandler({
-      resolveAgent: mockResolve,
+      loadAgent: mockResolve,
       createAgent: (config) => { capturedConfig = config; return { run: mockAgentRun, kill: mockAgentKill, config } as any; },
     });
 
@@ -480,7 +477,7 @@ describe("AgentHandler", () => {
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: "s1", stdout: null, output: jsonArrayOutput });
 
     const handler = new AgentHandler({
-      resolveAgent: mockResolve,
+      loadAgent: mockResolve,
       createAgent: () => ({ run: mockAgentRun, kill: mockAgentKill, config: {} } as any),
     });
 
@@ -514,7 +511,7 @@ describe("AgentHandler", () => {
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: "s1", stdout: null, output: jsonArrayOutput });
 
     const handler = new AgentHandler({
-      resolveAgent: mockResolve,
+      loadAgent: mockResolve,
       createAgent: () => ({ run: mockAgentRun, kill: mockAgentKill, config: {} } as any),
     });
 
@@ -548,7 +545,7 @@ describe("AgentHandler", () => {
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: "s2", stdout: null, output: wrapper });
 
     const handler = new AgentHandler({
-      resolveAgent: mockResolve,
+      loadAgent: mockResolve,
       createAgent: () => ({ run: mockAgentRun, kill: mockAgentKill, config: {} } as any),
     });
 
@@ -578,7 +575,7 @@ describe("AgentHandler", () => {
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: jsonArrayOutput });
 
     const handler = new AgentHandler({
-      resolveAgent: mockResolve,
+      loadAgent: mockResolve,
       createAgent: () => ({ run: mockAgentRun, kill: mockAgentKill, config: {} } as any),
     });
 
@@ -603,7 +600,7 @@ describe("AgentHandler", () => {
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: "not valid json" });
 
     const handler = new AgentHandler({
-      resolveAgent: mockResolve,
+      loadAgent: mockResolve,
       createAgent: () => ({ run: mockAgentRun, kill: mockAgentKill, config: {} } as any),
     });
 
@@ -634,7 +631,7 @@ describe("AgentHandler", () => {
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output });
 
     const handler = new AgentHandler({
-      resolveAgent: mockResolve,
+      loadAgent: mockResolve,
       createAgent: () => ({ run: mockAgentRun, kill: mockAgentKill, config: {} } as any),
     });
 
@@ -668,7 +665,7 @@ describe("AgentHandler", () => {
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output });
 
     const handler = new AgentHandler({
-      resolveAgent: mockResolve,
+      loadAgent: mockResolve,
       createAgent: () => ({ run: mockAgentRun, kill: mockAgentKill, config: {} } as any),
     });
 
@@ -773,7 +770,7 @@ describe("AgentHandler", () => {
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null });
 
     const handler = new AgentHandler({
-      resolveAgent: mockResolve,
+      loadAgent: mockResolve,
       createAgent: (config) => ({ run: mockAgentRun, kill: mockAgentKill, config } as any),
     });
 
@@ -804,7 +801,7 @@ describe("AgentHandler", () => {
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null });
 
     const handler = new AgentHandler({
-      resolveAgent: mockResolve,
+      loadAgent: mockResolve,
       createAgent: (config) => ({ run: mockAgentRun, kill: mockAgentKill, config } as any),
     });
 
@@ -830,7 +827,7 @@ describe("AgentHandler", () => {
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null });
 
     const handler = new AgentHandler({
-      resolveAgent: mockResolve,
+      loadAgent: mockResolve,
       createAgent: (config) => ({ run: mockAgentRun, kill: mockAgentKill, config } as any),
     });
 
