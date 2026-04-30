@@ -1447,7 +1447,7 @@ The reviewer pass confirmed `docs/superpowers/specs/2026-04-25-janitor-agent-des
 **Files:**
 - Modify: `meditations/illuminations/2026-04-30T1732-janitor-plan-no-frontmatter.md`
 
-- [ ] **Step 1: Inspect the current frontmatter**
+- [x] **Step 1: Inspect the current frontmatter**
 
 Run: `head -10 meditations/illuminations/2026-04-30T1732-janitor-plan-no-frontmatter.md`
 Expected output (approximate):
@@ -1460,7 +1460,7 @@ description: ...
 ---
 ```
 
-- [ ] **Step 2: Delete the `status: open` line**
+- [x] **Step 2: Delete the `status: open` line**
 
 Edit the file to remove only the `status: open` line. The remaining frontmatter:
 
@@ -1471,7 +1471,7 @@ description: ...
 ---
 ```
 
-- [ ] **Step 3: Visually confirm the frontmatter shape**
+- [x] **Step 3: Visually confirm the frontmatter shape**
 
 ```bash
 head -10 meditations/illuminations/2026-04-30T1732-janitor-plan-no-frontmatter.md
@@ -1479,7 +1479,7 @@ head -10 meditations/illuminations/2026-04-30T1732-janitor-plan-no-frontmatter.m
 
 Expected: frontmatter contains `date:` and `description:` lines, no `status:` line. The `description:` value should still match what listed before the strip (no other content was edited).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add meditations/illuminations/2026-04-30T1732-janitor-plan-no-frontmatter.md

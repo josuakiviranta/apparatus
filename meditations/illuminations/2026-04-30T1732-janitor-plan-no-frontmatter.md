@@ -1,6 +1,5 @@
 ---
 date: 2026-04-30
-status: open
 description: Two 2026-04-30 plan files have no YAML frontmatter, causing mark_plan_implemented to fail and leaving the bundle-pipelines plan invisible to the lifecycle tracker despite being fully shipped.
 ---
 
