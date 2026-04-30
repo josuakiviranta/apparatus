@@ -921,7 +921,7 @@ git commit -m "docs(pipeline): drop memory-reflector's side-folder fallback"
 
 ### Chunk 2 verification
 
-- [ ] **Run all pipeline + MCP tests:**
+- [x] **Run all pipeline + MCP tests:**
 
 ```bash
 npx vitest run src/cli/tests/illumination-server.test.ts pipelines/illumination-to-implementation/tests/
@@ -929,7 +929,7 @@ npx vitest run src/cli/tests/illumination-server.test.ts pipelines/illumination-
 
 Expected: PASS, including the new `consume.test.mjs`.
 
-- [ ] **Confirm pipeline structure:**
+- [x] **Confirm pipeline structure:**
 
 ```bash
 npx ralph pipeline validate pipelines/illumination-to-implementation/pipeline.dot
@@ -938,7 +938,7 @@ grep -E "mark_archived|mark_dispatched" pipelines/illumination-to-implementation
 
 Expected: validation PASS; grep returns nothing.
 
-- [ ] **Confirm script-file inventory:**
+- [x] **Confirm script-file inventory:**
 
 ```bash
 ls pipelines/illumination-to-implementation/*.mjs
