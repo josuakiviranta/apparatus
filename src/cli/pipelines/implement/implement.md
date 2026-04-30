@@ -6,6 +6,8 @@ permissionMode: dangerouslySkipPermissions
 tools: []
 mcp: []
 loop: true
+inputs:
+  - specs_dir
 outputs:
   done: boolean
 ---
