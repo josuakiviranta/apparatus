@@ -49,7 +49,7 @@ dispatched state. Its new role: scan source/workspace through a KISS
 lens, identify bloat / YAGNI / refactor opportunities, and write one
 illumination per candidate via `write_illumination`. Tools available:
 `Read`, `Grep`, `Glob`, `Bash`, `list_illuminations` (for dedup),
-`write_illumination`. The `pipelines/janitor/pipeline.dot` graph stays
+`write_illumination`. The `src/cli/pipelines/janitor/pipeline.dot` graph stays
 single-agent; only the agent's prompt changes.
 
 ## Considered alternatives

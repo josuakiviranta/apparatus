@@ -44,7 +44,7 @@ Runs a meditate session against the project's meditations. `--var steer=...` inj
 For unattended workspace hygiene scanning, schedule the bundled janitor pipeline:
 
 ```bash
-ralph heartbeat pipeline pipelines/janitor/pipeline.dot --project . --every 720
+ralph heartbeat pipeline janitor --project . --every 720
 ```
 
 The janitor scans source/workspace through a KISS lens — bloat, YAGNI violations, refactor opportunities — and writes one illumination per candidate. It is read-only on code; the only mutating call is `write_illumination`. See `docs/adr/0002-consume-only-illumination-lifecycle.md` for the lifecycle context.

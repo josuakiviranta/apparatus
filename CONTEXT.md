@@ -94,7 +94,7 @@ fails, tmux-tester fixes the code, never the scenario.
 ### Janitor
 
 A scheduled agent (run via `ralph heartbeat` against
-`pipelines/janitor/pipeline.dot`) that scans the workspace through a KISS
+`src/cli/pipelines/janitor/pipeline.dot`) that scans the workspace through a KISS
 lens — identifies bloat, YAGNI-violating abstractions, and refactor
 opportunities — and writes one illumination per candidate via
 `mcp__illumination__write_illumination`. It calls `list_illuminations`

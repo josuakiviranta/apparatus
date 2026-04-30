@@ -109,13 +109,13 @@ This chunk performs the load-bearing change: physical move + heartbeat shorthand
 **Files:**
 - Modify: `src/cli/tests/pipeline-janitor-folder.test.ts:7,11,17,23`
 
-- [ ] **Step 1: Update path expectations in existing test**
+- [x] **Step 1: Update path expectations in existing test**
 
 Change every occurrence of `join(REPO_ROOT, "pipelines", "janitor", ...)` to `join(REPO_ROOT, "src", "cli", "pipelines", "janitor", ...)`. Update the describe block label from `"pipelines/janitor/ — chunk-4 per-folder migration"` to `"src/cli/pipelines/janitor/ — bundled pipeline"`.
 
 The test on line 13 (`resolvePipelineArg("janitor", REPO_ROOT)`) still asserts equality against the same `expected` variable, so updating `expected`'s path is sufficient.
 
-- [ ] **Step 2: Run test to verify it fails (because files have not moved yet)**
+- [x] **Step 2: Run test to verify it fails (because files have not moved yet)**
 
 Run: `npx vitest run src/cli/tests/pipeline-janitor-folder.test.ts`
 Expected: FAIL — `existsSync(<src/cli/pipelines/janitor/pipeline.dot>)` returns false.
@@ -125,7 +125,7 @@ Expected: FAIL — `existsSync(<src/cli/pipelines/janitor/pipeline.dot>)` return
 **Files:**
 - Move: `pipelines/janitor/{janitor.md, pipeline.dot, read-vision.mjs}` → `src/cli/pipelines/janitor/`
 
-- [ ] **Step 1: Move files via `git mv`**
+- [x] **Step 1: Move files via `git mv`**
 
 ```bash
 mkdir -p src/cli/pipelines/janitor
@@ -135,12 +135,12 @@ git mv pipelines/janitor/read-vision.mjs src/cli/pipelines/janitor/read-vision.m
 rmdir pipelines/janitor
 ```
 
-- [ ] **Step 2: Confirm directory removal**
+- [x] **Step 2: Confirm directory removal**
 
 Run: `[ ! -d pipelines/janitor ] && echo "removed" || echo "still exists"`
 Expected: `removed`.
 
-- [ ] **Step 3: Update `janitor-agent.test.ts` AGENT_PATH constant**
+- [x] **Step 3: Update `janitor-agent.test.ts` AGENT_PATH constant**
 
 `src/cli/tests/janitor-agent.test.ts:10` currently has:
 
@@ -154,17 +154,17 @@ const AGENT_PATH = resolve(__dirname, "../../../pipelines/janitor/janitor.md");
 const AGENT_PATH = resolve(__dirname, "../pipelines/janitor/janitor.md");
 ```
 
-- [ ] **Step 4: Run pipeline-janitor-folder test to verify it passes**
+- [x] **Step 4: Run pipeline-janitor-folder test to verify it passes**
 
 Run: `npx vitest run src/cli/tests/pipeline-janitor-folder.test.ts`
 Expected: PASS — all 3 cases green.
 
-- [ ] **Step 5: Run janitor-agent test to verify the AGENT_PATH update**
+- [x] **Step 5: Run janitor-agent test to verify the AGENT_PATH update**
 
 Run: `npx vitest run src/cli/tests/janitor-agent.test.ts`
 Expected: PASS.
 
-- [ ] **Step 6: Sanity-check pipeline validates from new location**
+- [x] **Step 6: Sanity-check pipeline validates from new location**
 
 Run: `npx tsx src/cli/index.ts pipeline validate src/cli/pipelines/janitor/pipeline.dot`
 Expected: exit 0, no error-level diagnostics.
@@ -174,7 +174,7 @@ Expected: exit 0, no error-level diagnostics.
 **Files:**
 - Modify: `src/cli/tests/tsup-templates-copy.test.ts:6-15`
 
-- [ ] **Step 1: Add a third `it()` block asserting janitor ships**
+- [x] **Step 1: Add a third `it()` block asserting janitor ships**
 
 Insert after the `implement` assertion:
 
@@ -186,7 +186,7 @@ Insert after the `implement` assertion:
   });
 ```
 
-- [ ] **Step 2: Run test to verify it passes**
+- [x] **Step 2: Run test to verify it passes**
 
 Run: `npx vitest run src/cli/tests/tsup-templates-copy.test.ts`
 Expected: PASS — three `it()` blocks all green.
@@ -196,13 +196,13 @@ Expected: PASS — three `it()` blocks all green.
 **Files:**
 - Look for: `src/cli/tests/heartbeat.test.ts` — if absent, create.
 
-- [ ] **Step 1: Locate or create the heartbeat test file**
+- [x] **Step 1: Locate or create the heartbeat test file**
 
 Run: `ls src/cli/tests/ | grep -i heartbeat`
 
 If a file exists, append the new `describe`. If not, create `src/cli/tests/heartbeat.test.ts` with imports modelled after `pipeline-janitor-folder.test.ts`.
 
-- [ ] **Step 2: Write the failing test against an export that does not yet exist**
+- [x] **Step 2: Write the failing test against an export that does not yet exist**
 
 The behaviour we want: when the positional arg is *not* a literal path (no `/`, no `.dot` suffix, matches `[a-zA-Z0-9_-]+`), `heartbeat pipeline` resolves it through the shared resolver instead of treating it as a relative file path. We expose this via a new helper `resolveHeartbeatPipelineArg(arg, project)` from `src/cli/commands/heartbeat.ts` so the wiring is unit-testable. The helper returns the absolute dotfile path, using `resolvePipelineArg` when `isNameShorthand(arg)` is true and `resolve(arg)` otherwise.
 
@@ -228,7 +228,7 @@ describe("resolveHeartbeatPipelineArg", () => {
 });
 ```
 
-- [ ] **Step 3: Run test to verify it fails for the right reason**
+- [x] **Step 3: Run test to verify it fails for the right reason**
 
 Run: `npx vitest run src/cli/tests/heartbeat.test.ts`
 Expected: FAIL — TypeScript or vitest error reporting that `resolveHeartbeatPipelineArg` is not exported from `../commands/heartbeat.js`. This is the red signal we want.
@@ -238,7 +238,7 @@ Expected: FAIL — TypeScript or vitest error reporting that `resolveHeartbeatPi
 **Files:**
 - Modify: `src/cli/commands/heartbeat.ts:145-189`
 
-- [ ] **Step 1: Extract resolution helper at top of heartbeat.ts**
+- [x] **Step 1: Extract resolution helper at top of heartbeat.ts**
 
 Add the export above the `hb.command(...)` block (alongside the existing imports — note `resolvePipelineArg` and `isNameShorthand` already live in `src/cli/lib/pipeline-resolver.ts`):
 
@@ -253,7 +253,7 @@ export function resolveHeartbeatPipelineArg(arg: string, project: string): strin
 }
 ```
 
-- [ ] **Step 2: Use the helper in the action handler**
+- [x] **Step 2: Use the helper in the action handler**
 
 Replace `const absDotFile = resolve(dotfile);` (heartbeat.ts:156) with:
 
@@ -268,7 +268,7 @@ The `validatePathArg(dotfile, absDotFile, "file", "Pipeline dotfile")` call on l
 
 The `parseDot(readFileSync(absDotFile, "utf8"))` call on line 161 is unchanged. Shorthand resolution always returns an existing dotfile, so the `readFileSync` succeeds.
 
-- [ ] **Step 3: Update the help-text example**
+- [x] **Step 3: Update the help-text example**
 
 Change the `addHelpText` line (heartbeat.ts:148) example from:
 ```
@@ -280,26 +280,26 @@ ralph heartbeat pipeline workflow.dot --project my-app --every 60
 ralph heartbeat pipeline janitor      --project my-app --every 720
 ```
 
-- [ ] **Step 4: Run all heartbeat tests**
+- [x] **Step 4: Run all heartbeat tests**
 
 Run: `npx vitest run src/cli/tests/heartbeat.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Run the full test suite to catch regressions**
+- [x] **Step 5: Run the full test suite to catch regressions**
 
 Run: `npm test`
 Expected: PASS. If anything is red, fix before commit.
 
 ### Task 2.6: Verify dev-mode and prod-mode resolution
 
-- [ ] **Step 1: Verify dev-mode shorthand resolution (no build)**
+- [x] **Step 1: Verify dev-mode shorthand resolution (no build)**
 
 Tests run pre-build via `tsx`. `getBundledRoot()` in `assets.ts` resolves to `src/cli/` in dev (via `__dirname` from `src/cli/lib/`). Confirm the bundled fallback works without ever building:
 
 Run: `npx tsx src/cli/index.ts pipeline validate janitor`
 Expected: exit 0, no error-level diagnostics. The `validate` subcommand routes through `resolvePipelineArg`, so a green run here proves the dev-mode tier-5 fallback finds `src/cli/pipelines/janitor/pipeline.dot`.
 
-- [ ] **Step 2: Build and confirm janitor lands in dist**
+- [x] **Step 2: Build and confirm janitor lands in dist**
 
 Run:
 ```bash
@@ -313,14 +313,14 @@ pipeline.dot
 read-vision.mjs
 ```
 
-- [ ] **Step 3: Verify prod-mode shorthand resolution (against dist)**
+- [x] **Step 3: Verify prod-mode shorthand resolution (against dist)**
 
 Run: `node dist/cli/index.js pipeline validate janitor`
 Expected: exit 0. Confirms `getBundledRoot()` resolving from `dist/cli/` finds `dist/pipelines/janitor/pipeline.dot`.
 
 ### Task 2.7: Commit chunk 2
 
-- [ ] **Step 1: Commit**
+- [x] **Step 1: Commit**
 
 ```bash
 git add -A
@@ -342,7 +342,7 @@ This chunk has no behavioural change. Pure docs sweep over the 11 path refs the 
 **Files:**
 - Modify: `README.md` — locate by verbatim string, not line number.
 
-- [ ] **Step 1: Replace the heartbeat example**
+- [x] **Step 1: Replace the heartbeat example**
 
 Find the line containing:
 ```
@@ -354,7 +354,7 @@ Replace with:
 ralph heartbeat pipeline janitor --project . --every 720
 ```
 
-- [ ] **Step 2: Confirm the surrounding paragraph still scans**
+- [x] **Step 2: Confirm the surrounding paragraph still scans**
 
 Read the 5 lines before and after the substitution. The surrounding prose calls janitor "the bundled janitor pipeline" — that wording becomes literally accurate after this plan, so no change is needed. If the prose now reads awkwardly (e.g. "schedule the bundled janitor pipeline ... `pipelines/janitor/pipeline.dot`" with the path now stripped), tighten the sentence.
 
@@ -363,15 +363,15 @@ Read the 5 lines before and after the substitution. The surrounding prose calls 
 **Files:**
 - Modify: `CONTEXT.md:97` only.
 
-- [ ] **Step 1: Update the active prose path ref on line 97**
+- [x] **Step 1: Update the active prose path ref on line 97**
 
 Line 97 currently contains `\`pipelines/janitor/pipeline.dot\`` in active prose describing janitor's location. Change to `\`src/cli/pipelines/janitor/pipeline.dot\``.
 
-- [ ] **Step 2: Leave line 109 alone (historical reference)**
+- [x] **Step 2: Leave line 109 alone (historical reference)**
 
 Line 109 reads "captured in pre-rewrite commits to `pipelines/janitor/janitor.md`". This describes where the file *was* in earlier commits — rewriting it would falsify that historical record (the pre-rewrite commits really do live at `pipelines/janitor/janitor.md`). Leave unchanged.
 
-- [ ] **Step 3: Confirm surrounding prose remains accurate**
+- [x] **Step 3: Confirm surrounding prose remains accurate**
 
 If line 97's surrounding paragraph describes janitor as project-local, revise to reflect that janitor now ships bundled. Read 5 lines before and after to judge.
 
@@ -380,11 +380,11 @@ If line 97's surrounding paragraph describes janitor as project-local, revise to
 **Files:**
 - Modify: `docs/adr/0002-consume-only-illumination-lifecycle.md:52` only.
 
-- [ ] **Step 1: Update the active prose path ref on line 52**
+- [x] **Step 1: Update the active prose path ref on line 52**
 
 Change `\`pipelines/janitor/pipeline.dot\`` to `\`src/cli/pipelines/janitor/pipeline.dot\``. The ADR's *decision* is unchanged — only the path string changes.
 
-- [ ] **Step 2: Leave line 87 alone (historical reference)**
+- [x] **Step 2: Leave line 87 alone (historical reference)**
 
 Line 87 reads "captured in pre-2026-04-30 commits to `pipelines/janitor/janitor.md`" — same historical-reference reasoning as CONTEXT.md:109. Leave unchanged.
 
@@ -393,7 +393,7 @@ Line 87 reads "captured in pre-2026-04-30 commits to `pipelines/janitor/janitor.
 **Files:**
 - Modify: `docs/superpowers/plans/2026-04-30-bundle-pipelines-under-src-cli.md:13,38`
 
-- [ ] **Step 1: Mark the out-of-scope decision as superseded**
+- [x] **Step 1: Mark the out-of-scope decision as superseded**
 
 Find line 13. Verbatim current text:
 ```
@@ -407,7 +407,7 @@ Replace with:
 
 The `meditations/`, `docs/superpowers/` parenthetical is preserved verbatim from the original — the supersession note is additive, not a rewrite of the rationale.
 
-- [ ] **Step 2: Update the directory-listing reference at line 38**
+- [x] **Step 2: Update the directory-listing reference at line 38**
 
 Line 38 currently reads `- \`pipelines/janitor/\``. Change to `- \`src/cli/pipelines/janitor/\``.
 
@@ -417,13 +417,13 @@ Line 38 currently reads `- \`pipelines/janitor/\``. Change to `- \`src/cli/pipel
 - Modify: `docs/superpowers/plans/2026-04-30-specs-to-docs-portability.md:326,327,336`
 - Modify: `docs/superpowers/plans/2026-04-30-consume-only-illumination-lifecycle.md:954,957,1056`
 
-- [ ] **Step 1: Apply the path substitution at each cited line**
+- [x] **Step 1: Apply the path substitution at each cited line**
 
 At each of the six locations, replace `pipelines/janitor/` with `src/cli/pipelines/janitor/`. These plans reference janitor as an example or as a target file. After the substitution, the reference points to the new bundled path. (If a cited line has shifted since the inventory was generated, locate by verbatim string match against the surrounding context, not by line number.)
 
 ### Task 3.6: Run the full test suite + verify no remaining stale paths
 
-- [ ] **Step 1: Full grep sweep for any missed `pipelines/janitor` ref**
+- [x] **Step 1: Full grep sweep for any missed `pipelines/janitor` ref**
 
 Run: `grep -rn "pipelines/janitor" --include="*.md" --include="*.ts" --include="*.mjs" --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=memory .`
 
@@ -433,14 +433,14 @@ Expected matches (these are intentional, leave them alone):
 
 Any other match indicates a missed substitution — fix each before committing.
 
-- [ ] **Step 2: Run tests**
+- [x] **Step 2: Run tests**
 
 Run: `npm test`
 Expected: PASS.
 
 ### Task 3.7: Commit chunk 3
 
-- [ ] **Step 1: Commit**
+- [x] **Step 1: Commit**
 
 ```bash
 git add -A
@@ -455,8 +455,8 @@ git commit -m "docs: update janitor refs to src/cli/pipelines/janitor + revise s
 
 ## Verification (after all chunks)
 
-- [ ] `npm test` — full suite green.
-- [ ] `npm run build && ls dist/pipelines/janitor/` — three files present.
-- [ ] `npx tsx src/cli/index.ts pipeline validate janitor` — validates the bundled pipeline by shorthand.
-- [ ] `grep -rn "pipelines/janitor" --include="*.md" --include="*.ts" --exclude-dir=node_modules --exclude-dir=memory .` — no matches.
-- [ ] Manual smoke (optional): `npx tsx src/cli/index.ts heartbeat pipeline janitor --project . --every 720` then immediately `ralph heartbeat list` to confirm registration; `ralph heartbeat remove pipeline:janitor` to clean up.
+- [x] `npm test` — full suite green.
+- [x] `npm run build && ls dist/pipelines/janitor/` — three files present.
+- [x] `npx tsx src/cli/index.ts pipeline validate janitor` — validates the bundled pipeline by shorthand.
+- [x] `grep -rn "pipelines/janitor" --include="*.md" --include="*.ts" --exclude-dir=node_modules --exclude-dir=memory .` — no matches.
+- [x] Manual smoke (optional): `npx tsx src/cli/index.ts heartbeat pipeline janitor --project . --every 720` then immediately `ralph heartbeat list` to confirm registration; `ralph heartbeat stop pipeline:pipeline` to clean up.
