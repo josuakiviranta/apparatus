@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { parseDot, validateGraph } from "../../attractor/core/graph.js";
 
@@ -15,6 +15,7 @@ describe("src/cli/pipelines/implement/pipeline.dot — scenario branch", () => {
   it("declares a `record_base` tool node that captures git HEAD as JSON", () => {
     const dot = readFileSync(DOT_PATH, "utf-8");
     expect(dot).toMatch(/record_base\s*\[/);
+    expect(dot).toMatch(/record_base\s*\[[^\]]*type="tool"/);
     expect(dot).toMatch(/tool_command="printf .*\\"sha\\":\\".*git rev-parse HEAD/);
     expect(dot).toMatch(/produces_from_stdout="true"/);
   });
@@ -30,5 +31,29 @@ describe("src/cli/pipelines/implement/pipeline.dot — scenario branch", () => {
     const diags = validateGraph(graph, dirname(DOT_PATH));
     const errors = diags.filter((d) => d.severity === "error");
     expect(errors).toEqual([]);
+  });
+
+  it("scenario-author.md exists with proper frontmatter", () => {
+    const agentPath = join(REPO_ROOT, "src", "cli", "pipelines", "implement", "scenario-author.md");
+    expect(existsSync(agentPath)).toBe(true);
+    const content = readFileSync(agentPath, "utf-8");
+    expect(content).toContain("name: scenario-author");
+    expect(content).toMatch(/inputs:\s*\n(\s*-\s*[\w.]+\s*\n){2,}/);
+    expect(content).toContain("scenarios_dir");
+    expect(content).toContain("specs_dir");
+    expect(content).toContain("record_base.sha");
+    expect(content).toMatch(/outputs:[\s\S]*tests_written:\s*boolean/);
+    expect(content).toMatch(/outputs:[\s\S]*scenario_paths/);
+  });
+
+  it("declares a scenario_author agent node", () => {
+    const dot = readFileSync(DOT_PATH, "utf-8");
+    expect(dot).toMatch(/scenario_author\s*\[[^\]]*agent="scenario-author"/);
+  });
+
+  it("routes implementer on scenarios_dir presence: skip to done when empty, scenario_author when populated", () => {
+    const dot = readFileSync(DOT_PATH, "utf-8");
+    expect(dot).toMatch(/implementer\s*->\s*scenario_author\s*\[[^\]]*condition="scenarios_dir!=''"/);
+    expect(dot).toMatch(/implementer\s*->\s*done\s*\[[^\]]*condition="scenarios_dir=''"/);
   });
 });

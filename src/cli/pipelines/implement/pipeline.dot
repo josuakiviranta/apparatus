@@ -11,9 +11,13 @@ digraph implement {
 
   implementer [agent="implement", max_iterations="$max_iterations"]
 
+  scenario_author [agent="scenario-author"]
+
   done [shape=Msquare]
 
-  start       -> record_base
-  record_base -> implementer
-  implementer -> done
+  start           -> record_base
+  record_base     -> implementer
+  implementer     -> scenario_author   [condition="scenarios_dir!=''"]
+  implementer     -> done              [condition="scenarios_dir=''"]
+  scenario_author -> done
 }

@@ -335,7 +335,7 @@ If any criterion fails, fix before Chunk 3.
 
 ### Task 3.1: Failing tests for scenario_author wiring
 
-- [ ] **Step 1: Append tests to `src/cli/tests/pipeline-implement-folder.test.ts`**
+- [x] **Step 1: Append tests to `src/cli/tests/pipeline-implement-folder.test.ts`**
 
 Add inside the existing `describe`:
 
@@ -365,14 +365,14 @@ Add inside the existing `describe`:
   });
 ```
 
-- [ ] **Step 2: Run the test file, verify the 3 new tests fail**
+- [x] **Step 2: Run the test file, verify the 3 new tests fail**
 
 Run: `npx vitest run src/cli/tests/pipeline-implement-folder.test.ts`
 Expected: 3 new tests fail (no agent file yet, no node, no conditional edges).
 
 ### Task 3.2: Author the `scenario-author.md` agent
 
-- [ ] **Step 3: Create `src/cli/pipelines/implement/scenario-author.md`**
+- [x] **Step 3: Create `src/cli/pipelines/implement/scenario-author.md`**
 
 Write the file with this complete content:
 
@@ -522,7 +522,7 @@ Take your time. The tester depends on your precision.
 
 ### Task 3.3: Wire scenario_author into the graph (provisional `done` exit)
 
-- [ ] **Step 4: Modify `src/cli/pipelines/implement/pipeline.dot`**
+- [x] **Step 4: Modify `src/cli/pipelines/implement/pipeline.dot`**
 
 Replace the file with:
 
@@ -554,22 +554,22 @@ digraph implement {
 
 (Provisional `scenario_author -> done` will become `scenario_author -> implementation_tester` in Chunk 4. We use `done` here so the graph remains valid mid-plan.)
 
-- [ ] **Step 5: Run the test file**
+- [x] **Step 5: Run the test file**
 
 Run: `npx vitest run src/cli/tests/pipeline-implement-folder.test.ts`
 Expected: all tests in this file PASS (4 from Chunk 2 + 3 new = 7).
 
-- [ ] **Step 6: Run validate from CLI**
+- [x] **Step 6: Run validate from CLI**
 
 Run: `npx tsx src/cli/index.ts pipeline validate src/cli/pipelines/implement/pipeline.dot`
 Expected: zero error-level diagnostics.
 
-- [ ] **Step 7: Run full test suite**
+- [x] **Step 7: Run full test suite**
 
 Run: `npm test`
 Expected: green.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/cli/pipelines/implement/scenario-author.md src/cli/pipelines/implement/pipeline.dot src/cli/tests/pipeline-implement-folder.test.ts
@@ -578,7 +578,7 @@ git commit -m "feat(implement): add scenario-author agent and conditional skip b
 
 ### Task 3.4: Plan review checkpoint
 
-- [ ] **Step 9: Verify Chunk 3 acceptance criteria**
+- [x] **Step 9: Verify Chunk 3 acceptance criteria**
 
 - `scenario-author.md` exists at `src/cli/pipelines/implement/scenario-author.md` with full frontmatter (`inputs`, `outputs`).
 - Pipeline graph routes correctly: empty `scenarios_dir` → `implementer -> done`; populated → `implementer -> scenario_author -> done` (provisional).
