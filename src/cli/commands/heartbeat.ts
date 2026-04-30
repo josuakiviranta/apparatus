@@ -3,18 +3,23 @@ import { Command } from "commander";
 import { resolve, basename } from "path";
 import { statSync, Stats, readFileSync } from "fs";
 import { resolvePipelineArg, isNameShorthand } from "../lib/pipeline-resolver.js";
+import { request, stream } from "../../lib/daemon-client";
+import { parseDot } from "../../attractor/core/graph.js";
+import type { Task } from "../../daemon/state";
+import * as output from "../lib/output.js";
+import { collectKV } from "../lib/collect-kv.js";
 
+/**
+ * Resolves the heartbeat `pipeline` positional arg. Shorthand (e.g. `janitor`)
+ * routes through the shared resolver to find bundled or project-local pipelines;
+ * literal paths (containing `/` or `.dot`) resolve as-is.
+ */
 export function resolveHeartbeatPipelineArg(arg: string, project: string): string {
   if (isNameShorthand(arg)) {
     return resolvePipelineArg(arg, project);
   }
   return resolve(arg);
 }
-import { request, stream } from "../../lib/daemon-client";
-import { parseDot } from "../../attractor/core/graph.js";
-import type { Task } from "../../daemon/state";
-import * as output from "../lib/output.js";
-import { collectKV } from "../lib/collect-kv.js";
 
 /**
  * Validate that an argument resolves to an existing path of the expected kind.
