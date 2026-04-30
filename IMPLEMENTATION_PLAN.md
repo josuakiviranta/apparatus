@@ -387,7 +387,7 @@ git commit -m "refactor(illumination): delete mark_dispatched/mark_implemented/m
 
 ### Chunk 1 verification
 
-- [ ] **Final check:** Run the full test file and confirm the new tool surface is exactly what we expect.
+- [x] **Final check:** Run the full test file and confirm the new tool surface is exactly what we expect.
 
 ```bash
 npx vitest run src/cli/tests/illumination-server.test.ts
