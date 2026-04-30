@@ -1587,12 +1587,10 @@ Any hit elsewhere → stop, re-edit, re-verify.
 
 ---
 
-## Final integration check
+## Manual smoke checklist (user-run, post-loop)
 
-After all four chunks land, run a manual smoke pass before declaring done:
+Loop-side implementation (Chunks 1–4) is complete and verified as of commit `9dbb451`. These final smokes require interactive `ralph pipeline run` against an external test project with real Claude agents and gate input — they cannot run inside the autonomous loop. Run them when ready and open a follow-up plan if any fail.
 
-- [ ] Run `ralph pipeline run pipelines/illumination-to-implementation/pipeline.dot --project <test-project>` and walk the gate to "decline" — confirm the test illumination is deleted and the commit message says `meditate: consume <filename> (declined)`.
-- [ ] Run the same pipeline through "implement" against a trivial illumination and confirm memory-writer step 7b consumes the illumination with reason `implemented`.
-- [ ] Run `ralph heartbeat pipeline pipelines/janitor/pipeline.dot --project <test-project> --every 720` once (single iteration) and confirm the janitor either writes a `janitor-<area>` illumination or exits cleanly with no candidate.
-
-If any smoke step fails, open a follow-up plan; do not patch in this bundle.
+- Run `ralph pipeline run pipelines/illumination-to-implementation/pipeline.dot --project <test-project>` and walk the gate to "decline" — confirm the test illumination is deleted and the commit message says `meditate: consume <filename> (declined)`.
+- Run the same pipeline through "implement" against a trivial illumination and confirm memory-writer step 7b consumes the illumination with reason `implemented`.
+- Run `ralph heartbeat pipeline pipelines/janitor/pipeline.dot --project <test-project> --every 720` once (single iteration) and confirm the janitor either writes a `janitor-<area>` illumination or exits cleanly with no candidate.
