@@ -213,7 +213,7 @@ If any criterion fails, fix before proceeding to Chunk 2.
 
 ### Task 2.1: Failing test for new pipeline shape
 
-- [ ] **Step 1: Create test file `src/cli/tests/pipeline-implement-folder.test.ts`**
+- [x] **Step 1: Create test file `src/cli/tests/pipeline-implement-folder.test.ts`**
 
 ```ts
 import { describe, it, expect } from "vitest";
@@ -254,14 +254,14 @@ describe("src/cli/pipelines/implement/pipeline.dot — scenario branch", () => {
 });
 ```
 
-- [ ] **Step 2: Run the new test file, verify it fails**
+- [x] **Step 2: Run the new test file, verify it fails**
 
 Run: `npx vitest run src/cli/tests/pipeline-implement-folder.test.ts`
 Expected: 3 of 4 tests fail (the `validateGraph` test currently passes since the existing graph is valid; the structural ones all fail because `implementer` and `record_base` don't yet exist).
 
 ### Task 2.2: Modify `pipeline.dot`
 
-- [ ] **Step 3: Rewrite `src/cli/pipelines/implement/pipeline.dot`**
+- [x] **Step 3: Rewrite `src/cli/pipelines/implement/pipeline.dot`**
 
 Replace the entire file with:
 
@@ -289,22 +289,22 @@ digraph implement {
 
 (Note: `produces_from_stdout="true"` is a boolean flag — when truthy, the engine parses the **last non-empty stdout line as a JSON object** and exposes its top-level keys as `<nodeId>.<key>`. Implementation: `src/attractor/handlers/tool.ts:31-79`. We therefore emit `{"sha":"<hash>"}` from `git rev-parse HEAD` so downstream agents can consume `$record_base.sha`.)
 
-- [ ] **Step 4: Run the new test file, verify it passes**
+- [x] **Step 4: Run the new test file, verify it passes**
 
 Run: `npx vitest run src/cli/tests/pipeline-implement-folder.test.ts`
 Expected: all 4 tests PASS.
 
-- [ ] **Step 5: Run full test suite**
+- [x] **Step 5: Run full test suite**
 
 Run: `npm test`
 Expected: green (or only pre-existing failures).
 
-- [ ] **Step 6: Verify pipeline-validate from CLI still passes**
+- [x] **Step 6: Verify pipeline-validate from CLI still passes**
 
 Run: `npx tsx src/cli/index.ts pipeline validate src/cli/pipelines/implement/pipeline.dot`
 Expected: zero error-level diagnostics.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/cli/pipelines/implement/pipeline.dot src/cli/tests/pipeline-implement-folder.test.ts
@@ -313,7 +313,7 @@ git commit -m "refactor(implement): rename run→implementer, add record_base to
 
 ### Task 2.3: Plan review checkpoint
 
-- [ ] **Step 8: Verify Chunk 2 acceptance criteria**
+- [x] **Step 8: Verify Chunk 2 acceptance criteria**
 
 - Pipeline graph has 4 nodes: `start`, `record_base`, `implementer`, `done`.
 - `record_base.sha` will be in ctx after the tool node runs (verifiable via trace later, not in unit tests).
