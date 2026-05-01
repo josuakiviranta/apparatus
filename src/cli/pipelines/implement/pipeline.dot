@@ -25,7 +25,9 @@ digraph implement {
   record_base           -> implementer
   implementer           -> scenario_author        [condition="scenarios_dir!=''"]
   implementer           -> done                   [condition="scenarios_dir=''"]
-  scenario_author       -> implementation_tester
-  implementation_tester -> commit_push
+  scenario_author       -> implementation_tester  [condition="tests_written=true"]
+  scenario_author       -> done                   [condition="tests_written=false"]
+  implementation_tester -> commit_push            [condition="test_result=pass"]
+  implementation_tester -> done                   [condition="test_result=fail"]
   commit_push           -> done
 }

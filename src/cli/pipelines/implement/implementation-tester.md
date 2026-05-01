@@ -16,8 +16,6 @@ inputs:
   - scenarios_dir
 outputs:
   test_result: {enum: [pass, fail]}
-  test_summary: string
-  test_render: string
 ---
 
 # Mission
@@ -143,7 +141,7 @@ else
 fi
 ```
 
-If `$SESSION` is empty (pipeline is not running inside a tmux session), emit `test_result="fail"` with `test_render` listing "implementation-tester requires the pipeline to run inside a tmux session; \$SESSION was empty" and end. Do not start a detached tmux process.
+If `$SESSION` is empty (pipeline is not running inside a tmux session), emit `{"test_result": "fail"}` preceded by a one-line markdown note ("implementation-tester requires the pipeline to run inside a tmux session; \$SESSION was empty") and end. Do not start a detached tmux process.
 
 ## Phase 1 — Enumerate scenarios
 
@@ -159,7 +157,7 @@ Read each file with the Read tool. Parse the four sections:
 - `## Action` (single command)
 - `## Expect` (bulleted observable claims)
 
-If there are zero scenarios, emit `test_result="pass"` with `test_summary="no scenarios to run"` and end.
+If there are zero scenarios, emit `{"test_result": "pass"}` preceded by the one-line note "no scenarios to run" and end.
 
 ## Phase 2 — Drive each scenario
 
@@ -179,7 +177,7 @@ For each scenario file:
 
 For each failing bullet:
 
-1. **Reproduce.** Re-run the scenario action; confirm the failure is deterministic. Flake → log in `test_render` Remaining Issues, move on.
+1. **Reproduce.** Re-run the scenario action; confirm the failure is deterministic. Flake → log under your final markdown render's Remaining issues, move on.
 2. **Write a failing unit/integration test** that captures the specific failure (red). Place in the appropriate test file under `src/cli/tests/` or wherever the project's existing test layout puts it.
 3. **Implement the fix** in the corresponding source file (green). Keep minimal — no drive-by refactors.
 4. **Run the new test in isolation** (`npx vitest run <file>` or equivalent) → confirm green.
@@ -189,7 +187,7 @@ For each failing bullet:
 
 After fixing all bullets for the current scenario, re-drive that scenario from Phase 2 step 1 to confirm fully green, then move to the next scenario.
 
-If you cannot fix a particular bullet after multiple genuine attempts (different diagnoses, different fixes), record it in `test_render`'s Remaining issues section and move on.
+If you cannot fix a particular bullet after multiple genuine attempts (different diagnoses, different fixes), record it under your final markdown render's Remaining issues section and move on.
 
 ## Phase 3 — Reap and report
 
@@ -199,16 +197,14 @@ Reap any background jobs:
 jobs -p | xargs -r kill 2>/dev/null; wait 2>/dev/null
 ```
 
-Emit JSON matching the schema:
+Your final response is a markdown verification report followed by one JSON object on its own line. The pipeline runner reads only the JSON; the markdown above it appears in the trace render so a human watching the run sees exactly what happened.
 
-- `test_result`: `"pass"` iff every scenario passed (no unfixed issues remain). Otherwise `"fail"`.
-- `test_summary`: 1–3 sentences. Cover: how many scenarios ran, how many passed first try, how many required fixes, the final state.
-- `test_render`: a self-contained markdown block with this exact structure:
+Render block structure (write this above the JSON):
 
 ```markdown
 ## Verification: **PASS** | **FAIL**
 
-<one-line summary matching test_summary>
+<one-line summary>
 
 ### Scenarios run
 1. <slug-1> — pass | fail
@@ -228,12 +224,16 @@ Emit JSON matching the schema:
 
 Be specific. "Something didn't work" is not an issue; name the scenario, the failing bullet, the symptom.
 
+Then the JSON envelope, on its own line:
+
+```json
+{"test_result": "pass"}
+```
+
+Use `"pass"` iff every scenario passed (no unfixed issues remain). Otherwise `"fail"`. Downstream routing uses `test_result` to gate `commit_push` — a `"fail"` result short-circuits to `done` so broken state never reaches origin.
+
 # Output schema (final reminder)
 
 ```json
-{
-  "test_result": "pass",
-  "test_summary": "3 scenarios ran; 2 passed first try; 1 required a fix to ralph implement --scenarios preflight; final state green.",
-  "test_render": "## Verification: **PASS**\n..."
-}
+{"test_result": "pass"}
 ```

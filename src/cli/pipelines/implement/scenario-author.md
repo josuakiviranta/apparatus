@@ -16,8 +16,6 @@ inputs:
   - record_base.sha
 outputs:
   tests_written: boolean
-  scenario_paths: string[]
-  summary: string
 ---
 
 # Mission
@@ -114,18 +112,17 @@ If you wrote nothing (no clusters survived the three checks), make no commit.
 
 ## Phase 6 — Emit JSON
 
-Final text response (NOT inside a thinking block) is one JSON object matching the output schema:
+Your final response is a brief markdown summary followed by one JSON object on its own line. The pipeline runner reads only the JSON; the prose above it lands in the trace render so a human watching can see what you decided.
 
-```json
-{
-  "tests_written": true,
-  "scenario_paths": ["src/tests/scenarios/implement-with-scenarios-flag.md"],
-  "summary": "considered 3 candidates from 8 commits; wrote 1 new (implement --scenarios flag), skipped 2 (1 subsumed by ralph-implement-baseline.md, 1 infeasible — pure refactor of agent-loader)."
-}
+Example final response:
+
+```
+Considered 3 clusters from 8 commits. Wrote 1 new scenario (implement --scenarios flag), skipped 2 (1 subsumed by ralph-implement-baseline.md, 1 infeasible — pure refactor of agent-loader). Files touched: src/tests/scenarios/implement-with-scenarios-flag.md.
+
+{"tests_written": true}
 ```
 
-`tests_written` is `true` iff `scenario_paths` is non-empty (added OR modified files).
-`summary` is one sentence covering: candidates considered, written, skipped + brief reasons. Keep dense; it surfaces in trace logs.
+If you wrote or modified zero files, return `{"tests_written": false}` and a one-line note explaining why. Downstream routing uses `tests_written` to decide whether the implementation-tester runs.
 
 # Hard rules
 

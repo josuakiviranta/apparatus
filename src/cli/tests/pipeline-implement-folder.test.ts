@@ -43,7 +43,8 @@ describe("src/cli/pipelines/implement/pipeline.dot — scenario branch", () => {
     expect(content).not.toContain("specs_dir");
     expect(content).toContain("record_base.sha");
     expect(content).toMatch(/outputs:[\s\S]*tests_written:\s*boolean/);
-    expect(content).toMatch(/outputs:[\s\S]*scenario_paths/);
+    expect(content).not.toMatch(/outputs:[\s\S]*scenario_paths/);
+    expect(content).not.toMatch(/outputs:[\s\S]*\n\s*summary:/);
   });
 
   it("declares a scenario_author agent node", () => {
@@ -64,8 +65,8 @@ describe("src/cli/pipelines/implement/pipeline.dot — scenario branch", () => {
     expect(content).toContain("name: implementation-tester");
     expect(content).toContain("scenarios_dir");
     expect(content).toMatch(/outputs:[\s\S]*test_result/);
-    expect(content).toMatch(/outputs:[\s\S]*test_summary/);
-    expect(content).toMatch(/outputs:[\s\S]*test_render/);
+    expect(content).not.toMatch(/outputs:[\s\S]*test_summary/);
+    expect(content).not.toMatch(/outputs:[\s\S]*test_render/);
   });
 
   it("declares an implementation_tester node and a commit_push tool node", () => {
@@ -74,11 +75,12 @@ describe("src/cli/pipelines/implement/pipeline.dot — scenario branch", () => {
     expect(dot).toMatch(/commit_push\s*\[[^\]]*tool_command="git push origin/);
   });
 
-  it("wires scenario_author -> implementation_tester -> commit_push -> done", () => {
+  it("gates scenario_author on tests_written and tester on test_result", () => {
     const dot = readFileSync(DOT_PATH, "utf-8");
-    expect(dot).toMatch(/scenario_author\s*->\s*implementation_tester/);
-    expect(dot).toMatch(/implementation_tester\s*->\s*commit_push/);
+    expect(dot).toMatch(/scenario_author\s*->\s*implementation_tester\s*\[[^\]]*condition="tests_written=true"/);
+    expect(dot).toMatch(/scenario_author\s*->\s*done\s*\[[^\]]*condition="tests_written=false"/);
+    expect(dot).toMatch(/implementation_tester\s*->\s*commit_push\s*\[[^\]]*condition="test_result=pass"/);
+    expect(dot).toMatch(/implementation_tester\s*->\s*done\s*\[[^\]]*condition="test_result=fail"/);
     expect(dot).toMatch(/commit_push\s*->\s*done/);
-    expect(dot).not.toMatch(/scenario_author\s*->\s*done/);
   });
 });
