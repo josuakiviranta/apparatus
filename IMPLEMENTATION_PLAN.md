@@ -779,13 +779,13 @@ EOF
 **Files:**
 - Modify: `src/cli/tests/meditate.test.ts:267–288` (the two `specs_dir`-related test cases)
 
-- [ ] **Step 1: Locate the two target test cases by name**
+- [x] **Step 1: Locate the two target test cases by name**
 
 Use the Read tool on `src/cli/tests/meditate.test.ts`. Confirm the two test cases the next step rewrites:
 - `"passes specs_dir default of docs/specs to pipeline runtime"` — currently at lines 267–275
 - `"exploration step weights $specs_dir and src/ folders"` — currently at lines 279–291
 
-- [ ] **Step 2: Replace the two test cases (preserving existing mocking style — `vi.spyOn` on `pipelineMod`)**
+- [x] **Step 2: Replace the two test cases (preserving existing mocking style — `vi.spyOn` on `pipelineMod`)**
 
 The existing test scaffold (lines 250–276 of `meditate.test.ts`) uses `vi.spyOn(pipelineMod, "pipelineRunCommand").mockImplementation(...)` and calls `await meditateCommand(tmpDir)` (no DI third arg). The replacements below preserve that pattern exactly.
 
@@ -851,7 +851,7 @@ For the second case, use Edit:
     });
   ```
 
-- [ ] **Step 3: Run — expect FAIL**
+- [x] **Step 3: Run — expect FAIL**
 
 Run: `npx vitest run src/cli/tests/meditate.test.ts`
 
@@ -862,7 +862,7 @@ Expected: FAIL — meditate.md still contains `$specs_dir`; meditate.ts still pa
 **Files:**
 - Modify: `src/cli/pipelines/meditate/meditate.md:69`
 
-- [ ] **Step 1: Replace the exploration step**
+- [x] **Step 1: Replace the exploration step**
 
 Find:
 ```
@@ -874,7 +874,7 @@ Replace with:
 3. Use `glob_files` and `read_file` to explore the project. Discover the project layout: glob for source roots (`src/`, `lib/`, `app/`, `pkg/`, `cmd/`, `internal/`) and pick what exists. Read `CONTEXT.md` (domain language), files in `docs/adr/` (decision records), `README.md` (mission and command surface), and a sampling of the source roots to understand current structure. Compare what `CONTEXT.md` and ADRs commit to against what the source actually does. Note where they agree, where they drift, and where complexity is accumulating without earning its keep.
 ```
 
-- [ ] **Step 2: Verify zero residue**
+- [x] **Step 2: Verify zero residue**
 
 Run: `grep -n 'specs_dir\|\$specs_dir' src/cli/pipelines/meditate/meditate.md`
 
@@ -885,13 +885,13 @@ Expected: no output.
 **Files:**
 - Modify: `src/cli/pipelines/meditate/pipeline.dot:2`
 
-- [ ] **Step 1: Update inputs declaration**
+- [x] **Step 1: Update inputs declaration**
 
 Find: `  inputs="steer,vision,specs_dir"`
 
 Replace with: `  inputs="steer,vision"`
 
-- [ ] **Step 2: Validate**
+- [x] **Step 2: Validate**
 
 Run: `npx tsx src/cli/index.ts pipeline validate src/cli/pipelines/meditate/pipeline.dot`
 
@@ -902,19 +902,19 @@ Expected: OK.
 **Files:**
 - Modify: `src/cli/pipelines/janitor/pipeline.dot:4`
 
-- [ ] **Step 1: Update inputs declaration**
+- [x] **Step 1: Update inputs declaration**
 
 Find: `  inputs="project, specs_dir"`
 
 Replace with: `  inputs="project"`
 
-- [ ] **Step 2: Confirm janitor agent file has no `$specs_dir` residue**
+- [x] **Step 2: Confirm janitor agent file has no `$specs_dir` residue**
 
 Run: `grep -rn 'specs_dir\|\$specs_dir' src/cli/pipelines/janitor/`
 
 Expected: no output. (Verified at plan-write time: `src/cli/pipelines/janitor/janitor.md` is already clean. Only `pipeline.dot:4` had a hit, fixed in Task 4.4 step 1.)
 
-- [ ] **Step 3: Validate**
+- [x] **Step 3: Validate**
 
 Run: `npx tsx src/cli/index.ts pipeline validate src/cli/pipelines/janitor/pipeline.dot`
 
@@ -925,7 +925,7 @@ Expected: OK.
 **Files:**
 - Modify: `src/cli/tests/implement.test.ts:48–53`
 
-- [ ] **Step 1: Replace the test case (preserving existing `vi.mock` + `mockPipeline` pattern)**
+- [x] **Step 1: Replace the test case (preserving existing `vi.mock` + `mockPipeline` pattern)**
 
 The existing scaffold (`implement.test.ts:1–17`) uses `vi.mock("../commands/pipeline.js", ...)` and exposes `mockPipeline = pipelineRunCommand as ReturnType<typeof vi.fn>`. Tests call `await implementCommand("/my/project", {})` and assert via `expect(mockPipeline).toHaveBeenCalledWith(...)`. The replacement preserves that pattern.
 
@@ -952,7 +952,7 @@ Use Edit:
     });
   ```
 
-- [ ] **Step 2: Run — expect FAIL**
+- [x] **Step 2: Run — expect FAIL**
 
 Run: `npx vitest run src/cli/tests/implement.test.ts`
 
@@ -963,7 +963,7 @@ Expected: FAIL.
 **Files:**
 - Modify: `src/cli/commands/implement.ts:30–38`
 
-- [ ] **Step 1: Remove the `specs_dir` line**
+- [x] **Step 1: Remove the `specs_dir` line**
 
 Find:
 ```typescript
@@ -990,7 +990,7 @@ Replace with:
   });
 ```
 
-- [ ] **Step 2: Type check**
+- [x] **Step 2: Type check**
 
 Run: `npx tsc --noEmit`
 
@@ -1001,7 +1001,7 @@ Expected: PASS.
 **Files:**
 - Modify: `src/cli/commands/meditate.ts:80–87`
 
-- [ ] **Step 1: Remove the `specs_dir` line**
+- [x] **Step 1: Remove the `specs_dir` line**
 
 Find:
 ```typescript
@@ -1026,7 +1026,7 @@ Replace with:
     });
 ```
 
-- [ ] **Step 2: Type check**
+- [x] **Step 2: Type check**
 
 Run: `npx tsc --noEmit`
 
@@ -1034,13 +1034,13 @@ Expected: PASS.
 
 ### Task 4.8: Run vitest, expect all chunk-4 tests PASS
 
-- [ ] **Step 1: Run targeted tests**
+- [x] **Step 1: Run targeted tests**
 
 Run: `npx vitest run src/cli/tests/meditate.test.ts src/cli/tests/implement.test.ts`
 
 Expected: PASS (all assertions, including the rewrites in Tasks 4.1 and 4.5).
 
-- [ ] **Step 2: Run full vitest to catch knock-on failures**
+- [x] **Step 2: Run full vitest to catch knock-on failures**
 
 Run: `npx vitest run --reporter=default`
 
@@ -1053,7 +1053,7 @@ Those are addressed in Chunk 5.
 
 ### Task 4.9: Commit
 
-- [ ] **Step 1: Commit**
+- [x] **Step 1: Commit**
 
 ```bash
 git add src/cli/pipelines/meditate/ src/cli/pipelines/janitor/ \
