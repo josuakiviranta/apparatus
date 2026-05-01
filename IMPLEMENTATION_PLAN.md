@@ -327,17 +327,17 @@ This chunk has no unit tests; verification is via the pipeline validator and a f
 **Files:**
 - Modify: `pipelines/illumination-to-implementation/pipeline.dot:4`
 
-- [ ] **Step 1: Open the file and locate line 4**
+- [x] **Step 1: Open the file and locate line 4**
 
 Current: `  inputs="project, illuminations_dir, specs_dir, plans_dir, run_id"`
 
-- [ ] **Step 2: Replace line 4**
+- [x] **Step 2: Replace line 4**
 
 Replace with: `  inputs="project"`
 
 Use the Edit tool with `old_string=  inputs="project, illuminations_dir, specs_dir, plans_dir, run_id"` and `new_string=  inputs="project"`.
 
-- [ ] **Step 3: Validate the pipeline**
+- [x] **Step 3: Validate the pipeline**
 
 Run: `npx tsx src/cli/index.ts pipeline validate pipelines/illumination-to-implementation/pipeline.dot`
 
@@ -348,7 +348,7 @@ Expected: validator returns OK, OR returns errors about agents that still refere
 **Files:**
 - Modify: `pipelines/illumination-to-implementation/design-writer.md`
 
-- [ ] **Step 1: Update frontmatter `inputs:` list**
+- [x] **Step 1: Update frontmatter `inputs:` list**
 
 Use the Edit tool. Find the block:
 
@@ -373,17 +373,17 @@ inputs:
   - chat_summarizer.refinements
 ```
 
-- [ ] **Step 2: Replace the Mission paragraph**
+- [x] **Step 2: Replace the Mission paragraph**
 
 Find: `You turn an approved illumination — already refined and explained — into a superpowers-style design doc at \`$specs_dir/\`.`
 
 Replace with: `You turn an approved illumination — already refined and explained — into a superpowers-style design doc at \`docs/superpowers/specs/\` inside \`$project\`.`
 
-- [ ] **Step 3: Delete the "Inputs you will receive" entry for `$specs_dir`**
+- [x] **Step 3: Delete the "Inputs you will receive" entry for `$specs_dir`**
 
 Use the Edit tool with `old_string="- \`$specs_dir\` — output directory for the design doc.\n"` and `new_string=""` to remove the bullet entirely.
 
-- [ ] **Step 4: Replace the "Procedure" step 1 path derivation**
+- [x] **Step 4: Replace the "Procedure" step 1 path derivation**
 
 Find:
 ```
@@ -397,13 +397,13 @@ Replace with:
    - Example: illumination `2026-04-19T1100-gate-choice-namespacing.md` → design doc `$project/docs/superpowers/specs/2026-04-19-gate-choice-namespacing-design.md`.
 ```
 
-- [ ] **Step 5: Replace the "Procedure" step 4 reference**
+- [x] **Step 5: Replace the "Procedure" step 4 reference**
 
 Find: `Scan a couple of existing design docs in \`$specs_dir/\` first to match local conventions.`
 
 Replace with: `Scan a couple of existing design docs in \`$project/docs/superpowers/specs/\` first to match local conventions.`
 
-- [ ] **Step 6: Verify zero `$specs_dir` references remain**
+- [x] **Step 6: Verify zero `$specs_dir` references remain**
 
 Run: `grep -n 'specs_dir\|\$specs_dir' pipelines/illumination-to-implementation/design-writer.md`
 
@@ -414,7 +414,7 @@ Expected: no output (zero hits).
 **Files:**
 - Modify: `pipelines/illumination-to-implementation/plan-writer.md`
 
-- [ ] **Step 1: Update frontmatter `inputs:` list**
+- [x] **Step 1: Update frontmatter `inputs:` list**
 
 Find:
 ```yaml
@@ -433,17 +433,17 @@ inputs:
   - chat_summarizer.refinements
 ```
 
-- [ ] **Step 2: Replace the Mission paragraph**
+- [x] **Step 2: Replace the Mission paragraph**
 
 Find: `You turn an approved design doc into a chunked, TDD-shaped implementation plan at \`$plans_dir/\`.`
 
 Replace with: `You turn an approved design doc into a chunked, TDD-shaped implementation plan at \`docs/superpowers/plans/\` inside \`$project\`.`
 
-- [ ] **Step 3: Delete "Inputs you will receive" entry**
+- [x] **Step 3: Delete "Inputs you will receive" entry**
 
 Use the Edit tool with `old_string="- \`$plans_dir\` — output directory for the plan.\n"` and `new_string=""` to remove the bullet entirely.
 
-- [ ] **Step 4: Replace "Procedure" step 1 path derivation**
+- [x] **Step 4: Replace "Procedure" step 1 path derivation**
 
 Find:
 ```
@@ -457,7 +457,7 @@ Replace with:
    - Example: illumination `2026-04-19T1100-gate-choice-namespacing.md` → plan `$project/docs/superpowers/plans/2026-04-19-gate-choice-namespacing.md`.
 ```
 
-- [ ] **Step 5: Verify zero `$plans_dir` references remain**
+- [x] **Step 5: Verify zero `$plans_dir` references remain**
 
 Run: `grep -n 'plans_dir\|\$plans_dir' pipelines/illumination-to-implementation/plan-writer.md`
 
@@ -468,7 +468,7 @@ Expected: no output.
 **Files:**
 - Modify: `pipelines/illumination-to-implementation/verifier.md`
 
-- [ ] **Step 1: Locate the Project-fit (Feature-Creep lens) section**
+- [x] **Step 1: Locate the Project-fit (Feature-Creep lens) section**
 
 The current text at line 47 reads:
 
@@ -476,19 +476,19 @@ The current text at line 47 reads:
 3. **Project-fit (Feature-Creep lens)** — the change serves the project's stated goals. Read `README.md` and `$specs_dir/architecture.md` (or equivalents) before judging. If `$specs_dir` is empty in the Inputs block, default to `docs/specs`. Reject if the illumination:
 ```
 
-- [ ] **Step 2: Replace the project-fit instruction**
+- [x] **Step 2: Replace the project-fit instruction**
 
 Use the Edit tool. Replace the sentence "Read `README.md` and `$specs_dir/architecture.md` (or equivalents) before judging. If `$specs_dir` is empty in the Inputs block, default to `docs/specs`." with the orientation block from "File Structure → Reusable shared text" above (the block beginning "**Orient before acting.**" through the closing paragraph).
 
 The replacement integrates as: `the change serves the project's stated goals. <ORIENTATION_BLOCK> Use the discovered context to judge whether the change advances the project's goals. Reject if the illumination:`.
 
-- [ ] **Step 3: Replace the procedure step at line 66**
+- [x] **Step 3: Replace the procedure step at line 66**
 
 Find: `   - **Project-fit pass:** read project \`README.md\` and any \`$specs_dir/architecture.md\` / top-level spec; judge whether the illumination's change advances stated goals.`
 
 Replace with: `   - **Project-fit pass:** apply the orientation block (see step 2 above); judge whether the illumination's change advances the project's stated goals based on the discovered context.`
 
-- [ ] **Step 4: Verify zero `$specs_dir` references remain**
+- [x] **Step 4: Verify zero `$specs_dir` references remain**
 
 Run: `grep -n 'specs_dir\|\$specs_dir' pipelines/illumination-to-implementation/verifier.md`
 
@@ -499,7 +499,7 @@ Expected: no output.
 **Files:**
 - Modify: `pipelines/illumination-to-implementation/implement.md`
 
-- [ ] **Step 1: Replace step 0a**
+- [x] **Step 1: Replace step 0a**
 
 Find the line at line 16:
 ```
@@ -508,7 +508,7 @@ Find the line at line 16:
 
 Replace with the orientation block prefixed with `0a. ` (i.e., insert the shared block — see "File Structure → Reusable shared text" — as the body of step 0a).
 
-- [ ] **Step 2: Delete the inconsistency-update step**
+- [x] **Step 2: Delete the inconsistency-update step**
 
 Find the line at line 37:
 ```
@@ -517,7 +517,7 @@ Find the line at line 37:
 
 Delete this line entirely (no replacement). There is no `$specs_dir` to compare against anymore; spec inconsistencies are no longer a category.
 
-- [ ] **Step 3: Verify zero `$specs_dir` references remain**
+- [x] **Step 3: Verify zero `$specs_dir` references remain**
 
 Run: `grep -n 'specs_dir\|\$specs_dir' pipelines/illumination-to-implementation/implement.md`
 
@@ -528,7 +528,7 @@ Expected: no output.
 **Files:**
 - Read-only: every file under `pipelines/illumination-to-implementation/`
 
-- [ ] **Step 1: Grep entire pipeline directory for residual references**
+- [x] **Step 1: Grep entire pipeline directory for residual references**
 
 Run:
 ```bash
@@ -539,19 +539,19 @@ Expected: no output (zero hits across all files in the folder). If found, add an
 
 ### Task 2.7: Validate + commit
 
-- [ ] **Step 1: Run pipeline validator**
+- [x] **Step 1: Run pipeline validator**
 
 Run: `npx tsx src/cli/index.ts pipeline validate pipelines/illumination-to-implementation/pipeline.dot`
 
 Expected: OK (no `inputs_undeclared` errors; the pipeline now declares only `project` and the agent rubrics no longer reference `$specs_dir`/`$plans_dir`/`$illuminations_dir`/`$run_id`).
 
-- [ ] **Step 2: Type check**
+- [x] **Step 2: Type check**
 
 Run: `npx tsc --noEmit`
 
 Expected: PASS.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add pipelines/illumination-to-implementation/
