@@ -2,7 +2,6 @@
 name: chat-summarizer
 description: Merge a chat round into a cumulative refinements log with attribution
 inputs:
-  - illuminations_dir
   - run_id
   - verifier.illumination_path
   - verifier.summary
@@ -19,7 +18,7 @@ tools:
 
 # Mission
 
-Read `$illuminations_dir/.triage/$run_id/chat-notes.md` and the illumination at
+Read `$project/meditations/illuminations/.triage/$run_id/chat-notes.md` and the illumination at
 $verifier_illumination_path. Merge the latest chat round into the cumulative refinements
 log so design_writer and plan_writer can judge whether to honor each refinement.
 

@@ -15,7 +15,6 @@ outputs:
   design_doc_path: string
 inputs:
   - verifier.illumination_path
-  - specs_dir
   - verifier.summary
   - verifier.explanation
   - explainer.explainer_render
@@ -24,7 +23,7 @@ inputs:
 
 # Mission
 
-You turn an approved illumination — already refined and explained — into a superpowers-style design doc at `$specs_dir/`. You iterate with the `spec-document-reviewer` subagent from the `superpowers:brainstorming` skill until both of you agree the doc is ready. No iteration cap — ship when ready, not at an arbitrary count.
+You turn an approved illumination — already refined and explained — into a superpowers-style design doc at `docs/superpowers/specs/` inside `$project`. You iterate with the `spec-document-reviewer` subagent from the `superpowers:brainstorming` skill until both of you agree the doc is ready. No iteration cap — ship when ready, not at an arbitrary count.
 
 # Inputs you will receive
 
@@ -33,22 +32,21 @@ You turn an approved illumination — already refined and explained — into a s
 - `$verifier.explanation` — verifier's rubric evidence (relevance, accuracy, project-fit).
 - `$explainer.explainer_render` — the 4-section before/after the user just approved at the gate. This is the anchor: the design doc must stay consistent with what the user saw and agreed to.
 - `$chat_summarizer.refinements` — cumulative bullet log with per-entry attribution (Round, Topic, Rationale). Authoritative. Every bullet honored unless a later bullet explicitly overrides it. The rationale lines drive judgment calls.
-- `$specs_dir` — output directory for the design doc.
 - `$project` — repo root. Source code typically lives under `$project/src`; Glob from there when you need concrete code anchors.
 
 # Procedure
 
 1. **Derive the design-doc filename deterministically** from the illumination slug:
    - Read `$verifier_illumination_path`. Strip the date/time prefix (pattern `YYYY-MM-DDThhmm-`) and the `.md` extension to get `<slug>`.
-   - Target path: `$specs_dir/YYYY-MM-DD-<slug>-design.md` using today's date.
-   - Example: illumination `2026-04-19T1100-gate-choice-namespacing.md` → design doc `$specs_dir/2026-04-19-gate-choice-namespacing-design.md`.
+   - Target path: `$project/docs/superpowers/specs/YYYY-MM-DD-<slug>-design.md` using today's date.
+   - Example: illumination `2026-04-19T1100-gate-choice-namespacing.md` → design doc `$project/docs/superpowers/specs/2026-04-19-gate-choice-namespacing-design.md`.
    - This gives a 1:1 auditable link from illumination to design doc. Do not invent a new topic slug.
 
 2. **Load context.** Read the illumination in full. Re-read `$explainer.explainer_render` — the design doc must elaborate on, not contradict, what the user approved. Walk the `$chat_summarizer.refinements` log bullet-by-bullet; note any override chains so you know the current-state scope.
 
 3. **Invoke the brainstorming skill.** Load `superpowers:brainstorming` via the Skill tool. Skip the interactive Q&A phase — upstream nodes already captured intent. Jump to the "After the Design" section and follow its design-doc conventions.
 
-4. **Write the initial draft** to the derived path. Scan a couple of existing design docs in `$specs_dir/` first to match local conventions. Cover: overview, architecture, components, data flow, constraints, open questions. Ground every claim that touches real code in a `file:line` anchor — Glob `$project/src` (or wherever the repo layout puts sources) to find the right lines.
+4. **Write the initial draft** to the derived path. Scan a couple of existing design docs in `$project/docs/superpowers/specs/` first to match local conventions. Cover: overview, architecture, components, data flow, constraints, open questions. Ground every claim that touches real code in a `file:line` anchor — Glob `$project/src` (or wherever the repo layout puts sources) to find the right lines.
 
 5. **Run the Spec Review Loop.** Dispatch `spec-document-reviewer` (prompt defined by the brainstorming skill) via the Task tool. Pass it the draft + illumination context. Act on its verdict:
    - ✅ **Approved** → proceed to step 6.

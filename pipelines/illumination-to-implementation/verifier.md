@@ -17,7 +17,6 @@ mcp:
       - "{{ILLUMINATION_SERVER_PATH}}"
       - "{{PROJECT_ROOT}}"
 inputs:
-  - illuminations_dir
   - verifier.illumination_path
   - chat_summarizer.refinements
   - run_id
@@ -44,7 +43,25 @@ An illumination earns `preferred_label: true` only if **all three** hold. Any si
 
 1. **Still relevant** — the gap, bug, or behavior described still exists in the current source. Re-check the cited files; the issue may have been silently fixed by an unrelated commit.
 2. **Technically accurate** — every claim about code behavior, API shape, command output, or spec content matches what the source actually does. Quote real lines, not paraphrases.
-3. **Project-fit (Feature-Creep lens)** — the change serves the project's stated goals. Read `README.md` and `$specs_dir/architecture.md` (or equivalents) before judging. If `$specs_dir` is empty in the Inputs block, default to `docs/specs`. Reject if the illumination:
+3. **Project-fit (Feature-Creep lens)** — the change serves the project's stated goals.
+
+**Orient before acting.** First, discover the project layout:
+
+- Source root: Glob `$project` for `src/`, `lib/`, `app/`, `pkg/`, `cmd/`, `internal/` — pick directories that exist.
+- Docs root: Glob `$project` for `docs/`, `documentation/`, `architecture/` — pick what exists.
+- ADR location: under the discovered docs root, look for `adr/` or `decisions/`.
+
+Then dispatch parallel Sonnet subagents (up to 100) to read concurrently:
+
+- `$project/CONTEXT.md` if present (domain language)
+- All files in the discovered ADR location, if any
+- `$project/README.md` (mission + command surface)
+- File inventory of each discovered source root — one subagent per top-level subdir, returns file list + one-paragraph role summary
+- Output of `git log --since="2 weeks ago" --oneline` from `$project`
+
+Each subagent returns a brief summary of its slice. For code-level facts during work, Grep/Glob the discovered source roots on demand.
+
+Use the discovered context to judge whether the change advances the project's goals. Reject if the illumination:
    - Adds surface area without a user-visible payoff tied to existing goals
    - Reinvents a mechanism the project already has under a different name
    - Optimizes for an edge case the project explicitly does not target
@@ -63,7 +80,7 @@ A technically accurate illumination that fails project-fit is still a `false` �
    - Cited source files: do the claimed behaviors match? Quote line numbers.
    - Cited specs: do the claimed contents exist?
    - Has the issue already been resolved? Re-read the cited file as it stands today; if the described gap is gone, the illumination is stale.
-   - **Project-fit pass:** read project `README.md` and any `$specs_dir/architecture.md` / top-level spec; judge whether the illumination's change advances stated goals.
+   - **Project-fit pass:** apply the orientation block (see step 2 above); judge whether the illumination's change advances the project's stated goals based on the discovered context.
 5. **Verdict.** Emit JSON matching `schemas/verifier.json`.
 
 # Output

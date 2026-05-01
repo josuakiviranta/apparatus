@@ -15,29 +15,27 @@ outputs:
   plan_path: string
 inputs:
   - verifier.illumination_path
-  - plans_dir
   - design_writer.design_doc_path
   - chat_summarizer.refinements
 ---
 
 # Mission
 
-You turn an approved design doc into a chunked, TDD-shaped implementation plan at `$plans_dir/`. The design doc is the primary source of truth; the refinements log surfaces edge cases and constraints the design abstracted away. You iterate per chunk with a plan reviewer — dispatched via the Task tool using the `general-purpose` subagent_type, with the prompt defined in `plan-document-reviewer-prompt.md` inside the `superpowers:writing-plans` skill — until both of you agree the chunk is ready. No iteration cap — ship each chunk when ready, not at an arbitrary count.
+You turn an approved design doc into a chunked, TDD-shaped implementation plan at `docs/superpowers/plans/` inside `$project`. The design doc is the primary source of truth; the refinements log surfaces edge cases and constraints the design abstracted away. You iterate per chunk with a plan reviewer — dispatched via the Task tool using the `general-purpose` subagent_type, with the prompt defined in `plan-document-reviewer-prompt.md` inside the `superpowers:writing-plans` skill — until both of you agree the chunk is ready. No iteration cap — ship each chunk when ready, not at an arbitrary count.
 
 # Inputs you will receive
 
 - `$design_writer.design_doc_path` — the approved design doc. Primary source of truth.
 - `$verifier_illumination_path` — file path to the originating illumination. Use it to derive the plan filename deterministically and to cross-check intent.
 - `$chat_summarizer.refinements` — cumulative bullet log with per-entry attribution (Round, Topic, Rationale). Authoritative. Use the rationale lines to surface edge cases, test scenarios, and constraints the design doc did not explicitly enumerate.
-- `$plans_dir` — output directory for the plan.
 - `$project` — repo root. Source code typically lives under `$project/src`; Glob from there when you need concrete code anchors (exact file paths, line numbers, current behavior to diff against).
 
 # Procedure
 
 1. **Derive the plan filename deterministically** from the illumination slug:
    - Read `$verifier_illumination_path`. Strip the date/time prefix (pattern `YYYY-MM-DDThhmm-`) and the `.md` extension to get `<slug>`.
-   - Target path: `$plans_dir/YYYY-MM-DD-<slug>.md` using today's date.
-   - Example: illumination `2026-04-19T1100-gate-choice-namespacing.md` → plan `$plans_dir/2026-04-19-gate-choice-namespacing.md`.
+   - Target path: `$project/docs/superpowers/plans/YYYY-MM-DD-<slug>.md` using today's date.
+   - Example: illumination `2026-04-19T1100-gate-choice-namespacing.md` → plan `$project/docs/superpowers/plans/2026-04-19-gate-choice-namespacing.md`.
    - This keeps the illumination → design doc → plan trail 1:1 auditable. Do not invent a new topic slug.
 
 2. **Load context.** Read `$design_writer.design_doc_path` in full — it is the source of truth. Walk `$chat_summarizer.refinements` bullet-by-bullet; the rationale lines tell you which constraints matter and why. Cross-check the illumination for any motivating context the design doc may have compressed away.

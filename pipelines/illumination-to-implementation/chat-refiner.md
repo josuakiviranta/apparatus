@@ -10,7 +10,6 @@ tools:
   - Glob
 mcp: []
 inputs:
-  - illuminations_dir
   - run_id
   - verifier.illumination_path
   - verifier.summary

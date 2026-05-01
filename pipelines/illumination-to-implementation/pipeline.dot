@@ -1,7 +1,7 @@
 digraph illumination_to_implementation {
   goal="Triage an illumination into an approved design doc, implementation plan, and committed code"
   headless_safe=false
-  inputs="project, illuminations_dir, specs_dir, plans_dir, run_id"
+  inputs="project, run_id"
 
   start [shape=Mdiamond]
 
