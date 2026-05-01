@@ -56,8 +56,7 @@ Execute a `.dot` pipeline file. Use `--var` (repeatable) to pass caller variable
 
 ```bash
 ralph pipeline run pipelines/my-pipeline.dot \
-  --var meditations_dir=meditations \
-  --var specs_dir=docs/specs
+  --var meditations_dir=meditations
 ```
 
 Pass `--resume [runId]` to continue a pipeline after Ctrl-C, a node failure, or a crash. The engine checkpoints after every node advance to `~/.ralph/<projectKey>/runs/<runId>/checkpoint.json` — the trace `pipeline.jsonl` lives in the same directory. Bare `--resume` auto-selects when exactly one prior run exists for the project; pass an explicit `<runId>` to disambiguate. Older runs are pruned lazily (last 50 per project, override with `RALPH_RUNS_KEEP`). For `--resume` to be useful, tool-node scripts must be idempotent — a script that hard-requires "state before I act" will fail on retry; detect the desired outcome is already present and exit 0 as a no-op instead.
@@ -155,19 +154,12 @@ exits the loop with `agent.success=false`.
 
 Press `Ctrl+C`. Ralph cleanly terminates its own claude subprocess without affecting any other running claude sessions.
 
-## Directory Map
+## Where to look
 
-| Directory | Purpose |
-|---|---|
-| `src/` | All TypeScript source: `cli/`, `attractor/`, `daemon/`, `lib/`, `types/` |
-| `docs/specs/` | Authoritative behavioral specs (what the system does) |
-| `docs/` | Harness docs + `superpowers/specs/` (design proposals & history — how decisions were reached) |
-| `pipelines/` | Project-local `.dot` pipelines for ralph-cli itself (illumination-to-implementation, janitor) + `smoke/` test fixtures. Bundled pipelines (meditate, implement) ship from `src/cli/pipelines/`. |
-| `src/cli/pipelines/` | Bundled pipelines shipped to npm consumers (`meditate`, `implement`). Folder-form: `<name>/pipeline.dot` + agent `.md` files. Copied to `dist/pipelines/` at build. |
-| `meditations/` | Curated lenses in `stimuli/` + `illuminations/` (alive on disk; deleted on consume — see `docs/adr/0002-consume-only-illumination-lifecycle.md`) |
-| `memory/` | Session memory written by Claude agents across conversations |
-
-> **docs/specs/ vs docs/superpowers/specs/:** `docs/specs/` holds authoritative behavioral specifications (what the system does). `docs/superpowers/specs/` holds design proposals and history (how decisions were reached).
+- **`CONTEXT.md`** — domain language and glossary
+- **`docs/adr/`** — decision records (why things are the way they are)
+- **`src/`** — TypeScript source (CLI, pipeline engine, daemon, MCP servers)
+- **`pipelines/`** — project-local `.dot` pipelines (also `src/cli/pipelines/` for bundled ones shipped to consumers)
 
 ## Development
 
@@ -178,8 +170,6 @@ npm run build      # tsup → dist/
 npm link           # test ralph binary locally
 ```
 
-## Specs
+## Decisions
 
-- [Architecture](docs/specs/architecture.md)
-- [Commands](docs/specs/commands.md)
-- [Loop Script](docs/specs/loop.md)
+See [`docs/adr/`](docs/adr/) for accepted decision records.

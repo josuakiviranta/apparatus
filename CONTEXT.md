@@ -109,3 +109,24 @@ dispatched illuminations and flipped them to implemented when their plans
 completed (captured in pre-rewrite commits to `pipelines/janitor/janitor.md`
 and the memory entry at `memory/2026-04-25-state-machine-exists-verifier-ignores-it.md`).
 That role disappeared with the lifecycle simplification.
+
+### Documentation channels
+
+ralph-cli has three documentation channels with disjoint roles:
+
+- **`CONTEXT.md` (this file)** — domain language and glossary. Hand-curated.
+  Updated during grill-with-docs sessions and ADR writes. Stable.
+- **`docs/adr/`** — append-only decision records. Each captures a hard-to-reverse
+  or surprising-without-context choice with its trade-off. Never edited after
+  acceptance.
+- **`src/` and `pipelines/`** — the authoritative description of behavior.
+  Source code is truth. No spec file claims to mirror it.
+
+Removed on 2026-05-01: `docs/specs/` (behavioral specs that drifted faster than
+they could be maintained) and `docs/orientation/directory-inventory.md` (a
+curated file-tree summary that drifted on every reorg). See
+`docs/adr/0004-source-and-context-as-truth-no-behavioral-specs.md`.
+
+Agents needing workspace orientation discover the project layout at runtime
+(Glob source/docs roots) and read `CONTEXT.md` + `docs/adr/` + `README.md` +
+a live `src/` inventory. No preloaded curated overview.

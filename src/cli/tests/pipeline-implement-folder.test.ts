@@ -40,7 +40,7 @@ describe("src/cli/pipelines/implement/pipeline.dot — scenario branch", () => {
     expect(content).toContain("name: scenario-author");
     expect(content).toMatch(/inputs:\s*\n(\s*-\s*[\w.]+\s*\n){2,}/);
     expect(content).toContain("scenarios_dir");
-    expect(content).toContain("specs_dir");
+    expect(content).not.toContain("specs_dir");
     expect(content).toContain("record_base.sha");
     expect(content).toMatch(/outputs:[\s\S]*tests_written:\s*boolean/);
     expect(content).toMatch(/outputs:[\s\S]*scenario_paths/);

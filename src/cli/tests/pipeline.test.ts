@@ -181,10 +181,10 @@ describe("pipelineRunCommand", () => {
   it("passes --var values as callerContext to runPipeline", async () => {
     const dotFile = join(dir, "test.dot");
     writeFileSync(dotFile, VALID_DOT);
-    await pipelineRunCommand(dotFile, { logsRoot: dir, project: dir, variables: { specs_dir: "/tmp/specs", foo: "bar" } });
+    await pipelineRunCommand(dotFile, { logsRoot: dir, project: dir, variables: { widget_dir: "/tmp/widget", foo: "bar" } });
     const call = (engine.runPipeline as ReturnType<typeof vi.fn>).mock.calls[0];
     const opts = call[1];
-    expect(opts.callerContext).toEqual({ specs_dir: "/tmp/specs", foo: "bar" });
+    expect(opts.callerContext).toEqual({ widget_dir: "/tmp/widget", foo: "bar" });
   });
 
   it("nodes overview uses node IDs, not raw labels", async () => {

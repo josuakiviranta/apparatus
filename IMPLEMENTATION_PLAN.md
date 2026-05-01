@@ -1,5 +1,5 @@
 ---
-status: pending
+status: complete
 ---
 
 # Source-as-Truth — Excise `docs/specs/` Implementation Plan
@@ -1093,17 +1093,17 @@ EOF
 **Files:**
 - Modify: `src/cli/tests/pipeline.test.ts:184,187`
 
-- [ ] **Step 1: Locate the test using `specs_dir` as a generic variable**
+- [x] **Step 1: Locate the test using `specs_dir` as a generic variable**
 
 Look for a test that passes `{ specs_dir: "/tmp/specs", foo: "bar" }` and asserts `callerContext` round-trips. The test is concerned with variable plumbing, not the specs pattern.
 
-- [ ] **Step 2: Rename `specs_dir` → `widget_dir` in both lines**
+- [x] **Step 2: Rename `specs_dir` → `widget_dir` in both lines**
 
 Use Edit with `replace_all=false` on line 184: `specs_dir: "/tmp/specs"` → `widget_dir: "/tmp/widget"`.
 
 Then on line 187: `specs_dir: "/tmp/specs"` → `widget_dir: "/tmp/widget"`.
 
-- [ ] **Step 3: Run — expect PASS**
+- [x] **Step 3: Run — expect PASS**
 
 Run: `npx vitest run src/cli/tests/pipeline.test.ts`
 
@@ -1116,11 +1116,11 @@ Expected: PASS.
 
 The assertion at line 43 is checking that **`scenario-author.md`** (loaded into `content` at line 39) contains `"specs_dir"` in its frontmatter. Since Chunk 3 Task 3.3 step 1 removes the `- specs_dir` line from `scenario-author.md`, this assertion will start failing. The cleanest replacement is a positive absence-check confirming the excision actually happened.
 
-- [ ] **Step 1: Read the test file to confirm the assertion shape**
+- [x] **Step 1: Read the test file to confirm the assertion shape**
 
 Use the Read tool on `src/cli/tests/pipeline-implement-folder.test.ts`. Confirm `content` at line 39 reads `scenario-author.md`, and line 43 reads `expect(content).toContain("specs_dir");`.
 
-- [ ] **Step 2: Replace the assertion**
+- [x] **Step 2: Replace the assertion**
 
 Use Edit:
 - `old_string`: `    expect(content).toContain("specs_dir");\n`
@@ -1128,7 +1128,7 @@ Use Edit:
 
 (Inverted: now asserts the excision happened — `scenario-author.md` must no longer reference `specs_dir`.)
 
-- [ ] **Step 3: Run — expect PASS**
+- [x] **Step 3: Run — expect PASS**
 
 Run: `npx vitest run src/cli/tests/pipeline-implement-folder.test.ts`
 
@@ -1141,11 +1141,11 @@ Expected: PASS.
 
 The current test (lines 19–29) asserts the validator emits a `required_caller_vars` info banner naming `illuminations_dir`, `specs_dir`, `plans_dir`. After Chunk 2's `inputs="project"` rewrite, only `project` is declared and `project` is RESERVED — so the banner is either empty or omitted entirely. Three lines (26, 27, 28) all break together; the rewrite handles them as a unit.
 
-- [ ] **Step 1: Read the test file**
+- [x] **Step 1: Read the test file**
 
 Use the Read tool on `src/attractor/tests/illumination-pipeline-flow.test.ts` and confirm lines 19–29 contain the test case `"emits required_caller_vars info banner listing project, illuminations_dir, etc."`.
 
-- [ ] **Step 2: Replace the entire test case**
+- [x] **Step 2: Replace the entire test case**
 
 Use Edit:
 - `old_string`:
@@ -1179,7 +1179,7 @@ Use Edit:
     });
   ```
 
-- [ ] **Step 3: Run — expect PASS**
+- [x] **Step 3: Run — expect PASS**
 
 Run: `npx vitest run src/attractor/tests/illumination-pipeline-flow.test.ts`
 
@@ -1187,13 +1187,13 @@ Expected: PASS. If the validator's actual banner shape contradicts both branches
 
 ### Task 5.4: Run full vitest suite
 
-- [ ] **Step 1: Run all tests**
+- [x] **Step 1: Run all tests**
 
 Run: `npx vitest run --reporter=default`
 
 Expected: PASS (entire suite).
 
-- [ ] **Step 2: Run type check**
+- [x] **Step 2: Run type check**
 
 Run: `npx tsc --noEmit`
 
@@ -1204,7 +1204,7 @@ Expected: PASS.
 **Files:**
 - Modify: `README.md` (line 60, lines 158–170, lines 181–185)
 
-- [ ] **Step 1: Remove the `--var specs_dir=docs/specs` example at line 60**
+- [x] **Step 1: Remove the `--var specs_dir=docs/specs` example at line 60**
 
 Find:
 ```bash
@@ -1219,7 +1219,7 @@ ralph pipeline run pipelines/my-pipeline.dot \
   --var meditations_dir=meditations
 ```
 
-- [ ] **Step 2: Replace the Directory Map section (lines 158–170)**
+- [x] **Step 2: Replace the Directory Map section (lines 158–170)**
 
 Find the entire block from `## Directory Map` through the closing blockquote at line 170.
 
@@ -1234,7 +1234,7 @@ Replace with:
 - **`pipelines/`** — project-local `.dot` pipelines (also `src/cli/pipelines/` for bundled ones shipped to consumers)
 ```
 
-- [ ] **Step 3: Replace the Specs section (lines 181–185)**
+- [x] **Step 3: Replace the Specs section (lines 181–185)**
 
 Find (heading at line 181, list at 183–185):
 ```markdown
@@ -1257,7 +1257,7 @@ See [`docs/adr/`](docs/adr/) for accepted decision records.
 **Files:**
 - Modify: `CONTEXT.md` (append new section at end)
 
-- [ ] **Step 1: Append the "Documentation channels" section**
+- [x] **Step 1: Append the "Documentation channels" section**
 
 Append to the end of the file:
 
@@ -1287,13 +1287,13 @@ a live `src/` inventory. No preloaded curated overview.
 
 ### Task 5.7: Delete `docs/orientation/directory-inventory.md`
 
-- [ ] **Step 1: Delete the file**
+- [x] **Step 1: Delete the file**
 
 ```bash
 git rm docs/orientation/directory-inventory.md
 ```
 
-- [ ] **Step 2: Remove the folder if empty**
+- [x] **Step 2: Remove the folder if empty**
 
 ```bash
 if [ -z "$(ls -A docs/orientation 2>/dev/null)" ]; then rmdir docs/orientation; fi
@@ -1303,13 +1303,13 @@ if [ -z "$(ls -A docs/orientation 2>/dev/null)" ]; then rmdir docs/orientation; 
 
 `npm run build` MUST succeed before Task 5.9 smokes — the bundled CLI commands (`ralph implement`, `ralph meditate`, `ralph heartbeat pipeline janitor`) read pipeline files from `dist/pipelines/`, so stale dist would mask source-edit bugs.
 
-- [ ] **Step 1: Build**
+- [x] **Step 1: Build**
 
 Run: `npm run build`
 
 Expected: PASS — `dist/pipelines/*` regenerates with the new pipeline.dot files (no `specs_dir` in inputs) and updated agent rubrics.
 
-- [ ] **Step 2: Verify `dist/` is consistent**
+- [x] **Step 2: Verify `dist/` is consistent**
 
 Run: `grep -rn 'specs_dir\|\$specs_dir' dist/pipelines/`
 
@@ -1321,7 +1321,7 @@ Prerequisite: Task 5.4 (full vitest pass), Task 5.7 (directory-inventory deletio
 
 This is dogfooding — ralph-cli runs the affected pipelines against itself. The repo at this point still has `docs/specs/` (deletion is the next step). The smokes verify the agents tolerate either presence or absence; we want them to work in both.
 
-- [ ] **Step 1: Bundled `ralph implement` smoke**
+- [x] **Step 1: Bundled `ralph implement` smoke**
 
 Run (in a scratch directory):
 ```bash
@@ -1333,7 +1333,7 @@ mkdir -p /tmp/ralph-implement-smoke && cd /tmp/ralph-implement-smoke && \
 
 Expected: implement runs one iteration, the agent orients via discover-then-read (CONTEXT.md may be missing — that's tolerated), no engine preflight error about `specs_dir`. Exit cleanly.
 
-- [ ] **Step 2: Bundled `ralph meditate` smoke**
+- [x] **Step 2: Bundled `ralph meditate` smoke**
 
 Run:
 ```bash
@@ -1342,7 +1342,7 @@ cd /Users/josu/Documents/projects/ralph-cli && ralph meditate . --var steer="smo
 
 Expected: meditate runs, exploration step uses discover-then-read, no `$specs_dir` references in injected Inputs block, agent produces an illumination via `write_illumination`. Exit cleanly.
 
-- [ ] **Step 3: Bundled janitor smoke**
+- [x] **Step 3: Bundled janitor smoke**
 
 Run:
 ```bash
@@ -1351,7 +1351,7 @@ cd /Users/josu/Documents/projects/ralph-cli && ralph heartbeat pipeline janitor 
 
 Expected: janitor runs, no `$specs_dir` references, scans source. Cancel after one iteration.
 
-- [ ] **Step 4: Project-local illumination-to-implementation smoke**
+- [x] **Step 4: Project-local illumination-to-implementation smoke**
 
 First, list current alive illuminations and pick the most recent one:
 
@@ -1372,13 +1372,13 @@ Expected: pipeline starts at `verifier`. Verifier orients via discover-then-read
 
 ### Task 5.10: Final deletion of `docs/specs/`
 
-- [ ] **Step 1: Delete the folder**
+- [x] **Step 1: Delete the folder**
 
 ```bash
 git rm -r docs/specs/
 ```
 
-- [ ] **Step 2: Verify zero residual references in non-historical files**
+- [x] **Step 2: Verify zero residual references in non-historical files**
 
 Run:
 ```bash
@@ -1392,7 +1392,7 @@ grep -rn 'docs/specs\|specs_dir\|\$specs_dir' /Users/josu/Documents/projects/ral
 
 Expected: zero output (excluding historical/append-only files).
 
-- [ ] **Step 3: Final type check + build**
+- [x] **Step 3: Final type check + build**
 
 Run:
 ```bash
@@ -1403,7 +1403,7 @@ Expected: ALL PASS.
 
 ### Task 5.11: Commit + tag
 
-- [ ] **Step 1: Commit**
+- [x] **Step 1: Commit**
 
 ```bash
 git add -A
@@ -1427,7 +1427,7 @@ EOF
 )"
 ```
 
-- [ ] **Step 2: Tag (optional — skip unless explicitly requested)**
+- [x] **Step 2: Tag (optional — skip unless explicitly requested)**
 
 This change ships in a regular commit; no version bump is required. Skip tagging unless the user requests it. If they do, run `npm version patch --no-git-tag-version && git add package.json && git commit --amend --no-edit && git tag v$(node -p "require('./package.json').version")`.
 

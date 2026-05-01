@@ -16,16 +16,18 @@ describe("illumination-to-implementation pipeline — full flow validation", () 
     expect(errors).toEqual([]);
   });
 
-  it("emits required_caller_vars info banner listing project, illuminations_dir, etc.", () => {
+  it("does NOT require any caller vars (only $project declared, which is RESERVED)", () => {
     const info = diags.find(
       d => d.rule === "required_caller_vars" && d.severity === "info",
     );
-    expect(info).toBeDefined();
-    // $project is RESERVED so it must NOT appear; the other digraph inputs must.
-    expect(info!.message).not.toMatch(/\bproject\b/);
-    expect(info!.message).toContain("illuminations_dir");
-    expect(info!.message).toContain("specs_dir");
-    expect(info!.message).toContain("plans_dir");
+    // After the source-as-truth excision (ADR-0004), inputs="project" only.
+    // $project is RESERVED → no caller-vars banner expected, OR if emitted,
+    // it must not name any of the removed inputs.
+    if (info) {
+      expect(info.message).not.toMatch(/illuminations_dir|specs_dir|plans_dir/);
+    } else {
+      expect(info).toBeUndefined();
+    }
   });
 
   it("does NOT emit branch_incomplete_input for $refinements (covered by default_refinements=)", () => {
