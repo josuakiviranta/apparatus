@@ -65,6 +65,11 @@ sole test file that covered it. Pure subtraction; no behavior change to
   log, refinements log embedded in chat_summarizer output, design /
   plan / illumination docs). Future memory-mining passes should
   treat this run's process trace as unrecoverable.
+- `mark_plan_implemented` returned `success: false` with error
+  `"Cannot mark as implemented: current status is done"` — the plan's
+  status had already advanced past `pending` before this node ran.
+  Lifecycle flip skipped; manual frontmatter inspection may be
+  warranted.
 
 ## Final verification
 
