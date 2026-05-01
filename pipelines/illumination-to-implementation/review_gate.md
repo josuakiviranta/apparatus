@@ -6,9 +6,9 @@ choices:
   - Retry
 inputs:
   - project
-  - plan_path
+  - plan_writer.plan_path
 ---
 Review implementation
 
 Project: $project
-Plan: $plan_path
+Plan: $plan_writer.plan_path
