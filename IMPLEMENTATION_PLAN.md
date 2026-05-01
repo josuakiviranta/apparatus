@@ -175,7 +175,7 @@ EOF
 - Read-only: every file in `docs/specs/`
 - Output (intermediate): consolidated candidate list (in working memory or a scratch file)
 
-- [ ] **Step 1: Dispatch 11 salvage subagents in parallel**
+- [x] **Step 1: Dispatch 11 salvage subagents in parallel**
 
 Use the Agent tool with `subagent_type=Explore` (or `general-purpose`). Send all 11 dispatches in a single message for parallel execution. One subagent per file:
 
@@ -236,7 +236,7 @@ Salvage pass on a behavioral spec file slated for deletion.
 [If applicable, e.g. "Couldn't verify claims about the daemon socket protocol without runtime observation; treated as CURRENT pending dynamic check."]
 ```
 
-- [ ] **Step 2: Consolidate the 11 reports**
+- [x] **Step 2: Consolidate the 11 reports**
 
 Collect all 11 returned reports. Present a single triage table to the user with one row per ADR candidate across all 11 reports:
 
@@ -245,7 +245,7 @@ Collect all 11 returned reports. Present a single triage table to the user with 
 
 This is a **user-input checkpoint**. The plan executor must surface the table and wait for user triage decisions.
 
-- [ ] **Step 3: User triage**
+- [x] **Step 3: User triage**
 
 User inspects the table and marks each candidate Y / N. Optionally edits the proposed candidate text before approval.
 
@@ -254,7 +254,7 @@ User inspects the table and marks each candidate Y / N. Optionally edits the pro
 **Files (zero or more):**
 - Create: `docs/adr/0005-<slug>.md`, `0006-<slug>.md`, ... (one per approved candidate)
 
-- [ ] **Step 1: For each user-approved candidate, write a new ADR file**
+- [x] **Step 1: For each user-approved candidate, write a new ADR file**
 
 Use the existing `docs/adr/0001-…` and `0002-…` files as format references. Each ADR should have:
 
@@ -283,13 +283,13 @@ Use the existing `docs/adr/0001-…` and `0002-…` files as format references. 
 - Spec: `docs/superpowers/specs/2026-05-01-source-as-truth-no-behavioral-specs-design.md`
 ```
 
-- [ ] **Step 2: Verify each new ADR file**
+- [x] **Step 2: Verify each new ADR file**
 
 Run: `ls -la docs/adr/000*-*.md`
 
 Expected: ADR-0004 plus zero or more ADR-0005..N files.
 
-- [ ] **Step 3: Commit (one commit per ADR, or one batched commit if convenient)**
+- [x] **Step 3: Commit (one commit per ADR, or one batched commit if convenient)**
 
 ```bash
 git add docs/adr/000*-*.md
