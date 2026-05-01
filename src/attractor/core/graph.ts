@@ -14,6 +14,7 @@ import { parseConditionClauses } from "./conditions.js";
 import { resolveGate } from "../../cli/lib/gate-registry.js";
 import { resolveInputDecl } from "../transforms/inputs-resolver.js";
 import { SYSTEM_INJECTED_VARS } from "../handlers/agent-handler.js";
+import { outputsToZod } from "../../cli/lib/outputs-to-zod.js";
 
 const SYSTEM_VARS = new Set<string>(SYSTEM_INJECTED_VARS);
 
@@ -575,6 +576,7 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
     checkMissingInputProducer(graph, nodeProduces, dotDir, diags);
     checkInputTypeMismatch(graph, dotDir, diags);
     checkOrphanOutput(graph, dotDir, diags);
+    checkOutputsSchemaShape(graph, dotDir, diags);
   }
 
   // required_caller_vars — info banner listing vars that must be supplied via --var
@@ -672,6 +674,29 @@ function checkOrphanOutput(
         rule: "orphan_output",
         severity: "warning",
         message: `Agent "${node.agent}" at node "${id}" declares output "${key}" but no downstream node consumes it (no agent input, condition=, or $${key} reference). Drop "${key}" from outputs: or wire it into a consumer.`,
+        location: node.sourceLocation,
+      });
+    }
+  }
+}
+
+function checkOutputsSchemaShape(
+  graph: Graph,
+  dotDir: string,
+  diags: Diagnostic[],
+): void {
+  for (const [id, node] of graph.nodes) {
+    if (!node.agent) continue;
+    const cfg = tryResolveAgent(node, dotDir);
+    if (!cfg?.outputs) continue;
+    try {
+      outputsToZod(cfg.outputs);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      diags.push({
+        rule: "outputs_schema_invalid",
+        severity: "error",
+        message: `Agent "${node.agent}" at node "${id}" has an invalid outputs: shape — ${msg} This will crash at runtime when the node fires.`,
         location: node.sourceLocation,
       });
     }

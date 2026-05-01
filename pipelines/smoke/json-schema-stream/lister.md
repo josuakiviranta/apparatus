@@ -1,6 +1,6 @@
 ---
 name: lister
-description: Lists files in src/cli/lib/ and returns a structured JSON array with name and description for each file
+description: Lists files in src/cli/lib/ and returns a structured JSON array of file paths
 model: haiku
 permissionMode: dangerouslySkipPermissions
 tools:
@@ -8,11 +8,7 @@ tools:
 mcp: []
 inputs: []
 outputs:
-  files:
-    type: array
-    items:
-      name: string
-      description: string
+  files: {type: array, items: string}
 ---
 
-List the files in src/cli/lib/ using the Glob tool. For each file found, write one sentence describing what it does based on its name. Then return your structured JSON output.
+List the files in src/cli/lib/ using the Glob tool. Return your structured JSON output as `{"files": ["path1", "path2", ...]}`.
