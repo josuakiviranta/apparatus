@@ -82,7 +82,6 @@ export async function meditateCommand(
       variables: {
         steer: opts.variables?.steer ?? "",
         vision: readVisionIfPresent(absPath),
-        specs_dir: opts.variables?.specs_dir ?? "docs/specs",
       },
     });
   } finally {

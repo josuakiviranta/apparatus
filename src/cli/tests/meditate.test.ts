@@ -264,19 +264,19 @@ describe("meditateCommand (shim)", () => {
     expect(calls[0].opts.variables.vision).toBe("");
   });
 
-  it("passes specs_dir default of docs/specs to pipeline runtime", async () => {
+  it("does NOT pass specs_dir to pipeline runtime", async () => {
     const calls: Array<{ dotFile: string; opts: any }> = [];
     vi.spyOn(pipelineMod, "pipelineRunCommand").mockImplementation(async (dotFile, opts) => {
       calls.push({ dotFile, opts });
     });
     await meditateCommand(tmpDir);
     expect(calls).toHaveLength(1);
-    expect(calls[0].opts.variables.specs_dir).toBe("docs/specs");
+    expect(calls[0].opts.variables).not.toHaveProperty("specs_dir");
   });
 });
 
 describe("meditate template agent prompt body — exploration scope", () => {
-  it("exploration step weights $specs_dir and src/ folders", () => {
+  it("exploration step uses discover-then-read orientation, not $specs_dir", () => {
     const agentMd = readFileSync(
       join(__dirname, "..", "pipelines", "meditate", "meditate.md"),
       "utf-8",
@@ -285,9 +285,11 @@ describe("meditate template agent prompt body — exploration scope", () => {
     expect(frontmatterMatch).not.toBeNull();
     const body = agentMd.slice(frontmatterMatch![0].length);
 
-    expect(body).toMatch(/\$specs_dir/);
-    expect(body).toContain("src/");
-    expect(body.toLowerCase()).toContain("weighted focus");
+    expect(body).not.toMatch(/\$specs_dir/);
+    expect(body).not.toMatch(/specs_dir/);
+    expect(body).toContain("CONTEXT.md");
+    expect(body).toContain("docs/adr");
+    expect(body).toMatch(/src\/.*lib\/.*app\/.*pkg\/.*cmd\/.*internal\//s);
   });
 });
 

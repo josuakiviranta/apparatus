@@ -45,14 +45,11 @@ describe("implementCommand", () => {
     );
   });
 
-  it("passes specs_dir default of docs/specs to pipeline runtime", async () => {
+  it("does NOT pass specs_dir to pipeline runtime", async () => {
     await implementCommand("/my/project", {});
-    expect(mockPipeline).toHaveBeenCalledWith(
-      "implement",
-      expect.objectContaining({
-        variables: expect.objectContaining({ specs_dir: "docs/specs" }),
-      })
-    );
+    expect(mockPipeline).toHaveBeenCalled();
+    const opts = mockPipeline.mock.calls[0][1] as { variables: Record<string, unknown> };
+    expect(opts.variables).not.toHaveProperty("specs_dir");
   });
 
   it("passes scenarios_dir='' by default (flag not set)", async () => {
