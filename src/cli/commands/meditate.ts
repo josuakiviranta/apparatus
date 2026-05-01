@@ -1,7 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from "fs";
 import { join, resolve } from "path";
 import { MCP_CONFIG_GLOB } from "../lib/agent.js";
-import { resolveBundledPipeline } from "../lib/assets.js";
 import * as output from "../lib/output.js";
 import * as self from "./pipeline.js";
 
@@ -76,8 +75,7 @@ export async function meditateCommand(
   appendMeditateGitignore(absPath);
   writePid(absPath, process.pid);
   try {
-    const dotFile = resolveBundledPipeline("meditate");
-    return await self.pipelineRunCommand(dotFile, {
+    return await self.pipelineRunCommand("meditate", {
       project: absPath,
       variables: {
         steer: opts.variables?.steer ?? "",

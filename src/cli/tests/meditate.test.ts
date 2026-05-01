@@ -207,16 +207,29 @@ describe("meditate template agent tool whitelist", () => {
 });
 
 describe("meditateCommand (shim)", () => {
-  it("delegates to pipelineRunCommand with the bundled meditate template + steer variable", async () => {
+  it("delegates to pipelineRunCommand with the bare meditate name + steer variable", async () => {
     const calls: Array<{ dotFile: string; opts: any }> = [];
     vi.spyOn(pipelineMod, "pipelineRunCommand").mockImplementation(async (dotFile, opts) => {
       calls.push({ dotFile, opts });
     });
     await meditateCommand(tmpDir, { variables: { steer: "focus on auth flow" } });
     expect(calls).toHaveLength(1);
-    expect(calls[0].dotFile.endsWith("meditate/pipeline.dot")).toBe(true);
+    expect(calls[0].dotFile).toBe("meditate");
     expect(calls[0].opts.project).toBe(tmpDir);
     expect(calls[0].opts.variables.steer).toBe("focus on auth flow");
+  });
+
+  it("hands the bare 'meditate' name through so the runtime resolver can pick a project-local override", async () => {
+    const calls: Array<{ dotFile: string; opts: any }> = [];
+    vi.spyOn(pipelineMod, "pipelineRunCommand").mockImplementation(async (dotFile, opts) => {
+      calls.push({ dotFile, opts });
+    });
+    await meditateCommand(tmpDir);
+    expect(calls).toHaveLength(1);
+    // Bare name (not an absolute path) — proves the shim defers resolution to
+    // pipelineRunCommand → resolvePipelineArg, which honors project overrides.
+    expect(calls[0].dotFile).toBe("meditate");
+    expect(calls[0].opts.project).toBe(tmpDir);
   });
 
   it("passes empty steer string when --var steer=... is omitted", async () => {
