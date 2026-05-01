@@ -590,7 +590,7 @@ EOF
 **Files:**
 - Modify: `src/cli/tests/implement-rubric.test.ts`
 
-- [ ] **Step 1: Replace the entire file content**
+- [x] **Step 1: Replace the entire file content**
 
 Use the Write tool to replace `src/cli/tests/implement-rubric.test.ts` with:
 
@@ -641,7 +641,7 @@ describe("implement template agent frontmatter — inputs declaration", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test — expect FAIL**
+- [x] **Step 2: Run the test — expect FAIL**
 
 Run: `npx vitest run src/cli/tests/implement-rubric.test.ts`
 
@@ -652,7 +652,7 @@ Expected: tests FAIL because `src/cli/pipelines/implement/implement.md` still ha
 **Files:**
 - Modify: `src/cli/pipelines/implement/implement.md`
 
-- [ ] **Step 1: Update frontmatter `inputs:` list**
+- [x] **Step 1: Update frontmatter `inputs:` list**
 
 Use Edit:
 - `old_string`: `inputs:\n  - specs_dir\n`
@@ -660,13 +660,13 @@ Use Edit:
 
 (The `outputs:` line on line 11 remains untouched.)
 
-- [ ] **Step 2: Replace step 0a**
+- [x] **Step 2: Replace step 0a**
 
 Use Edit:
 - `old_string`: ``0a. Study `$specs_dir/*` with up to 500 parallel Sonnet subagents to learn the application specifications. If `$specs_dir` is empty in the Inputs block, default to `docs/specs`.``
 - `new_string`: `0a. ` followed by the orientation block from "File Structure → Reusable shared text" (the entire block, kept on multiple lines, beginning with `**Orient before acting.**`).
 
-- [ ] **Step 3: Delete step 9999999999999**
+- [x] **Step 3: Delete step 9999999999999**
 
 Use Edit:
 - `old_string`: ``9999999999999. If you find inconsistencies in the $specs_dir/\* then use an Opus 4.5 subagent with 'ultrathink' requested to update the specs.\n``
@@ -674,7 +674,7 @@ Use Edit:
 
 (Removes the inconsistency-update step and its trailing newline so subsequent line numbering stays clean.)
 
-- [ ] **Step 4: Verify zero residue**
+- [x] **Step 4: Verify zero residue**
 
 Run: `grep -n 'specs_dir\|\$specs_dir' src/cli/pipelines/implement/implement.md`
 
@@ -685,7 +685,7 @@ Expected: no output.
 **Files:**
 - Modify: `src/cli/pipelines/implement/scenario-author.md`
 
-- [ ] **Step 1: Update frontmatter `inputs:` list**
+- [x] **Step 1: Update frontmatter `inputs:` list**
 
 Use Edit:
 - `old_string`: `  - specs_dir\n`
@@ -693,13 +693,13 @@ Use Edit:
 
 (The `inputs:` block has multiple entries — `scenarios_dir`, `record_base.sha`, etc. — so only the `specs_dir` line is removed; the block stays non-empty.)
 
-- [ ] **Step 2: Replace the body reference at line 97**
+- [x] **Step 2: Replace the body reference at line 97**
 
 Use Edit:
 - `old_string`: ``- If `$specs_dir` documents the behavior under test, use the spec wording as the source of truth — don't invent new vocabulary.``
 - `new_string`: ``- Ground vocabulary in `$project/CONTEXT.md`, `$project/README.md`, and the discovered source code. Use the project's own terminology, not invented synonyms.``
 
-- [ ] **Step 3: Verify zero residue**
+- [x] **Step 3: Verify zero residue**
 
 Run: `grep -n 'specs_dir\|\$specs_dir' src/cli/pipelines/implement/scenario-author.md`
 
@@ -710,19 +710,19 @@ Expected: no output.
 **Files:**
 - Modify: `src/cli/pipelines/implement/pipeline.dot:3`
 
-- [ ] **Step 1: Update inputs declaration**
+- [x] **Step 1: Update inputs declaration**
 
 Use Edit:
 - `old_string`: `  inputs="specs_dir,max_iterations,llm_model,scenarios_dir"`
 - `new_string`: `  inputs="max_iterations,llm_model,scenarios_dir"`
 
-- [ ] **Step 2: Confirm exact landed value**
+- [x] **Step 2: Confirm exact landed value**
 
 Run: `grep -n 'inputs=' src/cli/pipelines/implement/pipeline.dot`
 
 Expected output (line 3): `  inputs="max_iterations,llm_model,scenarios_dir"` — Chunk 5 Task 5.2 will assert this verbatim.
 
-- [ ] **Step 3: Validate**
+- [x] **Step 3: Validate**
 
 Run: `npx tsx src/cli/index.ts pipeline validate src/cli/pipelines/implement/pipeline.dot`
 
@@ -730,19 +730,19 @@ Expected: OK.
 
 ### Task 3.5: Run rubric tests + commit
 
-- [ ] **Step 1: Run the rubric tests — expect PASS**
+- [x] **Step 1: Run the rubric tests — expect PASS**
 
 Run: `npx vitest run src/cli/tests/implement-rubric.test.ts`
 
 Expected: PASS.
 
-- [ ] **Step 2: Run full vitest to surface other regressions**
+- [x] **Step 2: Run full vitest to surface other regressions**
 
 Run: `npx vitest run --reporter=default`
 
 Expected: rubric test passes; `implement.test.ts` may now FAIL (CLI command still passes `specs_dir`); `pipeline-implement-folder.test.ts` may FAIL. Those are addressed in Chunk 4–5. Note the failures and proceed.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/cli/pipelines/implement/ src/cli/tests/implement-rubric.test.ts

@@ -13,7 +13,6 @@ tools:
 mcp: []
 inputs:
   - scenarios_dir
-  - specs_dir
   - record_base.sha
 outputs:
   tests_written: boolean
@@ -96,7 +95,7 @@ Rules of thumb:
 - One scenario per behavior. Don't bundle.
 - `## Action` is ONE command. If verifying a flow needs multiple commands, the supporting ones go in `## Setup`.
 - `## Expect` bullets are atomic and observable. "produces correct output" is not a bullet; "stdout contains 'AGENTS.md'" is.
-- If `$specs_dir` documents the behavior under test, use the spec wording as the source of truth — don't invent new vocabulary.
+- Ground vocabulary in `$project/CONTEXT.md`, `$project/README.md`, and the discovered source code. Use the project's own terminology, not invented synonyms.
 
 ## Phase 5 — Commit
 

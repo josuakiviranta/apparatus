@@ -6,14 +6,27 @@ permissionMode: dangerouslySkipPermissions
 tools: []
 mcp: []
 loop: true
-inputs:
-  - specs_dir
+inputs: []
 outputs:
   done: boolean
 ---
 
 0. **Skill invocation (mandatory, first action).** Before any reading, planning, or coding, invoke the `superpowers:subagent-driven-development` skill via the Skill tool. Invoke `superpowers:test-driven-development` before each chunk's implementation phase. These skills are the operating contract — not aspirational guidance. Skipping them is a procedure violation.
-0a. Study `$specs_dir/*` with up to 500 parallel Sonnet subagents to learn the application specifications. If `$specs_dir` is empty in the Inputs block, default to `docs/specs`.
+0a. **Orient before acting.** First, discover the project layout:
+
+- Source root: Glob `$project` for `src/`, `lib/`, `app/`, `pkg/`, `cmd/`, `internal/` — pick directories that exist.
+- Docs root: Glob `$project` for `docs/`, `documentation/`, `architecture/` — pick what exists.
+- ADR location: under the discovered docs root, look for `adr/` or `decisions/` (canonical: `docs/adr/`).
+
+Then dispatch parallel Sonnet subagents (up to 100) to read concurrently:
+
+- `$project/CONTEXT.md` if present (domain language)
+- All files in the discovered ADR location, if any
+- `$project/README.md` (mission + command surface)
+- File inventory of each discovered source root — one subagent per top-level subdir, returns file list + one-paragraph role summary
+- Output of `git log --since="2 weeks ago" --oneline` from `$project`
+
+Each subagent returns a brief summary of its slice. For code-level facts during work, Grep/Glob the discovered source roots on demand.
 0b. Study @IMPLEMENTATION_PLAN.md.
 0d. For reference, the application source code is in `src/*`.
 
@@ -34,7 +47,6 @@ outputs:
 9999999999. For any bugs you notice, resolve them or document them in @IMPLEMENTATION_PLAN.md using a subagent even if it is unrelated to the current piece of work.
 99999999999. Implement functionality completely. Placeholders and stubs waste efforts and time redoing the same work.
 999999999999. When @IMPLEMENTATION_PLAN.md becomes large periodically clean out the items that are completed from the file using a subagent.
-9999999999999. If you find inconsistencies in the $specs_dir/\* then use an Opus 4.5 subagent with 'ultrathink' requested to update the specs.
 99999999999999. IMPORTANT: Keep @AGENTS.md operational only — status updates and progress notes belong in `IMPLEMENTATION_PLAN.md`. A bloated AGENTS.md pollutes every future loop's context.
 9999999999999999. Use tmux harnessing tools to verify output for terminal outputs and other terminal UI related implementations.
 
