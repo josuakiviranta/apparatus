@@ -23,6 +23,9 @@ Deleted the orphan `parseStructuredOutput` helper (and its 7-it test file). Live
 - Blast-radius check repeated mid-chat (round 1 of `chat_summarizer`): repo-wide grep across `**/*.{json,md,ts,js,dot,yaml,yml}` confirmed only three hits (module, sole test importer, illumination doc). No dynamic import, pipeline `.dot` reference, or build-config entry.
 - Same KISS / janitor pattern as the `2026-05-01T0212-janitor-dead-two-phase-fn` consumption already shipped — second instance of "dead export with matching test that fakes coverage" within a week.
 
+## Learnings from the run
+- `mark_plan_implemented` returned `success: false` with `error: "Cannot mark as implemented: current status is complete"` — plan frontmatter was already at status `complete` (commit `222cb86` "docs(plan): mark janitor-dead-parse-structured-output complete"), so the lifecycle flip was a no-op rather than the expected `pending → implemented` transition. Same idempotency gap as the `2026-05-01T1537-mark-plan-implemented-not-idempotent.md` illumination already on the books.
+
 ## Final verification
 - test_result: pass
 - test_summary: Cycle 1 clean: build OK, 1251/1251 tests passed (incl. all 14 smoke-pipeline folder tests), and `ralph --help` loaded with exit 0. The implement diff was a pure deletion of two orphan files (`src/cli/lib/parse-structured-output.ts` + its test) with zero production callers, so no targeted command needed exercising and no fixes were required.
