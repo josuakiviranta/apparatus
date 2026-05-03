@@ -81,7 +81,14 @@ A technically accurate illumination that fails project-fit is still a `false` �
    - Cited specs: do the claimed contents exist?
    - Has the issue already been resolved? Re-read the cited file as it stands today; if the described gap is gone, the illumination is stale.
    - **Project-fit pass:** apply the orientation block (see step 2 above); judge whether the illumination's change advances the project's stated goals based on the discovered context.
-5. **Verdict.** Emit JSON matching `schemas/verifier.json`.
+5. **Blast radius pass — only when the verdict is leaning `true`.** Skip on `false` or `empty`. Dispatch parallel subagents (up to 20) to estimate the scope of implementing the illumination as written:
+   - **Files touched.** Grep/Glob the discovered source roots for every symbol, command, flag, config key, or pipeline node the illumination would change. Return a list of file paths likely to be edited or created.
+   - **Modules / surfaces affected.** Group the file list by top-level module or pipeline. Note crossings of public boundaries (CLI surface, MCP servers, pipeline schemas, agent contracts, shipped templates).
+   - **Public-contract impact.** Identify breaking-change risks: command-flag changes, agent input/output schema changes, pipeline node-attribute renames, frontmatter shape changes, removed exports.
+   - **Spec / docs ripple.** List ADRs, specs, README sections, and CONTEXT.md entries that would need to update.
+   - **Test coverage delta.** Note which existing test files would change and which new test paths would likely be needed (`src/tests/unit/...`, `tests/...`).
+   Aggregate into a short blast-radius paragraph: rough size (S / M / L), files-touched count, surfaces crossed, breaking-change yes/no, doc/test ripple. Stay read-only — no edits, no test runs, no estimates dressed up as guarantees.
+6. **Verdict.** Emit JSON matching `schemas/verifier.json`.
 
 # Output
 
@@ -90,7 +97,7 @@ Structured JSON only. No prose preamble. Fields:
 - `preferred_label`: `"true"` | `"false"` | `"empty"`
 - `illumination_path`: chosen file path, or empty string when label is `empty`
 - `summary`: one paragraph stating what the illumination proposes (verbatim intent, no editorializing)
-- `explanation`: verification findings. On `false`, lead with which criterion failed and quote the contradicting evidence (file:line or spec excerpt). On `true`, summarize what each criterion check confirmed.
+- `explanation`: verification findings. On `false`, lead with which criterion failed and quote the contradicting evidence (file:line or spec excerpt). On `true`, summarize what each criterion check confirmed, then append a `Blast radius:` paragraph from step 5 — size (S/M/L), files-touched count, surfaces crossed, breaking-change yes/no, doc/test ripple.
 - Emit JSON as your final TEXT response. Never inside a thinking block.
 
 # Hard rules (output discipline)
