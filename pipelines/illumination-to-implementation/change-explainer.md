@@ -71,6 +71,18 @@ Bullet list of what's in and what's out. Maximum **4 bullets**. No prose.
 
 **Do not** include a separate "Affected files" section — the `path:line` citations in section 1 already carry that information; a repeated path list is redundant and pads the render.
 
+### 4. Blast radius
+
+Read the `Blast radius:` paragraph at the tail of `$verifier.explanation` and lift its findings into a short bullet list. Maximum **5 bullets**, in this order when the data is present:
+
+- **Size:** S / M / L
+- **Files touched:** approximate count + the top crossed surfaces (CLI / pipeline / agents / docs)
+- **Breaking change:** yes / no — name the contract if yes (flag, schema, frontmatter shape, exported type)
+- **Spec / docs ripple:** ADRs, specs, README sections likely to update — by name
+- **Test ripple:** existing test files affected and likely-new test paths
+
+If the verifier did not produce a blast-radius paragraph (e.g. legacy run), write a single line: "Blast radius not estimated upstream." Do not invent numbers.
+
 # Procedure
 
 1. Read the illumination at `$verifier_illumination_path` fully.
@@ -81,14 +93,14 @@ Bullet list of what's in and what's out. Maximum **4 bullets**. No prose.
    - If the illumination proposes a command/output change, simulate or read the current output source (printer, formatter, template) to show the real "before".
    - For spec changes, quote the current spec text.
 5. **Draft Tier 1 first.** Close the repo in your head; write 3 jargon-free sentences from the reader's perspective. Verify: could someone who has never opened this codebase understand it? If not, rewrite.
-6. Draft Tier 2 underneath: `## What changes`, `## Why now`, `## Scope`. Respect the word and bullet caps strictly.
+6. Draft Tier 2 underneath: `## What changes`, `## Why now`, `## Scope`, `## Blast radius`. Respect the word and bullet caps strictly. The Blast radius bullets come from the `Blast radius:` paragraph at the tail of `$verifier.explanation` — lift, do not re-derive.
 7. Return as the `explainer_render` field in structured JSON.
 
 # Output
 
 Structured JSON matching the schema. Single field:
 
-- `explainer_render`: a markdown string. Tier 1 headings first, in order: `## In plain words`, `## Analog`, `## Simple output example`. Then Tier 2: `## What changes`, `## Why now`, `## Scope`. Use `##` for all section headings.
+- `explainer_render`: a markdown string. Tier 1 headings first, in order: `## In plain words`, `## Analog`, `## Simple output example`. Then Tier 2: `## What changes`, `## Why now`, `## Scope`, `## Blast radius`. Use `##` for all section headings.
 
 No preamble, no wrapping prose. Just the markdown.
 

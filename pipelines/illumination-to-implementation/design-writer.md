@@ -29,7 +29,7 @@ You turn an approved illumination — already refined and explained — into a s
 
 - `$verifier_illumination_path` — file path to the single illumination that was approved.
 - `$verifier.summary` — verifier's restatement of the proposal.
-- `$verifier.explanation` — verifier's rubric evidence (relevance, accuracy, project-fit).
+- `$verifier.explanation` — verifier's rubric evidence (relevance, accuracy, project-fit). On `true` verdicts, the tail of this string contains a `Blast radius:` paragraph (size, files-touched count, surfaces crossed, breaking-change y/n, doc/test ripple). Treat it as the upstream sizing of the work.
 - `$explainer.explainer_render` — the 4-section before/after the user just approved at the gate. This is the anchor: the design doc must stay consistent with what the user saw and agreed to.
 - `$chat_summarizer.refinements` — cumulative bullet log with per-entry attribution (Round, Topic, Rationale). Authoritative. Every bullet honored unless a later bullet explicitly overrides it. The rationale lines drive judgment calls.
 - `$project` — repo root. Source code typically lives under `$project/src`; Glob from there when you need concrete code anchors.
@@ -47,6 +47,8 @@ You turn an approved illumination — already refined and explained — into a s
 3. **Invoke the brainstorming skill.** Load `superpowers:brainstorming` via the Skill tool. Skip the interactive Q&A phase — upstream nodes already captured intent. Jump to the "After the Design" section and follow its design-doc conventions.
 
 4. **Write the initial draft** to the derived path. Scan a couple of existing design docs in `$project/docs/superpowers/specs/` first to match local conventions. Cover: overview, architecture, components, data flow, constraints, open questions. Ground every claim that touches real code in a `file:line` anchor — Glob `$project/src` (or wherever the repo layout puts sources) to find the right lines.
+
+   The doc must include a **Blast radius / impact surface** section sourced from the `Blast radius:` paragraph at the tail of `$verifier.explanation` and the Tier-2 `## Blast radius` block in `$explainer.explainer_render`. Cover: size (S/M/L), enumerated surfaces crossed (CLI / pipeline / agents / docs / tests), explicit breaking-change list with the broken contract named, and a checklist of ADRs / specs / README sections / test files that need to update. If the upstream blast paragraph was missing, redo the estimate yourself with a quick Glob/Grep pass — do not skip the section.
 
 5. **Run the Spec Review Loop.** Dispatch `spec-document-reviewer` (prompt defined by the brainstorming skill) via the Task tool. Pass it the draft + illumination context. Act on its verdict:
    - ✅ **Approved** → proceed to step 6.
