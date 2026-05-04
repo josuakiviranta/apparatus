@@ -77,8 +77,8 @@ describe("pipeline run pre-flight check", () => {
 describe("pipeline list shows requires:", () => {
   it("prints 'requires:' for pipelines with inputs=, omits it for legacy pipelines", () => {
     const project = mkdtempSync(join(tmpdir(), "ralph-list-"));
-    const pipelinesDir = join(project, "pipelines");
-    mkdirSync(pipelinesDir);
+    const pipelinesDir = join(project, ".ralph", "pipelines");
+    mkdirSync(pipelinesDir, { recursive: true });
     writeFileSync(join(pipelinesDir, "with-inputs.dot"), `digraph with_inputs {
       goal="declares contract"
       inputs="foo, bar"
