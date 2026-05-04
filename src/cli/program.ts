@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { implementCommand } from "./commands/implement";
 import { meditateCommand } from "./commands/meditate";
+import { initCommand } from "./commands/init";
 import { registerHeartbeatCommand } from "./commands/heartbeat";
 import {
   pipelineRunCommand,
@@ -22,6 +23,10 @@ export function createProgram(): Command {
   program.addHelpText(
     "after",
     `
+Bootstrap a project:
+  mkdir my-app && cd my-app && ralph init    Scaffold a fresh ralph project
+  ralph init                                  Initialize cwd as a ralph project
+
 Getting started (typical workflow):
   ralph implement my-app                  Run the agentic build loop (Ctrl-C to stop)
   ralph implement my-app --max 3          Run at most 3 iterations
@@ -82,6 +87,14 @@ Meditation (restricted insight sessions):
     .option("--scenarios <path>", "Relative path under <project-folder> for scenario tests; enables scenario-author + tester branch (requires tmux)")
     .action(async (projectFolder: string, options: { max?: number; model?: string; scenarios?: string }) => {
       await implementCommand(projectFolder, options);
+    });
+
+  program
+    .command("init [project-folder]")
+    .description("Scaffold .ralph/ tree in the project folder (defaults to cwd). Idempotent.")
+    .addHelpText("after", "\nExamples:\n  ralph init             # in cwd\n  ralph init my-app      # in ./my-app\n\nCreates .ralph/{pipelines,meditations,memory,docs/adr,runs}, scaffolds empty\nVISION.md and CONTEXT.md, runs 'git init -b main' if not already a repo, and\nappends .ralph/runs/ to .gitignore. Safe to run on existing projects — never\noverwrites files.\n")
+    .action(async (projectFolder?: string) => {
+      await initCommand(projectFolder ?? process.cwd());
     });
 
   program

@@ -175,7 +175,7 @@ without git instead of failing.
 - Test: `src/cli/tests/init.test.ts`
 - Modify: `src/cli/program.ts` (register the command + update top-level help-after examples)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // src/cli/tests/init.test.ts
@@ -283,12 +283,12 @@ describe("ralph init", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run src/cli/tests/init.test.ts`
 Expected: FAIL with module-not-found.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 ```ts
 // src/cli/commands/init.ts
@@ -356,12 +356,12 @@ function appendGitignoreLine(projectRoot: string, line: string): void {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run src/cli/tests/init.test.ts`
 Expected: 10 passing (or 9 + 1 skipped if no git).
 
-- [ ] **Step 5: Register the command in program.ts**
+- [x] **Step 5: Register the command in program.ts**
 
 Modify `src/cli/program.ts`:
 
@@ -387,12 +387,12 @@ Modify `src/cli/program.ts`:
      ralph init                                  Initialize cwd as a ralph project
    ```
 
-- [ ] **Step 6: Run full test suite + check cli-commands test**
+- [x] **Step 6: Run full test suite + check cli-commands test**
 
 Run: `npx vitest run`
 Expected: full suite green. Open `src/cli/tests/cli-commands.test.ts` — if it enumerates registered commands, add `init` to the expected list.
 
-- [ ] **Step 7: Build + smoke**
+- [x] **Step 7: Build + smoke**
 
 ```bash
 npm run build
@@ -406,7 +406,7 @@ rm -rf /tmp/ralph-init-smoke
 
 Expected: full tree present, .gitignore contains `.ralph/runs/`, `.git/` exists.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/cli/commands/init.ts src/cli/tests/init.test.ts src/cli/program.ts

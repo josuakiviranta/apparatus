@@ -1,0 +1,103 @@
+// src/cli/tests/init.test.ts
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { execSync } from "node:child_process";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { initCommand } from "../commands/init.js";
+
+function gitAvailable(): boolean {
+  try { execSync("git --version", { stdio: "ignore" }); return true; }
+  catch { return false; }
+}
+
+describe("ralph init", () => {
+  let projectDir: string;
+
+  beforeEach(() => {
+    projectDir = mkdtempSync(join(tmpdir(), "ralph-init-test-"));
+  });
+  afterEach(() => {
+    rmSync(projectDir, { recursive: true, force: true });
+  });
+
+  it("scaffolds the .ralph/ tree on a fresh directory", async () => {
+    await initCommand(projectDir);
+
+    expect(existsSync(join(projectDir, ".ralph"))).toBe(true);
+    expect(existsSync(join(projectDir, ".ralph/pipelines"))).toBe(true);
+    expect(existsSync(join(projectDir, ".ralph/meditations/illuminations"))).toBe(true);
+    expect(existsSync(join(projectDir, ".ralph/meditations/stimuli"))).toBe(true);
+    expect(existsSync(join(projectDir, ".ralph/memory"))).toBe(true);
+    expect(existsSync(join(projectDir, ".ralph/docs/adr"))).toBe(true);
+    expect(existsSync(join(projectDir, ".ralph/VISION.md"))).toBe(true);
+    expect(existsSync(join(projectDir, ".ralph/CONTEXT.md"))).toBe(true);
+  });
+
+  it("scaffolds README.md at root if absent", async () => {
+    await initCommand(projectDir);
+    expect(existsSync(join(projectDir, "README.md"))).toBe(true);
+  });
+
+  it("does not overwrite an existing README.md", async () => {
+    writeFileSync(join(projectDir, "README.md"), "existing content");
+    await initCommand(projectDir);
+    expect(readFileSync(join(projectDir, "README.md"), "utf8")).toBe("existing content");
+  });
+
+  it("does not overwrite an existing VISION.md", async () => {
+    mkdirSync(join(projectDir, ".ralph"), { recursive: true });
+    writeFileSync(join(projectDir, ".ralph/VISION.md"), "my vision");
+    await initCommand(projectDir);
+    expect(readFileSync(join(projectDir, ".ralph/VISION.md"), "utf8")).toBe("my vision");
+  });
+
+  it("appends .ralph/runs/ to .gitignore (creating the file if absent)", async () => {
+    await initCommand(projectDir);
+    const gitignore = readFileSync(join(projectDir, ".gitignore"), "utf8");
+    expect(gitignore).toContain(".ralph/runs/");
+  });
+
+  it("does not duplicate the .ralph/runs/ line on second invocation", async () => {
+    await initCommand(projectDir);
+    await initCommand(projectDir);
+    const gitignore = readFileSync(join(projectDir, ".gitignore"), "utf8");
+    const matches = gitignore.match(/^\.ralph\/runs\/$/gm) ?? [];
+    expect(matches.length).toBe(1);
+  });
+
+  it("is idempotent — running twice yields the same tree", async () => {
+    await initCommand(projectDir);
+    const firstSnapshot = JSON.stringify({
+      vision: readFileSync(join(projectDir, ".ralph/VISION.md"), "utf8"),
+      context: readFileSync(join(projectDir, ".ralph/CONTEXT.md"), "utf8"),
+    });
+    await initCommand(projectDir);
+    const secondSnapshot = JSON.stringify({
+      vision: readFileSync(join(projectDir, ".ralph/VISION.md"), "utf8"),
+      context: readFileSync(join(projectDir, ".ralph/CONTEXT.md"), "utf8"),
+    });
+    expect(secondSnapshot).toBe(firstSnapshot);
+  });
+
+  it("fills in missing subfolders on a partial existing .ralph/", async () => {
+    mkdirSync(join(projectDir, ".ralph/pipelines"), { recursive: true });
+    // .ralph/ exists with only pipelines/; meditations/, memory/, docs/ are missing
+    await initCommand(projectDir);
+    expect(existsSync(join(projectDir, ".ralph/meditations/illuminations"))).toBe(true);
+    expect(existsSync(join(projectDir, ".ralph/memory"))).toBe(true);
+    expect(existsSync(join(projectDir, ".ralph/docs/adr"))).toBe(true);
+  });
+
+  it.skipIf(!gitAvailable())("runs git init if the directory is not a repo", async () => {
+    await initCommand(projectDir);
+    expect(existsSync(join(projectDir, ".git"))).toBe(true);
+  });
+
+  it("does not re-init an existing git repo", async () => {
+    mkdirSync(join(projectDir, ".git"), { recursive: true });
+    writeFileSync(join(projectDir, ".git/sentinel"), "marker");
+    await initCommand(projectDir);
+    expect(readFileSync(join(projectDir, ".git/sentinel"), "utf8")).toBe("marker");
+  });
+});
