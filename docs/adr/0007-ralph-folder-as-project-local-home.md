@@ -65,3 +65,7 @@ Run state moves from `~/.ralph/<projectKey>/runs/` into
   specificity is handled by runtime variables." That stance is reversed:
   pipelines can now live per-project so meditation can iterate on them.
   Bundled pipelines remain the cross-project tier.
+
+---
+
+**Update 2026-05-04:** Partly superseded by [ADR-0008](0008-partial-revert-of-ralph-folder.md). The clauses of this ADR placing `CONTEXT.md`, `VISION.md`, `docs/adr/`, and the unused `memory/` slot under `.ralph/` are reversed; the remainder (project-local pipelines, meditations, run state, two-tier resolver) stands.

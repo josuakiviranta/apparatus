@@ -714,15 +714,15 @@ Goal: capture the decision in the ADR system. ADR-0008 defines the partition pri
 
 ### Tasks
 
-- [ ] **6.1: Read ADR-0007 to understand its structure.**
+- [x] **6.1: Read ADR-0007 to understand its structure.**
 
 Read `docs/adr/0007-ralph-folder-as-project-local-home.md`. Note its sections (Status, Context, Decision, Consequences, etc.) and the layout-tree block in Decision.
 
-- [ ] **6.2: Read 1-2 prior ADRs (e.g. 0001, 0002) to mirror style.**
+- [x] **6.2: Read 1-2 prior ADRs (e.g. 0001, 0002) to mirror style.**
 
 The repo's ADR style: short Markdown, MADR-ish. Match heading levels and prose voice.
 
-- [ ] **6.3: Write `docs/adr/0008-partial-revert-of-ralph-folder.md`.**
+- [x] **6.3: Write `docs/adr/0008-partial-revert-of-ralph-folder.md`.**
 
 When writing the "Supersedes (in part)" section, **quote the verbatim layout-tree fragment** from ADR-0007's Decision section (the lines showing `.ralph/CONTEXT.md`, `.ralph/VISION.md`, `.ralph/docs/adr/`, `.ralph/memory/`). Per spec §2 item 7, the supersession must reference specific lines, not just describe them.
 
@@ -797,7 +797,7 @@ The `.ralph/memory/` slot is removed. Session-closure files written by the `memo
 - Plan: `docs/superpowers/plans/2026-05-04-ralph-folder-partial-revert.md` — implementation plan.
 ```
 
-- [ ] **6.4: Add ADR-0007 footer.**
+- [x] **6.4: Add ADR-0007 footer.**
 
 Append at end of `docs/adr/0007-ralph-folder-as-project-local-home.md`:
 
@@ -808,7 +808,7 @@ Append at end of `docs/adr/0007-ralph-folder-as-project-local-home.md`:
 **Update 2026-05-04:** Partly superseded by [ADR-0008](0008-partial-revert-of-ralph-folder.md). The clauses of this ADR placing `CONTEXT.md`, `VISION.md`, `docs/adr/`, and the unused `memory/` slot under `.ralph/` are reversed; the remainder (project-local pipelines, meditations, run state, two-tier resolver) stands.
 ```
 
-- [ ] **6.5: Run `grep -rn` sanity check.**
+- [x] **6.5: Run `grep -rn` sanity check.**
 
 ```bash
 grep -rn 'ADR-0008\|0008-partial-revert' docs/adr/ CONTEXT.md VISION.md README.md
@@ -816,12 +816,12 @@ grep -rn 'ADR-0008\|0008-partial-revert' docs/adr/ CONTEXT.md VISION.md README.m
 
 Expected: hits in ADR-0007 footer (one), ADR-0008 file (multiple, self-references), CONTEXT.md (the supersession footer added in chunk 5), VISION.md (line 32 reference). Cross-references coherent.
 
-- [ ] **6.6: Run full test suite.**
+- [x] **6.6: Run full test suite.**
 
 Run: `npx tsc --noEmit && npx vitest run`
 Expected: PASS.
 
-- [ ] **6.7: Commit.**
+- [x] **6.7: Commit.**
 
 ```bash
 git add docs/adr/0008-partial-revert-of-ralph-folder.md \
