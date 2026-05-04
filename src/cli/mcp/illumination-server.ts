@@ -97,6 +97,38 @@ export function consume(
   return { success: true, filename, reason };
 }
 
+export function consumePlan(
+  projectRoot: string,
+  filename: string,
+  reason: ConsumeReason,
+): { success: true; filename: string; reason: ConsumeReason }
+  | { success: false; error: string } {
+  const fnErr = validateFilename(filename);
+  if (fnErr) throw new Error(fnErr);
+  if (reason !== "implemented" && reason !== "declined") {
+    throw new Error(`Invalid reason "${reason}". Must be "implemented" or "declined".`);
+  }
+
+  const filePath = join(projectRoot, "docs", "superpowers", "plans", filename);
+  if (!existsSync(filePath)) {
+    return { success: false, error: "Plan file not found" };
+  }
+
+  rmSync(filePath);
+
+  try {
+    execSync(`git -C "${projectRoot}" rm "${filePath}"`, { stdio: "ignore" });
+    execSync(
+      `git -C "${projectRoot}" commit -m "meditate: consume ${filename} (${reason})"`,
+      { stdio: "ignore" },
+    );
+  } catch {
+    // git unavailable / not a repo / nothing to commit — non-fatal, file already removed.
+  }
+
+  return { success: true, filename, reason };
+}
+
 export function assertWithinRoot(inputPath: string, projectRoot: string): void {
   const resolvedPath = resolve(inputPath);
   const resolvedRoot = resolve(projectRoot);
@@ -485,6 +517,24 @@ if (!isTestEnv) {
       },
       async ({ filename, reason }: { filename: string; reason: "implemented" | "declined" }) => {
         const result = consume(projectRoot, filename, reason);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      },
+    );
+
+    server.tool(
+      "consume_plan",
+      "Consume an implementation plan — delete the file from docs/superpowers/plans/ and commit the deletion. " +
+        "Use reason='implemented' after the implement loop succeeds and the plan's work has shipped. " +
+        "Use reason='declined' when the operator rejects the plan at the gate. " +
+        "Commit message format: 'meditate: consume <filename> (<reason>)' — searchable via git log --grep.",
+      {
+        filename: z.string(),
+        reason: z.enum(["implemented", "declined"]),
+      },
+      async ({ filename, reason }: { filename: string; reason: "implemented" | "declined" }) => {
+        const result = consumePlan(projectRoot, filename, reason);
         return {
           content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
         };

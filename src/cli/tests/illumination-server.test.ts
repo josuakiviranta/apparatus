@@ -11,7 +11,7 @@ vi.mock("node:child_process", () => ({
   execSync: mockExecSync,
 }));
 
-import { validateFilename, validateSlug, composeIlluminationFilename, writeIllumination, assertWithinRoot, readFile, validateGlobPattern, globFiles, projectTree, listMetaMeditations, readMetaMeditation, listIlluminations, listPlans, markPlanImplemented, consume } from "../mcp/illumination-server";
+import { validateFilename, validateSlug, composeIlluminationFilename, writeIllumination, assertWithinRoot, readFile, validateGlobPattern, globFiles, projectTree, listMetaMeditations, readMetaMeditation, listIlluminations, listPlans, markPlanImplemented, consume, consumePlan } from "../mcp/illumination-server";
 
 let tmpDir: string;
 
@@ -739,5 +739,64 @@ describe("listIlluminations — single-folder semantics", () => {
 
   it("returns the no-illuminations sentinel when folder is empty", () => {
     expect(listIlluminations(tmpDir)).toMatch(/no illuminations found/i);
+  });
+});
+
+describe("consumePlan", () => {
+  function seedPlan(filename: string, body = "# Plan body\n"): string {
+    const dir = join(tmpDir, "docs", "superpowers", "plans");
+    mkdirSync(dir, { recursive: true });
+    const filePath = join(dir, filename);
+    writeFileSync(filePath, body, "utf8");
+    return filePath;
+  }
+
+  it("deletes the plan file from disk", () => {
+    const filePath = seedPlan("2026-05-04-x.md");
+    consumePlan(tmpDir, "2026-05-04-x.md", "implemented");
+    expect(existsSync(filePath)).toBe(false);
+  });
+
+  it("commits with reason in the message — implemented", () => {
+    seedPlan("2026-05-04-x.md");
+    consumePlan(tmpDir, "2026-05-04-x.md", "implemented");
+    const calls = mockExecSync.mock.calls.map((c) => c[0] as string);
+    expect(calls.some((cmd) => cmd.includes("git -C") && cmd.includes("rm"))).toBe(true);
+    expect(calls.some((cmd) => cmd.includes("commit -m") && cmd.includes("(implemented)"))).toBe(true);
+  });
+
+  it("commits with reason in the message — declined", () => {
+    seedPlan("2026-05-04-y.md");
+    consumePlan(tmpDir, "2026-05-04-y.md", "declined");
+    const calls = mockExecSync.mock.calls.map((c) => c[0] as string);
+    expect(calls.some((cmd) => cmd.includes("commit -m") && cmd.includes("(declined)"))).toBe(true);
+  });
+
+  it("rejects invalid filenames", () => {
+    expect(() => consumePlan(tmpDir, "../oops", "declined")).toThrow(/Invalid filename/);
+  });
+
+  it("rejects unknown reasons", () => {
+    seedPlan("2026-05-04-z.md");
+    expect(() => consumePlan(tmpDir, "2026-05-04-z.md", "archived" as never)).toThrow(/reason/i);
+  });
+
+  it("returns success descriptor with consumed filename", () => {
+    seedPlan("2026-05-04-r.md");
+    const result = consumePlan(tmpDir, "2026-05-04-r.md", "implemented");
+    expect(result).toEqual({ success: true, filename: "2026-05-04-r.md", reason: "implemented" });
+  });
+
+  it("returns failure when file does not exist", () => {
+    const result = consumePlan(tmpDir, "2026-05-04-missing.md", "implemented");
+    expect(result).toEqual({ success: false, error: "Plan file not found" });
+  });
+
+  it("does not throw when git commands fail (fail-open, file already removed)", () => {
+    const filePath = seedPlan("2026-05-04-fail-open.md");
+    mockExecSync.mockImplementation(() => { throw new Error("git not found"); });
+    const result = consumePlan(tmpDir, "2026-05-04-fail-open.md", "implemented");
+    expect(result).toEqual({ success: true, filename: "2026-05-04-fail-open.md", reason: "implemented" });
+    expect(existsSync(filePath)).toBe(false);
   });
 });
