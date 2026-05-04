@@ -1,1443 +1,1088 @@
----
-status: complete
----
-
-# Source-as-Truth — Excise `docs/specs/` Implementation Plan
+# `.ralph/` as Project-Local Home — Implementation Plan
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Delete the hand-authored `docs/specs/` behavioral-specs folder, replace `$specs_dir` reads in pipeline agents with a discover-then-read orientation, and consolidate decision rationale into ADRs — so source code, `CONTEXT.md`, and `docs/adr/` become the only authoritative documentation.
+**Goal:** Move every ralph-touchable artifact in a target project under a single `<project>/.ralph/` folder, ship a `ralph init` command that scaffolds it, and migrate ralph-cli's own repo to the new layout.
 
-**Architecture:** Two parallel transformations. (1) **Decision capture:** salvage non-derivable WHY content from the 11 spec files into ADRs before deletion. (2) **Pattern excision:** every `$specs_dir` reference across four pipelines (`pipelines/illumination-to-implementation/`, `src/cli/pipelines/{implement,meditate,janitor}/`) and two CLI commands (`src/cli/commands/{implement,meditate}.ts`) is removed; affected agents adopt a shared discover-then-read orientation block (Glob source/docs roots → read CONTEXT.md + ADRs + README + live source inventory). Test contracts asserting the old pattern are deleted or rewritten.
+**Architecture:** Centralize path constants in a new `src/cli/lib/ralph-paths.ts` module, port every path-using site (MCP server, run-state I/O in `pipeline.ts`, pipeline-resolver) to the new module, then `git mv` ralph-cli's own files into `.ralph/` atomically. Bundled pipelines stay in `src/cli/pipelines/`; project-local pipelines override at `<project>/.ralph/pipelines/`.
 
-**Tech Stack:** TypeScript, vitest, tsup, ts-graphviz/ast pipeline parser. No new dependencies.
+**Tech Stack:** TypeScript, vitest, commander, tsup. No new runtime dependencies.
 
-**Spec:** `docs/superpowers/specs/2026-05-01-source-as-truth-no-behavioral-specs-design.md`
-
----
-
-## File Structure
-
-### New files
-
-- `docs/adr/0004-source-and-context-as-truth-no-behavioral-specs.md` — ADR capturing this decision
-- `docs/adr/0005-NN-…` (zero or more) — ADRs salvaged from `docs/specs/`
-
-### Modified files
-
-**Pipeline definitions:**
-- `pipelines/illumination-to-implementation/pipeline.dot`
-- `src/cli/pipelines/implement/pipeline.dot`
-- `src/cli/pipelines/meditate/pipeline.dot`
-- `src/cli/pipelines/janitor/pipeline.dot`
-
-**Pipeline agent prompts:**
-- `pipelines/illumination-to-implementation/{design-writer,plan-writer,verifier,implement}.md`
-- `src/cli/pipelines/implement/{implement,scenario-author}.md`
-- `src/cli/pipelines/meditate/meditate.md`
-
-**CLI command code:**
-- `src/cli/commands/implement.ts`
-- `src/cli/commands/meditate.ts`
-
-**Tests:**
-- `src/cli/tests/implement.test.ts`
-- `src/cli/tests/meditate.test.ts`
-- `src/cli/tests/implement-rubric.test.ts`
-- `src/cli/tests/pipeline-implement-folder.test.ts`
-- `src/cli/tests/pipeline.test.ts`
-- `src/attractor/tests/illumination-pipeline-flow.test.ts`
-
-**Repo content:**
-- `README.md` (lines 60, 158–170, 183–185)
-- `CONTEXT.md` (append "Documentation channels" section)
-
-### Deleted files / folders
-
-- `docs/specs/` — entire folder removed
-- `docs/orientation/directory-inventory.md` — folder if empty
-
-### Reusable shared text
-
-The discover-then-read orientation block (referenced by §3.2 of the spec) appears verbatim in four agent files. Use this exact text when the plan says "insert orientation block":
-
-```markdown
-**Orient before acting.** First, discover the project layout:
-
-- Source root: Glob `$project` for `src/`, `lib/`, `app/`, `pkg/`, `cmd/`, `internal/` — pick directories that exist.
-- Docs root: Glob `$project` for `docs/`, `documentation/`, `architecture/` — pick what exists.
-- ADR location: under the discovered docs root, look for `adr/` or `decisions/`.
-
-Then dispatch parallel Sonnet subagents (up to 100) to read concurrently:
-
-- `$project/CONTEXT.md` if present (domain language)
-- All files in the discovered ADR location, if any
-- `$project/README.md` (mission + command surface)
-- File inventory of each discovered source root — one subagent per top-level subdir, returns file list + one-paragraph role summary
-- Output of `git log --since="2 weeks ago" --oneline` from `$project`
-
-Each subagent returns a brief summary of its slice. For code-level facts during work, Grep/Glob the discovered source roots on demand.
-```
+**Spec:** `docs/superpowers/specs/2026-05-04-ralph-folder-as-project-local-home-design.md`
+**ADR:** `docs/adr/0007-ralph-folder-as-project-local-home.md` (will move to `.ralph/docs/adr/0007-...md` in Chunk 5)
 
 ---
 
-## Chunk 1: Decision capture (ADR foundation + salvage pass)
+## Chunk 1: `ralph-paths.ts` module (new, no behavior change)
 
-**Goal:** Lock the high-level decision into an ADR and salvage any non-derivable WHY content from `docs/specs/` into supplementary ADRs **before** any deletion. This chunk produces 1 to (1+N) new ADR files and zero code changes.
+This chunk introduces the central path module without touching any
+caller. After Chunk 1 lands, no production code yet *uses* the module —
+that wiring happens in Chunks 3–4. Chunk 1 is pure addition + tests, so
+the existing test suite continues to pass unmodified.
 
-### Task 1.1: Write ADR 0004 (foundational decision)
+### Task 1.1: Path-resolver module
 
 **Files:**
-- Create: `docs/adr/0004-source-and-context-as-truth-no-behavioral-specs.md`
+- Create: `src/cli/lib/ralph-paths.ts`
+- Test: `src/cli/tests/ralph-paths.test.ts`
 
-- [x] **Step 1: Write the ADR file**
+- [x] **Step 1: Write the failing test**
 
-Use this exact content:
+```ts
+// src/cli/tests/ralph-paths.test.ts
+import { describe, it, expect } from "vitest";
+import {
+  ralphDir,
+  meditationsDir,
+  illuminationsDir,
+  stimuliDir,
+  memoryDir,
+  docsAdrDir,
+  pipelinesDir,
+  runsDir,
+  runDir,
+} from "../lib/ralph-paths";
 
-```markdown
-# 0004: Source code, CONTEXT.md, and ADRs are the only authoritative documentation
+describe("ralph-paths", () => {
+  const project = "/abs/project";
 
-**Date:** 2026-05-01
-**Status:** Accepted
-
-## Context
-
-ralph-cli accumulated a third documentation channel — `docs/specs/` — alongside the glossary (`CONTEXT.md`) and decision records (`docs/adr/`). It held 11 hand-authored behavioral specs (`architecture.md`, `commands.md`, `pipeline.md`, `daemon.md`, `loop.md`, `heartbeat.md`, `meditate.md`, `mcp-illumination.md`, `memory-reflector.md`, `stream-formatter.md`, `README.md`) plus auto-generated design docs from the illumination-to-implementation pipeline.
-
-A 2026-05-01 audit found 3 of 11 files heavily DRIFTED (claims contradicted by `src/`), 1 DEAD (described a removed feature), and 5 nominally CURRENT but with no mechanism preventing future drift. Recent illuminations (`2026-05-01T0820-pipeline-spec-drift-poisons-agents.md`, `2026-05-01T0343-agent-orientation-docs-point-to-ghost-paths.md`) named spec drift as a hazard for any agent reading these files for project context.
-
-Pipeline agents — `verifier.md`, `implement.md`, `meditate.md`, `scenario-author.md` — preloaded `$specs_dir/*` to learn the project, then made decisions against an outdated mental model. The drift was not a maintenance problem; it was a structural one. Any document that summarizes structure or behavior is a future lie.
-
-## Decision
-
-The only authoritative documentation in this repo is:
-
-1. **`CONTEXT.md`** — domain language and glossary. Hand-curated. Updated during grill-with-docs sessions and ADR writes.
-2. **`docs/adr/`** — append-only decision records. Each captures a hard-to-reverse, surprising-without-context choice with its trade-off. Never edited after acceptance.
-3. **Source code** in `src/` and `pipelines/` — the truth about behavior. No spec file claims to mirror it.
-
-`docs/specs/` is deleted. Any non-derivable WHY content from its 11 files is salvaged into supplementary ADRs before deletion.
-
-Pipeline agents that need workspace orientation discover the project layout at runtime (Glob source/docs roots) and read `CONTEXT.md` + `docs/adr/` + `README.md` + a live source inventory. No preloaded curated overview. Instructions are positively phrased — substitution, not prohibition.
-
-The `docs/specs/architecture.md`-style overview is replaced by step-0a-style discovery in two agents (`verifier.md`, `implement.md`) and equivalent rubric updates in three more (`scenario-author.md`, `meditate.md`).
-
-The `$specs_dir` pipeline variable is removed from all four pipelines (`pipelines/illumination-to-implementation/`, `src/cli/pipelines/{implement,meditate,janitor}/`) and both CLI commands that plumb it (`src/cli/commands/{implement,meditate}.ts`).
-
-Auto-generated design docs from the illumination-to-implementation pipeline now land in `docs/superpowers/specs/` (a previously-intended-but-unbuilt folder), not `docs/specs/`. Plans continue to land in `docs/superpowers/plans/`. Both write paths are pipeline-owned conventions hardcoded inside agent files.
-
-## Consequences
-
-**Positive:**
-- Drift surface eliminated. Source code, the one thing always true, becomes the read target for behavior questions.
-- Pipeline call sites simplify to `ralph pipeline run <dot> --project .` with no `--var` flags.
-- Pipeline portability across target projects with different source layouts (`src/`, `lib/`, `app/`, `pkg/`, etc.) via runtime discovery.
-- Onboarding signal sharper: README points at four entry points (`CONTEXT.md`, `docs/adr/`, `src/`, `pipelines/`) with stable locations.
-
-**Negative:**
-- New contributors landing from GitHub get less hand-holding. Mitigated by README's "Where to look" pointer list.
-- Pipeline less portable to projects that do not adopt the (`meditations/illuminations/`, `docs/superpowers/specs/`, `docs/superpowers/plans/`) write convention — they would need to edit agent `.md` files.
-- Salvage pass may miss decisions buried in long passages. Mitigated by liberal candidate-surfacing during salvage and `git log` archaeology if anything is later needed.
-
-## Related
-
-- Spec: `docs/superpowers/specs/2026-05-01-source-as-truth-no-behavioral-specs-design.md`
-- ADR-0001 (`agents-live-next-to-pipeline`) — same principle: kill abstraction surfaces that drift.
-- ADR-0002 (`consume-only-illumination-lifecycle`) — same shape: collapse multi-state taxonomies into one source of truth.
-- Recent illuminations naming spec drift: `meditations/illuminations/2026-05-01T0820-pipeline-spec-drift-poisons-agents.md`, `meditations/illuminations/2026-05-01T0343-agent-orientation-docs-point-to-ghost-paths.md`, `meditations/illuminations/2026-05-01T0050-pipeline-location-drift-vs-vision.md`.
+  it("ralphDir joins project + .ralph", () => {
+    expect(ralphDir(project)).toBe("/abs/project/.ralph");
+  });
+  it("meditationsDir joins .ralph/meditations", () => {
+    expect(meditationsDir(project)).toBe("/abs/project/.ralph/meditations");
+  });
+  it("illuminationsDir joins .ralph/meditations/illuminations", () => {
+    expect(illuminationsDir(project)).toBe(
+      "/abs/project/.ralph/meditations/illuminations",
+    );
+  });
+  it("stimuliDir joins .ralph/meditations/stimuli", () => {
+    expect(stimuliDir(project)).toBe(
+      "/abs/project/.ralph/meditations/stimuli",
+    );
+  });
+  it("memoryDir joins .ralph/memory", () => {
+    expect(memoryDir(project)).toBe("/abs/project/.ralph/memory");
+  });
+  it("docsAdrDir joins .ralph/docs/adr", () => {
+    expect(docsAdrDir(project)).toBe("/abs/project/.ralph/docs/adr");
+  });
+  it("pipelinesDir joins .ralph/pipelines", () => {
+    expect(pipelinesDir(project)).toBe("/abs/project/.ralph/pipelines");
+  });
+  it("runsDir joins .ralph/runs", () => {
+    expect(runsDir(project)).toBe("/abs/project/.ralph/runs");
+  });
+  it("runDir joins .ralph/runs/<runId>", () => {
+    expect(runDir(project, "2026-05-04T12-00")).toBe(
+      "/abs/project/.ralph/runs/2026-05-04T12-00",
+    );
+  });
+  it("runDir composes from runsDir", () => {
+    const runId = "abc";
+    expect(runDir(project, runId).startsWith(runsDir(project))).toBe(true);
+  });
+});
 ```
 
-- [x] **Step 2: Verify ADR file written correctly**
+- [x] **Step 2: Run test to verify it fails**
 
-Run: `ls -la docs/adr/0004-source-and-context-as-truth-no-behavioral-specs.md && head -5 docs/adr/0004-source-and-context-as-truth-no-behavioral-specs.md`
+Run: `npx vitest run src/cli/tests/ralph-paths.test.ts`
+Expected: FAIL with module-not-found error.
 
-Expected: file exists, first line is `# 0004: Source code, CONTEXT.md, and ADRs are the only authoritative documentation`.
+- [x] **Step 3: Write minimal implementation**
 
-- [x] **Step 3: Commit**
+```ts
+// src/cli/lib/ralph-paths.ts
+import { join } from "node:path";
+
+export function ralphDir(projectRoot: string): string {
+  return join(projectRoot, ".ralph");
+}
+
+export function meditationsDir(projectRoot: string): string {
+  return join(ralphDir(projectRoot), "meditations");
+}
+
+export function illuminationsDir(projectRoot: string): string {
+  return join(meditationsDir(projectRoot), "illuminations");
+}
+
+export function stimuliDir(projectRoot: string): string {
+  return join(meditationsDir(projectRoot), "stimuli");
+}
+
+export function memoryDir(projectRoot: string): string {
+  return join(ralphDir(projectRoot), "memory");
+}
+
+export function docsAdrDir(projectRoot: string): string {
+  return join(ralphDir(projectRoot), "docs", "adr");
+}
+
+export function pipelinesDir(projectRoot: string): string {
+  return join(ralphDir(projectRoot), "pipelines");
+}
+
+export function runsDir(projectRoot: string): string {
+  return join(ralphDir(projectRoot), "runs");
+}
+
+export function runDir(projectRoot: string, runId: string): string {
+  return join(runsDir(projectRoot), runId);
+}
+```
+
+- [x] **Step 4: Run test to verify it passes**
+
+Run: `npx vitest run src/cli/tests/ralph-paths.test.ts`
+Expected: 10 passing.
+
+- [x] **Step 5: Run full test suite to verify no regressions**
+
+Run: `npx vitest run`
+Expected: Full suite green (pre-existing test count + 10 new).
+
+- [x] **Step 6: Commit**
 
 ```bash
-git add docs/adr/0004-source-and-context-as-truth-no-behavioral-specs.md
-git commit -m "$(cat <<'EOF'
-docs(adr): 0004 — source code + CONTEXT.md + ADRs as only truth
+git add src/cli/lib/ralph-paths.ts src/cli/tests/ralph-paths.test.ts
+git commit -m "feat(lib): add ralph-paths module — central path resolver for .ralph/ tree
 
-Captures the decision to delete docs/specs/ and adopt discover-then-read
-orientation in pipeline agents. References the design spec at
-docs/superpowers/specs/2026-05-01-source-as-truth-no-behavioral-specs-design.md.
-
-Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
-EOF
-)"
+No callers yet; subsequent chunks port the in-tree path-string sites
+to use these helpers. Pure addition, no behavior change."
 ```
-
-### Task 1.2: Salvage pass over `docs/specs/`
-
-**Files:**
-- Read-only: every file in `docs/specs/`
-- Output (intermediate): consolidated candidate list (in working memory or a scratch file)
-
-- [x] **Step 1: Dispatch 11 salvage subagents in parallel**
-
-Use the Agent tool with `subagent_type=Explore` (or `general-purpose`). Send all 11 dispatches in a single message for parallel execution. One subagent per file:
-
-- `docs/specs/architecture.md`
-- `docs/specs/commands.md`
-- `docs/specs/daemon.md`
-- `docs/specs/heartbeat.md`
-- `docs/specs/loop.md`
-- `docs/specs/mcp-illumination.md`
-- `docs/specs/meditate.md`
-- `docs/specs/memory-reflector.md`
-- `docs/specs/pipeline.md`
-- `docs/specs/README.md`
-- `docs/specs/stream-formatter.md`
-
-For each, send this prompt template (replace `<SPEC_PATH>`):
-
-```
-Salvage pass on a behavioral spec file slated for deletion.
-
-**Spec file:** <SPEC_PATH>
-
-**Task:** Read the file in full, then verify each non-trivial claim against the current source code by Grep/Read in `src/` (and `pipelines/`, `src/cli/pipelines/` as relevant). Return three things:
-
-1. **Validity verdict:** CURRENT (matches source today) / DRIFTED (one or more claims contradict source — pin examples) / DEAD (describes removed feature). Pin every drift claim with `file:line` evidence in BOTH the spec AND source.
-
-2. **ADR candidates:** verbatim quotes from the spec that meet ALL THREE criteria:
-   - Hard to reverse — describes a choice whose change would be costly later
-   - Surprising without context — a future reader would wonder "why did they do it this way?"
-   - Result of a real trade-off — there were genuine alternatives picked for specific reasons
-
-   Be liberal. When in doubt, surface as a candidate; the human triages.
-
-3. **Confidence note** if your verdict is ambiguous (e.g. partial match, or unverifiable claims).
-
-**Output format (markdown):**
-
-## Salvage Report: <SPEC_PATH>
-
-### Validity verdict
-**Status:** CURRENT / DRIFTED / DEAD
-
-**Evidence:**
-- [If DRIFTED or DEAD] spec line N claims X; src/path/to/file.ts:M shows Y
-- [Continue with all observed mismatches]
-
-### ADR candidates
-
-**Candidate 1:** [title]
-> [verbatim quote from spec, ≤10 lines]
-**Why ADR-worthy:** [one sentence — which of the three criteria + why]
-
-**Candidate 2:** ...
-
-(Or "None" if nothing meets the criteria.)
-
-### Confidence note
-[If applicable, e.g. "Couldn't verify claims about the daemon socket protocol without runtime observation; treated as CURRENT pending dynamic check."]
-```
-
-- [x] **Step 2: Consolidate the 11 reports**
-
-Collect all 11 returned reports. Present a single triage table to the user with one row per ADR candidate across all 11 reports:
-
-| File | Candidate | Quote (truncated) | ADR-worthy? (user picks) |
-|---|---|---|---|
-
-This is a **user-input checkpoint**. The plan executor must surface the table and wait for user triage decisions.
-
-- [x] **Step 3: User triage**
-
-User inspects the table and marks each candidate Y / N. Optionally edits the proposed candidate text before approval.
-
-### Task 1.3: Write salvaged ADRs (one per approved candidate)
-
-**Files (zero or more):**
-- Create: `docs/adr/0005-<slug>.md`, `0006-<slug>.md`, ... (one per approved candidate)
-
-- [x] **Step 1: For each user-approved candidate, write a new ADR file**
-
-Use the existing `docs/adr/0001-…` and `0002-…` files as format references. Each ADR should have:
-
-```markdown
-# 000N: <slug-as-title>
-
-**Date:** 2026-05-01
-**Status:** Accepted (salvaged from docs/specs/<file>.md before deletion)
-
-## Context
-
-[Verbatim quote from the spec, plus minimum context needed for a future reader to understand the choice. The salvage pass preserved this passage because it captures decision rationale that source code does not express.]
-
-## Decision
-
-[The choice itself, restated cleanly.]
-
-## Consequences
-
-[The trade-off accepted, restated cleanly. If the spec didn't explicitly note consequences, infer them from the surrounding context — but flag with "Inferred:" if doing so.]
-
-## Related
-
-- Salvaged from `docs/specs/<file>.md` on 2026-05-01 during the source-as-truth excision
-- See ADR-0004 for the broader excision rationale
-- Spec: `docs/superpowers/specs/2026-05-01-source-as-truth-no-behavioral-specs-design.md`
-```
-
-- [x] **Step 2: Verify each new ADR file**
-
-Run: `ls -la docs/adr/000*-*.md`
-
-Expected: ADR-0004 plus zero or more ADR-0005..N files.
-
-- [x] **Step 3: Commit (one commit per ADR, or one batched commit if convenient)**
-
-```bash
-git add docs/adr/000*-*.md
-git commit -m "$(cat <<'EOF'
-docs(adr): salvage decision context from docs/specs/ before deletion
-
-Each new ADR captures a hard-to-reverse, surprising-without-context choice
-that was buried in the soon-to-be-deleted docs/specs/*.md files. Source-only
-documentation cannot express these decisions; ADRs preserve them.
-
-Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
-EOF
-)"
-```
-
-If zero candidates were approved (all 11 files yielded only WHAT content, no salvage-worthy WHY), skip step 1–3 and note "No ADRs salvaged" in the commit log of Chunk 5.
-
-### Verification targets (Chunk 1)
-
-- Smokes: None
-- Manual exercises: `git log --oneline docs/adr/` — confirm one or more new ADR commits since this chunk started
-- Lint: None (no code changes)
-- Surfaces touched: documentation/decision-records
 
 ---
 
-## Chunk 2: illumination-to-implementation pipeline
+## Chunk 2: `ralph init` command (new, additive)
 
-**Goal:** Excise `$specs_dir` from the project-local pipeline at `pipelines/illumination-to-implementation/` and rewire its agents to use discover-then-read orientation + hardcoded write paths.
+`ralph init` scaffolds the `.ralph/` tree in-place. Idempotent. No
+overwrite. Optional `git init` if not already a repo. Appends
+`.ralph/runs/` to `.gitignore`.
 
-This chunk has no unit tests; verification is via the pipeline validator and a final smoke run. Edits are bundled into one atomic commit per logical unit.
+**Test prerequisite:** `git --version` must succeed in the test
+environment. The init command tolerates missing `git` (silently skips
+`git init`); the test that asserts `.git/` exists guards itself with a
+git availability check (Step 1 below) so it skips on environments
+without git instead of failing.
 
-### Task 2.1: Edit `pipeline.dot` (declared inputs)
-
-**Files:**
-- Modify: `pipelines/illumination-to-implementation/pipeline.dot:4`
-
-- [x] **Step 1: Open the file and locate line 4**
-
-Current: `  inputs="project, illuminations_dir, specs_dir, plans_dir, run_id"`
-
-- [x] **Step 2: Replace line 4**
-
-Replace with: `  inputs="project"`
-
-Use the Edit tool with `old_string=  inputs="project, illuminations_dir, specs_dir, plans_dir, run_id"` and `new_string=  inputs="project"`.
-
-- [x] **Step 3: Validate the pipeline**
-
-Run: `npx tsx src/cli/index.ts pipeline validate pipelines/illumination-to-implementation/pipeline.dot`
-
-Expected: validator returns OK, OR returns errors about agents that still reference `$specs_dir` / `$illuminations_dir` / `$plans_dir` (those will be fixed in Tasks 2.2–2.5; the validator's complaint is informational at this point).
-
-### Task 2.2: Edit `design-writer.md` (hardcode write target)
+### Task 2.1: Init command scaffold
 
 **Files:**
-- Modify: `pipelines/illumination-to-implementation/design-writer.md`
+- Create: `src/cli/commands/init.ts`
+- Test: `src/cli/tests/init.test.ts`
+- Modify: `src/cli/program.ts` (register the command + update top-level help-after examples)
 
-- [x] **Step 1: Update frontmatter `inputs:` list**
+- [ ] **Step 1: Write the failing test**
 
-Use the Edit tool. Find the block:
+```ts
+// src/cli/tests/init.test.ts
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { execSync } from "node:child_process";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { initCommand } from "../commands/init";
 
-```yaml
-inputs:
-  - verifier.illumination_path
-  - specs_dir
-  - verifier.summary
-  - verifier.explanation
-  - explainer.explainer_render
-  - chat_summarizer.refinements
+function gitAvailable(): boolean {
+  try { execSync("git --version", { stdio: "ignore" }); return true; }
+  catch { return false; }
+}
+
+describe("ralph init", () => {
+  let projectDir: string;
+
+  beforeEach(() => {
+    projectDir = mkdtempSync(join(tmpdir(), "ralph-init-test-"));
+  });
+  afterEach(() => {
+    rmSync(projectDir, { recursive: true, force: true });
+  });
+
+  it("scaffolds the .ralph/ tree on a fresh directory", async () => {
+    await initCommand(projectDir);
+
+    expect(existsSync(join(projectDir, ".ralph"))).toBe(true);
+    expect(existsSync(join(projectDir, ".ralph/pipelines"))).toBe(true);
+    expect(existsSync(join(projectDir, ".ralph/meditations/illuminations"))).toBe(true);
+    expect(existsSync(join(projectDir, ".ralph/meditations/stimuli"))).toBe(true);
+    expect(existsSync(join(projectDir, ".ralph/memory"))).toBe(true);
+    expect(existsSync(join(projectDir, ".ralph/docs/adr"))).toBe(true);
+    expect(existsSync(join(projectDir, ".ralph/VISION.md"))).toBe(true);
+    expect(existsSync(join(projectDir, ".ralph/CONTEXT.md"))).toBe(true);
+  });
+
+  it("scaffolds README.md at root if absent", async () => {
+    await initCommand(projectDir);
+    expect(existsSync(join(projectDir, "README.md"))).toBe(true);
+  });
+
+  it("does not overwrite an existing README.md", async () => {
+    writeFileSync(join(projectDir, "README.md"), "existing content");
+    await initCommand(projectDir);
+    expect(readFileSync(join(projectDir, "README.md"), "utf8")).toBe("existing content");
+  });
+
+  it("does not overwrite an existing VISION.md", async () => {
+    mkdirSync(join(projectDir, ".ralph"), { recursive: true });
+    writeFileSync(join(projectDir, ".ralph/VISION.md"), "my vision");
+    await initCommand(projectDir);
+    expect(readFileSync(join(projectDir, ".ralph/VISION.md"), "utf8")).toBe("my vision");
+  });
+
+  it("appends .ralph/runs/ to .gitignore (creating the file if absent)", async () => {
+    await initCommand(projectDir);
+    const gitignore = readFileSync(join(projectDir, ".gitignore"), "utf8");
+    expect(gitignore).toContain(".ralph/runs/");
+  });
+
+  it("does not duplicate the .ralph/runs/ line on second invocation", async () => {
+    await initCommand(projectDir);
+    await initCommand(projectDir);
+    const gitignore = readFileSync(join(projectDir, ".gitignore"), "utf8");
+    const matches = gitignore.match(/^\.ralph\/runs\/$/gm) ?? [];
+    expect(matches.length).toBe(1);
+  });
+
+  it("is idempotent — running twice yields the same tree", async () => {
+    await initCommand(projectDir);
+    const firstSnapshot = JSON.stringify({
+      vision: readFileSync(join(projectDir, ".ralph/VISION.md"), "utf8"),
+      context: readFileSync(join(projectDir, ".ralph/CONTEXT.md"), "utf8"),
+    });
+    await initCommand(projectDir);
+    const secondSnapshot = JSON.stringify({
+      vision: readFileSync(join(projectDir, ".ralph/VISION.md"), "utf8"),
+      context: readFileSync(join(projectDir, ".ralph/CONTEXT.md"), "utf8"),
+    });
+    expect(secondSnapshot).toBe(firstSnapshot);
+  });
+
+  it("fills in missing subfolders on a partial existing .ralph/", async () => {
+    mkdirSync(join(projectDir, ".ralph/pipelines"), { recursive: true });
+    // .ralph/ exists with only pipelines/; meditations/, memory/, docs/ are missing
+    await initCommand(projectDir);
+    expect(existsSync(join(projectDir, ".ralph/meditations/illuminations"))).toBe(true);
+    expect(existsSync(join(projectDir, ".ralph/memory"))).toBe(true);
+    expect(existsSync(join(projectDir, ".ralph/docs/adr"))).toBe(true);
+  });
+
+  it.skipIf(!gitAvailable())("runs git init if the directory is not a repo", async () => {
+    await initCommand(projectDir);
+    expect(existsSync(join(projectDir, ".git"))).toBe(true);
+  });
+
+  it("does not re-init an existing git repo", async () => {
+    mkdirSync(join(projectDir, ".git"), { recursive: true });
+    writeFileSync(join(projectDir, ".git/sentinel"), "marker");
+    await initCommand(projectDir);
+    expect(readFileSync(join(projectDir, ".git/sentinel"), "utf8")).toBe("marker");
+  });
+});
 ```
 
-Replace with (drop the `specs_dir` line):
+- [ ] **Step 2: Run test to verify it fails**
 
-```yaml
-inputs:
-  - verifier.illumination_path
-  - verifier.summary
-  - verifier.explanation
-  - explainer.explainer_render
-  - chat_summarizer.refinements
+Run: `npx vitest run src/cli/tests/init.test.ts`
+Expected: FAIL with module-not-found.
+
+- [ ] **Step 3: Write minimal implementation**
+
+```ts
+// src/cli/commands/init.ts
+import { mkdirSync, writeFileSync, existsSync, readFileSync, appendFileSync } from "node:fs";
+import { execSync } from "node:child_process";
+import {
+  ralphDir,
+  pipelinesDir,
+  illuminationsDir,
+  stimuliDir,
+  memoryDir,
+  docsAdrDir,
+} from "../lib/ralph-paths.js";
+import { join } from "node:path";
+
+export async function initCommand(projectRoot: string): Promise<void> {
+  const dirs = [
+    ralphDir(projectRoot),
+    pipelinesDir(projectRoot),
+    illuminationsDir(projectRoot),
+    stimuliDir(projectRoot),
+    memoryDir(projectRoot),
+    docsAdrDir(projectRoot),
+  ];
+  for (const d of dirs) {
+    mkdirSync(d, { recursive: true });
+  }
+
+  const visionPath = join(ralphDir(projectRoot), "VISION.md");
+  if (!existsSync(visionPath)) {
+    writeFileSync(visionPath, "# Vision\n\n_Describe what this project is and why it exists._\n");
+  }
+
+  const contextPath = join(ralphDir(projectRoot), "CONTEXT.md");
+  if (!existsSync(contextPath)) {
+    writeFileSync(contextPath, "# Domain Language\n\n## Glossary\n\n_Define the terms specific to this project's domain._\n");
+  }
+
+  const readmePath = join(projectRoot, "README.md");
+  if (!existsSync(readmePath)) {
+    writeFileSync(readmePath, "# Project\n\n_Top-level entry point for human readers._\n");
+  }
+
+  appendGitignoreLine(projectRoot, ".ralph/runs/");
+
+  if (!existsSync(join(projectRoot, ".git"))) {
+    try {
+      execSync(`git -C "${projectRoot}" init -b main`, { stdio: "ignore" });
+    } catch {
+      // git unavailable — non-fatal; user can run git init manually
+    }
+  }
+}
+
+function appendGitignoreLine(projectRoot: string, line: string): void {
+  const path = join(projectRoot, ".gitignore");
+  const existing = existsSync(path) ? readFileSync(path, "utf8") : "";
+  // Match against trimmed-whole-line equality. This intentionally does NOT
+  // dedupe near-variants like "/.ralph/runs/" or ".ralph/runs" (no trailing
+  // slash) — those are distinct gitignore patterns; user owns reconciliation.
+  const already = existing.split("\n").some((l) => l.trim() === line);
+  if (already) return;
+  const sep = existing.length > 0 && !existing.endsWith("\n") ? "\n" : "";
+  appendFileSync(path, `${sep}${line}\n`);
+}
 ```
 
-- [x] **Step 2: Replace the Mission paragraph**
+- [ ] **Step 4: Run test to verify it passes**
 
-Find: `You turn an approved illumination — already refined and explained — into a superpowers-style design doc at \`$specs_dir/\`.`
+Run: `npx vitest run src/cli/tests/init.test.ts`
+Expected: 10 passing (or 9 + 1 skipped if no git).
 
-Replace with: `You turn an approved illumination — already refined and explained — into a superpowers-style design doc at \`docs/superpowers/specs/\` inside \`$project\`.`
+- [ ] **Step 5: Register the command in program.ts**
 
-- [x] **Step 3: Delete the "Inputs you will receive" entry for `$specs_dir`**
+Modify `src/cli/program.ts`:
 
-Use the Edit tool with `old_string="- \`$specs_dir\` — output directory for the design doc.\n"` and `new_string=""` to remove the bullet entirely.
+1. Add near the top with other imports: `import { initCommand } from "./commands/init";`
 
-- [x] **Step 4: Replace the "Procedure" step 1 path derivation**
+2. After the existing `program.command("implement ...")` block (around line 76-85), add:
 
-Find:
+   ```ts
+   program
+     .command("init [project-folder]")
+     .description("Scaffold .ralph/ tree in the project folder (defaults to cwd). Idempotent.")
+     .addHelpText("after", "\nExamples:\n  ralph init             # in cwd\n  ralph init my-app      # in ./my-app\n\nCreates .ralph/{pipelines,meditations,memory,docs/adr,runs}, scaffolds empty\nVISION.md and CONTEXT.md, runs 'git init -b main' if not already a repo, and\nappends .ralph/runs/ to .gitignore. Safe to run on existing projects — never\noverwrites files.\n")
+     .action(async (projectFolder?: string) => {
+       await initCommand(projectFolder ?? process.cwd());
+     });
+   ```
+
+3. In the top-level `program.addHelpText("after", ...)` block (around lines 22-74), add a new "Bootstrap a project" stanza near the top:
+
+   ```
+   Bootstrap a project:
+     mkdir my-app && cd my-app && ralph init    Scaffold a fresh ralph project
+     ralph init                                  Initialize cwd as a ralph project
+   ```
+
+- [ ] **Step 6: Run full test suite + check cli-commands test**
+
+Run: `npx vitest run`
+Expected: full suite green. Open `src/cli/tests/cli-commands.test.ts` — if it enumerates registered commands, add `init` to the expected list.
+
+- [ ] **Step 7: Build + smoke**
+
+```bash
+npm run build
+mkdir /tmp/ralph-init-smoke && cd /tmp/ralph-init-smoke
+node /Users/josu/Documents/projects/ralph-cli/dist/cli/index.js init
+ls -la .ralph/
+cat .gitignore
+ls -la .git/
+rm -rf /tmp/ralph-init-smoke
 ```
-   - Target path: `$specs_dir/YYYY-MM-DD-<slug>-design.md` using today's date.
-   - Example: illumination `2026-04-19T1100-gate-choice-namespacing.md` → design doc `$specs_dir/2026-04-19-gate-choice-namespacing-design.md`.
+
+Expected: full tree present, .gitignore contains `.ralph/runs/`, `.git/` exists.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add src/cli/commands/init.ts src/cli/tests/init.test.ts src/cli/program.ts
+git commit -m "feat(cli): add ralph init — scaffold .ralph/ tree, idempotent
+
+mkdir -p the .ralph/{pipelines,meditations/{illuminations,stimuli},
+memory,docs/adr} subtree; scaffold empty VISION.md, CONTEXT.md, README.md
+if absent; append .ralph/runs/ to .gitignore (deduped); git init -b main
+if not already a repo. Safe to re-run on existing projects."
 ```
 
-Replace with:
+---
+
+## Chunk 3: MCP server path migration
+
+`src/cli/mcp/illumination-server.ts` has 18 path-string sites referencing
+`meditations/`. They fall into 4 categories. Each category has a distinct
+fix.
+
+### Task 3.0: Site enumeration (read-only ground truth)
+
+- [ ] **Step 1: Inventory the sites**
+
+Open `src/cli/mcp/illumination-server.ts` and confirm the four categories
+of `meditations/` references:
+
+| Category | Lines (approx; verify) | Fix in this chunk? |
+|---|---|---|
+| **Real `join()` sites** for project illuminations / project stimuli (live data on disk) | 49, 80, 198 | YES — route through `illuminationsDir(projectRoot)` / `stimuliDir(projectRoot)` |
+| **`meditationsDir` argv parameter** (line 305) and its consumers `listMetaMeditations` (line 169) and `readMetaMeditation` (line 244) | 169, 244, 305 | NO — this is the **bundled** stimuli folder fed in from the launcher (see §3.4 below). Path inside argv is opaque to this server. |
+| **Tool-description strings** (free-text in zod schemas / tool descriptions) | 335, 431, 443 | YES — text-substitute `meditations/illuminations/` → `.ralph/meditations/illuminations/` |
+| **`NO_META_MEDITATIONS_MESSAGE` block** (user-facing error text) | 162–167 | YES — text-substitute the path advice |
+
+Plans path (`docs/superpowers/plans/`) at `consumePlan` (lines ~100–130) and `listPlans` (lines ~229–242) is **out of scope** per spec §2 (plans surface stays put). Do not touch.
+
+- [ ] **Step 2: Inventory the bundled stimuli launcher**
+
+Find the spawn site for the illumination MCP server. Run:
+
+```bash
+grep -rn 'illumination-server\|meditationsDir\|process\.argv\[3\]' src/cli/
 ```
-   - Target path: `$project/docs/superpowers/specs/YYYY-MM-DD-<slug>-design.md` using today's date.
-   - Example: illumination `2026-04-19T1100-gate-choice-namespacing.md` → design doc `$project/docs/superpowers/specs/2026-04-19-gate-choice-namespacing-design.md`.
-```
 
-- [x] **Step 5: Replace the "Procedure" step 4 reference**
+The launcher (likely in `src/cli/lib/agent.ts` or `src/cli/lib/session.ts`)
+passes the bundled stimuli directory as `process.argv[3]`. Today this
+points at `src/cli/pipelines/meditate/stimuli/` (npm-bundled). After
+migration, **bundled stimuli stay where they are** (per spec §2 item 7),
+so this argv stays unchanged. Document the call site here for future
+reference; no edit needed in this chunk.
 
-Find: `Scan a couple of existing design docs in \`$specs_dir/\` first to match local conventions.`
-
-Replace with: `Scan a couple of existing design docs in \`$project/docs/superpowers/specs/\` first to match local conventions.`
-
-- [x] **Step 6: Verify zero `$specs_dir` references remain**
-
-Run: `grep -n 'specs_dir\|\$specs_dir' pipelines/illumination-to-implementation/design-writer.md`
-
-Expected: no output (zero hits).
-
-### Task 2.3: Edit `plan-writer.md` (hardcode write target)
+### Task 3.1: Port project-data path joins to ralph-paths
 
 **Files:**
-- Modify: `pipelines/illumination-to-implementation/plan-writer.md`
+- Modify: `src/cli/mcp/illumination-server.ts`
+- Modify: `src/cli/tests/illumination-server.test.ts`
+- Modify: `src/cli/tests/meditate.test.ts` (fixture path updates)
 
-- [x] **Step 1: Update frontmatter `inputs:` list**
+- [ ] **Step 1: Update test fixtures**
 
-Find:
-```yaml
-inputs:
-  - verifier.illumination_path
-  - plans_dir
-  - design_writer.design_doc_path
-  - chat_summarizer.refinements
+In `src/cli/tests/illumination-server.test.ts` (~18 occurrences across
+lines 108, 110, 121, 123, 132, 139, 416, 417, 422, 423, 457, 463, 471,
+479, 487, 539, 589, 590, 591), replace fixture-path prefixes:
+
+- `meditations/illuminations/` → `.ralph/meditations/illuminations/`
+- `meditations/stimuli/` → `.ralph/meditations/stimuli/`
+- `meditations/archived-illuminations/` and `meditations/implemented-illuminations/` (line 591 area) → `.ralph/meditations/archived-illuminations/` etc. **Note:** the prefix change is `meditations/` → `.ralph/meditations/` — apply once; do **not** apply `meditations/illuminations` → `.ralph/meditations/illuminations` as a substring rule, that would corrupt the sibling-folder paths.
+
+In `src/cli/tests/meditate.test.ts` (~9 occurrences across lines 41, 43, 51, 55, 56, 57, 248 + description strings around 134, 142, 156, 161): same prefix swap.
+
+- [ ] **Step 2: Run tests — expect failures**
+
+Run: `npx vitest run src/cli/tests/illumination-server.test.ts src/cli/tests/meditate.test.ts`
+Expected: FAIL — server still reads from old path; fixtures live at new path.
+
+- [ ] **Step 3: Update illumination-server.ts category 1 (real joins)**
+
+At the top of the file, add:
+```ts
+import { illuminationsDir, stimuliDir, meditationsDir } from "../lib/ralph-paths.js";
 ```
 
-Replace with (drop the `plans_dir` line):
-```yaml
-inputs:
-  - verifier.illumination_path
-  - design_writer.design_doc_path
-  - chat_summarizer.refinements
-```
+For each of the three `join(projectRoot, "meditations", "illuminations", ...)` sites (around lines 49, 80, 198), replace the prefix with `illuminationsDir(projectRoot)`. Same for any `join(projectRoot, "meditations", "stimuli", ...)` site. For sibling folders (`archived-illuminations`, `implemented-illuminations` if any survive), use `join(meditationsDir(projectRoot), "archived-illuminations", ...)`.
 
-- [x] **Step 2: Replace the Mission paragraph**
+- [ ] **Step 4: Update illumination-server.ts category 3 (tool descriptions)**
 
-Find: `You turn an approved design doc into a chunked, TDD-shaped implementation plan at \`$plans_dir/\`.`
+At lines ~335, 431, 443 (verify exact lines — these may shift after Step 3 edits), update tool-description text strings:
+- `"meditations/illuminations/"` → `".ralph/meditations/illuminations/"`
+- `"meditations/stimuli/"` → `".ralph/meditations/stimuli/"`
 
-Replace with: `You turn an approved design doc into a chunked, TDD-shaped implementation plan at \`docs/superpowers/plans/\` inside \`$project\`.`
+Tool descriptions are user-visible in the MCP tool surface; they must match the new layout.
 
-- [x] **Step 3: Delete "Inputs you will receive" entry**
+- [ ] **Step 5: Update illumination-server.ts category 4 (NO_META_MEDITATIONS_MESSAGE)**
 
-Use the Edit tool with `old_string="- \`$plans_dir\` — output directory for the plan.\n"` and `new_string=""` to remove the bullet entirely.
+In the message block (lines ~162–167), update any path advice referring to old `meditations/` paths under the user-data tier. The launcher-fed bundled stimuli path stays as-is (it's the npm bundled stimuli, not project data) — only update advice that points users at *project-local* paths.
 
-- [x] **Step 4: Replace "Procedure" step 1 path derivation**
+- [ ] **Step 6: Run tests — expect pass**
 
-Find:
-```
-   - Target path: `$plans_dir/YYYY-MM-DD-<slug>.md` using today's date.
-   - Example: illumination `2026-04-19T1100-gate-choice-namespacing.md` → plan `$plans_dir/2026-04-19-gate-choice-namespacing.md`.
-```
+Run: `npx vitest run src/cli/tests/illumination-server.test.ts src/cli/tests/meditate.test.ts`
+Expected: green.
 
-Replace with:
-```
-   - Target path: `$project/docs/superpowers/plans/YYYY-MM-DD-<slug>.md` using today's date.
-   - Example: illumination `2026-04-19T1100-gate-choice-namespacing.md` → plan `$project/docs/superpowers/plans/2026-04-19-gate-choice-namespacing.md`.
-```
+- [ ] **Step 7: Run full test suite**
 
-- [x] **Step 5: Verify zero `$plans_dir` references remain**
+Run: `npx vitest run`
+Expected: full suite green. Other tests that touch illumination paths may need fixture updates — fix in lockstep until green.
 
-Run: `grep -n 'plans_dir\|\$plans_dir' pipelines/illumination-to-implementation/plan-writer.md`
-
-Expected: no output.
-
-### Task 2.4: Edit `verifier.md` (orient via discover-then-read)
-
-**Files:**
-- Modify: `pipelines/illumination-to-implementation/verifier.md`
-
-- [x] **Step 1: Locate the Project-fit (Feature-Creep lens) section**
-
-The current text at line 47 reads:
-
-```
-3. **Project-fit (Feature-Creep lens)** — the change serves the project's stated goals. Read `README.md` and `$specs_dir/architecture.md` (or equivalents) before judging. If `$specs_dir` is empty in the Inputs block, default to `docs/specs`. Reject if the illumination:
-```
-
-- [x] **Step 2: Replace the project-fit instruction**
-
-Use the Edit tool. Replace the sentence "Read `README.md` and `$specs_dir/architecture.md` (or equivalents) before judging. If `$specs_dir` is empty in the Inputs block, default to `docs/specs`." with the orientation block from "File Structure → Reusable shared text" above (the block beginning "**Orient before acting.**" through the closing paragraph).
-
-The replacement integrates as: `the change serves the project's stated goals. <ORIENTATION_BLOCK> Use the discovered context to judge whether the change advances the project's goals. Reject if the illumination:`.
-
-- [x] **Step 3: Replace the procedure step at line 66**
-
-Find: `   - **Project-fit pass:** read project \`README.md\` and any \`$specs_dir/architecture.md\` / top-level spec; judge whether the illumination's change advances stated goals.`
-
-Replace with: `   - **Project-fit pass:** apply the orientation block (see step 2 above); judge whether the illumination's change advances the project's stated goals based on the discovered context.`
-
-- [x] **Step 4: Verify zero `$specs_dir` references remain**
-
-Run: `grep -n 'specs_dir\|\$specs_dir' pipelines/illumination-to-implementation/verifier.md`
-
-Expected: no output.
-
-### Task 2.5: Edit `implement.md` (orient via discover-then-read, drop fan-out)
-
-**Files:**
-- Modify: `pipelines/illumination-to-implementation/implement.md`
-
-- [x] **Step 1: Replace step 0a**
-
-Find the line at line 16:
-```
-0a. Study `$specs_dir/*` with up to 500 parallel Sonnet subagents to learn the application specifications. If `$specs_dir` is empty in the Inputs block, default to `docs/specs`.
-```
-
-Replace with the orientation block prefixed with `0a. ` (i.e., insert the shared block — see "File Structure → Reusable shared text" — as the body of step 0a).
-
-- [x] **Step 2: Delete the inconsistency-update step**
-
-Find the line at line 37:
-```
-9999999999999. If you find inconsistencies in the $specs_dir/\* then use an Opus 4.5 subagent with 'ultrathink' requested to update the specs.
-```
-
-Delete this line entirely (no replacement). There is no `$specs_dir` to compare against anymore; spec inconsistencies are no longer a category.
-
-- [x] **Step 3: Verify zero `$specs_dir` references remain**
-
-Run: `grep -n 'specs_dir\|\$specs_dir' pipelines/illumination-to-implementation/implement.md`
-
-Expected: no output.
-
-### Task 2.6: Verify ancillary files have no residue
-
-**Files:**
-- Read-only: every file under `pipelines/illumination-to-implementation/`
-
-- [x] **Step 1: Grep entire pipeline directory for residual references**
+- [ ] **Step 8: Static check — no remaining hardcoded literals in MCP server**
 
 Run:
 ```bash
-grep -rn 'specs_dir\|\$specs_dir' pipelines/illumination-to-implementation/
+grep -rn 'meditations/illuminations\|meditations/stimuli\|"meditations"' src/cli/mcp/
 ```
+Expected: zero hits in `src/cli/mcp/`. (Hits in `src/cli/pipelines/` are agent prompts; updated in Chunk 5.)
 
-Expected: no output (zero hits across all files in the folder). If found, add an Edit step to remove them before Task 2.7.
+- [ ] **Step 9: Commit**
 
-### Task 2.7: Validate + commit
-
-- [x] **Step 1: Run pipeline validator**
-
-Run: `npx tsx src/cli/index.ts pipeline validate pipelines/illumination-to-implementation/pipeline.dot`
-
-Expected: OK (no `inputs_undeclared` errors; the pipeline now declares only `project` and the agent rubrics no longer reference `$specs_dir`/`$plans_dir`/`$illuminations_dir`/`$run_id`).
-
-- [x] **Step 2: Type check**
-
-Run: `npx tsc --noEmit`
-
-Expected: PASS.
-
-- [x] **Step 3: Commit**
-
+Stage all files updated in this chunk:
 ```bash
-git add pipelines/illumination-to-implementation/
-git commit -m "$(cat <<'EOF'
-refactor(illumination-pipeline): drop \$specs_dir, hardcode write paths
+git add src/cli/mcp/illumination-server.ts src/cli/tests/illumination-server.test.ts src/cli/tests/meditate.test.ts
+# Add any other test files updated in lockstep at Step 7.
+git commit -m "refactor(mcp): route illumination + stimuli paths through ralph-paths
 
-- pipeline.dot inputs collapse to "project" only
-- design-writer hardcodes docs/superpowers/specs/ as write target
-- plan-writer hardcodes docs/superpowers/plans/ as write target
-- verifier + implement adopt discover-then-read orientation block
-  (Glob source/docs roots → read CONTEXT.md + ADRs + README + live src/ inventory)
-- implement drops the 500-subagent \$specs_dir/* fan-out
-
-Per ADR-0004. See docs/superpowers/specs/2026-05-01-source-as-truth-no-behavioral-specs-design.md.
-
-Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
-EOF
-)"
+Replace hardcoded meditations/{illuminations,stimuli} string joins with
+calls into the central ralph-paths module. Update tool-description
+strings and the NO_META_MEDITATIONS_MESSAGE to reference the new layout.
+Plans path (docs/superpowers/plans/) is out of scope — unchanged.
+Bundled-stimuli argv parameter is unchanged (bundled data stays put per
+spec §2 item 7). Fixture paths in tests update in lockstep."
 ```
-
-### Verification targets (Chunk 2)
-
-- Smokes: None directly; affected at Chunk 5 final smoke
-- Manual exercises: `npx tsx src/cli/index.ts pipeline validate pipelines/illumination-to-implementation/pipeline.dot`
-- Lint: `npx tsc --noEmit`
-- Surfaces touched: project-local pipeline `illumination-to-implementation`
 
 ---
 
-## Chunk 3: Bundled implement pipeline
+## Chunk 4: Run-state I/O migration
 
-**Goal:** Excise `$specs_dir` from the bundled implement pipeline (`src/cli/pipelines/implement/`) and rewrite the rubric tests to assert the new shape.
+The `~/.ralph/<projectKey>/runs/` derivation lives in
+`src/cli/commands/pipeline.ts` — **not** in `claudeTracePath.ts`
+(`claudeTracePath.ts` is for Claude Code session transcripts under
+`~/.claude/projects/`, which is unrelated and stays unchanged).
 
-### Task 3.1: Rewrite `implement-rubric.test.ts` (failing tests first)
+Sites in `pipeline.ts` (verified):
+
+- Line 51 — `deriveProjectKey` JSDoc
+- Line 54 — `export function deriveProjectKey(projectPath: string): string`
+- Lines 127–138 — first-run "Layout changed" notice block (legacy migration artifact)
+- Lines 322–326 — pipeline run path: `ralphRoot/projectKey/runs/`
+- Lines 627–666 — pipeline trace lookup: `ralphRoot/projectKey/runs/`
+
+Plus `src/cli/lib/pipeline-resolver.ts`:
+
+- Line 37 — `userFolderPath = join(homedir(), ".ralph", "pipelines", arg, "pipeline.dot")`
+- Line 41 — `userPath = join(homedir(), ".ralph", "pipelines", `${arg}.dot`)`
+
+These user-home pipeline fallbacks are deleted entirely per spec §2 item 3 ("no `userHomeRalphDir` export. The `~/.ralph/` tier goes away entirely") and §3.3 (two-tier read = project-local + bundled, no user-home tier).
+
+**Daemon decision (resolved up front):** `src/daemon/state.ts` writes `tasks.json`, `pids/<id>.pid`, `logs/<taskId>/<runId>.log` directly under `~/.ralph/` (siblings of the now-deleted `~/.ralph/<projectKey>/runs/` tree). These are genuinely **user-scoped** (heartbeat tasks span projects). They **stay at `~/.ralph/` root** as today — no migration, no renaming, no extra namespacing. After this chunk, `~/.ralph/` will hold only daemon state (tasks.json, pids/, logs/). Task 4.4 is a verify-only audit.
+
+**`RALPH_RUNS_ROOT` env var (resolved up front):** Today the env var allows overriding `~/.ralph` as the runs root. After migration, runs live at `<project>/.ralph/runs/`, so the env var no longer makes sense at the same name. **Decision: delete `RALPH_RUNS_ROOT` entirely.** No replacement. Project-local layout is the only option.
+
+**`pipeline trace --project` flag (resolved up front):** Becomes **mandatory by default** (spec §3.4 "becomes mandatory"). Implementation defaults to `process.cwd()` if absent — equivalent to the user typing `--project .`. No cross-project scan.
+
+### Task 4.1: Read pipeline.ts trace region
+
+- [ ] **Step 1: Read `src/cli/commands/pipeline.ts` lines 1–140 and 300–700**
+
+Confirm each site listed above exists and matches the line ranges. If
+line numbers have drifted, capture the new ranges before editing.
+
+- [ ] **Step 2: Inventory expected import additions**
+
+`pipeline.ts` will import `runDir`, `runsDir` from `../lib/ralph-paths.js`. Track this in your edit plan.
+
+(No commit at this task; read-only.)
+
+### Task 4.2: Port pipeline.ts run-state derivation
 
 **Files:**
-- Modify: `src/cli/tests/implement-rubric.test.ts`
+- Modify: `src/cli/commands/pipeline.ts`
+- Modify: `src/cli/tests/pipeline-trace-lookup.test.ts`
+- Modify: `src/cli/tests/pipeline-trace-command-validation.test.ts`
+- Modify: `src/cli/tests/pipeline-failure-reason.test.ts`
 
-- [x] **Step 1: Replace the entire file content**
+- [ ] **Step 1: Update tests to assert new path shape**
 
-Use the Write tool to replace `src/cli/tests/implement-rubric.test.ts` with:
+In each of the three test files, replace assertions like `~/.ralph/<projectKey>/runs/<runId>/...` with `<projectRoot>/.ralph/runs/<runId>/...`. Use the `runDir(projectRoot, runId)` helper in test imports for clarity.
 
-```typescript
-import { describe, it, expect } from "vitest";
-import { readFileSync } from "fs";
-import { join } from "path";
+For tests that exercise **cross-project trace scanning** (looking up a runId across multiple `<projectKey>` folders): **delete those tests entirely.** The cross-project scan goes away. Specifically, list each test by name in your scratch notes before deleting. Tests that exercise single-project lookup (most of them) keep their structure — only the path root changes.
 
-const agentPath = join(__dirname, "..", "pipelines", "implement", "implement.md");
+- [ ] **Step 2: Run tests — expect failures**
 
-describe("implement template agent prompt body — discover-then-read orientation", () => {
-  it("contains the source-root discovery glob", () => {
-    const agentMd = readFileSync(agentPath, "utf-8");
-    const frontmatterMatch = agentMd.match(/^---\n[\s\S]+?\n---\n/);
-    expect(frontmatterMatch).not.toBeNull();
-    const body = agentMd.slice(frontmatterMatch![0].length);
+Run: `npx vitest run src/cli/tests/pipeline-trace-lookup.test.ts src/cli/tests/pipeline-trace-command-validation.test.ts src/cli/tests/pipeline-failure-reason.test.ts`
+Expected: FAIL on path assertions.
 
-    // Body must Glob common source roots, not preload a specs dir
-    expect(body).toMatch(/src\/.*lib\/.*app\/.*pkg\/.*cmd\/.*internal\//s);
-  });
+- [ ] **Step 3: Update pipeline.ts**
 
-  it("references CONTEXT.md and docs/adr/ for orientation", () => {
-    const agentMd = readFileSync(agentPath, "utf-8");
-    const body = agentMd.slice(agentMd.match(/^---\n[\s\S]+?\n---\n/)![0].length);
+Add to imports: `import { runDir, runsDir } from "../lib/ralph-paths.js";`
 
-    expect(body).toMatch(/CONTEXT\.md/);
-    expect(body).toMatch(/docs\/adr/);
-  });
+For each site identified in Task 4.1:
 
-  it("contains zero literal $specs_dir references", () => {
-    const agentMd = readFileSync(agentPath, "utf-8");
-    const body = agentMd.slice(agentMd.match(/^---\n[\s\S]+?\n---\n/)![0].length);
+- **Line 54 `deriveProjectKey`:** delete entirely. The function and its JSDoc (line 51 area) go away.
+- **Lines 127–138 `maybePrintLayoutV2Notice` function definition:** delete entirely. This was a previous migration's artifact; it's superseded.
+- **`maybePrintLayoutV2Notice()` call site (around line 319):** delete the call. Otherwise an orphaned reference to a deleted function breaks the build.
+- **Lines 322–326:** replace `const ralphRoot = ... ; const projectKey = deriveProjectKey(...) ; const runsRoot = join(ralphRoot, projectKey, "runs")` with `const runsRoot = runsDir(opts.project ?? process.cwd())`.
+- **`listAllProjectRunsRoots` function (around lines 629–638):** delete entirely. With no cross-project scan, this helper has no callers.
+- **`findRunAcrossProjects` function (around lines 644–656):** delete entirely. Same reason.
+- **Lines 627–666 `pipelineTraceCommand` trace-lookup body:** replace the cross-project scan path with a single direct read: `runDir(opts.project ?? process.cwd(), runId)/pipeline.jsonl`. If absent, return "no such run."
+- **`RALPH_RUNS_ROOT` env var references:** delete the `process.env.RALPH_RUNS_ROOT ?? ...` fallback at lines 132, 322, 630, 664. Just use the project-local helper.
+- **`RALPH_RUNS_KEEP` env var (line 326):** **keep this.** It's a per-project pruning cap; the cap still applies to `<project>/.ralph/runs/`.
 
-    expect(body).not.toMatch(/\$specs_dir/);
-    expect(body).not.toMatch(/specs_dir/);
-  });
-});
+- [ ] **Step 4: Update `pipeline trace` command action**
 
-describe("implement template agent frontmatter — inputs declaration", () => {
-  it("does NOT declare specs_dir as a frontmatter input", () => {
-    const agentMd = readFileSync(agentPath, "utf-8");
-    const frontmatterMatch = agentMd.match(/^---\n([\s\S]+?)\n---\n/);
-    expect(frontmatterMatch).not.toBeNull();
-    const fm = frontmatterMatch![1];
+In `pipeline.ts` (`pipelineTraceCommand` function), update the `--project` handling: default to `process.cwd()` if absent. Remove any cross-project scan branch.
 
-    expect(fm).not.toMatch(/^\s*-\s+specs_dir\s*$/m);
-  });
-});
+- [ ] **Step 5: Update help text in program.ts**
+
+In `src/cli/program.ts`, the `pipeline run` help-after block (around line 112) and `pipeline trace` description mention `~/.ralph/<projectKey>/runs/<runId>/checkpoint.json`. Replace with `<project>/.ralph/runs/<runId>/checkpoint.json`. Update wording about cross-project scan if present.
+
+- [ ] **Step 6: Run tests — expect pass**
+
+Run: `npx vitest run src/cli/tests/pipeline-trace-lookup.test.ts src/cli/tests/pipeline-trace-command-validation.test.ts src/cli/tests/pipeline-failure-reason.test.ts`
+Expected: green.
+
+- [ ] **Step 7: Verify no remaining projectKey references**
+
+Run:
+```bash
+grep -rn 'projectKey\|deriveProjectKey\|RALPH_RUNS_ROOT' src/cli/
 ```
+Expected: zero hits in `src/cli/`. (Daemon code under `src/daemon/` may still reference its own user-scoped state; that is expected per the daemon decision above.)
 
-- [x] **Step 2: Run the test — expect FAIL**
+- [ ] **Step 8: Run full test suite**
 
-Run: `npx vitest run src/cli/tests/implement-rubric.test.ts`
+Run: `npx vitest run`
+Expected: full suite green.
 
-Expected: tests FAIL because `src/cli/pipelines/implement/implement.md` still has `$specs_dir` references and `- specs_dir` in frontmatter inputs.
-
-### Task 3.2: Edit `src/cli/pipelines/implement/implement.md`
-
-**Files:**
-- Modify: `src/cli/pipelines/implement/implement.md`
-
-- [x] **Step 1: Update frontmatter `inputs:` list**
-
-Use Edit:
-- `old_string`: `inputs:\n  - specs_dir\n`
-- `new_string`: `inputs: []\n`
-
-(The `outputs:` line on line 11 remains untouched.)
-
-- [x] **Step 2: Replace step 0a**
-
-Use Edit:
-- `old_string`: ``0a. Study `$specs_dir/*` with up to 500 parallel Sonnet subagents to learn the application specifications. If `$specs_dir` is empty in the Inputs block, default to `docs/specs`.``
-- `new_string`: `0a. ` followed by the orientation block from "File Structure → Reusable shared text" (the entire block, kept on multiple lines, beginning with `**Orient before acting.**`).
-
-- [x] **Step 3: Delete step 9999999999999**
-
-Use Edit:
-- `old_string`: ``9999999999999. If you find inconsistencies in the $specs_dir/\* then use an Opus 4.5 subagent with 'ultrathink' requested to update the specs.\n``
-- `new_string`: empty string
-
-(Removes the inconsistency-update step and its trailing newline so subsequent line numbering stays clean.)
-
-- [x] **Step 4: Verify zero residue**
-
-Run: `grep -n 'specs_dir\|\$specs_dir' src/cli/pipelines/implement/implement.md`
-
-Expected: no output.
-
-### Task 3.3: Edit `src/cli/pipelines/implement/scenario-author.md`
-
-**Files:**
-- Modify: `src/cli/pipelines/implement/scenario-author.md`
-
-- [x] **Step 1: Update frontmatter `inputs:` list**
-
-Use Edit:
-- `old_string`: `  - specs_dir\n`
-- `new_string`: `` (empty)
-
-(The `inputs:` block has multiple entries — `scenarios_dir`, `record_base.sha`, etc. — so only the `specs_dir` line is removed; the block stays non-empty.)
-
-- [x] **Step 2: Replace the body reference at line 97**
-
-Use Edit:
-- `old_string`: ``- If `$specs_dir` documents the behavior under test, use the spec wording as the source of truth — don't invent new vocabulary.``
-- `new_string`: ``- Ground vocabulary in `$project/CONTEXT.md`, `$project/README.md`, and the discovered source code. Use the project's own terminology, not invented synonyms.``
-
-- [x] **Step 3: Verify zero residue**
-
-Run: `grep -n 'specs_dir\|\$specs_dir' src/cli/pipelines/implement/scenario-author.md`
-
-Expected: no output.
-
-### Task 3.4: Edit `src/cli/pipelines/implement/pipeline.dot`
-
-**Files:**
-- Modify: `src/cli/pipelines/implement/pipeline.dot:3`
-
-- [x] **Step 1: Update inputs declaration**
-
-Use Edit:
-- `old_string`: `  inputs="specs_dir,max_iterations,llm_model,scenarios_dir"`
-- `new_string`: `  inputs="max_iterations,llm_model,scenarios_dir"`
-
-- [x] **Step 2: Confirm exact landed value**
-
-Run: `grep -n 'inputs=' src/cli/pipelines/implement/pipeline.dot`
-
-Expected output (line 3): `  inputs="max_iterations,llm_model,scenarios_dir"` — Chunk 5 Task 5.2 will assert this verbatim.
-
-- [x] **Step 3: Validate**
-
-Run: `npx tsx src/cli/index.ts pipeline validate src/cli/pipelines/implement/pipeline.dot`
-
-Expected: OK.
-
-### Task 3.5: Run rubric tests + commit
-
-- [x] **Step 1: Run the rubric tests — expect PASS**
-
-Run: `npx vitest run src/cli/tests/implement-rubric.test.ts`
-
-Expected: PASS.
-
-- [x] **Step 2: Run full vitest to surface other regressions**
-
-Run: `npx vitest run --reporter=default`
-
-Expected: rubric test passes; `implement.test.ts` may now FAIL (CLI command still passes `specs_dir`); `pipeline-implement-folder.test.ts` may FAIL. Those are addressed in Chunk 4–5. Note the failures and proceed.
-
-- [x] **Step 3: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
-git add src/cli/pipelines/implement/ src/cli/tests/implement-rubric.test.ts
-git commit -m "$(cat <<'EOF'
-refactor(implement-pipeline): drop \$specs_dir, adopt discover-then-read
+git add src/cli/commands/pipeline.ts src/cli/tests/pipeline-trace-lookup.test.ts src/cli/tests/pipeline-trace-command-validation.test.ts src/cli/tests/pipeline-failure-reason.test.ts src/cli/program.ts
+git commit -m "refactor(pipeline): run state writes to <project>/.ralph/runs/
 
-- pipeline.dot drops specs_dir from inputs
-- implement.md replaces step 0a (\$specs_dir/* fan-out) with discover-then-read
-- scenario-author.md grounds vocabulary in CONTEXT.md + README + source
-- implement-rubric.test.ts asserts new orientation shape (no \$specs_dir)
-
-Per ADR-0004.
-
-Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
-EOF
-)"
+Drop deriveProjectKey, the legacy 'Layout changed' notice block, and the
+RALPH_RUNS_ROOT env var. Pipeline run state writes to <project>/.ralph/
+runs/<runId>/. The cross-project scan in 'pipeline trace' goes away;
+--project (defaulting to cwd) is the only lookup mode. Help text and
+fixture-path assertions update in lockstep."
 ```
 
-### Verification targets (Chunk 3)
-
-- Smokes: None
-- Manual exercises: `npx tsx src/cli/index.ts pipeline validate src/cli/pipelines/implement/pipeline.dot`
-- Lint: `npx vitest run src/cli/tests/implement-rubric.test.ts`
-- Surfaces touched: bundled `implement` pipeline (TypeScript + agent rubric)
-
----
-
-## Chunk 4: Bundled meditate + janitor pipelines + CLI commands + their tests
-
-**Goal:** Excise `$specs_dir` from the bundled meditate pipeline, the bundled janitor pipeline, and both CLI commands (`implement.ts`, `meditate.ts`). Rewrite affected tests in lockstep.
-
-### Task 4.1: Rewrite meditate rubric tests (failing first)
+### Task 4.3: Port pipeline-resolver search path
 
 **Files:**
-- Modify: `src/cli/tests/meditate.test.ts:267–288` (the two `specs_dir`-related test cases)
+- Modify: `src/cli/lib/pipeline-resolver.ts`
+- Modify: `src/cli/tests/pipeline-resolver.test.ts`
 
-- [x] **Step 1: Locate the two target test cases by name**
+- [ ] **Step 1: Read `src/cli/lib/pipeline-resolver.ts` fully**
 
-Use the Read tool on `src/cli/tests/meditate.test.ts`. Confirm the two test cases the next step rewrites:
-- `"passes specs_dir default of docs/specs to pipeline runtime"` — currently at lines 267–275
-- `"exploration step weights $specs_dir and src/ folders"` — currently at lines 279–291
+Identify every search-path tier. Confirm sites at lines 37 and 41
+(`userFolderPath`, `userPath` rooted at `homedir() + ".ralph/pipelines/"`).
 
-- [x] **Step 2: Replace the two test cases (preserving existing mocking style — `vi.spyOn` on `pipelineMod`)**
+- [ ] **Step 2: Update tests**
 
-The existing test scaffold (lines 250–276 of `meditate.test.ts`) uses `vi.spyOn(pipelineMod, "pipelineRunCommand").mockImplementation(...)` and calls `await meditateCommand(tmpDir)` (no DI third arg). The replacements below preserve that pattern exactly.
+Replace fixture paths from `<project>/pipelines/...` to `<project>/.ralph/pipelines/...`. Delete any tests that exercise the user-home `~/.ralph/pipelines/` fallback (the tier is going away).
 
-For the first case, use Edit:
-- `old_string`:
-  ```typescript
-    it("passes specs_dir default of docs/specs to pipeline runtime", async () => {
-      const calls: Array<{ dotFile: string; opts: any }> = [];
-      vi.spyOn(pipelineMod, "pipelineRunCommand").mockImplementation(async (dotFile, opts) => {
-        calls.push({ dotFile, opts });
-      });
-      await meditateCommand(tmpDir);
-      expect(calls).toHaveLength(1);
-      expect(calls[0].opts.variables.specs_dir).toBe("docs/specs");
-    });
-  ```
-- `new_string`:
-  ```typescript
-    it("does NOT pass specs_dir to pipeline runtime", async () => {
-      const calls: Array<{ dotFile: string; opts: any }> = [];
-      vi.spyOn(pipelineMod, "pipelineRunCommand").mockImplementation(async (dotFile, opts) => {
-        calls.push({ dotFile, opts });
-      });
-      await meditateCommand(tmpDir);
-      expect(calls).toHaveLength(1);
-      expect(calls[0].opts.variables).not.toHaveProperty("specs_dir");
-    });
-  ```
+- [ ] **Step 3: Run tests — expect failure**
 
-For the second case, use Edit:
-- `old_string`:
-  ```typescript
-    it("exploration step weights $specs_dir and src/ folders", () => {
-      const agentMd = readFileSync(
-        join(__dirname, "..", "pipelines", "meditate", "meditate.md"),
-        "utf-8",
-      );
-      const frontmatterMatch = agentMd.match(/^---\n[\s\S]+?\n---\n/);
-      expect(frontmatterMatch).not.toBeNull();
-      const body = agentMd.slice(frontmatterMatch![0].length);
-
-      expect(body).toMatch(/\$specs_dir/);
-      expect(body).toContain("src/");
-      expect(body.toLowerCase()).toContain("weighted focus");
-    });
-  ```
-- `new_string`:
-  ```typescript
-    it("exploration step uses discover-then-read orientation, not $specs_dir", () => {
-      const agentMd = readFileSync(
-        join(__dirname, "..", "pipelines", "meditate", "meditate.md"),
-        "utf-8",
-      );
-      const frontmatterMatch = agentMd.match(/^---\n[\s\S]+?\n---\n/);
-      expect(frontmatterMatch).not.toBeNull();
-      const body = agentMd.slice(frontmatterMatch![0].length);
-
-      expect(body).not.toMatch(/\$specs_dir/);
-      expect(body).not.toMatch(/specs_dir/);
-      expect(body).toContain("CONTEXT.md");
-      expect(body).toContain("docs/adr");
-      expect(body).toMatch(/src\/.*lib\/.*app\/.*pkg\/.*cmd\/.*internal\//s);
-    });
-  ```
-
-- [x] **Step 3: Run — expect FAIL**
-
-Run: `npx vitest run src/cli/tests/meditate.test.ts`
-
-Expected: FAIL — meditate.md still contains `$specs_dir`; meditate.ts still passes `specs_dir` default.
-
-### Task 4.2: Edit `src/cli/pipelines/meditate/meditate.md`
-
-**Files:**
-- Modify: `src/cli/pipelines/meditate/meditate.md:69`
-
-- [x] **Step 1: Replace the exploration step**
-
-Find:
-```
-3. Use `glob_files` and `read_file` to explore the project, with weighted focus on `$specs_dir/*.md` and `src/`. If `$specs_dir` in the Inputs block is empty, default to `docs/specs`. Read the design specs to understand stated intent; read source code to compare it against actual structure. Note where they agree, where they drift, and where complexity is accumulating without earning its keep.
-```
-
-Replace with:
-```
-3. Use `glob_files` and `read_file` to explore the project. Discover the project layout: glob for source roots (`src/`, `lib/`, `app/`, `pkg/`, `cmd/`, `internal/`) and pick what exists. Read `CONTEXT.md` (domain language), files in `docs/adr/` (decision records), `README.md` (mission and command surface), and a sampling of the source roots to understand current structure. Compare what `CONTEXT.md` and ADRs commit to against what the source actually does. Note where they agree, where they drift, and where complexity is accumulating without earning its keep.
-```
-
-- [x] **Step 2: Verify zero residue**
-
-Run: `grep -n 'specs_dir\|\$specs_dir' src/cli/pipelines/meditate/meditate.md`
-
-Expected: no output.
-
-### Task 4.3: Edit `src/cli/pipelines/meditate/pipeline.dot`
-
-**Files:**
-- Modify: `src/cli/pipelines/meditate/pipeline.dot:2`
-
-- [x] **Step 1: Update inputs declaration**
-
-Find: `  inputs="steer,vision,specs_dir"`
-
-Replace with: `  inputs="steer,vision"`
-
-- [x] **Step 2: Validate**
-
-Run: `npx tsx src/cli/index.ts pipeline validate src/cli/pipelines/meditate/pipeline.dot`
-
-Expected: OK.
-
-### Task 4.4: Edit `src/cli/pipelines/janitor/pipeline.dot`
-
-**Files:**
-- Modify: `src/cli/pipelines/janitor/pipeline.dot:4`
-
-- [x] **Step 1: Update inputs declaration**
-
-Find: `  inputs="project, specs_dir"`
-
-Replace with: `  inputs="project"`
-
-- [x] **Step 2: Confirm janitor agent file has no `$specs_dir` residue**
-
-Run: `grep -rn 'specs_dir\|\$specs_dir' src/cli/pipelines/janitor/`
-
-Expected: no output. (Verified at plan-write time: `src/cli/pipelines/janitor/janitor.md` is already clean. Only `pipeline.dot:4` had a hit, fixed in Task 4.4 step 1.)
-
-- [x] **Step 3: Validate**
-
-Run: `npx tsx src/cli/index.ts pipeline validate src/cli/pipelines/janitor/pipeline.dot`
-
-Expected: OK.
-
-### Task 4.5: Rewrite implement command test (failing first)
-
-**Files:**
-- Modify: `src/cli/tests/implement.test.ts:48–53`
-
-- [x] **Step 1: Replace the test case (preserving existing `vi.mock` + `mockPipeline` pattern)**
-
-The existing scaffold (`implement.test.ts:1–17`) uses `vi.mock("../commands/pipeline.js", ...)` and exposes `mockPipeline = pipelineRunCommand as ReturnType<typeof vi.fn>`. Tests call `await implementCommand("/my/project", {})` and assert via `expect(mockPipeline).toHaveBeenCalledWith(...)`. The replacement preserves that pattern.
-
-Use Edit:
-- `old_string`:
-  ```typescript
-    it("passes specs_dir default of docs/specs to pipeline runtime", async () => {
-      await implementCommand("/my/project", {});
-      expect(mockPipeline).toHaveBeenCalledWith(
-        "implement",
-        expect.objectContaining({
-          variables: expect.objectContaining({ specs_dir: "docs/specs" }),
-        })
-      );
-    });
-  ```
-- `new_string`:
-  ```typescript
-    it("does NOT pass specs_dir to pipeline runtime", async () => {
-      await implementCommand("/my/project", {});
-      expect(mockPipeline).toHaveBeenCalled();
-      const opts = mockPipeline.mock.calls[0][1] as { variables: Record<string, unknown> };
-      expect(opts.variables).not.toHaveProperty("specs_dir");
-    });
-  ```
-
-- [x] **Step 2: Run — expect FAIL**
-
-Run: `npx vitest run src/cli/tests/implement.test.ts`
-
+Run: `npx vitest run src/cli/tests/pipeline-resolver.test.ts`
 Expected: FAIL.
 
-### Task 4.6: Edit `src/cli/commands/implement.ts`
+- [ ] **Step 4: Update the resolver**
 
-**Files:**
-- Modify: `src/cli/commands/implement.ts:30–38`
+Import `pipelinesDir` from `../lib/ralph-paths.js`.
 
-- [x] **Step 1: Remove the `specs_dir` line**
+Replace:
+- `<project>/pipelines/<name>` search → `pipelinesDir(project)/<name>` (i.e. `<project>/.ralph/pipelines/<name>`)
+- Delete the user-home fallback at lines 37 and 41 (`userFolderPath`, `userPath`). Two-tier resolution: project-local first, bundled second. No user-home tier.
 
-Find:
-```typescript
-  await pipelineRunCommand("implement", {
-    project: absPath,
-    variables: {
-      specs_dir: "docs/specs",
-      scenarios_dir: options.scenarios ?? "",
-      max_iterations: String(options.max ?? 0),
-      ...(options.model ? { llm_model: options.model } : {}),
-    },
-  });
-```
+- [ ] **Step 5: Run tests — expect pass**
 
-Replace with:
-```typescript
-  await pipelineRunCommand("implement", {
-    project: absPath,
-    variables: {
-      scenarios_dir: options.scenarios ?? "",
-      max_iterations: String(options.max ?? 0),
-      ...(options.model ? { llm_model: options.model } : {}),
-    },
-  });
-```
+Run: `npx vitest run src/cli/tests/pipeline-resolver.test.ts`
+Expected: green.
 
-- [x] **Step 2: Type check**
+- [ ] **Step 6: Run full test suite**
 
-Run: `npx tsc --noEmit`
+Run: `npx vitest run`
+Expected: full suite green.
 
-Expected: PASS.
-
-### Task 4.7: Edit `src/cli/commands/meditate.ts`
-
-**Files:**
-- Modify: `src/cli/commands/meditate.ts:80–87`
-
-- [x] **Step 1: Remove the `specs_dir` line**
-
-Find:
-```typescript
-    return await self.pipelineRunCommand(dotFile, {
-      project: absPath,
-      variables: {
-        steer: opts.variables?.steer ?? "",
-        vision: readVisionIfPresent(absPath),
-        specs_dir: opts.variables?.specs_dir ?? "docs/specs",
-      },
-    });
-```
-
-Replace with:
-```typescript
-    return await self.pipelineRunCommand(dotFile, {
-      project: absPath,
-      variables: {
-        steer: opts.variables?.steer ?? "",
-        vision: readVisionIfPresent(absPath),
-      },
-    });
-```
-
-- [x] **Step 2: Type check**
-
-Run: `npx tsc --noEmit`
-
-Expected: PASS.
-
-### Task 4.8: Run vitest, expect all chunk-4 tests PASS
-
-- [x] **Step 1: Run targeted tests**
-
-Run: `npx vitest run src/cli/tests/meditate.test.ts src/cli/tests/implement.test.ts`
-
-Expected: PASS (all assertions, including the rewrites in Tasks 4.1 and 4.5).
-
-- [x] **Step 2: Run full vitest to catch knock-on failures**
-
-Run: `npx vitest run --reporter=default`
-
-Expected: PASS, except possibly:
-- `pipeline-implement-folder.test.ts` (still asserts `specs_dir` in pipeline.dot)
-- `pipeline.test.ts` (uses `specs_dir` as a generic variable name)
-- `illumination-pipeline-flow.test.ts` (asserts `specs_dir` in preflight error message)
-
-Those are addressed in Chunk 5.
-
-### Task 4.9: Commit
-
-- [x] **Step 1: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add src/cli/pipelines/meditate/ src/cli/pipelines/janitor/ \
-        src/cli/commands/implement.ts src/cli/commands/meditate.ts \
-        src/cli/tests/meditate.test.ts src/cli/tests/implement.test.ts
-git commit -m "$(cat <<'EOF'
-refactor(meditate+janitor+CLI): drop \$specs_dir from bundled pipelines
+git add src/cli/lib/pipeline-resolver.ts src/cli/tests/pipeline-resolver.test.ts
+git commit -m "refactor(resolver): two-tier pipeline search — project-local + bundled
 
-- meditate pipeline.dot drops specs_dir input
-- meditate.md replaces \$specs_dir-weighted exploration with discover-then-read
-- janitor pipeline.dot drops specs_dir input
-- implement.ts and meditate.ts CLI commands no longer pass specs_dir
-- meditate.test.ts and implement.test.ts contract assertions inverted
-
-Per ADR-0004.
-
-Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
-EOF
-)"
+Project-local pipelines move from <project>/pipelines/ to <project>/
+.ralph/pipelines/. The user-home ~/.ralph/pipelines/ fallback is
+deleted entirely (per spec §3.3 — two tiers, not three)."
 ```
 
-### Verification targets (Chunk 4)
+### Task 4.4: Daemon state audit (verify-only)
 
-- Smokes: None directly
-- Manual exercises: `npx tsx src/cli/index.ts pipeline validate src/cli/pipelines/meditate/pipeline.dot`, same for `janitor`
-- Lint: `npx vitest run src/cli/tests/meditate.test.ts src/cli/tests/implement.test.ts`, `npx tsc --noEmit`
-- Surfaces touched: bundled `meditate` + `janitor` pipelines, `ralph implement` and `ralph meditate` command code
+**Files:**
+- Read: `src/daemon/state.ts`, `src/daemon/index.ts`
+- Modify: none expected
+
+- [ ] **Step 1: Read daemon state code**
+
+Confirm: state files (`tasks.json`, `pids/`, `logs/`) are user-scoped (track tasks across projects). They stay at `~/.ralph/heartbeat/` (or wherever they live today).
+
+- [ ] **Step 2: Verify no per-project state crept in**
+
+If state.ts writes any **per-project** files (e.g. project-specific run logs), those pieces alone migrate to `<project>/.ralph/runs/`. Otherwise leave untouched.
+
+- [ ] **Step 3: If no migration needed, no commit**
+
+If migration is needed (rare), apply the same TDD pattern as Tasks 4.2–4.3 in a separate commit.
+
+- [ ] **Step 4: Note the audit outcome in commit message log**
+
+Either commit nothing (skipped) or commit with message `audit(daemon): verified state is user-scoped — no migration`.
 
 ---
 
-## Chunk 5: Remaining tests, repo cleanup, deletion, and smoke
+## Chunk 5: Bundled pipelines + ralph-cli self-migration (single big-bang commit)
 
-**Goal:** Fix the residual tests that referenced `specs_dir` as a generic variable, perform repo content cleanup (README, CONTEXT.md, directory-inventory deletion), then `git rm -r docs/specs/`, then run end-to-end smoke for all four affected pipelines and the CLI commands.
+This chunk ports the bundled pipeline prompts that hardcode old paths,
+then performs the `git mv` of ralph-cli's own ralph-shaped files into
+`.ralph/`. Per spec §7.5, the bundled-pipeline edits and the `git mv`
+**land in a single commit** so no intermediate SHA leaves the repo in a
+broken state where prompts reference paths that don't exist on disk yet.
 
-### Task 5.1: Update `src/cli/tests/pipeline.test.ts` (rename generic variable)
-
-**Files:**
-- Modify: `src/cli/tests/pipeline.test.ts:184,187`
-
-- [x] **Step 1: Locate the test using `specs_dir` as a generic variable**
-
-Look for a test that passes `{ specs_dir: "/tmp/specs", foo: "bar" }` and asserts `callerContext` round-trips. The test is concerned with variable plumbing, not the specs pattern.
-
-- [x] **Step 2: Rename `specs_dir` → `widget_dir` in both lines**
-
-Use Edit with `replace_all=false` on line 184: `specs_dir: "/tmp/specs"` → `widget_dir: "/tmp/widget"`.
-
-Then on line 187: `specs_dir: "/tmp/specs"` → `widget_dir: "/tmp/widget"`.
-
-- [x] **Step 3: Run — expect PASS**
-
-Run: `npx vitest run src/cli/tests/pipeline.test.ts`
-
-Expected: PASS.
-
-### Task 5.2: Update `src/cli/tests/pipeline-implement-folder.test.ts`
+### Task 5.1: Combined bundled-pipeline path edits + repo self-migration
 
 **Files:**
-- Modify: `src/cli/tests/pipeline-implement-folder.test.ts:43`
+- Modify: `src/cli/pipelines/meditate/pipeline.dot` (the `meditations_dir` default)
+- Modify: `src/cli/pipelines/**/*.md` (any path strings in agent prompts)
+- `git mv`: `meditations/` → `.ralph/meditations/`
+- `git mv`: `docs/adr/` → `.ralph/docs/adr/`
+- `git mv`: `CONTEXT.md` → `.ralph/CONTEXT.md`
+- `git mv`: `VISION.md` → `.ralph/VISION.md`
+- Modify: `.gitignore` (append `.ralph/runs/`)
+- Modify: `README.md` (path-string updates)
 
-The assertion at line 43 is checking that **`scenario-author.md`** (loaded into `content` at line 39) contains `"specs_dir"` in its frontmatter. Since Chunk 3 Task 3.3 step 1 removes the `- specs_dir` line from `scenario-author.md`, this assertion will start failing. The cleanest replacement is a positive absence-check confirming the excision actually happened.
-
-- [x] **Step 1: Read the test file to confirm the assertion shape**
-
-Use the Read tool on `src/cli/tests/pipeline-implement-folder.test.ts`. Confirm `content` at line 39 reads `scenario-author.md`, and line 43 reads `expect(content).toContain("specs_dir");`.
-
-- [x] **Step 2: Replace the assertion**
-
-Use Edit:
-- `old_string`: `    expect(content).toContain("specs_dir");\n`
-- `new_string`: `    expect(content).not.toContain("specs_dir");\n`
-
-(Inverted: now asserts the excision happened — `scenario-author.md` must no longer reference `specs_dir`.)
-
-- [x] **Step 3: Run — expect PASS**
-
-Run: `npx vitest run src/cli/tests/pipeline-implement-folder.test.ts`
-
-Expected: PASS.
-
-### Task 5.3: Update `src/attractor/tests/illumination-pipeline-flow.test.ts`
-
-**Files:**
-- Modify: `src/attractor/tests/illumination-pipeline-flow.test.ts:19–29`
-
-The current test (lines 19–29) asserts the validator emits a `required_caller_vars` info banner naming `illuminations_dir`, `specs_dir`, `plans_dir`. After Chunk 2's `inputs="project"` rewrite, only `project` is declared and `project` is RESERVED — so the banner is either empty or omitted entirely. Three lines (26, 27, 28) all break together; the rewrite handles them as a unit.
-
-- [x] **Step 1: Read the test file**
-
-Use the Read tool on `src/attractor/tests/illumination-pipeline-flow.test.ts` and confirm lines 19–29 contain the test case `"emits required_caller_vars info banner listing project, illuminations_dir, etc."`.
-
-- [x] **Step 2: Replace the entire test case**
-
-Use Edit:
-- `old_string`:
-  ```typescript
-    it("emits required_caller_vars info banner listing project, illuminations_dir, etc.", () => {
-      const info = diags.find(
-        d => d.rule === "required_caller_vars" && d.severity === "info",
-      );
-      expect(info).toBeDefined();
-      // $project is RESERVED so it must NOT appear; the other digraph inputs must.
-      expect(info!.message).not.toMatch(/\bproject\b/);
-      expect(info!.message).toContain("illuminations_dir");
-      expect(info!.message).toContain("specs_dir");
-      expect(info!.message).toContain("plans_dir");
-    });
-  ```
-- `new_string`:
-  ```typescript
-    it("does NOT require any caller vars (only $project declared, which is RESERVED)", () => {
-      const info = diags.find(
-        d => d.rule === "required_caller_vars" && d.severity === "info",
-      );
-      // After the source-as-truth excision (ADR-0004), inputs="project" only.
-      // $project is RESERVED → no caller-vars banner expected, OR if emitted,
-      // it must not name any of the removed inputs.
-      if (info) {
-        expect(info.message).not.toMatch(/illuminations_dir|specs_dir|plans_dir/);
-      } else {
-        expect(info).toBeUndefined();
-      }
-    });
-  ```
-
-- [x] **Step 3: Run — expect PASS**
-
-Run: `npx vitest run src/attractor/tests/illumination-pipeline-flow.test.ts`
-
-Expected: PASS. If the validator's actual banner shape contradicts both branches of the conditional, fix the test to match the observed message and document the behavior in CONTEXT.md or an ADR.
-
-### Task 5.4: Run full vitest suite
-
-- [x] **Step 1: Run all tests**
-
-Run: `npx vitest run --reporter=default`
-
-Expected: PASS (entire suite).
-
-- [x] **Step 2: Run type check**
-
-Run: `npx tsc --noEmit`
-
-Expected: PASS.
-
-### Task 5.5: Update `README.md`
-
-**Files:**
-- Modify: `README.md` (line 60, lines 158–170, lines 181–185)
-
-- [x] **Step 1: Remove the `--var specs_dir=docs/specs` example at line 60**
-
-Find:
-```bash
-ralph pipeline run pipelines/my-pipeline.dot \
-  --var meditations_dir=meditations \
-  --var specs_dir=docs/specs
-```
-
-Replace with:
-```bash
-ralph pipeline run pipelines/my-pipeline.dot \
-  --var meditations_dir=meditations
-```
-
-- [x] **Step 2: Replace the Directory Map section (lines 158–170)**
-
-Find the entire block from `## Directory Map` through the closing blockquote at line 170.
-
-Replace with:
-
-```markdown
-## Where to look
-
-- **`CONTEXT.md`** — domain language and glossary
-- **`docs/adr/`** — decision records (why things are the way they are)
-- **`src/`** — TypeScript source (CLI, pipeline engine, daemon, MCP servers)
-- **`pipelines/`** — project-local `.dot` pipelines (also `src/cli/pipelines/` for bundled ones shipped to consumers)
-```
-
-- [x] **Step 3: Replace the Specs section (lines 181–185)**
-
-Find (heading at line 181, list at 183–185):
-```markdown
-## Specs
-
-- [Architecture](docs/specs/architecture.md)
-- [Commands](docs/specs/commands.md)
-- [Loop Script](docs/specs/loop.md)
-```
-
-Replace with:
-```markdown
-## Decisions
-
-See [`docs/adr/`](docs/adr/) for accepted decision records.
-```
-
-### Task 5.6: Update `CONTEXT.md`
-
-**Files:**
-- Modify: `CONTEXT.md` (append new section at end)
-
-- [x] **Step 1: Append the "Documentation channels" section**
-
-Append to the end of the file:
-
-```markdown
-
-### Documentation channels
-
-ralph-cli has three documentation channels with disjoint roles:
-
-- **`CONTEXT.md` (this file)** — domain language and glossary. Hand-curated.
-  Updated during grill-with-docs sessions and ADR writes. Stable.
-- **`docs/adr/`** — append-only decision records. Each captures a hard-to-reverse
-  or surprising-without-context choice with its trade-off. Never edited after
-  acceptance.
-- **`src/` and `pipelines/`** — the authoritative description of behavior.
-  Source code is truth. No spec file claims to mirror it.
-
-Removed on 2026-05-01: `docs/specs/` (behavioral specs that drifted faster than
-they could be maintained) and `docs/orientation/directory-inventory.md` (a
-curated file-tree summary that drifted on every reorg). See
-`docs/adr/0004-source-and-context-as-truth-no-behavioral-specs.md`.
-
-Agents needing workspace orientation discover the project layout at runtime
-(Glob source/docs roots) and read `CONTEXT.md` + `docs/adr/` + `README.md` +
-a live `src/` inventory. No preloaded curated overview.
-```
-
-### Task 5.7: Delete `docs/orientation/directory-inventory.md`
-
-- [x] **Step 1: Delete the file**
+- [ ] **Step 1: Verify clean working tree**
 
 ```bash
-git rm docs/orientation/directory-inventory.md
+git status
 ```
+Expected: clean. Migration must not mix with unrelated changes.
 
-- [x] **Step 2: Remove the folder if empty**
+- [ ] **Step 2: Find every old path string in bundled pipelines**
 
 ```bash
-if [ -z "$(ls -A docs/orientation 2>/dev/null)" ]; then rmdir docs/orientation; fi
+grep -rn 'meditations/illuminations\|meditations/stimuli' src/cli/pipelines/
 ```
 
-### Task 5.8: Run `npm run build` to regenerate `dist/`
+Save the list. For each hit, replace `meditations/illuminations` with `.ralph/meditations/illuminations` and `meditations/stimuli` with `.ralph/meditations/stimuli`. Apply edits in-place.
 
-`npm run build` MUST succeed before Task 5.9 smokes — the bundled CLI commands (`ralph implement`, `ralph meditate`, `ralph heartbeat pipeline janitor`) read pipeline files from `dist/pipelines/`, so stale dist would mask source-edit bugs.
-
-- [x] **Step 1: Build**
-
-Run: `npm run build`
-
-Expected: PASS — `dist/pipelines/*` regenerates with the new pipeline.dot files (no `specs_dir` in inputs) and updated agent rubrics.
-
-- [x] **Step 2: Verify `dist/` is consistent**
-
-Run: `grep -rn 'specs_dir\|\$specs_dir' dist/pipelines/`
-
-Expected: no output. If hits remain, the source files in `src/cli/pipelines/` were not updated correctly — re-check Tasks 3.2, 3.3, 3.4, 4.2, 4.3, 4.4.
-
-### Task 5.9: Run end-to-end smokes (4 commands)
-
-Prerequisite: Task 5.4 (full vitest pass), Task 5.7 (directory-inventory deletion committed), and Task 5.8 (build) must all be complete. Per spec §7, smokes must pass before `git rm -r docs/specs/` in Task 5.10.
-
-This is dogfooding — ralph-cli runs the affected pipelines against itself. The repo at this point still has `docs/specs/` (deletion is the next step). The smokes verify the agents tolerate either presence or absence; we want them to work in both.
-
-- [x] **Step 1: Bundled `ralph implement` smoke**
-
-Run (in a scratch directory):
-```bash
-mkdir -p /tmp/ralph-implement-smoke && cd /tmp/ralph-implement-smoke && \
-  git init -b main && \
-  printf '# scratch\n' > README.md && git add README.md && git commit -m "init" && \
-  ralph implement . --max 1
-```
-
-Expected: implement runs one iteration, the agent orients via discover-then-read (CONTEXT.md may be missing — that's tolerated), no engine preflight error about `specs_dir`. Exit cleanly.
-
-- [x] **Step 2: Bundled `ralph meditate` smoke**
-
-Run:
-```bash
-cd /Users/josu/Documents/projects/ralph-cli && ralph meditate . --var steer="smoke test"
-```
-
-Expected: meditate runs, exploration step uses discover-then-read, no `$specs_dir` references in injected Inputs block, agent produces an illumination via `write_illumination`. Exit cleanly.
-
-- [x] **Step 3: Bundled janitor smoke**
-
-Run:
-```bash
-cd /Users/josu/Documents/projects/ralph-cli && ralph heartbeat pipeline janitor --project . --every 0
-```
-
-Expected: janitor runs, no `$specs_dir` references, scans source. Cancel after one iteration.
-
-- [x] **Step 4: Project-local illumination-to-implementation smoke**
-
-First, list current alive illuminations and pick the most recent one:
+- [ ] **Step 3: Re-grep to confirm**
 
 ```bash
-ls -1t meditations/illuminations/*.md | head -5
+grep -rn 'meditations/illuminations\|meditations/stimuli' src/cli/pipelines/
 ```
+Expected: every remaining hit (if any) starts with `.ralph/meditations/`.
 
-Use the first listed file as the smoke target. If `meditations/illuminations/` is empty, restore one from history with `git checkout HEAD~10 -- meditations/illuminations/2026-05-01T0820-pipeline-spec-drift-poisons-agents.md` (or any other file present in HEAD~10 — `git log --all --oneline -- meditations/illuminations/` lists candidates).
+- [ ] **Step 4: Create the .ralph/ tree at repo root via direct mkdir**
 
-Then run:
+Do **not** use `ralph init` for the self-migration. The `dist/` may be stale (Chunk 2 added init but the developer may not have rebuilt) and using a tool to scaffold what `git mv` then overwrites adds an unnecessary delete-the-stub dance. Direct mkdir is honest:
 
 ```bash
-cd /Users/josu/Documents/projects/ralph-cli && \
-  ralph pipeline run pipelines/illumination-to-implementation/pipeline.dot --project .
+mkdir -p .ralph/pipelines .ralph/meditations .ralph/memory .ralph/docs
 ```
 
-Expected: pipeline starts at `verifier`. Verifier orients via discover-then-read (no `$specs_dir/architecture.md` read attempt). Either reach the approval gate or cancel cleanly with Ctrl-C. The smoke tests pipeline structure, not full triage execution.
+(`.ralph/meditations/illuminations`, `.ralph/meditations/stimuli`, `.ralph/docs/adr` will be created by the `git mv`s below.)
 
-### Task 5.10: Final deletion of `docs/specs/`
-
-- [x] **Step 1: Delete the folder**
+- [ ] **Step 5: `git mv` the four targets**
 
 ```bash
-git rm -r docs/specs/
+git mv meditations .ralph/meditations
+git mv docs/adr .ralph/docs/adr
+git mv CONTEXT.md .ralph/CONTEXT.md
+git mv VISION.md .ralph/VISION.md
 ```
 
-- [x] **Step 2: Verify zero residual references in non-historical files**
+`docs/superpowers/` (specs + plans) stays at `docs/superpowers/` per spec §2 out-of-scope.
 
-Run:
+**Important:** do not run `git add .ralph/` between Step 4 and Step 5. If `.ralph/CONTEXT.md` becomes a tracked empty stub, `git mv CONTEXT.md .ralph/CONTEXT.md` will refuse with "destination exists."
+
+- [ ] **Step 6: Verify history follows for each moved file**
+
 ```bash
-grep -rn 'docs/specs\|specs_dir\|\$specs_dir' /Users/josu/Documents/projects/ralph-cli \
-  --include="*.ts" --include="*.dot" --include="*.md" --include="*.json" \
-  --include="*.sh" --include="*.mjs" 2>/dev/null \
-  | grep -v "meditations/illuminations\|/memory/\|/dist/\|docs/superpowers/plans/" \
-  | grep -v "docs/superpowers/specs/\|docs/adr/0003" \
-  | grep -v "meditations/stimuli/.triage"
+git log --follow --oneline .ralph/VISION.md | head -5
+git log --follow --oneline .ralph/CONTEXT.md | head -5
+git log --follow --oneline .ralph/docs/adr/0001-agents-live-next-to-pipeline.md | head -5
 ```
+Expected: each shows commits from before the move (proving git tracked the rename).
 
-Expected: zero output (excluding historical/append-only files).
+- [ ] **Step 7: Update path strings in `.ralph/CONTEXT.md` inline**
 
-- [x] **Step 3: Final type check + build**
+Open `.ralph/CONTEXT.md` and update every reference:
+- `meditations/illuminations/` → `.ralph/meditations/illuminations/`
+- `meditations/stimuli/` (if any) → `.ralph/meditations/stimuli/`
+- `meditations/archived-illuminations/` → `.ralph/meditations/archived-illuminations/`
+- `meditations/implemented-illuminations/` → `.ralph/meditations/implemented-illuminations/`
+- `docs/adr/` → `.ralph/docs/adr/` (in any cross-references)
 
-Run:
+Verify with:
 ```bash
-npx tsc --noEmit && npm run build && npx vitest run
+grep -n 'meditations/\|docs/adr/' .ralph/CONTEXT.md
+```
+Expected: every remaining hit has the `.ralph/` prefix.
+
+- [ ] **Step 8: Update path strings in README.md**
+
+Locate references via:
+```bash
+grep -n 'meditations/\|~/.ralph\|docs/adr/' README.md
 ```
 
-Expected: ALL PASS.
+Apply edits:
+- The `ralph heartbeat pipeline janitor` example (around line 47): janitor writes illuminations to `.ralph/meditations/illuminations/`.
+- The `--resume` paragraph (around line 62): `~/.ralph/<projectKey>/runs/<runId>/checkpoint.json` → `<project>/.ralph/runs/<runId>/checkpoint.json`.
+- The "Where to look" section (around lines 158–162): `docs/adr/` → `.ralph/docs/adr/` (and `CONTEXT.md` → `.ralph/CONTEXT.md`).
+- Add a "Bootstrap a project" section near the top: `mkdir foo && cd foo && ralph init`.
 
-### Task 5.11: Commit + tag
+- [ ] **Step 9: Update ADR cross-references**
 
-- [x] **Step 1: Commit**
+Run a broad grep:
+```bash
+grep -rn 'docs/adr/' --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.git . | grep -v '^docs/superpowers/'
+```
+
+(Lines under `docs/superpowers/` are spec/plan history — keep their references untouched. Lines outside that path get updated to `.ralph/docs/adr/`.)
+
+ADRs that cross-reference each other by bare filename (`0001-...md`, no path prefix) work post-move because they're sibling-relative — no change needed for those.
+
+- [ ] **Step 10: Append `.ralph/runs/` to .gitignore**
+
+```bash
+grep -n '\.ralph/runs/' .gitignore
+```
+If absent:
+```bash
+echo '.ralph/runs/' >> .gitignore
+```
+
+- [ ] **Step 11: Run full test suite**
+
+```bash
+npx vitest run
+```
+Expected: full suite green. Tests that asserted on `meditations/...`, `docs/adr/...`, or `CONTEXT.md` paths get `.ralph/` prefixes in the same commit if any remain (most should have been caught in earlier chunks).
+
+- [ ] **Step 12: Smoke — bundled pipeline against migrated repo**
+
+```bash
+npm run build
+node dist/cli/index.js pipeline run src/cli/pipelines/meditate/pipeline.dot --project .
+```
+Expected: meditate pipeline runs to completion. Capture the runId from the run output.
+
+```bash
+ls -la .ralph/runs/
+```
+Expected: a `<runId>/` subdirectory containing `checkpoint.json` and `pipeline.jsonl`.
+
+If illumination written, confirm location:
+```bash
+ls -la .ralph/meditations/illuminations/
+```
+
+- [ ] **Step 13: Single big-bang commit**
 
 ```bash
 git add -A
-git commit -m "$(cat <<'EOF'
-refactor(docs): delete docs/specs/ — source code + CONTEXT.md + ADRs are truth
+git commit -m "refactor(repo): migrate ralph-cli to .ralph/ layout (big-bang)
 
-Final step of the source-as-truth excision (ADR-0004). Removes:
+Bundled-pipeline path strings and ralph-cli's own ralph-shaped files
+land in a single commit per spec §7.5 — no intermediate SHA where
+prompts reference paths that don't exist on disk.
 
-- docs/specs/ (11 hand-authored behavioral specs)
-- docs/orientation/directory-inventory.md (curated file-tree summary)
+git mv: meditations/ -> .ralph/meditations/
+git mv: docs/adr/ -> .ralph/docs/adr/
+git mv: CONTEXT.md -> .ralph/CONTEXT.md
+git mv: VISION.md -> .ralph/VISION.md
 
-Updates README.md (Where to look pointer list) and CONTEXT.md
-(Documentation channels section). \$specs_dir is now zero references in
-non-historical files.
-
-Per ADR-0004. Spec at
-docs/superpowers/specs/2026-05-01-source-as-truth-no-behavioral-specs-design.md.
-
-Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
-EOF
-)"
+Path strings updated in: bundled pipeline prompts, .ralph/CONTEXT.md,
+README.md, ADR cross-references. .gitignore gains .ralph/runs/.
+End-to-end meditate smoke verified against the migrated layout."
 ```
 
-- [x] **Step 2: Tag (optional — skip unless explicitly requested)**
+---
 
-This change ships in a regular commit; no version bump is required. Skip tagging unless the user requests it. If they do, run `npm version patch --no-git-tag-version && git add package.json && git commit --amend --no-edit && git tag v$(node -p "require('./package.json').version")`.
+## Chunk 6: Final verification + cleanup
 
-### Verification targets (Chunk 5)
+### Task 6.1: Static-check sweep
 
-- Smokes:
-  - Bundled `ralph implement` — Task 5.9 step 1
-  - Bundled `ralph meditate` — Task 5.9 step 2
-  - Bundled janitor heartbeat — Task 5.9 step 3
-  - Project-local illumination-to-implementation pipeline — Task 5.9 step 4
-- Manual exercises: `ralph implement`, `ralph meditate`, `ralph heartbeat pipeline janitor`, `ralph pipeline run`
-- Lint: `npx vitest run`, `npx tsc --noEmit`, `npm run build`
-- Surfaces touched: docs (`README.md`, `CONTEXT.md`, `docs/specs/`, `docs/orientation/`), all four affected pipelines, both CLI commands, six test files
+- [ ] **Step 1: No remaining old-path literals in src/**
+
+```bash
+grep -rn 'meditations/illuminations\|meditations/stimuli' src/
+```
+Expected: zero hits in `src/`. (Hits inside `dist/` are stale build artifacts; `npm run build` to refresh.)
+
+```bash
+grep -rn '"docs/adr"\|join(.*"docs", "adr"' src/
+```
+Expected: zero hits.
+
+- [ ] **Step 2: No remaining `~/.ralph/<projectKey>` references in src/cli/**
+
+```bash
+grep -rn 'homedir.*\.ralph\|process\.env\.HOME.*\.ralph' src/cli/
+```
+Expected: zero hits in `src/cli/`. Daemon code (`src/daemon/`) may retain user-home references per Task 4.4 — that's expected.
+
+- [ ] **Step 3: No remaining projectKey references**
+
+```bash
+grep -rn 'projectKey\|deriveProjectKey\|RALPH_RUNS_ROOT' src/cli/
+```
+Expected: zero hits.
+
+- [ ] **Step 4: TypeScript check**
+
+```bash
+npx tsc --noEmit
+```
+Expected: clean.
+
+- [ ] **Step 5: Build**
+
+```bash
+npm run build
+```
+Expected: `dist/cli/index.js`, `dist/cli/mcp/illumination-server.js`, `dist/daemon/index.js` all rebuild cleanly.
+
+### Task 6.2: End-to-end smokes
+
+- [ ] **Step 1: Fresh `ralph init` on a temp dir**
+
+```bash
+mkdir /tmp/ralph-init-fresh && cd /tmp/ralph-init-fresh
+node /Users/josu/Documents/projects/ralph-cli/dist/cli/index.js init
+ls -la .ralph/
+cat .gitignore
+git log --oneline 2>/dev/null || echo "no git or no commits yet"
+```
+
+Expected: full `.ralph/` tree present (pipelines, meditations/illuminations, meditations/stimuli, memory, docs/adr), `VISION.md` and `CONTEXT.md` scaffolded, `.gitignore` contains `.ralph/runs/`, `.git/` exists (if git available), `README.md` at root.
+
+```bash
+cd /tmp && rm -rf /tmp/ralph-init-fresh
+```
+
+- [ ] **Step 2: Bundled meditate pipeline against ralph-cli itself**
+
+```bash
+cd /Users/josu/Documents/projects/ralph-cli
+node dist/cli/index.js pipeline run src/cli/pipelines/meditate/pipeline.dot --project .
+RUNID=$(ls -t .ralph/runs | head -1)
+echo "Run: $RUNID"
+ls -la .ralph/runs/$RUNID/
+```
+
+Expected: pipeline runs to completion. `.ralph/runs/<runId>/checkpoint.json` and `.ralph/runs/<runId>/pipeline.jsonl` exist.
+
+- [ ] **Step 3: Trace lookup**
+
+```bash
+node dist/cli/index.js pipeline trace $RUNID --project .
+```
+Expected: trace surfaces the run completed in Step 2.
+
+- [ ] **Step 4: Bundled-fallback resolver smoke**
+
+Confirm two-tier resolver works when project-local has nothing:
+
+```bash
+mkdir /tmp/ralph-bundled-smoke && cd /tmp/ralph-bundled-smoke
+node /Users/josu/Documents/projects/ralph-cli/dist/cli/index.js init
+node /Users/josu/Documents/projects/ralph-cli/dist/cli/index.js pipeline run /Users/josu/Documents/projects/ralph-cli/src/cli/pipelines/meditate/pipeline.dot --project .
+```
+Expected: pipeline runs (resolver finds bundled pipeline; project has no `.ralph/pipelines/meditate/`).
+
+```bash
+cd /tmp && rm -rf /tmp/ralph-bundled-smoke
+```
+
+### Task 6.3: Documentation cleanup
+
+- [ ] **Step 1: Verify ADR-0007 is reachable from new location**
+
+```bash
+ls .ralph/docs/adr/0007-ralph-folder-as-project-local-home.md
+```
+Expected: present.
+
+- [ ] **Step 2: Update CONTEXT.md (now at .ralph/CONTEXT.md) for the new layout**
+
+Add a new term entry "Project-local layout":
+
+```md
+### Project-local layout
+
+A target project declares itself ralph-shaped by having a `<project>/.ralph/`
+folder. That folder is the single home for everything ralph-touchable in
+the project: pipelines, meditations (illuminations + stimuli), memory,
+ADRs, CONTEXT.md, VISION.md, and run state.
+
+Two-tier pipeline read at runtime:
+- **Project-local:** `<project>/.ralph/pipelines/<name>/pipeline.dot`
+- **Bundled fallback:** `src/cli/pipelines/<name>/pipeline.dot` (in npm package)
+
+Two-tier stimuli reads (project-local + bundled) work the same way for
+the meditate pipeline.
+
+See `.ralph/docs/adr/0007-ralph-folder-as-project-local-home.md` for
+the full layout and the trade-off against ADR-0001.
+```
+
+Update the existing "Agent loading" term: project-local pipelines now live in
+`.ralph/pipelines/<name>/` (was `<project>/pipelines/<name>/`).
+
+Update the existing "Illumination lifecycle" term: every `meditations/illuminations/`
+reference becomes `.ralph/meditations/illuminations/`.
+
+- [ ] **Step 3: Decide migration documentation for downstream projects**
+
+Spec §9.5 asks: should the `git mv` migration recipe for downstream
+projects (other repos using ralph-cli) be documented?
+
+**Decision for this plan:** add a short "Migrating an existing project" snippet to README.md:
+
+```md
+## Migrating an existing ralph project to the .ralph/ layout
+
+If your project pre-dates the .ralph/ convention:
+
+```bash
+mkdir -p .ralph/pipelines .ralph/memory .ralph/docs
+git mv meditations .ralph/meditations
+[ -d docs/adr ] && git mv docs/adr .ralph/docs/adr
+[ -f CONTEXT.md ] && git mv CONTEXT.md .ralph/CONTEXT.md
+[ -f VISION.md ] && git mv VISION.md .ralph/VISION.md
+echo '.ralph/runs/' >> .gitignore
+git commit -m "refactor: migrate to .ralph/ layout"
+```
+
+The `~/.ralph/<projectKey>/runs/` directory in your home folder is
+inert under the new ralph-cli — you can `rm -rf ~/.ralph/<your-project-key>/`
+once you've stopped needing the historical run logs.
+```
+
+- [ ] **Step 4: Commit doc cleanup**
+
+```bash
+git add .ralph/CONTEXT.md README.md
+git commit -m "docs: refresh CONTEXT.md path terms; add migration recipe to README"
+```
+
+---
+
+## Done criteria
+
+All of the below must be true before declaring the migration complete:
+
+- [ ] `npx vitest run` — full suite green.
+- [ ] `npx tsc --noEmit` — clean.
+- [ ] `npm run build` — succeeds; `dist/` artifacts present.
+- [ ] `grep -rn 'meditations/illuminations\|meditations/stimuli' src/` — zero hits.
+- [ ] `grep -rn 'projectKey\|deriveProjectKey\|RALPH_RUNS_ROOT' src/cli/` — zero hits.
+- [ ] `grep -rn 'maybePrintLayoutV2Notice\|findRunAcrossProjects\|listAllProjectRunsRoots' src/cli/` — zero hits (dead-code purge).
+- [ ] `grep -rn 'homedir.*\.ralph' src/cli/` — zero hits (daemon code excluded).
+- [ ] `.gitignore` contains a `.ralph/runs/` line.
+- [ ] `ralph init` on a fresh tempdir scaffolds the full `.ralph/` tree, idempotent on re-run.
+- [ ] `ralph init` on a partial-tree directory fills missing subfolders without overwriting.
+- [ ] Bundled meditate pipeline runs end-to-end against ralph-cli's migrated repo, writes run state to `.ralph/runs/<runId>/`, illumination (if written) to `.ralph/meditations/illuminations/`.
+- [ ] Bundled-fallback resolver works: `pipeline run` succeeds against an `.ralph/`-bare project.
+- [ ] `pipeline trace <runId> --project .` surfaces the run.
+- [ ] ADR-0007 lives at `.ralph/docs/adr/0007-...`.
+- [ ] CONTEXT.md (now at `.ralph/CONTEXT.md`) carries the new "Project-local layout" term and updated path strings.
+- [ ] README.md (still at root) mentions `ralph init` in getting-started and the migration recipe in the migration section.
