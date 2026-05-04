@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync, rmSync, lstatSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, readdirSync, rmSync, lstatSync } from "fs";
 import { resolve, join, basename, dirname, relative } from "path";
 import { randomUUID } from "crypto";
 import { JsonlPipelineTracer } from "../../attractor/tracer/jsonl-pipeline-tracer.js";
