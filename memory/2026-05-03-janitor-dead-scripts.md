@@ -23,6 +23,9 @@ Deleted the dead `scripts/` folder: `backfill-plan-frontmatter.sh` (one-shot mig
 - Pure subtraction: nothing in `src/`, `dist/`, `package.json`, or npm `files` was touched. Surfaces crossed: zero (no imports, no script bindings, no callers).
 - Followed the existing janitor lens (recent bundled-janitor illuminations 2026-05-01T0212 and T0255-bundled).
 
+## Learnings from the run
+- Plan lifecycle flip failed: "Cannot mark as implemented: current status is complete" — plan was already flipped earlier in the session by a prior commit (`4663907 docs(plan): mark janitor-dead-scripts complete`), so `mark_plan_implemented` rejected the second flip. Same not-idempotent pattern logged in illumination 2026-05-01T1537-mark-plan-implemented-not-idempotent.md.
+
 ## Final verification
 - test_result: pass
 - test_summary: Cycle 1 clean: build + 1251 tests pass (134 files, includes all 14 pipeline-smoke-*-folder.test.ts wrappers); tool smoke pipeline runs ✓ success in tmux. Diff was pure deletion of two unreferenced dev scripts (scripts/backfill-plan-frontmatter.sh, scripts/audit-tool-nodes.mjs) plus the empty scripts/ folder — no source/dist surface touched. No fixes were needed.
