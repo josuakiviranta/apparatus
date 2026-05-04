@@ -568,12 +568,12 @@ These user-home pipeline fallbacks are deleted entirely per spec §2 item 3 ("no
 
 ### Task 4.1: Read pipeline.ts trace region
 
-- [ ] **Step 1: Read `src/cli/commands/pipeline.ts` lines 1–140 and 300–700**
+- [x] **Step 1: Read `src/cli/commands/pipeline.ts` lines 1–140 and 300–700**
 
 Confirm each site listed above exists and matches the line ranges. If
 line numbers have drifted, capture the new ranges before editing.
 
-- [ ] **Step 2: Inventory expected import additions**
+- [x] **Step 2: Inventory expected import additions**
 
 `pipeline.ts` will import `runDir`, `runsDir` from `../lib/ralph-paths.js`. Track this in your edit plan.
 
@@ -587,18 +587,18 @@ line numbers have drifted, capture the new ranges before editing.
 - Modify: `src/cli/tests/pipeline-trace-command-validation.test.ts`
 - Modify: `src/cli/tests/pipeline-failure-reason.test.ts`
 
-- [ ] **Step 1: Update tests to assert new path shape**
+- [x] **Step 1: Update tests to assert new path shape**
 
 In each of the three test files, replace assertions like `~/.ralph/<projectKey>/runs/<runId>/...` with `<projectRoot>/.ralph/runs/<runId>/...`. Use the `runDir(projectRoot, runId)` helper in test imports for clarity.
 
 For tests that exercise **cross-project trace scanning** (looking up a runId across multiple `<projectKey>` folders): **delete those tests entirely.** The cross-project scan goes away. Specifically, list each test by name in your scratch notes before deleting. Tests that exercise single-project lookup (most of them) keep their structure — only the path root changes.
 
-- [ ] **Step 2: Run tests — expect failures**
+- [x] **Step 2: Run tests — expect failures**
 
 Run: `npx vitest run src/cli/tests/pipeline-trace-lookup.test.ts src/cli/tests/pipeline-trace-command-validation.test.ts src/cli/tests/pipeline-failure-reason.test.ts`
 Expected: FAIL on path assertions.
 
-- [ ] **Step 3: Update pipeline.ts**
+- [x] **Step 3: Update pipeline.ts**
 
 Add to imports: `import { runDir, runsDir } from "../lib/ralph-paths.js";`
 
@@ -614,20 +614,20 @@ For each site identified in Task 4.1:
 - **`RALPH_RUNS_ROOT` env var references:** delete the `process.env.RALPH_RUNS_ROOT ?? ...` fallback at lines 132, 322, 630, 664. Just use the project-local helper.
 - **`RALPH_RUNS_KEEP` env var (line 326):** **keep this.** It's a per-project pruning cap; the cap still applies to `<project>/.ralph/runs/`.
 
-- [ ] **Step 4: Update `pipeline trace` command action**
+- [x] **Step 4: Update `pipeline trace` command action**
 
 In `pipeline.ts` (`pipelineTraceCommand` function), update the `--project` handling: default to `process.cwd()` if absent. Remove any cross-project scan branch.
 
-- [ ] **Step 5: Update help text in program.ts**
+- [x] **Step 5: Update help text in program.ts**
 
 In `src/cli/program.ts`, the `pipeline run` help-after block (around line 112) and `pipeline trace` description mention `~/.ralph/<projectKey>/runs/<runId>/checkpoint.json`. Replace with `<project>/.ralph/runs/<runId>/checkpoint.json`. Update wording about cross-project scan if present.
 
-- [ ] **Step 6: Run tests — expect pass**
+- [x] **Step 6: Run tests — expect pass**
 
 Run: `npx vitest run src/cli/tests/pipeline-trace-lookup.test.ts src/cli/tests/pipeline-trace-command-validation.test.ts src/cli/tests/pipeline-failure-reason.test.ts`
 Expected: green.
 
-- [ ] **Step 7: Verify no remaining projectKey references**
+- [x] **Step 7: Verify no remaining projectKey references**
 
 Run:
 ```bash
@@ -635,12 +635,12 @@ grep -rn 'projectKey\|deriveProjectKey\|RALPH_RUNS_ROOT' src/cli/
 ```
 Expected: zero hits in `src/cli/`. (Daemon code under `src/daemon/` may still reference its own user-scoped state; that is expected per the daemon decision above.)
 
-- [ ] **Step 8: Run full test suite**
+- [x] **Step 8: Run full test suite**
 
 Run: `npx vitest run`
 Expected: full suite green.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add src/cli/commands/pipeline.ts src/cli/tests/pipeline-trace-lookup.test.ts src/cli/tests/pipeline-trace-command-validation.test.ts src/cli/tests/pipeline-failure-reason.test.ts src/cli/program.ts
