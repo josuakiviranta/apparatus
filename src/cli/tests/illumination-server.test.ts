@@ -396,15 +396,21 @@ describe("projectTree", () => {
 });
 
 describe("listMetaMeditations", () => {
-  it("returns newline-separated sorted filenames when dir has .md files", () => {
-    writeFileSync(join(tmpDir, "b-lens.md"), "content b");
-    writeFileSync(join(tmpDir, "a-lens.md"), "content a");
+  it("returns sorted filename — description pairs when dir has .md files", () => {
+    writeFileSync(join(tmpDir, "b-lens.md"), "---\ndescription: B lens summary\n---\ncontent b");
+    writeFileSync(join(tmpDir, "a-lens.md"), "---\ndescription: A lens summary\n---\ncontent a");
     const result = listMetaMeditations(tmpDir);
-    expect(result).toBe("a-lens.md\nb-lens.md");
+    expect(result).toBe("a-lens.md — A lens summary\nb-lens.md — B lens summary");
+  });
+
+  it("falls back to (no description) when frontmatter is missing", () => {
+    writeFileSync(join(tmpDir, "raw-lens.md"), "no frontmatter here");
+    const result = listMetaMeditations(tmpDir);
+    expect(result).toBe("raw-lens.md — (no description)");
   });
 
   it("only lists .md files, ignoring other file types", () => {
-    writeFileSync(join(tmpDir, "a-lens.md"), "");
+    writeFileSync(join(tmpDir, "a-lens.md"), "---\ndescription: A\n---\n");
     writeFileSync(join(tmpDir, "config.json"), "");
     const result = listMetaMeditations(tmpDir);
     expect(result).toContain("a-lens.md");

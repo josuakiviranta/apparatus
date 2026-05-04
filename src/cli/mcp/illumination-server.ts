@@ -173,7 +173,9 @@ export function listMetaMeditations(meditationsDir: string): string {
       .filter((f) => f.endsWith(".md"))
       .sort();
     if (files.length === 0) return NO_META_MEDITATIONS_MESSAGE;
-    return files.join("\n");
+    return files
+      .map((name) => `${name} — ${parseIlluminationDescription(join(meditationsDir, name))}`)
+      .join("\n");
   } catch {
     return NO_META_MEDITATIONS_MESSAGE;
   }
