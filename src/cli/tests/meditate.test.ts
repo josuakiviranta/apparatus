@@ -180,7 +180,7 @@ describe("meditate template agent tool whitelist", () => {
       "mcp__illumination__mark_dispatched",
       "mcp__illumination__mark_archived",
       "mcp__illumination__list_plans",
-      "mcp__illumination__mark_plan_implemented",
+      "mcp__illumination__consume_plan",
     ];
     for (const tool of forbidden) {
       expect(tools).not.toContain(tool);
@@ -198,7 +198,7 @@ describe("meditate template agent tool whitelist", () => {
       "mark_dispatched",
       "mark_archived",
       "list_plans",
-      "mark_plan_implemented",
+      "consume_plan",
     ];
     for (const name of removedNames) {
       expect(body).not.toContain(name);

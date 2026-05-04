@@ -9,7 +9,7 @@ tools:
   - Grep
   - Glob
   - Bash
-  - mcp__illumination__mark_plan_implemented
+  - mcp__illumination__consume_plan
   - mcp__illumination__consume
 mcp:
   - name: illumination
@@ -127,7 +127,7 @@ Memory files are reference documents for future sessions. Keep them dense, scann
 
 7. **Mark the lifecycle artifacts complete (best-effort, both halves).** Run them in this order:
 
-   **7a. Plan side.** If `$plan_writer.plan_path` is set and non-empty, call `mark_plan_implemented` with the basename of `$plan_writer.plan_path` (strip the directory portion — the tool resolves the file under `docs/superpowers/plans/`). On `success: true`, do nothing more — the tool auto-commits its own frontmatter rewrite. On `success: false` (orphan plan with no frontmatter, plan already `implemented`, plan file missing), append a single bullet to the memory file's `Learnings from the run` section quoting the `error` field verbatim, then continue. If `$plan_writer.plan_path` is empty or unset, skip 7a and append `- Plan lifecycle flip skipped: $plan_writer.plan_path was empty` to the memory file.
+   **7a. Plan side.** If `$plan_writer.plan_path` is set and non-empty, call `consume_plan` with `filename = basename of $plan_writer.plan_path` (strip the directory portion — the tool deletes the file from `docs/superpowers/plans/` and commits `meditate: consume <filename> (implemented)`) and `reason = "implemented"`. On `success: true`, do nothing more — the tool auto-commits its own deletion. On `success: false` (plan file already gone from a prior run, invalid filename), append a single bullet to the memory file's `Learnings from the run` section quoting the `error` field verbatim, then continue. If `$plan_writer.plan_path` is empty or unset, skip 7a and append `- Plan consume skipped: $plan_writer.plan_path was empty` to the memory file.
 
    **7b. Illumination side.** If `$verifier_illumination_path` is set and non-empty, call `consume` with `filename = basename of $verifier_illumination_path` and `reason = "implemented"` (strip the directory portion — the tool deletes the file from `meditations/illuminations/` and commits `meditate: consume <filename> (implemented)`). On `success: true`, do nothing more. On `success: false` (file missing), append a single bullet to the memory file's `Learnings from the run` section quoting the `error` field verbatim, then continue. If `$verifier_illumination_path` is empty or unset, skip 7b and append `- Illumination consume skipped: $verifier_illumination_path was empty` to the memory file.
 
@@ -142,4 +142,4 @@ Memory files are reference documents for future sessions. Keep them dense, scann
 - Commit exactly **once** at the end of the node (or skip the commit if nothing is staged). Do not split into multiple commits. `implement` and `tmux-tester` already made per-chunk / per-fix commits earlier.
 - **Push is unconditional.** Prior session commits must reach `origin` even if this node staged nothing new.
 - No writes outside `$project/memory/` and git operations. Do not touch source code, specs, or pipelines from this node.
-- Both lifecycle calls — `mark_plan_implemented` (step 7a) and `consume` (step 7b) — are **best-effort**. Never abort the node on `success: false` from either. Push (step 6) and the structured-JSON emit (step 8) are non-negotiable; both lifecycle calls in step 7 are opportunistic. A frontmatter-less, already-`implemented`, or missing plan/illumination must not block finalization.
+- Both lifecycle calls — `consume_plan` (step 7a) and `consume` (step 7b) — are **best-effort**. Never abort the node on `success: false` from either. Push (step 6) and the structured-JSON emit (step 8) are non-negotiable; both lifecycle calls in step 7 are opportunistic. A missing plan or illumination file (already consumed by a prior run) must not block finalization.

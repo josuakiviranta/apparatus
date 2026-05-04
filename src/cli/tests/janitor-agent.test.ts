@@ -39,7 +39,7 @@ describe("janitor.md — frontmatter contract", () => {
       "mcp__illumination__mark_archived",
       "mcp__illumination__mark_dispatched",
       "mcp__illumination__mark_implemented",
-      "mcp__illumination__mark_plan_implemented",
+      "mcp__illumination__consume_plan",
       "mcp__illumination__list_plans",
     ];
     for (const t of forbidden) expect(config.tools).not.toContain(t);
@@ -81,7 +81,7 @@ describe("janitor.md — procedure body contract", () => {
 
   it("does NOT mention deleted lifecycle tools or states", () => {
     expect(fileText).not.toMatch(/mark_implemented/);
-    expect(fileText).not.toMatch(/mark_plan_implemented/);
+    expect(fileText).not.toMatch(/consume_plan/);
     expect(fileText).not.toMatch(/list_plans/);
     expect(fileText).not.toMatch(/dispatched/);
   });
