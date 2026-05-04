@@ -132,8 +132,7 @@ export function variableExpansionTransform(graph: Graph, vars: { project?: strin
 
 const VAR_RE = /\$([a-zA-Z_][\w.]*)/g;
 const RESERVED = new Set(["goal", "project", "run_id"]);
-// String-valued node attributes the scanner must walk for $var references.
-// Keep in sync with the fields list in graph.ts variable_coverage check.
+// String-valued node attributes the runtime expander walks for $var references.
 const STRING_ATTRS = ["prompt", "toolCommand", "label", "scriptArgs", "cwd"];
 
 export { STRING_ATTRS };

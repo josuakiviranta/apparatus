@@ -796,6 +796,25 @@ describe("validateGraph — variable_coverage", () => {
     expect(warnings[0].message).toContain("has no known producer");
     expect(warnings[0].message).toContain("$choice");
   });
+
+  it("scans $var refs inside cwd= on tool nodes", () => {
+    // Regression: STRING_ATTRS at variable-expansion.ts:137 includes "cwd",
+    // so the runtime expander already handles $var inside cwd=. The validator
+    // must match that coverage so authors learn about typos at validate time
+    // instead of run time.
+    const graph = parseDot(`digraph g {
+      start [shape=Mdiamond]
+      consumer [shape=parallelogram, tool_command="echo hi", cwd="/tmp/$typoname"]
+      done [shape=Msquare]
+      start -> consumer -> done
+    }`);
+    const diags = validateGraph(graph);
+    const warnings = diags.filter(d => d.rule === "variable_coverage");
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0].message).toContain("typoname");
+    expect(warnings[0].message).toContain("consumer");
+    expect(warnings[0].severity).toBe("warning");
+  });
 });
 
 describe("parseDot inputs= attribute", () => {
