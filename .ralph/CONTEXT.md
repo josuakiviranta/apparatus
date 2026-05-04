@@ -19,9 +19,26 @@ the old `agent-registry.ts` multi-tier resolver, the user-dir tier
 `allowBundledFallback`/`RegistryOptions` shape. Stray
 `~/.ralph/agents/` files on contributor machines are now inert.
 
-All pipelines live in this repo (`pipelines/`, `src/cli/pipelines/`). A
-pipeline is run against an external target project via `--project <folder>`
-(positional refactor pending).
+All pipelines live in this repo (`src/cli/pipelines/` for bundled) or in
+a target project's `.ralph/pipelines/<name>/` folder. A pipeline is run
+against an external target project via `--project <folder>`.
+
+### Project-local layout
+
+A target project declares itself ralph-shaped by having a `<project>/.ralph/`
+folder. That folder is the single home for everything ralph-touchable in
+the project: pipelines, meditations (illuminations + stimuli), memory,
+ADRs, CONTEXT.md, VISION.md, and run state.
+
+Two-tier pipeline read at runtime:
+- **Project-local:** `<project>/.ralph/pipelines/<name>/pipeline.dot`
+- **Bundled fallback:** `src/cli/pipelines/<name>/pipeline.dot` (in npm package)
+
+Two-tier stimuli reads (project-local + bundled) work the same way for
+the meditate pipeline.
+
+See `.ralph/docs/adr/0007-ralph-folder-as-project-local-home.md` for
+the full layout and the trade-off against ADR-0001.
 
 ### Illumination lifecycle
 

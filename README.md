@@ -2,6 +2,17 @@
 
 Agentic loop runner for AI-assisted project development.
 
+## Bootstrap a project
+
+Scaffold a fresh ralph-shaped project:
+
+````bash
+mkdir my-app && cd my-app
+ralph init
+````
+
+`ralph init` is idempotent. It creates `.ralph/{pipelines,meditations/{illuminations,stimuli},memory,docs/adr}`, scaffolds empty `VISION.md` and `CONTEXT.md`, runs `git init -b main` if the directory is not yet a repo, and appends `.ralph/runs/` to `.gitignore`. Re-running it on an existing project fills in any missing subfolders without overwriting your files.
+
 ## Install
 
 ```bash
@@ -169,6 +180,22 @@ npm run dev        # tsx watch
 npm run build      # tsup → dist/
 npm link           # test ralph binary locally
 ```
+
+## Migrating an existing ralph project to the .ralph/ layout
+
+If your project pre-dates the .ralph/ convention:
+
+````bash
+mkdir -p .ralph/pipelines .ralph/memory .ralph/docs
+git mv meditations .ralph/meditations
+[ -d docs/adr ] && git mv docs/adr .ralph/docs/adr
+[ -f CONTEXT.md ] && git mv CONTEXT.md .ralph/CONTEXT.md
+[ -f VISION.md ] && git mv VISION.md .ralph/VISION.md
+echo '.ralph/runs/' >> .gitignore
+git commit -m "refactor: migrate to .ralph/ layout"
+````
+
+The `~/.ralph/<projectKey>/runs/` directory in your home folder is inert under the new ralph-cli — you can `rm -rf ~/.ralph/<your-project-key>/` once you've stopped needing the historical run logs.
 
 ## Decisions
 
