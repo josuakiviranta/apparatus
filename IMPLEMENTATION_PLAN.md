@@ -428,7 +428,7 @@ fix.
 
 ### Task 3.0: Site enumeration (read-only ground truth)
 
-- [ ] **Step 1: Inventory the sites**
+- [x] **Step 1: Inventory the sites**
 
 Open `src/cli/mcp/illumination-server.ts` and confirm the four categories
 of `meditations/` references:
@@ -442,7 +442,7 @@ of `meditations/` references:
 
 Plans path (`docs/superpowers/plans/`) at `consumePlan` (lines ~100–130) and `listPlans` (lines ~229–242) is **out of scope** per spec §2 (plans surface stays put). Do not touch.
 
-- [ ] **Step 2: Inventory the bundled stimuli launcher**
+- [x] **Step 2: Inventory the bundled stimuli launcher**
 
 Find the spawn site for the illumination MCP server. Run:
 
@@ -464,7 +464,7 @@ reference; no edit needed in this chunk.
 - Modify: `src/cli/tests/illumination-server.test.ts`
 - Modify: `src/cli/tests/meditate.test.ts` (fixture path updates)
 
-- [ ] **Step 1: Update test fixtures**
+- [x] **Step 1: Update test fixtures**
 
 In `src/cli/tests/illumination-server.test.ts` (~18 occurrences across
 lines 108, 110, 121, 123, 132, 139, 416, 417, 422, 423, 457, 463, 471,
@@ -476,12 +476,12 @@ lines 108, 110, 121, 123, 132, 139, 416, 417, 422, 423, 457, 463, 471,
 
 In `src/cli/tests/meditate.test.ts` (~9 occurrences across lines 41, 43, 51, 55, 56, 57, 248 + description strings around 134, 142, 156, 161): same prefix swap.
 
-- [ ] **Step 2: Run tests — expect failures**
+- [x] **Step 2: Run tests — expect failures**
 
 Run: `npx vitest run src/cli/tests/illumination-server.test.ts src/cli/tests/meditate.test.ts`
 Expected: FAIL — server still reads from old path; fixtures live at new path.
 
-- [ ] **Step 3: Update illumination-server.ts category 1 (real joins)**
+- [x] **Step 3: Update illumination-server.ts category 1 (real joins)**
 
 At the top of the file, add:
 ```ts
@@ -490,7 +490,7 @@ import { illuminationsDir, stimuliDir, meditationsDir } from "../lib/ralph-paths
 
 For each of the three `join(projectRoot, "meditations", "illuminations", ...)` sites (around lines 49, 80, 198), replace the prefix with `illuminationsDir(projectRoot)`. Same for any `join(projectRoot, "meditations", "stimuli", ...)` site. For sibling folders (`archived-illuminations`, `implemented-illuminations` if any survive), use `join(meditationsDir(projectRoot), "archived-illuminations", ...)`.
 
-- [ ] **Step 4: Update illumination-server.ts category 3 (tool descriptions)**
+- [x] **Step 4: Update illumination-server.ts category 3 (tool descriptions)**
 
 At lines ~335, 431, 443 (verify exact lines — these may shift after Step 3 edits), update tool-description text strings:
 - `"meditations/illuminations/"` → `".ralph/meditations/illuminations/"`
@@ -498,21 +498,21 @@ At lines ~335, 431, 443 (verify exact lines — these may shift after Step 3 edi
 
 Tool descriptions are user-visible in the MCP tool surface; they must match the new layout.
 
-- [ ] **Step 5: Update illumination-server.ts category 4 (NO_META_MEDITATIONS_MESSAGE)**
+- [x] **Step 5: Update illumination-server.ts category 4 (NO_META_MEDITATIONS_MESSAGE)**
 
 In the message block (lines ~162–167), update any path advice referring to old `meditations/` paths under the user-data tier. The launcher-fed bundled stimuli path stays as-is (it's the npm bundled stimuli, not project data) — only update advice that points users at *project-local* paths.
 
-- [ ] **Step 6: Run tests — expect pass**
+- [x] **Step 6: Run tests — expect pass**
 
 Run: `npx vitest run src/cli/tests/illumination-server.test.ts src/cli/tests/meditate.test.ts`
 Expected: green.
 
-- [ ] **Step 7: Run full test suite**
+- [x] **Step 7: Run full test suite**
 
 Run: `npx vitest run`
 Expected: full suite green. Other tests that touch illumination paths may need fixture updates — fix in lockstep until green.
 
-- [ ] **Step 8: Static check — no remaining hardcoded literals in MCP server**
+- [x] **Step 8: Static check — no remaining hardcoded literals in MCP server**
 
 Run:
 ```bash
@@ -520,7 +520,7 @@ grep -rn 'meditations/illuminations\|meditations/stimuli\|"meditations"' src/cli
 ```
 Expected: zero hits in `src/cli/mcp/`. (Hits in `src/cli/pipelines/` are agent prompts; updated in Chunk 5.)
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 Stage all files updated in this chunk:
 ```bash

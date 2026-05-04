@@ -3,6 +3,7 @@ import { execSync } from "node:child_process";
 import { join, resolve, isAbsolute, relative } from "path";
 import ignore from "ignore";
 import fg from "fast-glob";
+import { illuminationsDir } from "../lib/ralph-paths.js";
 
 // ─── Exported pure helpers (for testing) ──────────────────────────────────────
 
@@ -46,7 +47,7 @@ export function writeIllumination(
   if (!description || !description.trim()) throw new Error("description is required");
   const date = new Date().toISOString().slice(0, 10);
   const frontmatter = `---\ndate: ${date}\ndescription: ${description.trim()}\n---\n\n`;
-  const dir = join(projectRoot, "meditations", "illuminations");
+  const dir = illuminationsDir(projectRoot);
   mkdirSync(dir, { recursive: true });
   const filePath = join(dir, filename);
   writeFileSync(filePath, frontmatter + content, "utf8");
@@ -77,7 +78,7 @@ export function consume(
     throw new Error(`Invalid reason "${reason}". Must be "implemented" or "declined".`);
   }
 
-  const filePath = join(projectRoot, "meditations", "illuminations", filename);
+  const filePath = join(illuminationsDir(projectRoot), filename);
   if (!existsSync(filePath)) {
     return { success: false, error: "Illumination file not found" };
   }
@@ -195,7 +196,7 @@ function parseIlluminationDescription(filePath: string): string {
 }
 
 export function listIlluminations(projectRoot: string): string {
-  const dir = join(projectRoot, "meditations", "illuminations");
+  const dir = illuminationsDir(projectRoot);
   let files: string[];
   try {
     files = readdirSync(dir).filter((f) => f.endsWith(".md")).sort();
@@ -332,7 +333,7 @@ if (!isTestEnv) {
 
     server.tool(
       "write_illumination",
-      "Write a meditation illumination file to meditations/illuminations/. " +
+      "Write a meditation illumination file to .ralph/meditations/illuminations/. " +
         "Provide a kebab-case `slug` (lowercase alphanumeric + hyphens, e.g. `janitor-doc-drift` or `my-insight`); " +
         "the server prepends the current YYYY-MM-DDTHHMM- timestamp and appends .md — do not include either yourself. " +
         "Provide a one-sentence `description` summarizing the core insight — this is required. " +
@@ -428,7 +429,7 @@ if (!isTestEnv) {
 
     server.tool(
       "list_illuminations",
-      "List illuminations in meditations/illuminations/, with descriptions. " +
+      "List illuminations in .ralph/meditations/illuminations/, with descriptions. " +
         "Call this at the start of a session to orient yourself before writing new insights. " +
         "No filters — every file in the folder is alive.",
       {},
@@ -440,7 +441,7 @@ if (!isTestEnv) {
 
     server.tool(
       "consume",
-      "Consume an illumination — delete the file from meditations/illuminations/ and commit the deletion. " +
+      "Consume an illumination — delete the file from .ralph/meditations/illuminations/ and commit the deletion. " +
         "Use reason='implemented' after the implement loop succeeds and a memory file has been written. " +
         "Use reason='declined' when the operator rejects an illumination at the gate. " +
         "Commit message format: 'meditate: consume <filename> (<reason>)' — searchable via git log --grep.",

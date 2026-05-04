@@ -105,9 +105,9 @@ describe("validateFilename", () => {
 });
 
 describe("writeIllumination", () => {
-  it("writes content to meditations/illuminations/<filename>", () => {
+  it("writes content to .ralph/meditations/illuminations/<filename>", () => {
     const result = writeIllumination(tmpDir, "2026-04-04T1430-test.md", "A test insight", "# Hello");
-    const expected = join(tmpDir, "meditations", "illuminations", "2026-04-04T1430-test.md");
+    const expected = join(tmpDir, ".ralph", "meditations", "illuminations", "2026-04-04T1430-test.md");
     expect(result).toBe(expected);
     expect(readFileSync(expected, "utf8")).toContain("# Hello");
   });
@@ -118,9 +118,9 @@ describe("writeIllumination", () => {
     expect(readFileSync(result, "utf8")).toContain("v2");
   });
 
-  it("creates meditations/illuminations/ directory if absent", () => {
+  it("creates .ralph/meditations/illuminations/ directory if absent", () => {
     writeIllumination(tmpDir, "test.md", "Some description", "content");
-    expect(existsSync(join(tmpDir, "meditations", "illuminations"))).toBe(true);
+    expect(existsSync(join(tmpDir, ".ralph", "meditations", "illuminations"))).toBe(true);
   });
 
   it("throws an error for an invalid filename", () => {
@@ -129,14 +129,14 @@ describe("writeIllumination", () => {
 
   it("prepends YAML frontmatter with date and description", () => {
     writeIllumination(tmpDir, "test.md", "My core insight", "# Body");
-    const written = readFileSync(join(tmpDir, "meditations", "illuminations", "test.md"), "utf8");
+    const written = readFileSync(join(tmpDir, ".ralph", "meditations", "illuminations", "test.md"), "utf8");
     const today = new Date().toISOString().slice(0, 10);
     expect(written).toMatch(new RegExp(`^---\\ndate: ${today}\\ndescription: My core insight\\n---\\n`));
   });
 
   it("places the content body after the frontmatter separator", () => {
     writeIllumination(tmpDir, "test.md", "Insight here", "# Body\nParagraph");
-    const written = readFileSync(join(tmpDir, "meditations", "illuminations", "test.md"), "utf8");
+    const written = readFileSync(join(tmpDir, ".ralph", "meditations", "illuminations", "test.md"), "utf8");
     const parts = written.split("---\n");
     // parts[0] is empty (before first ---), parts[1] is frontmatter fields, rest is body
     const body = parts.slice(2).join("---\n");
@@ -454,13 +454,13 @@ describe("listIlluminations", () => {
   });
 
   it("returns no-illuminations message when directory is empty", () => {
-    mkdirSync(join(tmpDir, "meditations", "illuminations"), { recursive: true });
+    mkdirSync(join(tmpDir, ".ralph", "meditations", "illuminations"), { recursive: true });
     const result = listIlluminations(tmpDir);
     expect(result).toBe("No illuminations found.");
   });
 
   it("returns filename and description for a file with frontmatter", () => {
-    const dir = join(tmpDir, "meditations", "illuminations");
+    const dir = join(tmpDir, ".ralph", "meditations", "illuminations");
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, "2026-04-08T0900-my-insight.md"), "---\ndate: 2026-04-08\ndescription: Something important.\n---\n\n# My Insight\n\nBody.");
     const result = listIlluminations(tmpDir);
@@ -468,7 +468,7 @@ describe("listIlluminations", () => {
   });
 
   it("shows (no description) for a file without frontmatter", () => {
-    const dir = join(tmpDir, "meditations", "illuminations");
+    const dir = join(tmpDir, ".ralph", "meditations", "illuminations");
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, "old-insight.md"), "# Old Insight\n\nNo frontmatter here.");
     const result = listIlluminations(tmpDir);
@@ -476,7 +476,7 @@ describe("listIlluminations", () => {
   });
 
   it("shows (no description) for a file with frontmatter missing description field", () => {
-    const dir = join(tmpDir, "meditations", "illuminations");
+    const dir = join(tmpDir, ".ralph", "meditations", "illuminations");
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, "partial.md"), "---\ndate: 2026-04-08\n---\n\n# Partial");
     const result = listIlluminations(tmpDir);
@@ -484,7 +484,7 @@ describe("listIlluminations", () => {
   });
 
   it("lists multiple files sorted by filename", () => {
-    const dir = join(tmpDir, "meditations", "illuminations");
+    const dir = join(tmpDir, ".ralph", "meditations", "illuminations");
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, "2026-04-08T1100-second.md"), "---\ndate: 2026-04-08\ndescription: Second insight.\n---\n\n# Second");
     writeFileSync(join(dir, "2026-04-08T0900-first.md"), "---\ndate: 2026-04-08\ndescription: First insight.\n---\n\n# First");
@@ -536,7 +536,7 @@ describe("listPlans", () => {
 
 describe("consume", () => {
   function seedIllumination(filename: string, body = "body"): string {
-    const dir = join(tmpDir, "meditations", "illuminations");
+    const dir = join(tmpDir, ".ralph", "meditations", "illuminations");
     mkdirSync(dir, { recursive: true });
     const filePath = join(dir, filename);
     writeFileSync(filePath, `---\ndate: 2026-04-30\ndescription: test\n---\n\n${body}`, "utf8");
@@ -586,9 +586,9 @@ describe("consume", () => {
 });
 
 describe("listIlluminations — single-folder semantics", () => {
-  it("returns only files in meditations/illuminations/ (does not union side folders)", () => {
-    const aliveDir = join(tmpDir, "meditations", "illuminations");
-    const archivedDir = join(tmpDir, "meditations", "archived-illuminations");
+  it("returns only files in .ralph/meditations/illuminations/ (does not union side folders)", () => {
+    const aliveDir = join(tmpDir, ".ralph", "meditations", "illuminations");
+    const archivedDir = join(tmpDir, ".ralph", "meditations", "archived-illuminations");
     mkdirSync(aliveDir, { recursive: true });
     mkdirSync(archivedDir, { recursive: true });
     writeFileSync(join(aliveDir, "alive.md"), `---\ndate: 2026-04-30\ndescription: alive one\n---\n`);

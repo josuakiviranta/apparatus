@@ -38,9 +38,9 @@ afterEach(() => {
 });
 
 describe("ensureMeditationDirs", () => {
-  it("creates meditations/illuminations/ nested structure", () => {
+  it("creates .ralph/meditations/illuminations/ nested structure", () => {
     ensureMeditationDirs(tmpDir);
-    expect(existsSync(join(tmpDir, "meditations", "illuminations"))).toBe(true);
+    expect(existsSync(join(tmpDir, ".ralph", "meditations", "illuminations"))).toBe(true);
   });
 
   it("is idempotent — does not throw if dirs already exist", () => {
@@ -52,9 +52,9 @@ describe("ensureMeditationDirs", () => {
     const tmp = mkdtempSync(join(tmpdir(), "ralph-meditate-dirs-"));
     try {
       ensureMeditationDirs(tmp);
-      expect(existsSync(join(tmp, "meditations", "illuminations"))).toBe(true);
-      expect(existsSync(join(tmp, "meditations", "archived-illuminations"))).toBe(false);
-      expect(existsSync(join(tmp, "meditations", "implemented-illuminations"))).toBe(false);
+      expect(existsSync(join(tmp, ".ralph", "meditations", "illuminations"))).toBe(true);
+      expect(existsSync(join(tmp, ".ralph", "meditations", "archived-illuminations"))).toBe(false);
+      expect(existsSync(join(tmp, ".ralph", "meditations", "implemented-illuminations"))).toBe(false);
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }
@@ -245,7 +245,7 @@ describe("meditateCommand (shim)", () => {
   it("runs preflight: ensureMeditationDirs + appendMeditateGitignore before pipeline", async () => {
     vi.spyOn(pipelineMod, "pipelineRunCommand").mockImplementation(async () => {});
     await meditateCommand(tmpDir);
-    expect(existsSync(join(tmpDir, "meditations", "illuminations"))).toBe(true);
+    expect(existsSync(join(tmpDir, ".ralph", "meditations", "illuminations"))).toBe(true);
     expect(existsSync(join(tmpDir, ".gitignore"))).toBe(true);
   });
 

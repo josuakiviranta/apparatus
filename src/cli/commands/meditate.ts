@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from "fs";
 import { join, resolve } from "path";
 import { MCP_CONFIG_GLOB } from "../lib/agent.js";
+import { illuminationsDir } from "../lib/ralph-paths.js";
 import * as output from "../lib/output.js";
 import * as self from "./pipeline.js";
 
@@ -41,7 +42,7 @@ export function readVisionIfPresent(projectFolder: string): string {
 }
 
 export function ensureMeditationDirs(projectFolder: string): void {
-  mkdirSync(join(projectFolder, "meditations", "illuminations"), { recursive: true });
+  mkdirSync(illuminationsDir(projectFolder), { recursive: true });
 }
 
 export function appendMeditateGitignore(projectFolder: string): void {
