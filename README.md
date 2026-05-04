@@ -89,7 +89,7 @@ Inspect the context and trace logs for a completed pipeline run. `--node-receive
 
 ### Pipeline script files
 
-Tool nodes can externalise their logic into `pipelines/scripts/<name>.<ext>` rather than embedding shell in the `.dot` file. Reference the script from a node with `script_file="pipelines/scripts/<name>.mjs"` (plus optional `script_args="..."` and `produces_from_stdout="<context-key>"`). See [`pipelines/scripts/mark-dispatched.mjs`](pipelines/scripts/mark-dispatched.mjs) for a working example, and the [design doc](docs/superpowers/specs/2026-04-17-pipeline-script-files-design.md) for the full attribute surface and rationale.
+Tool nodes can externalise their logic into a sibling script file next to `pipeline.dot` rather than embedding shell in the `.dot` file. Reference the script from a node with `script_file="<name>.<ext>"` (resolved relative to the pipeline folder), plus optional `script_args="..."` and `produces_from_stdout="<context-key>"`. See [`.ralph/pipelines/illumination-to-implementation/consume.mjs`](.ralph/pipelines/illumination-to-implementation/consume.mjs) for a working example, and the [design doc](docs/superpowers/specs/2026-04-17-pipeline-script-files-design.md) for the full attribute surface and rationale.
 
 ### Pipeline tool nodes and `cwd=`
 

@@ -1,0 +1,28 @@
+digraph idea_to_issues {
+  goal="Rough idea → grilling → PRD → vertical-slice GitHub issues → autonomous implementation loop"
+  inputs="project, run_id"
+
+  start [shape=Mdiamond]
+
+  grill                 [agent="grill", interactive=true, default_idea=""]
+  write_prd             [agent="write_prd"]
+  slice_to_issues       [agent="slice_to_issues"]
+  approve_breakdown     [shape=hexagon]
+  publish_issues        [type="tool",
+                         cwd="$project",
+                         script_file="publish_issues.mjs",
+                         script_args="$slice_to_issues.issues_path",
+                         produces_from_stdout=true]
+  implement_from_issues [agent="implement_from_issues", max_iterations="20"]
+  done                  [shape=Msquare]
+
+  start                 -> grill
+  grill                 -> write_prd
+  write_prd             -> slice_to_issues
+  slice_to_issues       -> approve_breakdown
+  approve_breakdown     -> publish_issues   [label="approve"]
+  approve_breakdown     -> slice_to_issues  [label="reslice"]
+  approve_breakdown     -> done             [label="cancel"]
+  publish_issues        -> implement_from_issues
+  implement_from_issues -> done
+}
