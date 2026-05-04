@@ -2,7 +2,8 @@ import { describe, it, expect, beforeAll, beforeEach, afterAll } from "vitest";
 import { mkdtempSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pipelineTraceCommand, deriveProjectKey } from "../commands/pipeline.js";
+import { pipelineTraceCommand } from "../commands/pipeline.js";
+import { runDir } from "../lib/ralph-paths.js";
 
 describe("pipeline trace --node-receive surfaces validation attempts", () => {
   const logs: string[] = [];
@@ -12,12 +13,10 @@ describe("pipeline trace --node-receive surfaces validation attempts", () => {
   afterAll(() => { console.log = origLog; });
 
   it("prints validation-failure events keyed by nodeReceiveId", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "trace-"));
-    process.env.RALPH_RUNS_ROOT = dir;
-    const project = "/tmp/some-project";
-    const projectKey = deriveProjectKey(project);
-    const tracePath = join(dir, projectKey, "runs", "r1", "pipeline.jsonl");
-    mkdirSync(join(dir, projectKey, "runs", "r1"), { recursive: true });
+    const projectRoot = mkdtempSync(join(tmpdir(), "trace-"));
+    const traceDir = runDir(projectRoot, "r1");
+    mkdirSync(traceDir, { recursive: true });
+    const tracePath = join(traceDir, "pipeline.jsonl");
 
     const lines = [
       { kind: "pipeline-start", runId: "r1", pipelineName: "p", nodes: ["start","verifier"], timestamp: "" },
@@ -28,7 +27,7 @@ describe("pipeline trace --node-receive surfaces validation attempts", () => {
     ];
     writeFileSync(tracePath, lines.map(l => JSON.stringify(l)).join("\n"));
 
-    await pipelineTraceCommand("r1", { project, nodeReceive: "verifier-1" });
+    await pipelineTraceCommand("r1", { project: projectRoot, nodeReceive: "verifier-1" });
 
     const out = logs.join("\n");
     expect(out).toMatch(/validation attempts:/);

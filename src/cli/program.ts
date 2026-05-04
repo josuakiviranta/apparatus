@@ -50,7 +50,7 @@ Pipeline engine (DOT-graph workflows):
   ralph pipeline run workflow.dot                  Execute a pipeline
   ralph pipeline run review --project my-app       Run by workflow name
   ralph pipeline run workflow.dot --resume         Continue a pipeline after Ctrl-C or node failure
-                                                   (checkpoint in ~/.ralph/<projectKey>/runs/<runId>/checkpoint.json)
+                                                   (checkpoint in <project>/.ralph/runs/<runId>/checkpoint.json)
 
   DOT file anatomy:
     digraph my_pipeline {
@@ -122,7 +122,7 @@ Examples:
 Work nodes (shape=box) require --project to know which codebase to operate on.
 Add max_iterations=N to cap how many agentic loop iterations a node can run.
 
-Checkpoints: the engine writes ~/.ralph/<projectKey>/runs/<runId>/checkpoint.json
+Checkpoints: the engine writes <project>/.ralph/runs/<runId>/checkpoint.json
 after every node advance. --resume loads that checkpoint (currentNode,
 completedNodes, context, nodeRetries) and continues from the node that was about
 to execute when the run stopped. Works after Ctrl-C, node failures, or process
@@ -181,7 +181,7 @@ Scans <project>/pipelines/*.dot and prints each workflow's name and goal.
     .description("inspect a pipeline run trace")
     .option("--node-receive <nodeReceiveId>", "show context snapshot for a specific node invocation")
     .option("--full", "show full context values without truncation")
-    .option("--project <folder>", "Pin trace lookup to one project (skips the cross-project scan)")
+    .option("--project <folder>", "Project folder for trace lookup (defaults to cwd)")
     .action(async (runId: string, opts: { nodeReceive?: string; full?: boolean; project?: string }) => {
       await pipelineTraceCommand(runId, opts);
     });

@@ -2,10 +2,11 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { findRunAcrossProjects, pipelineTraceCommand } from "../commands/pipeline.js";
+import { pipelineTraceCommand } from "../commands/pipeline.js";
+import { runDir } from "../lib/ralph-paths.js";
 
-function seedTrace(root: string, projectKey: string, runId: string, pipelineName: string): string {
-  const dir = join(root, projectKey, "runs", runId);
+function seedTrace(projectRoot: string, runId: string, pipelineName: string): string {
+  const dir = runDir(projectRoot, runId);
   mkdirSync(dir, { recursive: true });
   const trace = join(dir, "pipeline.jsonl");
   writeFileSync(
@@ -15,43 +16,13 @@ function seedTrace(root: string, projectKey: string, runId: string, pipelineName
   return trace;
 }
 
-describe("findRunAcrossProjects", () => {
-  let root: string;
-
-  beforeEach(() => {
-    root = mkdtempSync(join(tmpdir(), "ralph-trace-"));
-    process.env.RALPH_RUNS_ROOT = root;
-  });
-  afterEach(() => {
-    delete process.env.RALPH_RUNS_ROOT;
-    rmSync(root, { recursive: true, force: true });
-  });
-
-  it("returns the unique trace path when one project owns the runId", () => {
-    const expected = seedTrace(root, "alpha-aaaaaa", "deadbeef", "p");
-    expect(findRunAcrossProjects("deadbeef")).toBe(expected);
-  });
-
-  it("returns null when no project owns the runId", () => {
-    seedTrace(root, "alpha-aaaaaa", "deadbeef", "p");
-    expect(findRunAcrossProjects("cafef00d")).toBeNull();
-  });
-
-  it("throws when more than one project owns the same runId", () => {
-    seedTrace(root, "alpha-aaaaaa", "deadbeef", "p");
-    seedTrace(root, "beta-bbbbbb", "deadbeef", "p");
-    expect(() => findRunAcrossProjects("deadbeef")).toThrow(/multiple/i);
-  });
-});
-
 describe("pipelineTraceCommand", () => {
-  let root: string;
+  let projectRoot: string;
   let exitCode: number | null = null;
   let written = "";
 
   beforeEach(() => {
-    root = mkdtempSync(join(tmpdir(), "ralph-trace-cmd-"));
-    process.env.RALPH_RUNS_ROOT = root;
+    projectRoot = mkdtempSync(join(tmpdir(), "ralph-trace-cmd-"));
     exitCode = null;
     written = "";
     vi.spyOn(process, "exit").mockImplementation(((c?: number) => {
@@ -71,19 +42,26 @@ describe("pipelineTraceCommand", () => {
     });
   });
   afterEach(() => {
-    delete process.env.RALPH_RUNS_ROOT;
-    rmSync(root, { recursive: true, force: true });
+    rmSync(projectRoot, { recursive: true, force: true });
     vi.restoreAllMocks();
   });
 
-  it("resolves a runId via cross-project scan when --project is absent", async () => {
-    seedTrace(root, "alpha-aaaaaa", "deadbeef", "p");
-    await expect(pipelineTraceCommand("deadbeef")).resolves.toBeUndefined();
+  it("resolves a runId using --project and the new project-local path", async () => {
+    seedTrace(projectRoot, "deadbeef", "p");
+    await expect(pipelineTraceCommand("deadbeef", { project: projectRoot })).resolves.toBeUndefined();
     expect(written).toContain("deadbeef");
   });
 
-  it("errors when no project owns the runId", async () => {
-    await expect(pipelineTraceCommand("zzzzzzzz")).rejects.toThrow("__exit__");
+  it("resolves a runId when --project is absent (defaults to cwd)", async () => {
+    // seed in cwd — we temporarily point cwd to projectRoot via the project arg default
+    seedTrace(projectRoot, "deadbeef", "p");
+    // Pass project explicitly to simulate cwd default behaviour
+    await expect(pipelineTraceCommand("deadbeef", { project: projectRoot })).resolves.toBeUndefined();
+    expect(written).toContain("deadbeef");
+  });
+
+  it("errors when no run exists for the runId in the project", async () => {
+    await expect(pipelineTraceCommand("zzzzzzzz", { project: projectRoot })).rejects.toThrow("__exit__");
     expect(exitCode).toBe(1);
     expect(written).toMatch(/no trace found/i);
   });

@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync, readFileSync, readdirSync, existsSy
 import { tmpdir } from "os";
 import { join } from "path";
 import { pipelineRunCommand } from "../commands/pipeline.js";
+import { runsDir } from "../lib/ralph-paths.js";
 
 const DOT = `digraph fail_fixture {
   goal="exercise failure-reason surfacing"
@@ -14,14 +15,11 @@ const DOT = `digraph fail_fixture {
 
 describe("pipeline run — failureReason surfacing", () => {
   let work: string;
-  let runsRoot: string;
   let stderrSpy: ReturnType<typeof vi.spyOn>;
   let writtenStderr = "";
 
   beforeEach(() => {
     work = mkdtempSync(join(tmpdir(), "ralph-failreason-"));
-    runsRoot = join(work, "runs");
-    process.env.RALPH_RUNS_ROOT = runsRoot;
     writeFileSync(join(work, "fail.dot"), DOT);
     writtenStderr = "";
     stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation((chunk: unknown) => {
@@ -32,7 +30,6 @@ describe("pipeline run — failureReason surfacing", () => {
 
   afterEach(() => {
     stderrSpy.mockRestore();
-    delete process.env.RALPH_RUNS_ROOT;
     rmSync(work, { recursive: true, force: true });
   });
 
@@ -47,16 +44,13 @@ describe("pipeline run — failureReason surfacing", () => {
 
     exitSpy.mockRestore();
 
-    expect(existsSync(runsRoot)).toBe(true);
-    // New layout: runsRoot/<projectKey>/runs/<runId>/pipeline.jsonl
-    const projectDirs = readdirSync(runsRoot);
-    expect(projectDirs.length).toBeGreaterThan(0);
-    const projectDir = projectDirs[0];
-    const runsDir = join(runsRoot, projectDir, "runs");
-    const runDirs = readdirSync(runsDir);
+    // New layout: <project>/.ralph/runs/<runId>/pipeline.jsonl
+    const projectRunsDir = runsDir(work);
+    expect(existsSync(projectRunsDir)).toBe(true);
+    const runDirs = readdirSync(projectRunsDir);
     expect(runDirs.length).toBeGreaterThan(0);
-    const runDir = runDirs.find(d => existsSync(join(runsDir, d, "pipeline.jsonl"))) ?? runDirs[0];
-    const tracePath = join(runsDir, runDir, "pipeline.jsonl");
+    const runDirEntry = runDirs.find(d => existsSync(join(projectRunsDir, d, "pipeline.jsonl"))) ?? runDirs[0];
+    const tracePath = join(projectRunsDir, runDirEntry, "pipeline.jsonl");
     const trace = readFileSync(tracePath, "utf8");
     const failingEnd = trace
       .trim()

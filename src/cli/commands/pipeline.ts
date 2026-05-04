@@ -1,7 +1,6 @@
 import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync, rmSync, lstatSync } from "fs";
 import { resolve, join, basename, dirname, relative } from "path";
-import { homedir } from "os";
-import { randomUUID, createHash } from "crypto";
+import { randomUUID } from "crypto";
 import { JsonlPipelineTracer } from "../../attractor/tracer/jsonl-pipeline-tracer.js";
 import type { PipelineTracer } from "../../attractor/tracer/pipeline-tracer.js";
 import { parseDot, validateGraph, validateOrRaise } from "../../attractor/core/graph.js";
@@ -16,6 +15,7 @@ import {
 import { InkInterviewer } from "../../attractor/interviewer/ink.js";
 import { AutoApproveInterviewer } from "../../attractor/interviewer/auto-approve.js";
 import { getPipelinesDir, resolvePipelineArg, isNameShorthand } from "../lib/pipeline-resolver.js";
+import { runDir, runsDir } from "../lib/ralph-paths.js";
 import { PassThrough } from "stream";
 import { parseStreamJsonEvents, streamEvents } from "../lib/stream-formatter.js";
 import * as output from "../lib/output.js";
@@ -44,19 +44,6 @@ export interface PipelineValidateOptions {
 
 interface EdgeDiagnostic { severity: "warning" | "error"; message: string }
 
-/**
- * Derive a stable, human-readable project key from an absolute project path.
- * Shape: `<basename>-<6 hex chars of sha256(absolutePath)>`.
- *
- * Used to namespace per-project run state under `~/.ralph/<project-key>/runs/`.
- * Pure function — no I/O — exported for tests.
- */
-export function deriveProjectKey(projectPath: string): string {
-  const abs = resolve(projectPath);
-  const base = basename(abs);
-  const hash6 = createHash("sha256").update(abs).digest("hex").slice(0, 6);
-  return `${base}-${hash6}`;
-}
 
 /**
  * Resolve the target logsRoot for a `--resume` invocation.
@@ -123,27 +110,6 @@ export function gcOldRuns(runsRoot: string, keep: number): void {
   }
 }
 
-/**
- * One-time first-run notice: if legacy `~/.ralph/runs/` exists and
- * `~/.ralph/.layout-v2` does not, print a one-line notice and touch the
- * sentinel file. Idempotent thereafter.
- */
-export function maybePrintLayoutV2Notice(): void {
-  const ralphRoot = process.env.RALPH_RUNS_ROOT ?? join(homedir(), ".ralph");
-  const legacy = join(ralphRoot, "runs");
-  const sentinel = join(ralphRoot, ".layout-v2");
-  if (!existsSync(legacy) || existsSync(sentinel)) return;
-  process.stderr.write(
-    "[ralph] Layout changed; previous runs at ~/.ralph/runs/ are preserved " +
-    "but unreachable from the new tooling. Delete with: rm -rf ~/.ralph/runs/\n",
-  );
-  try {
-    mkdirSync(ralphRoot, { recursive: true });
-    writeFileSync(sentinel, "");
-  } catch {
-    // Best-effort: if sentinel write fails, the user sees the notice next run.
-  }
-}
 
 export function diffEdgeLabels(prev: Graph, curr: Graph): EdgeDiagnostic[] {
   const out: EdgeDiagnostic[] = [];
@@ -316,12 +282,8 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
     process.exit(1);
   }
 
-  maybePrintLayoutV2Notice();
-
   const runId = randomUUID().slice(0, 8);
-  const ralphRoot = process.env.RALPH_RUNS_ROOT ?? join(homedir(), ".ralph");
-  const projectKey = deriveProjectKey(opts.project ?? process.cwd());
-  const runsRoot = join(ralphRoot, projectKey, "runs");
+  const runsRoot = runsDir(opts.project ?? process.cwd());
   if (!opts.resume) {
     const keep = Number(process.env.RALPH_RUNS_KEEP ?? "50");
     gcOldRuns(runsRoot, Number.isFinite(keep) && keep > 0 ? keep : 50);
@@ -621,70 +583,17 @@ export async function pipelineListCommand(opts: PipelineListOptions = {}): Promi
   }
 }
 
-/**
- * Walk all project run-roots and return the set of directories. Used as the
- * default scan target when a project is not pinned. Each root has the shape
- * `~/.ralph/<projectKey>/runs/`.
- */
-function listAllProjectRunsRoots(): string[] {
-  const ralphRoot = process.env.RALPH_RUNS_ROOT ?? join(homedir(), ".ralph");
-  if (!existsSync(ralphRoot)) return [];
-  const out: string[] = [];
-  for (const name of readdirSync(ralphRoot)) {
-    const candidate = join(ralphRoot, name, "runs");
-    if (existsSync(candidate)) out.push(candidate);
-  }
-  return out;
-}
-
-/**
- * Resolve a runId to its trace path by scanning all project run-roots.
- * Returns null if no project owns the runId. Throws if more than one does.
- */
-export function findRunAcrossProjects(runId: string): string | null {
-  const roots = listAllProjectRunsRoots();
-  const matches: string[] = [];
-  for (const root of roots) {
-    const candidate = join(root, runId, "pipeline.jsonl");
-    if (existsSync(candidate)) matches.push(candidate);
-  }
-  if (matches.length === 0) return null;
-  if (matches.length > 1) {
-    throw new Error(`[ralph] multiple projects own runId ${runId}: ${matches.join(", ")}`);
-  }
-  return matches[0];
-}
-
 export async function pipelineTraceCommand(
   runId: string,
   opts: { nodeReceive?: string; full?: boolean; project?: string } = {}
 ): Promise<void> {
-  let tracePath: string;
-  if (opts.project) {
-    const ralphRoot = process.env.RALPH_RUNS_ROOT ?? join(homedir(), ".ralph");
-    const projectKey = deriveProjectKey(opts.project);
-    tracePath = join(ralphRoot, projectKey, "runs", runId, "pipeline.jsonl");
-    if (!existsSync(tracePath)) {
-      await output.error(`No trace found for run: ${runId}`);
-      await output.error(`Expected: ${tracePath}`);
-      process.exit(1);
-      return;
-    }
-  } else {
-    let resolved: string | null;
-    try {
-      resolved = findRunAcrossProjects(runId);
-    } catch (e) {
-      await output.error((e as Error).message);
-      process.exit(1);
-      return;
-    }
-    if (!resolved) {
-      await output.error(`No trace found for run: ${runId}`);
-      process.exit(1);
-      return;
-    }
-    tracePath = resolved;
+  const project = resolve(opts.project ?? process.cwd());
+  const tracePath = join(runDir(project, runId), "pipeline.jsonl");
+  if (!existsSync(tracePath)) {
+    await output.error(`No trace found for run: ${runId}`);
+    await output.error(`Expected: ${tracePath}`);
+    process.exit(1);
+    return;
   }
 
   let raw: string;

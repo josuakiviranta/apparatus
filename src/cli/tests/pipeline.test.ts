@@ -165,15 +165,15 @@ describe("pipelineRunCommand", () => {
     }
   });
 
-  it("places logsRoot under ~/.ralph/<projectKey>/runs/<runId> when none provided", async () => {
+  it("places logsRoot under <project>/.ralph/runs/<runId> when none provided", async () => {
     const dotFile = join(dir, "test.dot");
     writeFileSync(dotFile, VALID_DOT);
     await pipelineRunCommand(dotFile, { project: dir });
     const call = (engine.runPipeline as ReturnType<typeof vi.fn>).mock.calls[0];
     const opts = call[1];
-    // logsRoot shape: <ralph-root>/<basename>-<6hex>/runs/<8hex runId>
+    // logsRoot shape: <project>/.ralph/runs/<8hex runId>
     expect(opts.logsRoot).toMatch(
-      new RegExp(`\\.ralph[\\\\/].+-[0-9a-f]{6}[\\\\/]runs[\\\\/][0-9a-f]{8}$`),
+      new RegExp(`\\.ralph[\\\\/]runs[\\\\/][0-9a-f]{8}$`),
     );
     expect(opts.logsRoot).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
   });
@@ -219,10 +219,8 @@ describe("pipelineRunCommand — --resume resolution", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     dir = mkdtempSync(join(tmpdir(), "ralph-pipeline-resume-"));
-    process.env.RALPH_RUNS_ROOT = dir;
   });
   afterEach(() => {
-    delete process.env.RALPH_RUNS_ROOT;
     rmSync(dir, { recursive: true });
   });
 
