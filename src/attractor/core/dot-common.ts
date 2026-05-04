@@ -1,4 +1,4 @@
-import type { Node } from "../types.js";
+import type { Graph, Node } from "../types.js";
 
 // Convert snake_case to camelCase
 export function toCamel(s: string): string {
@@ -85,4 +85,24 @@ export function parseInputsAttr(raw: unknown): string[] | undefined {
     out.push(name);
   }
   return out.length > 0 ? out : undefined;
+}
+
+/**
+ * Build a forward-adjacency map keyed by every node id in `graph.nodes`,
+ * containing only edges whose `from` and `to` are both in `nodes`. Edges
+ * whose either endpoint is missing from `nodes` are silently skipped — see
+ * design doc §7.1 for why the strict guard is the safe default.
+ *
+ * Single source of truth for the forward-adjacency recipe. Callers:
+ *   - graph.ts validateGraph (variable_coverage)
+ *   - graph.ts isProducerOnEveryPath
+ *   - flow-analyzer.ts computeScope
+ */
+export function buildForwardAdj(graph: Graph): Map<string, string[]> {
+  const fwd = new Map<string, string[]>();
+  for (const id of graph.nodes.keys()) fwd.set(id, []);
+  for (const e of graph.edges) {
+    if (fwd.has(e.from) && fwd.has(e.to)) fwd.get(e.from)!.push(e.to);
+  }
+  return fwd;
 }

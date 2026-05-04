@@ -1,4 +1,5 @@
 import type { Graph } from "../types.js";
+import { buildForwardAdj } from "./dot-common.js";
 
 /**
  * Compute the set of variable names in scope at each node.
@@ -49,18 +50,13 @@ function computeScope(
     Array.isArray(graph.inputs) ? graph.inputs : [],
   );
 
-  // Build forward and reverse adjacency lists
-  const fwd = new Map<string, string[]>();
+  // Build forward adjacency via the shared primitive (dot-common.ts).
+  const fwd = buildForwardAdj(graph);
+  // Reverse adjacency stays inline — only consumer in the repo (design §7.3).
   const rev = new Map<string, string[]>();
-  for (const id of nodes.keys()) {
-    fwd.set(id, []);
-    rev.set(id, []);
-  }
+  for (const id of nodes.keys()) rev.set(id, []);
   for (const e of edges) {
-    if (fwd.has(e.from) && fwd.has(e.to)) {
-      fwd.get(e.from)!.push(e.to);
-      rev.get(e.to)!.push(e.from);
-    }
+    if (rev.has(e.from) && rev.has(e.to)) rev.get(e.to)!.push(e.from);
   }
 
   // Find start node: shape=Mdiamond or id="start"

@@ -6,6 +6,7 @@ import {
   parseStylesheet,
   applyStylesheet,
   parseInputsAttr,
+  buildForwardAdj,
 } from "../core/dot-common.js";
 
 describe("dot-common helpers", () => {
@@ -48,5 +49,50 @@ describe("applyStylesheet preserves metadata", () => {
     const result = applyStylesheet(node, [{ selector: "x", selectorType: "id", props: { extra: "hi" } }]);
     expect(result.sourceLocation).toEqual(node.sourceLocation);
     expect(result.attrLocations).toEqual(node.attrLocations);
+  });
+});
+
+describe("buildForwardAdj", () => {
+  it("returns a forward-adjacency map keyed by every node id", () => {
+    const graph = {
+      nodes: new Map([
+        ["a", { id: "a" }],
+        ["b", { id: "b" }],
+        ["c", { id: "c" }],
+      ]),
+      edges: [
+        { from: "a", to: "b" },
+        { from: "b", to: "c" },
+      ],
+    } as any;
+
+    const fwd = buildForwardAdj(graph);
+
+    expect([...fwd.keys()].sort()).toEqual(["a", "b", "c"]);
+    expect(fwd.get("a")).toEqual(["b"]);
+    expect(fwd.get("b")).toEqual(["c"]);
+    expect(fwd.get("c")).toEqual([]);
+  });
+
+  it("silently skips edges with an endpoint missing from nodes", () => {
+    const graph = {
+      nodes: new Map([
+        ["a", { id: "a" }],
+        ["b", { id: "b" }],
+      ]),
+      edges: [
+        { from: "a", to: "b" },
+        { from: "a", to: "ghost" },     // endpoint missing — must be skipped
+        { from: "phantom", to: "b" },   // origin missing  — must be skipped
+      ],
+    } as any;
+
+    const fwd = buildForwardAdj(graph);
+
+    expect([...fwd.keys()].sort()).toEqual(["a", "b"]);
+    expect(fwd.get("a")).toEqual(["b"]);
+    expect(fwd.get("b")).toEqual([]);
+    expect(fwd.has("ghost")).toBe(false);
+    expect(fwd.has("phantom")).toBe(false);
   });
 });

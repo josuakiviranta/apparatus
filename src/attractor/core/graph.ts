@@ -6,6 +6,7 @@ import { validateNode } from "./schemas.js";
 import { parseDotV2 } from "./graph-ast.js";
 import {
   toCamel,
+  buildForwardAdj,
 } from "./dot-common.js";
 import { loadAgent } from "../../cli/lib/agent-loader.js";
 import type { AgentConfig } from "../../cli/lib/agent.js";
@@ -62,6 +63,63 @@ const INLINE_SCRIPT_PATTERNS: RegExp[] = [
   /\bbash\s+-c\b/,
   /<<\s*['"]?[A-Z]/, // heredoc marker
 ];
+
+interface GraphTraversal {
+  hasDefault(node: Node, varName: string): boolean;
+  reachable(source: string, target: string, excluded: Set<string>): boolean;
+  findQualifiedProducer(consumerId: string): string | undefined;
+}
+
+/**
+ * Bundle three reachability helpers behind a narrow interface, capturing
+ * `graph.nodes`, `adj`, and `resolveHandlerType` as closure state. Replaces
+ * the three nested closures that used to live inside `validateGraph`
+ * (hasDefault, reachableWithout, findQualifiedProducer) — see design doc §3.3.
+ *
+ * The rename `reachableWithout` → `reachable` reflects that the exclusion
+ * set is now a method parameter, not a free-function name property.
+ */
+function createGraphTraversal(
+  graph: Graph,
+  adj: Map<string, string[]>,
+  resolveHandler: (node: Node) => string,
+): GraphTraversal {
+  const { nodes } = graph;
+
+  function hasDefault(node: Node, varName: string): boolean {
+    const key = toCamel("default_" + varName);
+    return node[key] !== undefined;
+  }
+
+  function reachable(source: string, target: string, excluded: Set<string>): boolean {
+    if (source === target) return true;
+    const visited = new Set<string>();
+    const queue = [source];
+    while (queue.length > 0) {
+      const cur = queue.shift()!;
+      if (visited.has(cur)) continue;
+      visited.add(cur);
+      if (cur === target) return true;
+      for (const next of (adj.get(cur) ?? [])) {
+        if (!excluded.has(next)) queue.push(next);
+      }
+    }
+    return false;
+  }
+
+  function findQualifiedProducer(consumerId: string): string | undefined {
+    for (const [id, node] of nodes) {
+      if (id === consumerId) continue;
+      if (resolveHandler(node) !== "tool") continue;
+      if (!node.producesFromStdout) continue;
+      if (!reachable(id, consumerId, new Set())) continue;
+      return id;
+    }
+    return undefined;
+  }
+
+  return { hasDefault, reachable, findQualifiedProducer };
+}
 
 export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
   const diags: Diagnostic[] = [];
@@ -168,12 +226,9 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
     "wait.human": ["chat.output", "choice"],
   };
 
-  // Build adjacency list for forward BFS
-  const adj = new Map<string, string[]>();
-  for (const n of nodes.keys()) adj.set(n, []);
-  for (const e of edges) {
-    if (adj.has(e.from)) adj.get(e.from)!.push(e.to);
-  }
+  // Build adjacency list for forward BFS (shared primitive — see dot-common.ts).
+  const adj = buildForwardAdj(graph);
+  const traversal = createGraphTraversal(graph, adj, resolveHandlerType);
 
   // Collect what each node produces
   const nodeProduces = new Map<string, Set<string>>();
@@ -212,44 +267,6 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
     nodeProduces.set(id, produced);
   }
 
-  // Check if a node has a default for a given variable.
-  // DOT `default_<var>` is normalized to camelCase at parse time via toCamel
-  // (graph.ts:7). Route lookup through the same helper so snake_case var names
-  // like $test_result resolve to defaultTestResult, not defaultTest_result.
-  function hasDefault(node: Node, varName: string): boolean {
-    const key = toCamel("default_" + varName);
-    return node[key] !== undefined;
-  }
-
-  // BFS reachability check: can `target` be reached from `source` without visiting any node in `excluded`?
-  function reachableWithout(source: string, target: string, excluded: Set<string>): boolean {
-    if (source === target) return true;
-    const visited = new Set<string>();
-    const queue = [source];
-    while (queue.length > 0) {
-      const cur = queue.shift()!;
-      if (visited.has(cur)) continue;
-      visited.add(cur);
-      if (cur === target) return true;
-      for (const next of (adj.get(cur) ?? [])) {
-        if (!excluded.has(next)) queue.push(next);
-      }
-    }
-    return false;
-  }
-
-  // Find an upstream produces_from_stdout tool node that can reach consumerId.
-  function findQualifiedProducer(consumerId: string): string | undefined {
-    for (const [id, node] of nodes) {
-      if (id === consumerId) continue;
-      if (resolveHandlerType(node) !== "tool") continue;
-      if (!node.producesFromStdout) continue;
-      if (!reachableWithout(id, consumerId, new Set())) continue;
-      return id;
-    }
-    return undefined;
-  }
-
   if (startNodes.length === 1) {
     const startId = startNodes[0].id;
     for (const [consumerId, consumer] of nodes) {
@@ -282,7 +299,7 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
           lookupKey = varName.slice(dotIdx + 1);
         }
 
-        if (hasDefault(consumer, lookupKey) || hasDefault(consumer, varName)) continue;
+        if (traversal.hasDefault(consumer, lookupKey) || traversal.hasDefault(consumer, varName)) continue;
 
         // Find all producer nodes for this variable. Verbatim match handles
         // pseudo-keys + bare keys; qualified split handles `<node>.<key>` refs
@@ -308,7 +325,7 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
 
         // Check: is consumer reachable from start when all producers are removed?
         // If yes, there's a path that skips all producers → warn
-        if (reachableWithout(startId, consumerId, producers)) {
+        if (traversal.reachable(startId, consumerId, producers)) {
           const producerList = [...producers].join(", ");
           diags.push({
             rule: "variable_coverage",
@@ -499,7 +516,7 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
             // and an upstream produces_from_stdout tool node exists on the path.
             // The bare key cannot resolve (producer writes `${nodeId}.key`).
             // default_* does NOT silence this — bare keys cannot read qualified outputs.
-            const qualifiedProducer = findQualifiedProducer(node.id);
+            const qualifiedProducer = traversal.findQualifiedProducer(node.id);
             if (qualifiedProducer !== undefined) {
               diags.push({
                 rule: "bare_input_from_qualified_producer",
@@ -511,7 +528,7 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
             }
 
             // bare_input_not_in_caller_inputs_or_system — fallback existing rule
-            if (!hasDefault(node, resolved.localKey)) {
+            if (!traversal.hasDefault(node, resolved.localKey)) {
               diags.push({
                 rule: "bare_input_not_in_caller_inputs_or_system",
                 severity: "error",
@@ -831,12 +848,8 @@ function isProducerOnEveryPath(
   if (producer === start) return true; // start itself produces — trivially true
   if (producer === target) return true; // producer === consumer — degenerate, skip
 
-  // Build forward adjacency
-  const fwd = new Map<string, string[]>();
-  for (const id of graph.nodes.keys()) fwd.set(id, []);
-  for (const e of graph.edges) {
-    if (fwd.has(e.from) && fwd.has(e.to)) fwd.get(e.from)!.push(e.to);
-  }
+  // Build forward adjacency (shared primitive — see dot-common.ts).
+  const fwd = buildForwardAdj(graph);
 
   // BFS from start, excluding producer — if we can still reach target, producer
   // is NOT on every path.
