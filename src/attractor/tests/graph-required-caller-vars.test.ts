@@ -165,4 +165,36 @@ body
     // my_key is produced internally — no required_caller_vars diagnostic
     expect(info).toBeUndefined();
   });
+
+  it("excludes tool-node produces= keys and agent default_<key>= vars from required_caller_vars", () => {
+    const dir = join(tmpdir(), `req-caller-vars-6-${Date.now()}`);
+    setupAgents(dir, {
+      "consumer.md": `---
+name: consumer
+description: needs sha and max_iterations
+inputs:
+  - tool_node.sha
+  - max_iterations
+---
+body
+`,
+    });
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      tool_node [type="tool",
+                 cwd=".",
+                 tool_command="printf '{\\"sha\\":\\"abc\\"}\\n'",
+                 produces_from_stdout="true",
+                 produces="sha"]
+      c [agent="consumer", default_max_iterations="0"]
+      done [shape=Msquare]
+      start -> tool_node -> c -> done
+    }`;
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    const info = diags.find(d => d.rule === "required_caller_vars");
+    // tool_node.sha is produced via produces="sha"; max_iterations is silenced
+    // via default_max_iterations="0" on the consumer. Neither should appear.
+    expect(info).toBeUndefined();
+  });
 });

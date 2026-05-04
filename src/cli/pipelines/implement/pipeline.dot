@@ -1,15 +1,16 @@
 digraph implement {
   goal="Autonomous implementation loop"
-  inputs="max_iterations,llm_model,scenarios_dir"
+  inputs="llm_model,scenarios_dir"
 
   start [shape=Mdiamond]
 
   record_base [type="tool",
                cwd="$project",
                tool_command="printf '{\"sha\":\"%s\"}\n' \"$(git rev-parse HEAD)\"",
-               produces_from_stdout="true"]
+               produces_from_stdout="true",
+               produces="sha"]
 
-  implementer [agent="implement", max_iterations="$max_iterations"]
+  implementer [agent="implement", max_iterations="$max_iterations", default_max_iterations="0"]
 
   scenario_author [agent="scenario-author"]
 
