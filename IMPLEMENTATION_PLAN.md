@@ -746,14 +746,14 @@ broken state where prompts reference paths that don't exist on disk yet.
 - Modify: `.gitignore` (append `.ralph/runs/`)
 - Modify: `README.md` (path-string updates)
 
-- [ ] **Step 1: Verify clean working tree**
+- [x] **Step 1: Verify clean working tree**
 
 ```bash
 git status
 ```
 Expected: clean. Migration must not mix with unrelated changes.
 
-- [ ] **Step 2: Find every old path string in bundled pipelines**
+- [x] **Step 2: Find every old path string in bundled pipelines**
 
 ```bash
 grep -rn 'meditations/illuminations\|meditations/stimuli' src/cli/pipelines/
@@ -761,14 +761,14 @@ grep -rn 'meditations/illuminations\|meditations/stimuli' src/cli/pipelines/
 
 Save the list. For each hit, replace `meditations/illuminations` with `.ralph/meditations/illuminations` and `meditations/stimuli` with `.ralph/meditations/stimuli`. Apply edits in-place.
 
-- [ ] **Step 3: Re-grep to confirm**
+- [x] **Step 3: Re-grep to confirm**
 
 ```bash
 grep -rn 'meditations/illuminations\|meditations/stimuli' src/cli/pipelines/
 ```
 Expected: every remaining hit (if any) starts with `.ralph/meditations/`.
 
-- [ ] **Step 4: Create the .ralph/ tree at repo root via direct mkdir**
+- [x] **Step 4: Create the .ralph/ tree at repo root via direct mkdir**
 
 Do **not** use `ralph init` for the self-migration. The `dist/` may be stale (Chunk 2 added init but the developer may not have rebuilt) and using a tool to scaffold what `git mv` then overwrites adds an unnecessary delete-the-stub dance. Direct mkdir is honest:
 
@@ -778,7 +778,7 @@ mkdir -p .ralph/pipelines .ralph/meditations .ralph/memory .ralph/docs
 
 (`.ralph/meditations/illuminations`, `.ralph/meditations/stimuli`, `.ralph/docs/adr` will be created by the `git mv`s below.)
 
-- [ ] **Step 5: `git mv` the four targets**
+- [x] **Step 5: `git mv` the four targets**
 
 ```bash
 git mv meditations .ralph/meditations
@@ -791,7 +791,7 @@ git mv VISION.md .ralph/VISION.md
 
 **Important:** do not run `git add .ralph/` between Step 4 and Step 5. If `.ralph/CONTEXT.md` becomes a tracked empty stub, `git mv CONTEXT.md .ralph/CONTEXT.md` will refuse with "destination exists."
 
-- [ ] **Step 6: Verify history follows for each moved file**
+- [x] **Step 6: Verify history follows for each moved file**
 
 ```bash
 git log --follow --oneline .ralph/VISION.md | head -5
@@ -800,7 +800,7 @@ git log --follow --oneline .ralph/docs/adr/0001-agents-live-next-to-pipeline.md 
 ```
 Expected: each shows commits from before the move (proving git tracked the rename).
 
-- [ ] **Step 7: Update path strings in `.ralph/CONTEXT.md` inline**
+- [x] **Step 7: Update path strings in `.ralph/CONTEXT.md` inline**
 
 Open `.ralph/CONTEXT.md` and update every reference:
 - `meditations/illuminations/` → `.ralph/meditations/illuminations/`
@@ -815,7 +815,7 @@ grep -n 'meditations/\|docs/adr/' .ralph/CONTEXT.md
 ```
 Expected: every remaining hit has the `.ralph/` prefix.
 
-- [ ] **Step 8: Update path strings in README.md**
+- [x] **Step 8: Update path strings in README.md**
 
 Locate references via:
 ```bash
@@ -828,7 +828,7 @@ Apply edits:
 - The "Where to look" section (around lines 158–162): `docs/adr/` → `.ralph/docs/adr/` (and `CONTEXT.md` → `.ralph/CONTEXT.md`).
 - Add a "Bootstrap a project" section near the top: `mkdir foo && cd foo && ralph init`.
 
-- [ ] **Step 9: Update ADR cross-references**
+- [x] **Step 9: Update ADR cross-references**
 
 Run a broad grep:
 ```bash
@@ -839,7 +839,7 @@ grep -rn 'docs/adr/' --exclude-dir=node_modules --exclude-dir=dist --exclude-dir
 
 ADRs that cross-reference each other by bare filename (`0001-...md`, no path prefix) work post-move because they're sibling-relative — no change needed for those.
 
-- [ ] **Step 10: Append `.ralph/runs/` to .gitignore**
+- [x] **Step 10: Append `.ralph/runs/` to .gitignore**
 
 ```bash
 grep -n '\.ralph/runs/' .gitignore
@@ -849,14 +849,14 @@ If absent:
 echo '.ralph/runs/' >> .gitignore
 ```
 
-- [ ] **Step 11: Run full test suite**
+- [x] **Step 11: Run full test suite**
 
 ```bash
 npx vitest run
 ```
 Expected: full suite green. Tests that asserted on `meditations/...`, `docs/adr/...`, or `CONTEXT.md` paths get `.ralph/` prefixes in the same commit if any remain (most should have been caught in earlier chunks).
 
-- [ ] **Step 12: Smoke — bundled pipeline against migrated repo**
+- [x] **Step 12: Smoke — bundled pipeline against migrated repo**
 
 ```bash
 npm run build
@@ -874,7 +874,7 @@ If illumination written, confirm location:
 ls -la .ralph/meditations/illuminations/
 ```
 
-- [ ] **Step 13: Single big-bang commit**
+- [x] **Step 13: Single big-bang commit**
 
 ```bash
 git add -A
@@ -1086,3 +1086,11 @@ All of the below must be true before declaring the migration complete:
 - [ ] ADR-0007 lives at `.ralph/docs/adr/0007-...`.
 - [ ] CONTEXT.md (now at `.ralph/CONTEXT.md`) carries the new "Project-local layout" term and updated path strings.
 - [ ] README.md (still at root) mentions `ralph init` in getting-started and the migration recipe in the migration section.
+
+## Session Notes — 2026-05-04
+
+- Chunk 5 Task 5.1 shipped at commit 5491175. Big-bang migration: meditations/, docs/adr/, CONTEXT.md, VISION.md → .ralph/. Bundled pipeline path strings updated. ADR-0007 + spec landed in same commit.
+- Catch-up fix at 551faf3: pipeline-preflight.test.ts fixtures updated from <tmpdir>/pipelines/ → <tmpdir>/.ralph/pipelines/ — Chunk 4 had missed this test's fixture.
+- Smoke deviation: Step 12 used `pipeline validate` instead of `pipeline run` to keep the iteration short. Full end-to-end run deferred to Chunk 6 Task 6.2.
+- Implementer noted: pre-create `mkdir -p .ralph/meditations` before `git mv meditations .ralph/meditations` caused nested `.ralph/meditations/meditations/`; corrected with extra git mvs. Net result identical to plan intent. Future big-bangs: skip the meditations subdir in the pre-mkdir.
+- Remaining: Chunk 6 (final verification + doc cleanup).
