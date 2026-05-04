@@ -24,10 +24,9 @@ Requires: Node.js >=18, [`claude` CLI](https://www.npmjs.com/package/@anthropic-
 ## Commands
 
 ```bash
-ralph implement <project-folder> [--max N] [--model <name>] [--scenarios <path>]
+ralph implement <project-folder> [--max N] [--scenarios <path>]
 ```
 Runs the agentic build loop. Claude iterates, commits, and pushes changes until done (or `N` iterations).
-`--model` overrides the LLM model for the session.
 
 `--scenarios <path>` enables an opt-in branch that authors operator-surface
 scenario tests in `<project>/<path>` after the implementer finishes, then

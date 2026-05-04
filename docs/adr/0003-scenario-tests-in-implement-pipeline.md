@@ -1,5 +1,7 @@
 # Scenario tests in the bundled implement pipeline
 
+**Status note (2026-05-04):** The `--model <name>` flag shown in this ADR's CLI synopses was removed on 2026-05-04; see `docs/superpowers/specs/2026-05-04-model-flag-dead-in-implement-pipeline-design.md`. Historical CLI synopses and `inputs=` examples below are preserved as dated artifacts and are NOT retro-edited.
+
 **Status:** accepted (2026-04-30)
 
 ## Context

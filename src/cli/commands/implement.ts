@@ -5,7 +5,6 @@ import * as output from "../lib/output.js";
 
 export interface ImplementOptions {
   max?: number;
-  model?: string;
   scenarios?: string;
 }
 
@@ -32,7 +31,6 @@ export async function implementCommand(
     variables: {
       scenarios_dir: options.scenarios ?? "",
       max_iterations: String(options.max ?? 0),
-      ...(options.model ? { llm_model: options.model } : {}),
     },
   });
 }
