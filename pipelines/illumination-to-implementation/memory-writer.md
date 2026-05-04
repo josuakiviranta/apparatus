@@ -46,7 +46,7 @@ Memory files are reference documents for future sessions. Keep them dense, scann
 
 # Procedure
 
-1. **Derive the memory filename.** Strip the date prefix from the plan filename to get the slug. Target path: `$project/memory/YYYY-MM-DD-<slug>.md` using today's date. Keeps the illumination → design → plan → memory naming chain 1:1.
+1. **Derive the memory filename.** Strip the date prefix from the plan filename to get the slug. Target path: `$project/.ralph/sessions/YYYY-MM-DD-<slug>.md` using today's date. Keeps the illumination → design → plan → memory naming chain 1:1.
 
 2. **Read the trace.** Open `~/.ralph/<projectKey>/runs/$run_id/pipeline.jsonl` (or pass the runId to `ralph pipeline trace`). It is a structured JSONL log of every node start/end, context update, and failure/retry during this run. Scan it for:
    - Node execution order and duration.
@@ -141,5 +141,5 @@ Memory files are reference documents for future sessions. Keep them dense, scann
 - The `Learnings from the run` section is **optional**. Only include when the trace reveals a real pattern. Padding dilutes the signal future memory-mining passes rely on.
 - Commit exactly **once** at the end of the node (or skip the commit if nothing is staged). Do not split into multiple commits. `implement` and `tmux-tester` already made per-chunk / per-fix commits earlier.
 - **Push is unconditional.** Prior session commits must reach `origin` even if this node staged nothing new.
-- No writes outside `$project/memory/` and git operations. Do not touch source code, specs, or pipelines from this node.
+- No writes outside `$project/.ralph/sessions/` and git operations. Do not touch source code, specs, or pipelines from this node.
 - Both lifecycle calls — `consume_plan` (step 7a) and `consume` (step 7b) — are **best-effort**. Never abort the node on `success: false` from either. Push (step 6) and the structured-JSON emit (step 8) are non-negotiable; both lifecycle calls in step 7 are opportunistic. A missing plan or illumination file (already consumed by a prior run) must not block finalization.
