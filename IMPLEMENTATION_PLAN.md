@@ -1,1105 +1,999 @@
-# `.ralph/` as Project-Local Home — Implementation Plan
+# Partial Revert of `.ralph/` — Implementation Plan
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Move every ralph-touchable artifact in a target project under a single `<project>/.ralph/` folder, ship a `ralph init` command that scaffolds it, and migrate ralph-cli's own repo to the new layout.
+**Goal:** Move `CONTEXT.md`, `VISION.md`, `docs/adr/` from `.ralph/` back to repo root; finish migrating root `pipelines/` (→ `.ralph/pipelines/` and `.ralph/scenarios/`) and root `memory/` (→ `.ralph/sessions/`) into `.ralph/`; rename `memoryDir`→`sessionsDir`; write ADR-0008 documenting the partition principle.
 
-**Architecture:** Centralize path constants in a new `src/cli/lib/ralph-paths.ts` module, port every path-using site (MCP server, run-state I/O in `pipeline.ts`, pipeline-resolver) to the new module, then `git mv` ralph-cli's own files into `.ralph/` atomically. Bundled pipelines stay in `src/cli/pipelines/`; project-local pipelines override at `<project>/.ralph/pipelines/`.
+**Architecture:** Seven staged commits. Each commit leaves the repo passing `npx tsc --noEmit`, `npx vitest run`, and the smoke-pipeline suite. Code edits land before file moves so tests can be updated atomically with the moves they cover. Pipeline-prompt edits land before the `memory/` `git mv` so the live `memory-writer` node never references the wrong path.
 
-**Tech Stack:** TypeScript, vitest, commander, tsup. No new runtime dependencies.
+**Tech Stack:** TypeScript, Vitest, tsup, ralph-cli's pipeline DSL (`.dot` + agent `.md`).
 
-**Spec:** `docs/superpowers/specs/2026-05-04-ralph-folder-as-project-local-home-design.md`
-**ADR:** `docs/adr/0007-ralph-folder-as-project-local-home.md` (will move to `.ralph/docs/adr/0007-...md` in Chunk 5)
+**Spec:** `docs/superpowers/specs/2026-05-04-ralph-folder-partial-revert-design.md`
+
+**Pre-flight requirement:** Read the spec end-to-end before starting. The §1.2 two-clause partition principle and §8 commit-ordering constraints are load-bearing.
 
 ---
 
-## Chunk 1: `ralph-paths.ts` module (new, no behavior change)
+## File structure plan
 
-This chunk introduces the central path module without touching any
-caller. After Chunk 1 lands, no production code yet *uses* the module —
-that wiring happens in Chunks 3–4. Chunk 1 is pure addition + tests, so
-the existing test suite continues to pass unmodified.
+| File | Status | Responsibility |
+|------|--------|---------------|
+| `src/cli/lib/ralph-paths.ts` | modified | Drop `docsAdrDir()`; rename `memoryDir()` → `sessionsDir()` returning `.ralph/sessions`. |
+| `src/cli/commands/init.ts` | modified | Scaffold `CONTEXT.md`, `VISION.md`, `docs/adr/` at repo root; scaffold `.ralph/sessions/` instead of `.ralph/memory/`. |
+| `src/cli/program.ts` | modified | Help-text edits at lines 95 and 194. |
+| `src/cli/tests/ralph-paths.test.ts` | modified | Drop `docsAdrDir` test; rename memory→sessions test. |
+| `src/cli/tests/init.test.ts` | modified | Flip path assertions to root for CONTEXT/VISION/docs-adr; expect `.ralph/sessions` instead of `.ralph/memory`. |
+| `src/tests/scenarios/ralph-init-scaffolds-tree.md` | modified | Flip path assertions. |
+| `src/tests/scenarios/ralph-init-idempotent.md` | modified | Flip path assertions. |
+| `src/attractor/tests/illumination-pipeline-flow.test.ts` | modified | Path constants → `.ralph/pipelines/illumination-to-implementation`. |
+| `src/attractor/tests/dual-parser.test.ts` | modified | `roots` array → `[".ralph/pipelines", ".ralph/scenarios"]`. |
+| `src/cli/tests/pipeline-smoke-*-folder.test.ts` (14 files) | modified | `REPO_ROOT/pipelines/smoke/` → `REPO_ROOT/.ralph/scenarios/`. |
+| `pipelines/illumination-to-implementation/memory-writer.md` | modified | Write target `$project/memory/` → `$project/.ralph/sessions/` at lines 49 + 144. |
+| `pipelines/illumination-to-implementation/verifier.md` | modified | Example string `.ralph/docs/adr/0007-…` → `docs/adr/0007-…` at line 83. |
+| `.ralph/CONTEXT.md` → `CONTEXT.md` | moved + rewritten | git mv + multi-section content rewrite. |
+| `.ralph/VISION.md` → `VISION.md` | moved + 2-line edit | git mv + lines 30, 32 edits. |
+| `.ralph/docs/adr/` → `docs/adr/` | moved | git mv. |
+| `pipelines/illumination-to-implementation/` → `.ralph/pipelines/illumination-to-implementation/` | moved | git mv (21 files). |
+| `pipelines/smoke/` → `.ralph/scenarios/` | moved | git mv (~40 files across 14 subdirs). |
+| `memory/` → `.ralph/sessions/` | moved | git mv (18 files). |
+| `.ralph/memory/` | removed | rmdir empty. |
+| `docs/adr/0008-partial-revert-of-ralph-folder.md` | created | New ADR documenting partition principle + supersession. |
+| `docs/adr/0007-ralph-folder-as-project-local-home.md` | modified | One-line footer pointing at ADR-0008. |
+| `README.md` | modified | Lines 14, 37, 61, 170-173, 184-198, 202. |
+| `AGENTS.md` | modified | Line 17. |
+| `IMPLEMENTATION_PLAN.md` | deleted | Stale. |
 
-### Task 1.1: Path-resolver module
+---
+
+## Chunk 1: Code edits — `ralph-paths.ts`, `init.ts`, `program.ts`, tests
+
+Goal: every code-level path constant reflects the partial-revert layout. No file moves yet. After this commit, `npx tsc --noEmit` and `npx vitest run src/cli/tests/ralph-paths.test.ts src/cli/tests/init.test.ts` pass; full vitest passes too because no file moves invalidate other tests yet (test fixtures and `.ralph/CONTEXT.md` still exist at their pre-revert locations).
 
 **Files:**
-- Create: `src/cli/lib/ralph-paths.ts`
-- Test: `src/cli/tests/ralph-paths.test.ts`
+- Modify: `src/cli/lib/ralph-paths.ts`
+- Modify: `src/cli/tests/ralph-paths.test.ts`
+- Modify: `src/cli/commands/init.ts`
+- Modify: `src/cli/tests/init.test.ts`
+- Modify: `src/tests/scenarios/ralph-init-scaffolds-tree.md`
+- Modify: `src/tests/scenarios/ralph-init-idempotent.md`
+- Modify: `src/cli/program.ts`
 
-- [x] **Step 1: Write the failing test**
+### Tasks
 
-```ts
-// src/cli/tests/ralph-paths.test.ts
-import { describe, it, expect } from "vitest";
-import {
-  ralphDir,
-  meditationsDir,
-  illuminationsDir,
-  stimuliDir,
-  memoryDir,
-  docsAdrDir,
-  pipelinesDir,
-  runsDir,
-  runDir,
-} from "../lib/ralph-paths";
+- [x] **1.1: Update `ralph-paths.ts` test first (TDD red).**
 
-describe("ralph-paths", () => {
-  const project = "/abs/project";
+Read current `src/cli/tests/ralph-paths.test.ts`. Replace the `memoryDir` test with the renamed `sessionsDir` test, and delete the `docsAdrDir` test entirely.
 
-  it("ralphDir joins project + .ralph", () => {
-    expect(ralphDir(project)).toBe("/abs/project/.ralph");
-  });
-  it("meditationsDir joins .ralph/meditations", () => {
-    expect(meditationsDir(project)).toBe("/abs/project/.ralph/meditations");
-  });
-  it("illuminationsDir joins .ralph/meditations/illuminations", () => {
-    expect(illuminationsDir(project)).toBe(
-      "/abs/project/.ralph/meditations/illuminations",
-    );
-  });
-  it("stimuliDir joins .ralph/meditations/stimuli", () => {
-    expect(stimuliDir(project)).toBe(
-      "/abs/project/.ralph/meditations/stimuli",
-    );
-  });
-  it("memoryDir joins .ralph/memory", () => {
-    expect(memoryDir(project)).toBe("/abs/project/.ralph/memory");
-  });
-  it("docsAdrDir joins .ralph/docs/adr", () => {
-    expect(docsAdrDir(project)).toBe("/abs/project/.ralph/docs/adr");
-  });
-  it("pipelinesDir joins .ralph/pipelines", () => {
-    expect(pipelinesDir(project)).toBe("/abs/project/.ralph/pipelines");
-  });
-  it("runsDir joins .ralph/runs", () => {
-    expect(runsDir(project)).toBe("/abs/project/.ralph/runs");
-  });
-  it("runDir joins .ralph/runs/<runId>", () => {
-    expect(runDir(project, "2026-05-04T12-00")).toBe(
-      "/abs/project/.ralph/runs/2026-05-04T12-00",
-    );
-  });
-  it("runDir composes from runsDir", () => {
-    const runId = "abc";
-    expect(runDir(project, runId).startsWith(runsDir(project))).toBe(true);
-  });
+```typescript
+// Remove: it("docsAdrDir joins .ralph/docs/adr", () => { ... });
+// Remove: import { docsAdrDir } from "../lib/ralph-paths.js";
+
+// Replace memoryDir test with:
+import { sessionsDir } from "../lib/ralph-paths.js";
+
+it("sessionsDir joins .ralph/sessions", () => {
+  expect(sessionsDir("/abs/project")).toBe("/abs/project/.ralph/sessions");
 });
 ```
 
-- [x] **Step 2: Run test to verify it fails**
+- [x] **1.2: Run the test to verify red.**
 
 Run: `npx vitest run src/cli/tests/ralph-paths.test.ts`
-Expected: FAIL with module-not-found error.
+Expected: FAIL — `sessionsDir` is not exported, `docsAdrDir` is.
 
-- [x] **Step 3: Write minimal implementation**
+- [x] **1.3: Update `ralph-paths.ts` (green).**
 
-```ts
-// src/cli/lib/ralph-paths.ts
-import { join } from "node:path";
+In `src/cli/lib/ralph-paths.ts`:
+- Delete the `docsAdrDir` export (lines ~24-26).
+- Rename the `memoryDir` export to `sessionsDir`, returning `<project>/.ralph/sessions`.
 
-export function ralphDir(projectRoot: string): string {
-  return join(projectRoot, ".ralph");
-}
-
-export function meditationsDir(projectRoot: string): string {
-  return join(ralphDir(projectRoot), "meditations");
-}
-
-export function illuminationsDir(projectRoot: string): string {
-  return join(meditationsDir(projectRoot), "illuminations");
-}
-
-export function stimuliDir(projectRoot: string): string {
-  return join(meditationsDir(projectRoot), "stimuli");
-}
-
+```typescript
+// Before:
 export function memoryDir(projectRoot: string): string {
-  return join(ralphDir(projectRoot), "memory");
+  return join(projectRoot, ".ralph", "memory");
 }
-
 export function docsAdrDir(projectRoot: string): string {
-  return join(ralphDir(projectRoot), "docs", "adr");
+  return join(projectRoot, ".ralph", "docs", "adr");
 }
 
-export function pipelinesDir(projectRoot: string): string {
-  return join(ralphDir(projectRoot), "pipelines");
-}
-
-export function runsDir(projectRoot: string): string {
-  return join(ralphDir(projectRoot), "runs");
-}
-
-export function runDir(projectRoot: string, runId: string): string {
-  return join(runsDir(projectRoot), runId);
+// After (docsAdrDir removed entirely):
+export function sessionsDir(projectRoot: string): string {
+  return join(projectRoot, ".ralph", "sessions");
 }
 ```
 
-- [x] **Step 4: Run test to verify it passes**
+- [x] **1.4: Run ralph-paths.test.ts (verify green).**
 
 Run: `npx vitest run src/cli/tests/ralph-paths.test.ts`
-Expected: 10 passing.
+Expected: PASS.
 
-- [x] **Step 5: Run full test suite to verify no regressions**
+- [x] **1.5: Run `npx tsc --noEmit` to find broken callers.**
 
-Run: `npx vitest run`
-Expected: Full suite green (pre-existing test count + 10 new).
+Expected: errors at every `import { memoryDir }` or `import { docsAdrDir }` site. Should be `init.ts` and `init.test.ts`.
 
-- [x] **Step 6: Commit**
+- [x] **1.6: Update `init.test.ts` first (TDD red — assertions flip).**
 
-```bash
-git add src/cli/lib/ralph-paths.ts src/cli/tests/ralph-paths.test.ts
-git commit -m "feat(lib): add ralph-paths module — central path resolver for .ralph/ tree
+Read current file (~85 lines). Update path assertions:
+- Line 32: `existsSync(join(projectDir, ".ralph/docs/adr"))` → `existsSync(join(projectDir, "docs/adr"))`.
+- Line 33: `existsSync(join(projectDir, ".ralph/VISION.md"))` → `existsSync(join(projectDir, "VISION.md"))`.
+- Line 34: `existsSync(join(projectDir, ".ralph/CONTEXT.md"))` → `existsSync(join(projectDir, "CONTEXT.md"))`.
+- Line 50, 52: `.ralph/VISION.md` → `VISION.md`.
+- Line 72-78: `.ralph/VISION.md` → `VISION.md`, `.ralph/CONTEXT.md` → `CONTEXT.md`.
+- Line 89: `.ralph/docs/adr` → `docs/adr`.
+- Add new assertion (after existing dir checks): `expect(existsSync(join(projectDir, ".ralph/sessions"))).toBe(true);`.
+- Replace any reference to `.ralph/memory` with `.ralph/sessions`.
 
-No callers yet; subsequent chunks port the in-tree path-string sites
-to use these helpers. Pure addition, no behavior change."
-```
-
----
-
-## Chunk 2: `ralph init` command (new, additive)
-
-`ralph init` scaffolds the `.ralph/` tree in-place. Idempotent. No
-overwrite. Optional `git init` if not already a repo. Appends
-`.ralph/runs/` to `.gitignore`.
-
-**Test prerequisite:** `git --version` must succeed in the test
-environment. The init command tolerates missing `git` (silently skips
-`git init`); the test that asserts `.git/` exists guards itself with a
-git availability check (Step 1 below) so it skips on environments
-without git instead of failing.
-
-### Task 2.1: Init command scaffold
-
-**Files:**
-- Create: `src/cli/commands/init.ts`
-- Test: `src/cli/tests/init.test.ts`
-- Modify: `src/cli/program.ts` (register the command + update top-level help-after examples)
-
-- [x] **Step 1: Write the failing test**
-
-```ts
-// src/cli/tests/init.test.ts
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { execSync } from "node:child_process";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { initCommand } from "../commands/init";
-
-function gitAvailable(): boolean {
-  try { execSync("git --version", { stdio: "ignore" }); return true; }
-  catch { return false; }
-}
-
-describe("ralph init", () => {
-  let projectDir: string;
-
-  beforeEach(() => {
-    projectDir = mkdtempSync(join(tmpdir(), "ralph-init-test-"));
-  });
-  afterEach(() => {
-    rmSync(projectDir, { recursive: true, force: true });
-  });
-
-  it("scaffolds the .ralph/ tree on a fresh directory", async () => {
-    await initCommand(projectDir);
-
-    expect(existsSync(join(projectDir, ".ralph"))).toBe(true);
-    expect(existsSync(join(projectDir, ".ralph/pipelines"))).toBe(true);
-    expect(existsSync(join(projectDir, ".ralph/meditations/illuminations"))).toBe(true);
-    expect(existsSync(join(projectDir, ".ralph/meditations/stimuli"))).toBe(true);
-    expect(existsSync(join(projectDir, ".ralph/memory"))).toBe(true);
-    expect(existsSync(join(projectDir, ".ralph/docs/adr"))).toBe(true);
-    expect(existsSync(join(projectDir, ".ralph/VISION.md"))).toBe(true);
-    expect(existsSync(join(projectDir, ".ralph/CONTEXT.md"))).toBe(true);
-  });
-
-  it("scaffolds README.md at root if absent", async () => {
-    await initCommand(projectDir);
-    expect(existsSync(join(projectDir, "README.md"))).toBe(true);
-  });
-
-  it("does not overwrite an existing README.md", async () => {
-    writeFileSync(join(projectDir, "README.md"), "existing content");
-    await initCommand(projectDir);
-    expect(readFileSync(join(projectDir, "README.md"), "utf8")).toBe("existing content");
-  });
-
-  it("does not overwrite an existing VISION.md", async () => {
-    mkdirSync(join(projectDir, ".ralph"), { recursive: true });
-    writeFileSync(join(projectDir, ".ralph/VISION.md"), "my vision");
-    await initCommand(projectDir);
-    expect(readFileSync(join(projectDir, ".ralph/VISION.md"), "utf8")).toBe("my vision");
-  });
-
-  it("appends .ralph/runs/ to .gitignore (creating the file if absent)", async () => {
-    await initCommand(projectDir);
-    const gitignore = readFileSync(join(projectDir, ".gitignore"), "utf8");
-    expect(gitignore).toContain(".ralph/runs/");
-  });
-
-  it("does not duplicate the .ralph/runs/ line on second invocation", async () => {
-    await initCommand(projectDir);
-    await initCommand(projectDir);
-    const gitignore = readFileSync(join(projectDir, ".gitignore"), "utf8");
-    const matches = gitignore.match(/^\.ralph\/runs\/$/gm) ?? [];
-    expect(matches.length).toBe(1);
-  });
-
-  it("is idempotent — running twice yields the same tree", async () => {
-    await initCommand(projectDir);
-    const firstSnapshot = JSON.stringify({
-      vision: readFileSync(join(projectDir, ".ralph/VISION.md"), "utf8"),
-      context: readFileSync(join(projectDir, ".ralph/CONTEXT.md"), "utf8"),
-    });
-    await initCommand(projectDir);
-    const secondSnapshot = JSON.stringify({
-      vision: readFileSync(join(projectDir, ".ralph/VISION.md"), "utf8"),
-      context: readFileSync(join(projectDir, ".ralph/CONTEXT.md"), "utf8"),
-    });
-    expect(secondSnapshot).toBe(firstSnapshot);
-  });
-
-  it("fills in missing subfolders on a partial existing .ralph/", async () => {
-    mkdirSync(join(projectDir, ".ralph/pipelines"), { recursive: true });
-    // .ralph/ exists with only pipelines/; meditations/, memory/, docs/ are missing
-    await initCommand(projectDir);
-    expect(existsSync(join(projectDir, ".ralph/meditations/illuminations"))).toBe(true);
-    expect(existsSync(join(projectDir, ".ralph/memory"))).toBe(true);
-    expect(existsSync(join(projectDir, ".ralph/docs/adr"))).toBe(true);
-  });
-
-  it.skipIf(!gitAvailable())("runs git init if the directory is not a repo", async () => {
-    await initCommand(projectDir);
-    expect(existsSync(join(projectDir, ".git"))).toBe(true);
-  });
-
-  it("does not re-init an existing git repo", async () => {
-    mkdirSync(join(projectDir, ".git"), { recursive: true });
-    writeFileSync(join(projectDir, ".git/sentinel"), "marker");
-    await initCommand(projectDir);
-    expect(readFileSync(join(projectDir, ".git/sentinel"), "utf8")).toBe("marker");
-  });
-});
-```
-
-- [x] **Step 2: Run test to verify it fails**
+- [x] **1.7: Run init.test.ts to verify red.**
 
 Run: `npx vitest run src/cli/tests/init.test.ts`
-Expected: FAIL with module-not-found.
+Expected: FAIL — `init.ts` still scaffolds the old layout.
 
-- [x] **Step 3: Write minimal implementation**
+- [x] **1.8: Update `init.ts` (green).**
 
-```ts
-// src/cli/commands/init.ts
-import { mkdirSync, writeFileSync, existsSync, readFileSync, appendFileSync } from "node:fs";
-import { execSync } from "node:child_process";
+Read current `src/cli/commands/init.ts` (~80 lines). Apply edits:
+
+- Line 9-10: imports — drop `docsAdrDir`, replace `memoryDir` with `sessionsDir`.
+
+```typescript
+// Before:
 import {
-  ralphDir,
-  pipelinesDir,
-  illuminationsDir,
-  stimuliDir,
-  memoryDir,
-  docsAdrDir,
+  ralphDir, meditationsDir, illuminationsDir, stimuliDir,
+  memoryDir, docsAdrDir, pipelinesDir,
 } from "../lib/ralph-paths.js";
-import { join } from "node:path";
 
-export async function initCommand(projectRoot: string): Promise<void> {
-  const dirs = [
-    ralphDir(projectRoot),
-    pipelinesDir(projectRoot),
-    illuminationsDir(projectRoot),
-    stimuliDir(projectRoot),
-    memoryDir(projectRoot),
-    docsAdrDir(projectRoot),
-  ];
-  for (const d of dirs) {
-    mkdirSync(d, { recursive: true });
-  }
-
-  const visionPath = join(ralphDir(projectRoot), "VISION.md");
-  if (!existsSync(visionPath)) {
-    writeFileSync(visionPath, "# Vision\n\n_Describe what this project is and why it exists._\n");
-  }
-
-  const contextPath = join(ralphDir(projectRoot), "CONTEXT.md");
-  if (!existsSync(contextPath)) {
-    writeFileSync(contextPath, "# Domain Language\n\n## Glossary\n\n_Define the terms specific to this project's domain._\n");
-  }
-
-  const readmePath = join(projectRoot, "README.md");
-  if (!existsSync(readmePath)) {
-    writeFileSync(readmePath, "# Project\n\n_Top-level entry point for human readers._\n");
-  }
-
-  appendGitignoreLine(projectRoot, ".ralph/runs/");
-
-  if (!existsSync(join(projectRoot, ".git"))) {
-    try {
-      execSync(`git -C "${projectRoot}" init -b main`, { stdio: "ignore" });
-    } catch {
-      // git unavailable — non-fatal; user can run git init manually
-    }
-  }
-}
-
-function appendGitignoreLine(projectRoot: string, line: string): void {
-  const path = join(projectRoot, ".gitignore");
-  const existing = existsSync(path) ? readFileSync(path, "utf8") : "";
-  // Match against trimmed-whole-line equality. This intentionally does NOT
-  // dedupe near-variants like "/.ralph/runs/" or ".ralph/runs" (no trailing
-  // slash) — those are distinct gitignore patterns; user owns reconciliation.
-  const already = existing.split("\n").some((l) => l.trim() === line);
-  if (already) return;
-  const sep = existing.length > 0 && !existing.endsWith("\n") ? "\n" : "";
-  appendFileSync(path, `${sep}${line}\n`);
-}
+// After:
+import {
+  ralphDir, meditationsDir, illuminationsDir, stimuliDir,
+  sessionsDir, pipelinesDir,
+} from "../lib/ralph-paths.js";
 ```
 
-- [x] **Step 4: Run test to verify it passes**
+- Lines 15-21 (the dirs array): drop `docsAdrDir(projectRoot)`, replace `memoryDir(projectRoot)` with `sessionsDir(projectRoot)`. Add a new entry for the root `docs/adr/` dir.
+
+```typescript
+// New dirs array shape (preserve existing entries; just swap the listed ones):
+const dirs = [
+  ralphDir(projectRoot),
+  pipelinesDir(projectRoot),
+  meditationsDir(projectRoot),
+  illuminationsDir(projectRoot),
+  stimuliDir(projectRoot),
+  sessionsDir(projectRoot),               // was memoryDir
+  join(projectRoot, "docs", "adr"),       // was docsAdrDir(projectRoot) but at root
+];
+```
+
+- Lines 27-32: `writeFileSync` calls for `CONTEXT.md`, `VISION.md`, `README.md`. Update target paths so `CONTEXT.md` and `VISION.md` write to `projectRoot` (not `ralphDir(projectRoot)`).
+
+```typescript
+// Before:
+const visionPath = join(ralphDir(projectRoot), "VISION.md");
+const contextPath = join(ralphDir(projectRoot), "CONTEXT.md");
+
+// After:
+const visionPath = join(projectRoot, "VISION.md");
+const contextPath = join(projectRoot, "CONTEXT.md");
+```
+
+- [x] **1.9: Run init.test.ts (verify green).**
 
 Run: `npx vitest run src/cli/tests/init.test.ts`
-Expected: 10 passing (or 9 + 1 skipped if no git).
+Expected: PASS.
 
-- [x] **Step 5: Register the command in program.ts**
+- [x] **1.10a: Update `src/tests/scenarios/ralph-init-scaffolds-tree.md`.**
 
-Modify `src/cli/program.ts`:
+Read the file. Then edit lines 16-18:
+```
+- directory `init-smoke/.ralph/docs/adr` exists      → `init-smoke/docs/adr`
+- file `init-smoke/.ralph/VISION.md` exists ...       → `init-smoke/VISION.md`
+- file `init-smoke/.ralph/CONTEXT.md` exists ...      → `init-smoke/CONTEXT.md`
+```
+Add a new assertion line under the existing dir checks: `- directory init-smoke/.ralph/sessions exists`.
 
-1. Add near the top with other imports: `import { initCommand } from "./commands/init";`
+- [x] **1.10b: Update `src/tests/scenarios/ralph-init-idempotent.md`.**
 
-2. After the existing `program.command("implement ...")` block (around line 76-85), add:
+Read the file. Then flip lines 7-8 and 16-17: `idem-smoke/.ralph/VISION.md` → `idem-smoke/VISION.md`; same for `CONTEXT.md`. Run `git diff src/tests/scenarios/ralph-init-idempotent.md` after to verify.
 
-   ```ts
-   program
-     .command("init [project-folder]")
-     .description("Scaffold .ralph/ tree in the project folder (defaults to cwd). Idempotent.")
-     .addHelpText("after", "\nExamples:\n  ralph init             # in cwd\n  ralph init my-app      # in ./my-app\n\nCreates .ralph/{pipelines,meditations,memory,docs/adr,runs}, scaffolds empty\nVISION.md and CONTEXT.md, runs 'git init -b main' if not already a repo, and\nappends .ralph/runs/ to .gitignore. Safe to run on existing projects — never\noverwrites files.\n")
-     .action(async (projectFolder?: string) => {
-       await initCommand(projectFolder ?? process.cwd());
-     });
-   ```
+- [x] **1.11: Update `program.ts` line 95 (init `addHelpText`).**
 
-3. In the top-level `program.addHelpText("after", ...)` block (around lines 22-74), add a new "Bootstrap a project" stanza near the top:
+Exact before (one long line in the file):
 
-   ```
-   Bootstrap a project:
-     mkdir my-app && cd my-app && ralph init    Scaffold a fresh ralph project
-     ralph init                                  Initialize cwd as a ralph project
-   ```
+```typescript
+.addHelpText("after", "\nExamples:\n  ralph init             # in cwd\n  ralph init my-app      # in ./my-app\n\nCreates .ralph/{pipelines,meditations,memory,docs/adr,runs}, scaffolds empty\nVISION.md and CONTEXT.md, runs 'git init -b main' if not already a repo, and\nappends .ralph/runs/ to .gitignore. Safe to run on existing projects — never\noverwrites files.\n")
+```
 
-- [x] **Step 6: Run full test suite + check cli-commands test**
+Exact after:
 
-Run: `npx vitest run`
-Expected: full suite green. Open `src/cli/tests/cli-commands.test.ts` — if it enumerates registered commands, add `init` to the expected list.
+```typescript
+.addHelpText("after", "\nExamples:\n  ralph init             # in cwd\n  ralph init my-app      # in ./my-app\n\nCreates .ralph/{pipelines,meditations/{illuminations,stimuli},sessions,runs}\nplus root docs/adr/, scaffolds empty CONTEXT.md, VISION.md, README.md at\nrepo root, runs 'git init -b main' if not already a repo, and appends\n.ralph/runs/ to .gitignore. Safe to run on existing projects — never\noverwrites files.\n")
+```
 
-- [x] **Step 7: Build + smoke**
+- [x] **1.12: Update `program.ts` line 194 (pipeline-show example).**
+
+Verify line 194 contains `ralph pipeline show pipelines/illumination-to-implementation/pipeline.dot` (in an `addHelpText` block). Replace `pipelines/` with `.ralph/pipelines/`:
+
+```
+ralph pipeline show pipelines/illumination-to-implementation/pipeline.dot
+   ↓
+ralph pipeline show .ralph/pipelines/illumination-to-implementation/pipeline.dot
+```
+
+- [x] **1.13: Run full vitest + tsc.**
+
+Run: `npx tsc --noEmit && npx vitest run`
+Expected: PASS. Note: tests reading or writing the live `.ralph/CONTEXT.md` etc. don't exist; init tests use temp dirs.
+
+- [x] **1.14: Commit.**
+
+```bash
+git add src/cli/lib/ralph-paths.ts src/cli/tests/ralph-paths.test.ts \
+        src/cli/commands/init.ts src/cli/tests/init.test.ts \
+        src/tests/scenarios/ralph-init-scaffolds-tree.md \
+        src/tests/scenarios/ralph-init-idempotent.md \
+        src/cli/program.ts
+git commit -m "refactor: revert CONTEXT/VISION/docs-adr scaffold to repo root
+
+memoryDir → sessionsDir; docsAdrDir deleted. ralph init now
+scaffolds CONTEXT.md, VISION.md, docs/adr/ at repo root and
+.ralph/sessions/ for memory-writer output."
+```
+
+---
+
+## Chunk 2: Pipeline-prompt edits — `memory-writer.md`, `verifier.md`
+
+Goal: the `memory-writer` pipeline node, when next invoked, writes to `.ralph/sessions/` instead of root `memory/`. Verifier example string flips. These edits land **before** any `git mv` of the live `memory/` directory so the prompt and the directory layout never disagree.
+
+**Files:**
+- Modify: `pipelines/illumination-to-implementation/memory-writer.md`
+- Modify: `pipelines/illumination-to-implementation/verifier.md`
+
+### Tasks
+
+- [ ] **2.1: Update `memory-writer.md` line 49 (write-target path).**
+
+```
+$project/memory/YYYY-MM-DD-<slug>.md
+   ↓
+$project/.ralph/sessions/YYYY-MM-DD-<slug>.md
+```
+
+- [ ] **2.2: Update `memory-writer.md` line 144 (no-writes-outside guard).**
+
+```
+No writes outside $project/memory/
+   ↓
+No writes outside $project/.ralph/sessions/
+```
+
+- [ ] **2.3: Verify no other `memory/` references in `memory-writer.md`.**
+
+Run: `grep -n "memory/" pipelines/illumination-to-implementation/memory-writer.md`
+Expected: zero hits, or only hits inside `.ralph/sessions/` paths.
+
+- [ ] **2.4: Update `verifier.md` line 83 example string.**
+
+```
+"ADR subagent confirmed the resume contract at `.ralph/docs/adr/0007-…`"
+   ↓
+"ADR subagent confirmed the resume contract at `docs/adr/0007-…`"
+```
+
+- [ ] **2.5: Sanity-read both prompts end-to-end.**
+
+The narrative around the edited lines must remain coherent. Specifically: in `verifier.md`, line 83 sits inside a longer explanation of attribution; the edit must not break sentence flow.
+
+- [ ] **2.6: Commit.**
+
+```bash
+git add pipelines/illumination-to-implementation/memory-writer.md \
+        pipelines/illumination-to-implementation/verifier.md
+git commit -m "refactor(pipelines): memory-writer writes to .ralph/sessions/
+
+memory-writer.md target path: \$project/memory/ → \$project/.ralph/sessions/.
+verifier.md example string: .ralph/docs/adr/ → docs/adr/.
+Edits land before the corresponding git mv so the live pipeline
+node never references a missing path."
+```
+
+---
+
+## Chunk 3: Move third-party convention files back to root
+
+Goal: `CONTEXT.md`, `VISION.md`, `docs/adr/` return to repo root. AGENTS.md reference flips. After this commit, third-party skills that hard-code root paths land correctly.
+
+**Files (moved):**
+- `git mv .ralph/CONTEXT.md CONTEXT.md`
+- `git mv .ralph/VISION.md VISION.md`
+- `git mv .ralph/docs/adr docs/adr` (note: this preserves the `docs/` directory at root since `docs/superpowers/` and `docs/harness/` already live there)
+
+**Files (modified):**
+- `AGENTS.md`
+
+### Tasks
+
+- [ ] **3.1: Verify `docs/` directory at root currently has only `superpowers/` and `harness/`.**
+
+Run: `ls /Users/josu/Documents/projects/ralph-cli/docs/`
+Expected: `harness  superpowers` (no `adr` yet).
+
+- [ ] **3.2: `git mv .ralph/CONTEXT.md CONTEXT.md`.**
+
+```bash
+git mv .ralph/CONTEXT.md CONTEXT.md
+```
+
+- [ ] **3.3: `git mv .ralph/VISION.md VISION.md`.**
+
+```bash
+git mv .ralph/VISION.md VISION.md
+```
+
+- [ ] **3.4: `git mv .ralph/docs/adr docs/adr`.**
+
+```bash
+git mv .ralph/docs/adr docs/adr
+```
+
+- [ ] **3.5: Verify `.ralph/docs/` is empty after the move; remove if so.**
+
+```bash
+ls .ralph/docs/         # expected: empty
+rmdir .ralph/docs       # safe; only removes if empty
+```
+
+- [ ] **3.6: Update `AGENTS.md` line 17.**
+
+```
+.ralph/docs/adr/0001-...
+   ↓
+docs/adr/0001-...
+```
+
+- [ ] **3.7: Local grep sweep — third-party convention paths gone from `.ralph/`.**
+
+```bash
+grep -rn '\.ralph/CONTEXT\.md\|\.ralph/VISION\.md\|\.ralph/docs/adr' \
+  src/ pipelines/ AGENTS.md README.md \
+  --exclude-dir=node_modules --exclude-dir=dist 2>/dev/null
+```
+Expected: hits only in README.md (chunk 5 will fix) and `pipelines/illumination-to-implementation/verifier.md` if not already touched (chunk 2 fixed it). No hits under `src/`. AGENTS.md:17 should already be flipped by step 3.6.
+
+- [ ] **3.8: Run full test suite + tsc.**
+
+Run: `npx tsc --noEmit && npx vitest run`
+Expected: PASS. Tests don't reference ralph-cli's own CONTEXT.md/VISION.md/ADR files (init tests use temp dirs); the move is invisible to runtime code.
+
+- [ ] **3.9: Verify ADR file count.**
+
+Run: `ls docs/adr/ | wc -l`
+Expected: `7` (ADR-0001 through ADR-0007).
+
+- [ ] **3.10: Commit.**
+
+```bash
+git add CONTEXT.md VISION.md docs/adr/ AGENTS.md
+git add -u .ralph/CONTEXT.md .ralph/VISION.md .ralph/docs   # tracks the moved-from sources
+git status                                                  # confirm renames recognised, no stray files
+git commit -m "refactor: revert CONTEXT.md, VISION.md, docs/adr/ to repo root
+
+Third-party conventions (DDD glossary, MADR ADRs, generic project
+docs) belong at repo root where the wider ecosystem expects them.
+ADR-0007 had over-claimed these into .ralph/; ADR-0008 (next chunk)
+documents the partition principle.
+
+AGENTS.md:17 reference flipped."
+```
+
+---
+
+## Chunk 4: Move ralph-defined dirs into `.ralph/`
+
+Goal: complete ADR-0007's incomplete migration. Root `pipelines/illumination-to-implementation/` → `.ralph/pipelines/`; root `pipelines/smoke/` → `.ralph/scenarios/`; root `memory/` → `.ralph/sessions/`. Test path constants update atomically with the moves.
+
+**Files (moved):**
+- `git mv pipelines/illumination-to-implementation .ralph/pipelines/illumination-to-implementation`
+- `git mv pipelines/smoke .ralph/scenarios`
+- `git mv memory .ralph/sessions`
+
+**Files (modified):**
+- `src/attractor/tests/illumination-pipeline-flow.test.ts`
+- `src/attractor/tests/dual-parser.test.ts`
+- `src/cli/tests/pipeline-smoke-conditional-folder.test.ts`
+- `src/cli/tests/pipeline-smoke-chat-only-folder.test.ts`
+- `src/cli/tests/pipeline-smoke-missing-caller-var-folder.test.ts`
+- `src/cli/tests/pipeline-smoke-tool-folder.test.ts`
+- `src/cli/tests/pipeline-smoke-agent-json-vars-folder.test.ts`
+- `src/cli/tests/pipeline-smoke-chat-end-to-end-folder.test.ts`
+- `src/cli/tests/pipeline-smoke-tool-runtime-vars-folder.test.ts`
+- `src/cli/tests/pipeline-smoke-store-folder.test.ts`
+- `src/cli/tests/pipeline-smoke-gate-folder.test.ts`
+- `src/cli/tests/pipeline-smoke-tmux-tester-folder.test.ts`
+- `src/cli/tests/pipeline-smoke-meditate-steer-folder.test.ts`
+- `src/cli/tests/pipeline-smoke-json-schema-stream-folder.test.ts`
+- `src/cli/tests/pipeline-smoke-static-multi-node-folder.test.ts`
+- `src/cli/tests/pipeline-smoke-agent-implement-folder.test.ts`
+
+### Tasks
+
+- [ ] **4.1: `git mv pipelines/illumination-to-implementation/ .ralph/pipelines/illumination-to-implementation/`.**
+
+```bash
+mkdir -p .ralph/pipelines
+git mv pipelines/illumination-to-implementation .ralph/pipelines/illumination-to-implementation
+```
+
+- [ ] **4.2: `git mv pipelines/smoke/ .ralph/scenarios/`.**
+
+```bash
+git mv pipelines/smoke .ralph/scenarios
+```
+
+- [ ] **4.3: Verify root `pipelines/` is empty; remove if so.**
+
+```bash
+ls pipelines/         # expected: empty
+rmdir pipelines       # safe; only removes if empty
+```
+
+- [ ] **4.4: `git mv memory/ .ralph/sessions/`.**
+
+Note: `.ralph/sessions/` doesn't exist yet (created lazily by chunk 1's `init.ts` only when `ralph init` runs). Need to ensure target parent exists.
+
+```bash
+git mv memory .ralph/sessions
+```
+
+If `git mv` complains about `.ralph/sessions` not existing as a parent: that's expected since `.ralph/` exists but `.ralph/sessions/` does not. The `git mv <src> <dest>` form treats `<dest>` as the new name. Verify with `ls .ralph/sessions/` after — should contain 18 .md files.
+
+- [ ] **4.5: Remove empty `.ralph/memory/` if it exists.**
+
+```bash
+ls .ralph/memory/    # expected: empty (chunk 1 made init.ts not create it, but for ralph-cli's own .ralph/ the dir was created by past ralph init)
+rmdir .ralph/memory  # safe
+```
+
+- [ ] **4.6: Update `illumination-pipeline-flow.test.ts:8-9`.**
+
+```typescript
+// Before:
+const dotPath = resolve(root, "pipelines/illumination-to-implementation/pipeline.dot");
+const dotDir = resolve(root, "pipelines/illumination-to-implementation");
+
+// After:
+const dotPath = resolve(root, ".ralph/pipelines/illumination-to-implementation/pipeline.dot");
+const dotDir = resolve(root, ".ralph/pipelines/illumination-to-implementation");
+```
+
+- [ ] **4.7: Update `dual-parser.test.ts:16`.**
+
+```typescript
+// Before:
+const roots = ["pipelines", "pipelines/smoke"];
+
+// After:
+const roots = [".ralph/pipelines", ".ralph/scenarios"];
+```
+
+- [ ] **4.8: Update each of the 14 `pipeline-smoke-*-folder.test.ts` files — ~4 edit sites per file.**
+
+**Important:** each file has FOUR substitutions, not one. Sample structure (from `pipeline-smoke-tool-folder.test.ts`, similar across all 14):
+
+```typescript
+// Line 8  — describe(...) string with literal path:
+describe("pipelines/smoke/tool/ — chunk-4 per-folder migration", () => {
+
+// Line 9  — it(...) string with literal path:
+  it("pipeline.dot exists at <repo>/pipelines/smoke/tool/pipeline.dot", () => {
+
+// Line 10 — join(...) array form:
+    const expected = join(REPO_ROOT, "pipelines", "smoke", "tool", "pipeline.dot");
+
+// Line 15 — second join(...) call inside a different `it` block:
+    const dotPath = join(REPO_ROOT, "pipelines", "smoke", "tool", "pipeline.dot");
+```
+
+Replacements (apply all four to each file; `<subdir>` is the per-file directory name like `tool`, `conditional`, `chat-only`, etc.):
+
+```typescript
+// describe + it strings:
+"pipelines/smoke/<subdir>/" → ".ralph/scenarios/<subdir>/"
+"<repo>/pipelines/smoke/<subdir>/pipeline.dot" → "<repo>/.ralph/scenarios/<subdir>/pipeline.dot"
+
+// join(...) array forms (both occurrences per file):
+join(REPO_ROOT, "pipelines", "smoke", "<subdir>", ...)
+   → join(REPO_ROOT, ".ralph", "scenarios", "<subdir>", ...)
+```
+
+Process: for each of the 14 files, read the file once, list the line numbers containing `pipelines` `smoke` (string-literal or array-arg), apply substitutions, save. The 14 files (subdir per file is the trailing token before `-folder.test.ts`):
+
+`conditional`, `chat-only`, `missing-caller-var`, `tool`, `agent-json-vars`, `chat-end-to-end`, `tool-runtime-vars`, `store`, `gate`, `tmux-tester`, `meditate-steer`, `json-schema-stream`, `static-multi-node`, `agent-implement`.
+
+After all 14 files updated, verify:
+
+```bash
+grep -rn 'pipelines/smoke\|"pipelines",\s*"smoke"' src/cli/tests/ src/attractor/tests/
+```
+Expected: zero hits. (Pattern catches both string-literal forms and array-arg forms.)
+
+- [ ] **4.9: Run all four kinds of tests.**
+
+```bash
+npx vitest run src/attractor/tests/illumination-pipeline-flow.test.ts
+npx vitest run src/attractor/tests/dual-parser.test.ts
+npx vitest run src/cli/tests/pipeline-smoke-
+npx vitest run    # full suite
+```
+
+Expected: all PASS.
+
+- [ ] **4.10: Run smoke verification of pipeline list.**
+
+```bash
+npx ralph pipeline list .
+```
+
+Expected: `illumination-to-implementation` appears; nothing under `.ralph/scenarios/` is listed (subdirs invisible to top-level scan, per spec §3.3).
+
+- [ ] **4.11: Commit.**
+
+```bash
+git add .ralph/ src/attractor/tests/illumination-pipeline-flow.test.ts \
+        src/attractor/tests/dual-parser.test.ts \
+        src/cli/tests/pipeline-smoke-*-folder.test.ts \
+        pipelines/ memory/    # the moved-from sources
+git status              # confirm move-pairs are tracked as renames
+git commit -m "refactor: complete .ralph/ migration of ralph-defined artefacts
+
+- pipelines/illumination-to-implementation → .ralph/pipelines/...
+- pipelines/smoke → .ralph/scenarios (renamed: smoke fixtures are
+  test scenarios, not production pipelines; commingling them under
+  .ralph/pipelines would pollute pipeline list).
+- memory → .ralph/sessions (renamed: 'memory' is overloaded across
+  Claude auto-memory, ADR-0007's empty slot, and session-closure
+  files; sessions describes what the dir holds).
+- Drop empty .ralph/memory/.
+
+Test path constants for 14 smoke-folder tests, illumination-flow
+test, and dual-parser test updated atomically with the moves."
+```
+
+---
+
+## Chunk 5: Doc updates — `README.md`, `CONTEXT.md`, `VISION.md`
+
+Goal: README reflects the partial-revert layout. CONTEXT.md (now at root) is rewritten to document the partition principle, the new `.ralph/sessions/` and `.ralph/scenarios/` slots, and the split "Harness scenario" / "Smoke-pipeline scenario" glossary entries. VISION.md narrative updates to describe the partition.
+
+**Files:**
+- Modify: `README.md`
+- Modify: `CONTEXT.md`
+- Modify: `VISION.md`
+
+### Tasks
+
+- [ ] **5.1: Update `README.md` line 14 (init description).**
+
+```
+Before:
+`ralph init` is idempotent. It creates `.ralph/{pipelines,meditations/{illuminations,stimuli},memory,docs/adr}`, scaffolds empty `VISION.md` and `CONTEXT.md`, ...
+
+After:
+`ralph init` is idempotent. It creates `.ralph/{pipelines,meditations/{illuminations,stimuli},sessions,runs}` plus root `docs/adr/`, scaffolds empty `VISION.md`, `CONTEXT.md`, and `README.md` at repo root, ...
+```
+
+- [ ] **5.2: Update `README.md` line 37.**
+
+```
+documented in `.ralph/CONTEXT.md` and `.ralph/docs/adr/0003-...`
+   ↓
+documented in `CONTEXT.md` and `docs/adr/0003-...`
+```
+
+- [ ] **5.3: Update `README.md` line 61.**
+
+```
+See `.ralph/docs/adr/0002-...`
+   ↓
+See `docs/adr/0002-...`
+```
+
+- [ ] **5.4: Update `README.md` lines 170-173 ("Where to look" section).**
+
+```
+- **`.ralph/CONTEXT.md`** — domain language and glossary
+- **`.ralph/docs/adr/`** — decision records
+   ↓
+- **`CONTEXT.md`** — domain language and glossary
+- **`docs/adr/`** — decision records (why things are the way they are)
+```
+
+- [ ] **5.5: Delete `README.md` lines 184-198 (migration recipe).**
+
+The "Migrating an existing ralph project to the .ralph/ layout" section described migrating *into* the ADR-0007 layout that this revert undoes. No projects need it; deletion is cleaner than rewriting. Delete the section header (line 184) through the post-recipe paragraph (line 198 — the "~/.ralph/<projectKey>/runs/" inert-dir note).
+
+- [ ] **5.6: Update `README.md` line 202.**
+
+```
+See [`.ralph/docs/adr/`](.ralph/docs/adr/) for accepted decision records.
+   ↓
+See [`docs/adr/`](docs/adr/) for accepted decision records.
+```
+
+- [ ] **5.7: Multi-section rewrite of `CONTEXT.md` (now at repo root).**
+
+Read the file end-to-end first. Then apply:
+
+(a) **Layout diagram** (~lines 26-34). Update the `.ralph/` tree:
+```
+.ralph/
+├── pipelines/
+├── meditations/
+│   ├── illuminations/
+│   └── stimuli/
+├── sessions/                ← was memory
+├── scenarios/               ← new (smoke-pipeline fixtures)
+└── runs/
+```
+And add a sibling note: `<repo root>/CONTEXT.md, VISION.md, docs/adr/, README.md` — pre-existing project-doc conventions.
+
+(b) **Inline self-references** to flip (lines listed):
+- Line 15: `.ralph/docs/adr/0001-...` → `docs/adr/0001-...`
+- Line 40: `.ralph/docs/adr/0007-...` → `docs/adr/0007-...`
+- Line 70: `.ralph/docs/adr/0002-...` → `docs/adr/0002-...`
+- Line 136: `.ralph/docs/adr/` → `docs/adr/`
+- Line 145: `.ralph/docs/adr/0004-...` → `docs/adr/0004-...`
+- Line 148: `.ralph/CONTEXT.md` → `CONTEXT.md`; `.ralph/docs/adr/` → `docs/adr/`
+
+**Do NOT flip** lines pointing at `.ralph/meditations/illuminations/` (lines 23, 46, 65, 72), `.ralph/pipelines/` (lines 23, 34), or `~/.ralph/agents/` (lines 17, 20). Those stay.
+
+(c) **Glossary split.** The existing "Scenario test" entry defines scenarios as harness fixtures. Split into:
+- **"Harness scenario"** — operator-surface markdown driven by tmux-tester; lives at `src/tests/scenarios/`. Cross-ref: see "Smoke-pipeline scenario."
+- **"Smoke-pipeline scenario"** — pipeline-engine test fixture (`.dot` + agent `.md` with ralph-specific frontmatter); lives at `.ralph/scenarios/`; consumed by `pipeline-smoke-*-folder.test.ts`. Cross-ref: see "Harness scenario."
+
+(d) **New glossary entries.**
+- **"Session-closure file"** — markdown narrative written by the `memory-writer` pipeline node at the end of each illumination-implementation session; lives at `.ralph/sessions/<date>-<slug>.md`. Replaces the prior loose use of "session memory."
+- **"Project-local artefact"** — file or directory matching the §1.2 two-clause rule (ralph-defined AND no pre-existing root convention); belongs in `<project>/.ralph/`. Cross-ref ADR-0007 + ADR-0008.
+
+(e) **ADR supersession footer.**
+At end of file (or natural section break): "ADR-0007 (`.ralph/` as project-local home) is partly superseded by ADR-0008 (partial revert + partition principle). See `docs/adr/0008-partial-revert-of-ralph-folder.md`."
+
+- [ ] **5.8: Update `VISION.md` line 30 + line 32 (post-`git mv`, now at repo root).**
+
+Line 30 narrative: replace the sentence that says `.ralph/` is "the single home for everything ralph-touchable in the project: pipelines, meditations …, memory, ADRs, CONTEXT.md, VISION.md, run state" with:
+
+> A target project declares itself ralph-shaped by having a `.ralph/` folder. That folder holds ralph-defined project-local artefacts: pipelines, meditations (illuminations + stimuli), sessions (closure files written by `memory-writer`), scenarios (smoke-pipeline test fixtures), and run state. Project-doc conventions owned by the wider ecosystem — `CONTEXT.md`, `VISION.md`, `docs/adr/`, `README.md` — stay at repo root where humans, IDE doc-outliners, and third-party tooling expect them.
+
+Line 32:
+```
+See `.ralph/docs/adr/0007-ralph-folder-as-project-local-home.md` for the full layout.
+   ↓
+See `docs/adr/0007-ralph-folder-as-project-local-home.md` (and the partial-revert refinement in `docs/adr/0008-partial-revert-of-ralph-folder.md`) for the layout and partition principle.
+```
+
+- [ ] **5.9: Run grep sweep.**
+
+```bash
+grep -rn '\.ralph/CONTEXT\.md\|\.ralph/VISION\.md\|\.ralph/docs/adr' \
+  README.md CONTEXT.md VISION.md AGENTS.md src/ pipelines/ \
+  --exclude-dir=node_modules --exclude-dir=dist
+```
+Expected: zero hits in live files (historical plans/specs under `docs/superpowers/` are exempt).
+
+- [ ] **5.10: Run full test suite.**
+
+Run: `npx tsc --noEmit && npx vitest run`
+Expected: PASS.
+
+- [ ] **5.11: Commit.**
+
+```bash
+git add README.md CONTEXT.md VISION.md
+git commit -m "docs: align README/CONTEXT/VISION with partial-revert layout
+
+README: drop migration recipe (no projects need it); flip
+inline .ralph/CONTEXT.md and .ralph/docs/adr/ refs to root.
+
+CONTEXT: layout diagram + inline self-refs flip; glossary
+splits Scenario test into Harness scenario + Smoke-pipeline
+scenario; new entries Session-closure file + Project-local
+artefact (the partition principle).
+
+VISION: narrative reflects ralph-defined-vs-pre-existing
+partition; ADR-0008 cross-reference."
+```
+
+---
+
+## Chunk 6: Write ADR-0008 + ADR-0007 footer
+
+Goal: capture the decision in the ADR system. ADR-0008 defines the partition principle (§1.2 two-clause rule from spec) and explicitly supersedes the relevant clauses of ADR-0007. ADR-0007 receives a one-line pointer footer.
+
+**Files:**
+- Create: `docs/adr/0008-partial-revert-of-ralph-folder.md`
+- Modify: `docs/adr/0007-ralph-folder-as-project-local-home.md`
+
+### Tasks
+
+- [ ] **6.1: Read ADR-0007 to understand its structure.**
+
+Read `docs/adr/0007-ralph-folder-as-project-local-home.md`. Note its sections (Status, Context, Decision, Consequences, etc.) and the layout-tree block in Decision.
+
+- [ ] **6.2: Read 1-2 prior ADRs (e.g. 0001, 0002) to mirror style.**
+
+The repo's ADR style: short Markdown, MADR-ish. Match heading levels and prose voice.
+
+- [ ] **6.3: Write `docs/adr/0008-partial-revert-of-ralph-folder.md`.**
+
+When writing the "Supersedes (in part)" section, **quote the verbatim layout-tree fragment** from ADR-0007's Decision section (the lines showing `.ralph/CONTEXT.md`, `.ralph/VISION.md`, `.ralph/docs/adr/`, `.ralph/memory/`). Per spec §2 item 7, the supersession must reference specific lines, not just describe them.
+
+Skeleton:
+
+```markdown
+# 0008 — Partial Revert of ADR-0007: Restore Third-Party Convention Files to Repo Root
+
+**Status:** Accepted (2026-05-04)
+
+**Supersedes (in part):** ADR-0007. Specifically, the layout-tree clauses placing `CONTEXT.md`, `VISION.md`, `docs/adr/`, and the unused `memory/` slot under `.ralph/`. The remainder of ADR-0007 (project-local pipelines, meditations, run state, the two-tier resolver) stands.
+
+## Context
+
+ADR-0007 (one week prior) introduced `<project>/.ralph/` as "the home for everything ralph-touchable." Operational evidence accumulated within days of dogfooding revealed an over-claim: third-party skills (`grill-with-docs`, `improve-codebase-architecture`) hard-code `CONTEXT.md` and `docs/adr/` at repo root by ecosystem convention. Placing these files under `.ralph/` made them invisible to skills that expect the standard layout. Two further symptoms: discoverability drop on GitHub (where outsiders browse root-level docs by default) and incomplete migration drift (root `pipelines/` and `memory/` never moved, while their `.ralph/` slots remained empty).
+
+The principle "ralph reads it, therefore ralph owns it" does not hold. Reading a file is not the same as defining its convention.
+
+## Decision
+
+Adopt a **two-clause partition principle**:
+
+A file or directory belongs in `<project>/.ralph/` only if **both**:
+
+- **Clause A — ralph-defined.** Its format, lifecycle, or discovery semantics are specified by ralph (illumination YAML schema, `.dot` files with ralph attributes, run-state checkpoint format, etc.).
+- **Clause B — no pre-existing root convention.** No widely-adopted ecosystem convention places the file at repo root (DDD glossary, MADR ADRs, generic markdown project-docs, npm `package.json`, etc.).
+
+Both clauses are necessary. Clause A alone is too permissive (ralph parses many files). Clause B alone is too restrictive (it forbids `.ralph/` entirely). The combination is the rule.
+
+### Concrete moves
+
+| File | Lives at |
+|------|----------|
+| `CONTEXT.md`, `VISION.md` | repo root (clause B fails: pre-existing project-doc conventions) |
+| `docs/adr/` | repo root (clause B fails: MADR convention) |
+| `.ralph/pipelines/` | inside `.ralph/` (both clauses) |
+| `.ralph/meditations/{illuminations,stimuli}/` | inside `.ralph/` (both clauses) |
+| `.ralph/sessions/` | inside `.ralph/` (both clauses; renamed from "memory" — overloaded term) |
+| `.ralph/scenarios/` | inside `.ralph/` (both clauses; smoke-pipeline test fixtures) |
+| `.ralph/runs/` | inside `.ralph/` (both clauses; unchanged from ADR-0007) |
+
+### Deprecated from ADR-0007
+
+The `.ralph/memory/` slot is removed. Session-closure files written by the `memory-writer` pipeline node now land at `.ralph/sessions/`. The `memoryDir()` helper in `ralph-paths.ts` is renamed `sessionsDir()`. The `docsAdrDir()` helper is deleted; ADR paths use root `docs/adr/`.
+
+## Consequences
+
+**Positive:**
+- Third-party skills land correctly at root-conventional paths.
+- GitHub/IDE doc-outliners surface project docs by default.
+- Operational test exists for future placement decisions; reduces re-litigation risk.
+
+**Negative:**
+- Reverses an accepted ADR within one week. Sets a precedent that ADRs encode best-understanding-at-time and update with new operational evidence. Mitigated by the append-only ADR convention: ADR-0007's body stays unchanged; ADR-0008 supersedes by reference.
+- Dual locations for project content (`.ralph/` for ralph-defined, root for pre-existing conventions) require operators to learn the partition. The §Decision table is the reference.
+
+**Out of scope (preserved from ADR-0007):**
+- Project-local pipelines as a tier (`.ralph/pipelines/` overrides bundled).
+- Run-state inside `.ralph/runs/` (no user-home tier).
+- `~/.ralph/agents/` rejected (per ADR-0001).
+
+## Alternatives considered and rejected
+
+- **`CONTEXT-MAP.md` at root pointing into `.ralph/`.** Documented escape hatch in the skill ecosystem. Rejected: only fixes the primary skill, leaves humans + IDE outliners + secondary tools unhelped; codifies the over-claim instead of correcting it.
+- **Patch the skills to look at `.ralph/CONTEXT.md` first.** Rejected: global blast radius (every project on the machine), bus-factor (collaborators on fresh machines silently fall back), sibling-skill drift (each doc-aware skill needs its own patch).
+- **Symlinks.** Rejected: platform-fragile; doesn't match what humans see in GitHub UI.
+
+## References
+
+- ADR-0007: `.ralph/` as project-local home for ralph-touchable state.
+- Spec: `docs/superpowers/specs/2026-05-04-ralph-folder-partial-revert-design.md` — full design and operational test.
+- Plan: `docs/superpowers/plans/2026-05-04-ralph-folder-partial-revert.md` — implementation plan.
+```
+
+- [ ] **6.4: Add ADR-0007 footer.**
+
+Append at end of `docs/adr/0007-ralph-folder-as-project-local-home.md`:
+
+```markdown
+
+---
+
+**Update 2026-05-04:** Partly superseded by [ADR-0008](0008-partial-revert-of-ralph-folder.md). The clauses of this ADR placing `CONTEXT.md`, `VISION.md`, `docs/adr/`, and the unused `memory/` slot under `.ralph/` are reversed; the remainder (project-local pipelines, meditations, run state, two-tier resolver) stands.
+```
+
+- [ ] **6.5: Run `grep -rn` sanity check.**
+
+```bash
+grep -rn 'ADR-0008\|0008-partial-revert' docs/adr/ CONTEXT.md VISION.md README.md
+```
+
+Expected: hits in ADR-0007 footer (one), ADR-0008 file (multiple, self-references), CONTEXT.md (the supersession footer added in chunk 5), VISION.md (line 32 reference). Cross-references coherent.
+
+- [ ] **6.6: Run full test suite.**
+
+Run: `npx tsc --noEmit && npx vitest run`
+Expected: PASS.
+
+- [ ] **6.7: Commit.**
+
+```bash
+git add docs/adr/0008-partial-revert-of-ralph-folder.md \
+        docs/adr/0007-ralph-folder-as-project-local-home.md
+git commit -m "docs(adr): ADR-0008 — partial revert of ADR-0007
+
+Documents the two-clause partition principle (ralph-defined AND
+no pre-existing root convention) and supersedes the layout-tree
+clauses of ADR-0007 that placed CONTEXT.md, VISION.md, docs/adr/,
+and the unused memory/ slot under .ralph/.
+
+ADR-0007 footer points readers at ADR-0008."
+```
+
+---
+
+## Chunk 7: Cleanup + smoke verification + skill landing check
+
+Goal: stale doc deletion, full smoke pass, empirical skill-landing verification (the original motivation).
+
+**Files:**
+- Delete: `IMPLEMENTATION_PLAN.md`
+
+### Tasks
+
+- [ ] **7.1: Verify `.ralph/memory/` is gone (chunk 4 should have removed).**
+
+```bash
+test -d .ralph/memory && echo "still exists; rmdir" || echo "gone"
+```
+
+If still exists: `rmdir .ralph/memory`. Should be empty.
+
+- [ ] **7.2: Delete `IMPLEMENTATION_PLAN.md`.**
+
+```bash
+git rm IMPLEMENTATION_PLAN.md
+```
+
+- [ ] **7.3: Final grep sweep — partition principle invariants.**
+
+```bash
+# No ralph-defined paths leaked to root:
+grep -rn '"\\?meditations/illuminations\\|"\\?meditations/stimuli\\|"\\?\\.\\?/runs/' \
+  src/ pipelines/ --exclude-dir=node_modules --exclude-dir=dist | grep -v '\\.ralph'
+# Expected: zero hits (all references go through ralph-paths.ts).
+
+# No third-party-convention paths still under .ralph/:
+grep -rn '\\.ralph/CONTEXT\\.md\\|\\.ralph/VISION\\.md\\|\\.ralph/docs/adr' \
+  src/ pipelines/ README.md AGENTS.md CONTEXT.md VISION.md docs/adr/ \
+  --exclude-dir=node_modules --exclude-dir=dist
+# Expected: zero live hits. Historical hits in docs/superpowers/plans/specs/ exempt.
+
+# memoryDir / docsAdrDir gone from src/:
+grep -rn '\\bmemoryDir\\b\\|\\bdocsAdrDir\\b' src/
+# Expected: zero hits.
+```
+
+- [ ] **7.4: Build verification.**
 
 ```bash
 npm run build
-mkdir /tmp/ralph-init-smoke && cd /tmp/ralph-init-smoke
+```
+
+Expected: PASS. tsup re-bundles `dist/cli/index.js` etc. with the new help-text strings.
+
+- [ ] **7.5: Smoke — `ralph init` in a temp dir.**
+
+```bash
+TMPDIR=$(mktemp -d /tmp/ralph-init-test.XXXXXX)
+cd "$TMPDIR"
 node /Users/josu/Documents/projects/ralph-cli/dist/cli/index.js init
-ls -la .ralph/
-cat .gitignore
-ls -la .git/
-rm -rf /tmp/ralph-init-smoke
-```
-
-Expected: full tree present, .gitignore contains `.ralph/runs/`, `.git/` exists.
-
-- [x] **Step 8: Commit**
-
-```bash
-git add src/cli/commands/init.ts src/cli/tests/init.test.ts src/cli/program.ts
-git commit -m "feat(cli): add ralph init — scaffold .ralph/ tree, idempotent
-
-mkdir -p the .ralph/{pipelines,meditations/{illuminations,stimuli},
-memory,docs/adr} subtree; scaffold empty VISION.md, CONTEXT.md, README.md
-if absent; append .ralph/runs/ to .gitignore (deduped); git init -b main
-if not already a repo. Safe to re-run on existing projects."
-```
-
----
-
-## Chunk 3: MCP server path migration
-
-`src/cli/mcp/illumination-server.ts` has 18 path-string sites referencing
-`meditations/`. They fall into 4 categories. Each category has a distinct
-fix.
-
-### Task 3.0: Site enumeration (read-only ground truth)
-
-- [x] **Step 1: Inventory the sites**
-
-Open `src/cli/mcp/illumination-server.ts` and confirm the four categories
-of `meditations/` references:
-
-| Category | Lines (approx; verify) | Fix in this chunk? |
-|---|---|---|
-| **Real `join()` sites** for project illuminations / project stimuli (live data on disk) | 49, 80, 198 | YES — route through `illuminationsDir(projectRoot)` / `stimuliDir(projectRoot)` |
-| **`meditationsDir` argv parameter** (line 305) and its consumers `listMetaMeditations` (line 169) and `readMetaMeditation` (line 244) | 169, 244, 305 | NO — this is the **bundled** stimuli folder fed in from the launcher (see §3.4 below). Path inside argv is opaque to this server. |
-| **Tool-description strings** (free-text in zod schemas / tool descriptions) | 335, 431, 443 | YES — text-substitute `meditations/illuminations/` → `.ralph/meditations/illuminations/` |
-| **`NO_META_MEDITATIONS_MESSAGE` block** (user-facing error text) | 162–167 | YES — text-substitute the path advice |
-
-Plans path (`docs/superpowers/plans/`) at `consumePlan` (lines ~100–130) and `listPlans` (lines ~229–242) is **out of scope** per spec §2 (plans surface stays put). Do not touch.
-
-- [x] **Step 2: Inventory the bundled stimuli launcher**
-
-Find the spawn site for the illumination MCP server. Run:
-
-```bash
-grep -rn 'illumination-server\|meditationsDir\|process\.argv\[3\]' src/cli/
-```
-
-The launcher (likely in `src/cli/lib/agent.ts` or `src/cli/lib/session.ts`)
-passes the bundled stimuli directory as `process.argv[3]`. Today this
-points at `src/cli/pipelines/meditate/stimuli/` (npm-bundled). After
-migration, **bundled stimuli stay where they are** (per spec §2 item 7),
-so this argv stays unchanged. Document the call site here for future
-reference; no edit needed in this chunk.
-
-### Task 3.1: Port project-data path joins to ralph-paths
-
-**Files:**
-- Modify: `src/cli/mcp/illumination-server.ts`
-- Modify: `src/cli/tests/illumination-server.test.ts`
-- Modify: `src/cli/tests/meditate.test.ts` (fixture path updates)
-
-- [x] **Step 1: Update test fixtures**
-
-In `src/cli/tests/illumination-server.test.ts` (~18 occurrences across
-lines 108, 110, 121, 123, 132, 139, 416, 417, 422, 423, 457, 463, 471,
-479, 487, 539, 589, 590, 591), replace fixture-path prefixes:
-
-- `meditations/illuminations/` → `.ralph/meditations/illuminations/`
-- `meditations/stimuli/` → `.ralph/meditations/stimuli/`
-- `meditations/archived-illuminations/` and `meditations/implemented-illuminations/` (line 591 area) → `.ralph/meditations/archived-illuminations/` etc. **Note:** the prefix change is `meditations/` → `.ralph/meditations/` — apply once; do **not** apply `meditations/illuminations` → `.ralph/meditations/illuminations` as a substring rule, that would corrupt the sibling-folder paths.
-
-In `src/cli/tests/meditate.test.ts` (~9 occurrences across lines 41, 43, 51, 55, 56, 57, 248 + description strings around 134, 142, 156, 161): same prefix swap.
-
-- [x] **Step 2: Run tests — expect failures**
-
-Run: `npx vitest run src/cli/tests/illumination-server.test.ts src/cli/tests/meditate.test.ts`
-Expected: FAIL — server still reads from old path; fixtures live at new path.
-
-- [x] **Step 3: Update illumination-server.ts category 1 (real joins)**
-
-At the top of the file, add:
-```ts
-import { illuminationsDir, stimuliDir, meditationsDir } from "../lib/ralph-paths.js";
-```
-
-For each of the three `join(projectRoot, "meditations", "illuminations", ...)` sites (around lines 49, 80, 198), replace the prefix with `illuminationsDir(projectRoot)`. Same for any `join(projectRoot, "meditations", "stimuli", ...)` site. For sibling folders (`archived-illuminations`, `implemented-illuminations` if any survive), use `join(meditationsDir(projectRoot), "archived-illuminations", ...)`.
-
-- [x] **Step 4: Update illumination-server.ts category 3 (tool descriptions)**
-
-At lines ~335, 431, 443 (verify exact lines — these may shift after Step 3 edits), update tool-description text strings:
-- `"meditations/illuminations/"` → `".ralph/meditations/illuminations/"`
-- `"meditations/stimuli/"` → `".ralph/meditations/stimuli/"`
-
-Tool descriptions are user-visible in the MCP tool surface; they must match the new layout.
-
-- [x] **Step 5: Update illumination-server.ts category 4 (NO_META_MEDITATIONS_MESSAGE)**
-
-In the message block (lines ~162–167), update any path advice referring to old `meditations/` paths under the user-data tier. The launcher-fed bundled stimuli path stays as-is (it's the npm bundled stimuli, not project data) — only update advice that points users at *project-local* paths.
-
-- [x] **Step 6: Run tests — expect pass**
-
-Run: `npx vitest run src/cli/tests/illumination-server.test.ts src/cli/tests/meditate.test.ts`
-Expected: green.
-
-- [x] **Step 7: Run full test suite**
-
-Run: `npx vitest run`
-Expected: full suite green. Other tests that touch illumination paths may need fixture updates — fix in lockstep until green.
-
-- [x] **Step 8: Static check — no remaining hardcoded literals in MCP server**
-
-Run:
-```bash
-grep -rn 'meditations/illuminations\|meditations/stimuli\|"meditations"' src/cli/mcp/
-```
-Expected: zero hits in `src/cli/mcp/`. (Hits in `src/cli/pipelines/` are agent prompts; updated in Chunk 5.)
-
-- [x] **Step 9: Commit**
-
-Stage all files updated in this chunk:
-```bash
-git add src/cli/mcp/illumination-server.ts src/cli/tests/illumination-server.test.ts src/cli/tests/meditate.test.ts
-# Add any other test files updated in lockstep at Step 7.
-git commit -m "refactor(mcp): route illumination + stimuli paths through ralph-paths
-
-Replace hardcoded meditations/{illuminations,stimuli} string joins with
-calls into the central ralph-paths module. Update tool-description
-strings and the NO_META_MEDITATIONS_MESSAGE to reference the new layout.
-Plans path (docs/superpowers/plans/) is out of scope — unchanged.
-Bundled-stimuli argv parameter is unchanged (bundled data stays put per
-spec §2 item 7). Fixture paths in tests update in lockstep."
-```
-
----
-
-## Chunk 4: Run-state I/O migration
-
-The `~/.ralph/<projectKey>/runs/` derivation lives in
-`src/cli/commands/pipeline.ts` — **not** in `claudeTracePath.ts`
-(`claudeTracePath.ts` is for Claude Code session transcripts under
-`~/.claude/projects/`, which is unrelated and stays unchanged).
-
-Sites in `pipeline.ts` (verified):
-
-- Line 51 — `deriveProjectKey` JSDoc
-- Line 54 — `export function deriveProjectKey(projectPath: string): string`
-- Lines 127–138 — first-run "Layout changed" notice block (legacy migration artifact)
-- Lines 322–326 — pipeline run path: `ralphRoot/projectKey/runs/`
-- Lines 627–666 — pipeline trace lookup: `ralphRoot/projectKey/runs/`
-
-Plus `src/cli/lib/pipeline-resolver.ts`:
-
-- Line 37 — `userFolderPath = join(homedir(), ".ralph", "pipelines", arg, "pipeline.dot")`
-- Line 41 — `userPath = join(homedir(), ".ralph", "pipelines", `${arg}.dot`)`
-
-These user-home pipeline fallbacks are deleted entirely per spec §2 item 3 ("no `userHomeRalphDir` export. The `~/.ralph/` tier goes away entirely") and §3.3 (two-tier read = project-local + bundled, no user-home tier).
-
-**Daemon decision (resolved up front):** `src/daemon/state.ts` writes `tasks.json`, `pids/<id>.pid`, `logs/<taskId>/<runId>.log` directly under `~/.ralph/` (siblings of the now-deleted `~/.ralph/<projectKey>/runs/` tree). These are genuinely **user-scoped** (heartbeat tasks span projects). They **stay at `~/.ralph/` root** as today — no migration, no renaming, no extra namespacing. After this chunk, `~/.ralph/` will hold only daemon state (tasks.json, pids/, logs/). Task 4.4 is a verify-only audit.
-
-**`RALPH_RUNS_ROOT` env var (resolved up front):** Today the env var allows overriding `~/.ralph` as the runs root. After migration, runs live at `<project>/.ralph/runs/`, so the env var no longer makes sense at the same name. **Decision: delete `RALPH_RUNS_ROOT` entirely.** No replacement. Project-local layout is the only option.
-
-**`pipeline trace --project` flag (resolved up front):** Becomes **mandatory by default** (spec §3.4 "becomes mandatory"). Implementation defaults to `process.cwd()` if absent — equivalent to the user typing `--project .`. No cross-project scan.
-
-### Task 4.1: Read pipeline.ts trace region
-
-- [x] **Step 1: Read `src/cli/commands/pipeline.ts` lines 1–140 and 300–700**
-
-Confirm each site listed above exists and matches the line ranges. If
-line numbers have drifted, capture the new ranges before editing.
-
-- [x] **Step 2: Inventory expected import additions**
-
-`pipeline.ts` will import `runDir`, `runsDir` from `../lib/ralph-paths.js`. Track this in your edit plan.
-
-(No commit at this task; read-only.)
-
-### Task 4.2: Port pipeline.ts run-state derivation
-
-**Files:**
-- Modify: `src/cli/commands/pipeline.ts`
-- Modify: `src/cli/tests/pipeline-trace-lookup.test.ts`
-- Modify: `src/cli/tests/pipeline-trace-command-validation.test.ts`
-- Modify: `src/cli/tests/pipeline-failure-reason.test.ts`
-
-- [x] **Step 1: Update tests to assert new path shape**
-
-In each of the three test files, replace assertions like `~/.ralph/<projectKey>/runs/<runId>/...` with `<projectRoot>/.ralph/runs/<runId>/...`. Use the `runDir(projectRoot, runId)` helper in test imports for clarity.
-
-For tests that exercise **cross-project trace scanning** (looking up a runId across multiple `<projectKey>` folders): **delete those tests entirely.** The cross-project scan goes away. Specifically, list each test by name in your scratch notes before deleting. Tests that exercise single-project lookup (most of them) keep their structure — only the path root changes.
-
-- [x] **Step 2: Run tests — expect failures**
-
-Run: `npx vitest run src/cli/tests/pipeline-trace-lookup.test.ts src/cli/tests/pipeline-trace-command-validation.test.ts src/cli/tests/pipeline-failure-reason.test.ts`
-Expected: FAIL on path assertions.
-
-- [x] **Step 3: Update pipeline.ts**
-
-Add to imports: `import { runDir, runsDir } from "../lib/ralph-paths.js";`
-
-For each site identified in Task 4.1:
-
-- **Line 54 `deriveProjectKey`:** delete entirely. The function and its JSDoc (line 51 area) go away.
-- **Lines 127–138 `maybePrintLayoutV2Notice` function definition:** delete entirely. This was a previous migration's artifact; it's superseded.
-- **`maybePrintLayoutV2Notice()` call site (around line 319):** delete the call. Otherwise an orphaned reference to a deleted function breaks the build.
-- **Lines 322–326:** replace `const ralphRoot = ... ; const projectKey = deriveProjectKey(...) ; const runsRoot = join(ralphRoot, projectKey, "runs")` with `const runsRoot = runsDir(opts.project ?? process.cwd())`.
-- **`listAllProjectRunsRoots` function (around lines 629–638):** delete entirely. With no cross-project scan, this helper has no callers.
-- **`findRunAcrossProjects` function (around lines 644–656):** delete entirely. Same reason.
-- **Lines 627–666 `pipelineTraceCommand` trace-lookup body:** replace the cross-project scan path with a single direct read: `runDir(opts.project ?? process.cwd(), runId)/pipeline.jsonl`. If absent, return "no such run."
-- **`RALPH_RUNS_ROOT` env var references:** delete the `process.env.RALPH_RUNS_ROOT ?? ...` fallback at lines 132, 322, 630, 664. Just use the project-local helper.
-- **`RALPH_RUNS_KEEP` env var (line 326):** **keep this.** It's a per-project pruning cap; the cap still applies to `<project>/.ralph/runs/`.
-
-- [x] **Step 4: Update `pipeline trace` command action**
-
-In `pipeline.ts` (`pipelineTraceCommand` function), update the `--project` handling: default to `process.cwd()` if absent. Remove any cross-project scan branch.
-
-- [x] **Step 5: Update help text in program.ts**
-
-In `src/cli/program.ts`, the `pipeline run` help-after block (around line 112) and `pipeline trace` description mention `~/.ralph/<projectKey>/runs/<runId>/checkpoint.json`. Replace with `<project>/.ralph/runs/<runId>/checkpoint.json`. Update wording about cross-project scan if present.
-
-- [x] **Step 6: Run tests — expect pass**
-
-Run: `npx vitest run src/cli/tests/pipeline-trace-lookup.test.ts src/cli/tests/pipeline-trace-command-validation.test.ts src/cli/tests/pipeline-failure-reason.test.ts`
-Expected: green.
-
-- [x] **Step 7: Verify no remaining projectKey references**
-
-Run:
-```bash
-grep -rn 'projectKey\|deriveProjectKey\|RALPH_RUNS_ROOT' src/cli/
-```
-Expected: zero hits in `src/cli/`. (Daemon code under `src/daemon/` may still reference its own user-scoped state; that is expected per the daemon decision above.)
-
-- [x] **Step 8: Run full test suite**
-
-Run: `npx vitest run`
-Expected: full suite green.
-
-- [x] **Step 9: Commit**
-
-```bash
-git add src/cli/commands/pipeline.ts src/cli/tests/pipeline-trace-lookup.test.ts src/cli/tests/pipeline-trace-command-validation.test.ts src/cli/tests/pipeline-failure-reason.test.ts src/cli/program.ts
-git commit -m "refactor(pipeline): run state writes to <project>/.ralph/runs/
-
-Drop deriveProjectKey, the legacy 'Layout changed' notice block, and the
-RALPH_RUNS_ROOT env var. Pipeline run state writes to <project>/.ralph/
-runs/<runId>/. The cross-project scan in 'pipeline trace' goes away;
---project (defaulting to cwd) is the only lookup mode. Help text and
-fixture-path assertions update in lockstep."
-```
-
-### Task 4.3: Port pipeline-resolver search path
-
-**Files:**
-- Modify: `src/cli/lib/pipeline-resolver.ts`
-- Modify: `src/cli/tests/pipeline-resolver.test.ts`
-
-- [x] **Step 1: Read `src/cli/lib/pipeline-resolver.ts` fully**
-
-Identify every search-path tier. Confirm sites at lines 37 and 41
-(`userFolderPath`, `userPath` rooted at `homedir() + ".ralph/pipelines/"`).
-
-- [x] **Step 2: Update tests**
-
-Replace fixture paths from `<project>/pipelines/...` to `<project>/.ralph/pipelines/...`. Delete any tests that exercise the user-home `~/.ralph/pipelines/` fallback (the tier is going away).
-
-- [x] **Step 3: Run tests — expect failure**
-
-Run: `npx vitest run src/cli/tests/pipeline-resolver.test.ts`
-Expected: FAIL.
-
-- [x] **Step 4: Update the resolver**
-
-Import `pipelinesDir` from `../lib/ralph-paths.js`.
-
-Replace:
-- `<project>/pipelines/<name>` search → `pipelinesDir(project)/<name>` (i.e. `<project>/.ralph/pipelines/<name>`)
-- Delete the user-home fallback at lines 37 and 41 (`userFolderPath`, `userPath`). Two-tier resolution: project-local first, bundled second. No user-home tier.
-
-- [x] **Step 5: Run tests — expect pass**
-
-Run: `npx vitest run src/cli/tests/pipeline-resolver.test.ts`
-Expected: green.
-
-- [x] **Step 6: Run full test suite**
-
-Run: `npx vitest run`
-Expected: full suite green.
-
-- [x] **Step 7: Commit**
-
-```bash
-git add src/cli/lib/pipeline-resolver.ts src/cli/tests/pipeline-resolver.test.ts
-git commit -m "refactor(resolver): two-tier pipeline search — project-local + bundled
-
-Project-local pipelines move from <project>/pipelines/ to <project>/
-.ralph/pipelines/. The user-home ~/.ralph/pipelines/ fallback is
-deleted entirely (per spec §3.3 — two tiers, not three)."
-```
-
-### Task 4.4: Daemon state audit (verify-only)
-
-**Files:**
-- Read: `src/daemon/state.ts`, `src/daemon/index.ts`
-- Modify: none expected
-
-- [x] **Step 1: Read daemon state code**
-
-Confirm: state files (`tasks.json`, `pids/`, `logs/`) are user-scoped (track tasks across projects). They stay at `~/.ralph/heartbeat/` (or wherever they live today).
-
-- [x] **Step 2: Verify no per-project state crept in**
-
-If state.ts writes any **per-project** files (e.g. project-specific run logs), those pieces alone migrate to `<project>/.ralph/runs/`. Otherwise leave untouched.
-
-- [x] **Step 3: If no migration needed, no commit**
-
-If migration is needed (rare), apply the same TDD pattern as Tasks 4.2–4.3 in a separate commit.
-
-- [x] **Step 4: Note the audit outcome in commit message log**
-
-Either commit nothing (skipped) or commit with message `audit(daemon): verified state is user-scoped — no migration`.
-
----
-
-## Chunk 5: Bundled pipelines + ralph-cli self-migration (single big-bang commit)
-
-This chunk ports the bundled pipeline prompts that hardcode old paths,
-then performs the `git mv` of ralph-cli's own ralph-shaped files into
-`.ralph/`. Per spec §7.5, the bundled-pipeline edits and the `git mv`
-**land in a single commit** so no intermediate SHA leaves the repo in a
-broken state where prompts reference paths that don't exist on disk yet.
-
-### Task 5.1: Combined bundled-pipeline path edits + repo self-migration
-
-**Files:**
-- Modify: `src/cli/pipelines/meditate/pipeline.dot` (the `meditations_dir` default)
-- Modify: `src/cli/pipelines/**/*.md` (any path strings in agent prompts)
-- `git mv`: `meditations/` → `.ralph/meditations/`
-- `git mv`: `docs/adr/` → `.ralph/docs/adr/`
-- `git mv`: `CONTEXT.md` → `.ralph/CONTEXT.md`
-- `git mv`: `VISION.md` → `.ralph/VISION.md`
-- Modify: `.gitignore` (append `.ralph/runs/`)
-- Modify: `README.md` (path-string updates)
-
-- [x] **Step 1: Verify clean working tree**
-
-```bash
-git status
-```
-Expected: clean. Migration must not mix with unrelated changes.
-
-- [x] **Step 2: Find every old path string in bundled pipelines**
-
-```bash
-grep -rn 'meditations/illuminations\|meditations/stimuli' src/cli/pipelines/
-```
-
-Save the list. For each hit, replace `meditations/illuminations` with `.ralph/meditations/illuminations` and `meditations/stimuli` with `.ralph/meditations/stimuli`. Apply edits in-place.
-
-- [x] **Step 3: Re-grep to confirm**
-
-```bash
-grep -rn 'meditations/illuminations\|meditations/stimuli' src/cli/pipelines/
-```
-Expected: every remaining hit (if any) starts with `.ralph/meditations/`.
-
-- [x] **Step 4: Create the .ralph/ tree at repo root via direct mkdir**
-
-Do **not** use `ralph init` for the self-migration. The `dist/` may be stale (Chunk 2 added init but the developer may not have rebuilt) and using a tool to scaffold what `git mv` then overwrites adds an unnecessary delete-the-stub dance. Direct mkdir is honest:
-
-```bash
-mkdir -p .ralph/pipelines .ralph/meditations .ralph/memory .ralph/docs
-```
-
-(`.ralph/meditations/illuminations`, `.ralph/meditations/stimuli`, `.ralph/docs/adr` will be created by the `git mv`s below.)
-
-- [x] **Step 5: `git mv` the four targets**
-
-```bash
-git mv meditations .ralph/meditations
-git mv docs/adr .ralph/docs/adr
-git mv CONTEXT.md .ralph/CONTEXT.md
-git mv VISION.md .ralph/VISION.md
-```
-
-`docs/superpowers/` (specs + plans) stays at `docs/superpowers/` per spec §2 out-of-scope.
-
-**Important:** do not run `git add .ralph/` between Step 4 and Step 5. If `.ralph/CONTEXT.md` becomes a tracked empty stub, `git mv CONTEXT.md .ralph/CONTEXT.md` will refuse with "destination exists."
-
-- [x] **Step 6: Verify history follows for each moved file**
-
-```bash
-git log --follow --oneline .ralph/VISION.md | head -5
-git log --follow --oneline .ralph/CONTEXT.md | head -5
-git log --follow --oneline .ralph/docs/adr/0001-agents-live-next-to-pipeline.md | head -5
-```
-Expected: each shows commits from before the move (proving git tracked the rename).
-
-- [x] **Step 7: Update path strings in `.ralph/CONTEXT.md` inline**
-
-Open `.ralph/CONTEXT.md` and update every reference:
-- `meditations/illuminations/` → `.ralph/meditations/illuminations/`
-- `meditations/stimuli/` (if any) → `.ralph/meditations/stimuli/`
-- `meditations/archived-illuminations/` → `.ralph/meditations/archived-illuminations/`
-- `meditations/implemented-illuminations/` → `.ralph/meditations/implemented-illuminations/`
-- `docs/adr/` → `.ralph/docs/adr/` (in any cross-references)
-
-Verify with:
-```bash
-grep -n 'meditations/\|docs/adr/' .ralph/CONTEXT.md
-```
-Expected: every remaining hit has the `.ralph/` prefix.
-
-- [x] **Step 8: Update path strings in README.md**
-
-Locate references via:
-```bash
-grep -n 'meditations/\|~/.ralph\|docs/adr/' README.md
-```
-
-Apply edits:
-- The `ralph heartbeat pipeline janitor` example (around line 47): janitor writes illuminations to `.ralph/meditations/illuminations/`.
-- The `--resume` paragraph (around line 62): `~/.ralph/<projectKey>/runs/<runId>/checkpoint.json` → `<project>/.ralph/runs/<runId>/checkpoint.json`.
-- The "Where to look" section (around lines 158–162): `docs/adr/` → `.ralph/docs/adr/` (and `CONTEXT.md` → `.ralph/CONTEXT.md`).
-- Add a "Bootstrap a project" section near the top: `mkdir foo && cd foo && ralph init`.
-
-- [x] **Step 9: Update ADR cross-references**
-
-Run a broad grep:
-```bash
-grep -rn 'docs/adr/' --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.git . | grep -v '^docs/superpowers/'
-```
-
-(Lines under `docs/superpowers/` are spec/plan history — keep their references untouched. Lines outside that path get updated to `.ralph/docs/adr/`.)
-
-ADRs that cross-reference each other by bare filename (`0001-...md`, no path prefix) work post-move because they're sibling-relative — no change needed for those.
-
-- [x] **Step 10: Append `.ralph/runs/` to .gitignore**
-
-```bash
-grep -n '\.ralph/runs/' .gitignore
-```
-If absent:
-```bash
-echo '.ralph/runs/' >> .gitignore
-```
-
-- [x] **Step 11: Run full test suite**
-
-```bash
-npx vitest run
-```
-Expected: full suite green. Tests that asserted on `meditations/...`, `docs/adr/...`, or `CONTEXT.md` paths get `.ralph/` prefixes in the same commit if any remain (most should have been caught in earlier chunks).
-
-- [x] **Step 12: Smoke — bundled pipeline against migrated repo**
-
-```bash
-npm run build
-node dist/cli/index.js pipeline run src/cli/pipelines/meditate/pipeline.dot --project .
-```
-Expected: meditate pipeline runs to completion. Capture the runId from the run output.
-
-```bash
-ls -la .ralph/runs/
-```
-Expected: a `<runId>/` subdirectory containing `checkpoint.json` and `pipeline.jsonl`.
-
-If illumination written, confirm location:
-```bash
-ls -la .ralph/meditations/illuminations/
-```
-
-- [x] **Step 13: Single big-bang commit**
-
-```bash
-git add -A
-git commit -m "refactor(repo): migrate ralph-cli to .ralph/ layout (big-bang)
-
-Bundled-pipeline path strings and ralph-cli's own ralph-shaped files
-land in a single commit per spec §7.5 — no intermediate SHA where
-prompts reference paths that don't exist on disk.
-
-git mv: meditations/ -> .ralph/meditations/
-git mv: docs/adr/ -> .ralph/docs/adr/
-git mv: CONTEXT.md -> .ralph/CONTEXT.md
-git mv: VISION.md -> .ralph/VISION.md
-
-Path strings updated in: bundled pipeline prompts, .ralph/CONTEXT.md,
-README.md, ADR cross-references. .gitignore gains .ralph/runs/.
-End-to-end meditate smoke verified against the migrated layout."
-```
-
----
-
-## Chunk 6: Final verification + cleanup
-
-### Task 6.1: Static-check sweep
-
-- [x] **Step 1: No remaining old-path literals in src/**
-
-```bash
-grep -rn 'meditations/illuminations\|meditations/stimuli' src/
-```
-Expected: zero hits in `src/`. (Hits inside `dist/` are stale build artifacts; `npm run build` to refresh.)
-
-```bash
-grep -rn '"docs/adr"\|join(.*"docs", "adr"' src/
-```
-Expected: zero hits.
-
-- [x] **Step 2: No remaining `~/.ralph/<projectKey>` references in src/cli/**
-
-```bash
-grep -rn 'homedir.*\.ralph\|process\.env\.HOME.*\.ralph' src/cli/
-```
-Expected: zero hits in `src/cli/`. Daemon code (`src/daemon/`) may retain user-home references per Task 4.4 — that's expected.
-
-- [x] **Step 3: No remaining projectKey references**
-
-```bash
-grep -rn 'projectKey\|deriveProjectKey\|RALPH_RUNS_ROOT' src/cli/
-```
-Expected: zero hits.
-
-- [x] **Step 4: TypeScript check**
-
-```bash
-npx tsc --noEmit
-```
-Expected: clean.
-
-- [x] **Step 5: Build**
-
-```bash
-npm run build
-```
-Expected: `dist/cli/index.js`, `dist/cli/mcp/illumination-server.js`, `dist/daemon/index.js` all rebuild cleanly.
-
-### Task 6.2: End-to-end smokes
-
-- [x] **Step 1: Fresh `ralph init` on a temp dir**
-
-```bash
-mkdir /tmp/ralph-init-fresh && cd /tmp/ralph-init-fresh
-node /Users/josu/Documents/projects/ralph-cli/dist/cli/index.js init
-ls -la .ralph/
-cat .gitignore
-git log --oneline 2>/dev/null || echo "no git or no commits yet"
-```
-
-Expected: full `.ralph/` tree present (pipelines, meditations/illuminations, meditations/stimuli, memory, docs/adr), `VISION.md` and `CONTEXT.md` scaffolded, `.gitignore` contains `.ralph/runs/`, `.git/` exists (if git available), `README.md` at root.
-
-```bash
-cd /tmp && rm -rf /tmp/ralph-init-fresh
-```
-
-- [x] **Step 2: Bundled meditate pipeline against ralph-cli itself**
-
-```bash
+ls -la                                # expect: CONTEXT.md, VISION.md, README.md, .ralph/, docs/, .gitignore
+ls -la .ralph/                        # expect: pipelines/, meditations/, sessions/, runs/ (lazy or eager)
+ls docs/                              # expect: adr/
+cat .gitignore                        # expect: contains .ralph/runs/
 cd /Users/josu/Documents/projects/ralph-cli
-node dist/cli/index.js pipeline run src/cli/pipelines/meditate/pipeline.dot --project .
-RUNID=$(ls -t .ralph/runs | head -1)
-echo "Run: $RUNID"
-ls -la .ralph/runs/$RUNID/
+rm -rf "$TMPDIR"
 ```
 
-Expected: pipeline runs to completion. `.ralph/runs/<runId>/checkpoint.json` and `.ralph/runs/<runId>/pipeline.jsonl` exist.
+Expected: all assertions hold.
 
-Note: Smokes 10 and 11 (Steps 2 and 4) used `pipeline validate` instead of `pipeline run` because `pipeline run` requires interactive `--var` input for the meditate pipeline. The resolver was verified against an absolute path invoked from a `/tmp` cwd, confirming the two-tier bundled-fallback logic works.
+- [ ] **7.6: Smoke — `ralph init` idempotent.**
 
-- [x] **Step 3: Trace lookup**
+Same temp dir flow but run `ralph init` twice. Confirm no overwrites of empty files re-scaffolded with custom content.
+
+- [ ] **7.7: Smoke — `ralph pipeline list .` from repo root.**
 
 ```bash
-node dist/cli/index.js pipeline trace $RUNID --project .
+node /Users/josu/Documents/projects/ralph-cli/dist/cli/index.js pipeline list .
 ```
-Expected: trace surfaces the run completed in Step 2.
 
-- [x] **Step 4: Bundled-fallback resolver smoke**
+Expected: lists `illumination-to-implementation` (the only top-level `.dot` under `.ralph/pipelines/`); does NOT list anything from `.ralph/scenarios/` (subdirs invisible).
 
-Confirm two-tier resolver works when project-local has nothing:
+- [ ] **7.7b: (optional) Smoke — `ralph pipeline run` against the moved illumination pipeline.**
+
+Per spec §10.3, run the relocated pipeline end-to-end as a final integration check. Heavy operation (drives multiple agent invocations), so optional and flagged.
 
 ```bash
-mkdir /tmp/ralph-bundled-smoke && cd /tmp/ralph-bundled-smoke
-node /Users/josu/Documents/projects/ralph-cli/dist/cli/index.js init
-node /Users/josu/Documents/projects/ralph-cli/dist/cli/index.js pipeline run /Users/josu/Documents/projects/ralph-cli/src/cli/pipelines/meditate/pipeline.dot --project .
+node /Users/josu/Documents/projects/ralph-cli/dist/cli/index.js \
+  pipeline run .ralph/pipelines/illumination-to-implementation/pipeline.dot \
+  --project /Users/josu/Documents/projects/ralph-cli
 ```
-Expected: pipeline runs (resolver finds bundled pipeline; project has no `.ralph/pipelines/meditate/`).
+
+Expected: pipeline resolves, run state writes to `.ralph/runs/<runId>/`, no path-related errors. Skip if no fresh illumination is available to consume.
+
+- [ ] **7.8: Empirical skill-landing check (the original motivation).**
 
 ```bash
-cd /tmp && rm -rf /tmp/ralph-bundled-smoke
+# Confirm the skill ecosystem hard-codes root paths:
+grep -rn 'CONTEXT\\.md\\|docs/adr' \
+  ~/.claude/skills/grill-with-docs/ \
+  ~/.claude/skills/improve-codebase-architecture/ 2>/dev/null | head -20
+
+# Confirm both files now exist at root:
+test -f CONTEXT.md && echo "CONTEXT.md at root: ✓" || echo "MISSING"
+test -d docs/adr && echo "docs/adr at root: ✓" || echo "MISSING"
+ls docs/adr/ | wc -l                  # expect: 8 (ADRs 0001-0008)
 ```
 
-### Task 6.3: Documentation cleanup
+Expected: skill files reference root paths; both targets exist.
 
-- [x] **Step 1: Verify ADR-0007 is reachable from new location**
+- [ ] **7.9: Optional — manual `/grill-with-docs` invocation.**
+
+In a fresh Claude Code session at the repo root, invoke `/grill-with-docs` against any topic. Confirm the skill discovers `CONTEXT.md` and `docs/adr/` without complaint. Record the session result in this plan's verification section if convenient.
+
+- [ ] **7.10: Final full test run.**
 
 ```bash
-ls .ralph/docs/adr/0007-ralph-folder-as-project-local-home.md
-```
-Expected: present.
-
-- [x] **Step 2: Update CONTEXT.md (now at .ralph/CONTEXT.md) for the new layout**
-
-Add a new term entry "Project-local layout":
-
-```md
-### Project-local layout
-
-A target project declares itself ralph-shaped by having a `<project>/.ralph/`
-folder. That folder is the single home for everything ralph-touchable in
-the project: pipelines, meditations (illuminations + stimuli), memory,
-ADRs, CONTEXT.md, VISION.md, and run state.
-
-Two-tier pipeline read at runtime:
-- **Project-local:** `<project>/.ralph/pipelines/<name>/pipeline.dot`
-- **Bundled fallback:** `src/cli/pipelines/<name>/pipeline.dot` (in npm package)
-
-Two-tier stimuli reads (project-local + bundled) work the same way for
-the meditate pipeline.
-
-See `.ralph/docs/adr/0007-ralph-folder-as-project-local-home.md` for
-the full layout and the trade-off against ADR-0001.
+npx tsc --noEmit && npx vitest run
 ```
 
-Update the existing "Agent loading" term: project-local pipelines now live in
-`.ralph/pipelines/<name>/` (was `<project>/pipelines/<name>/`).
+Expected: PASS, full green.
 
-Update the existing "Illumination lifecycle" term: every `meditations/illuminations/`
-reference becomes `.ralph/meditations/illuminations/`.
-
-- [x] **Step 3: Decide migration documentation for downstream projects**
-
-Spec §9.5 asks: should the `git mv` migration recipe for downstream
-projects (other repos using ralph-cli) be documented?
-
-**Decision for this plan:** add a short "Migrating an existing project" snippet to README.md:
-
-```md
-## Migrating an existing ralph project to the .ralph/ layout
-
-If your project pre-dates the .ralph/ convention:
+- [ ] **7.11: Commit cleanup.**
 
 ```bash
-mkdir -p .ralph/pipelines .ralph/memory .ralph/docs
-git mv meditations .ralph/meditations
-[ -d docs/adr ] && git mv docs/adr .ralph/docs/adr
-[ -f CONTEXT.md ] && git mv CONTEXT.md .ralph/CONTEXT.md
-[ -f VISION.md ] && git mv VISION.md .ralph/VISION.md
-echo '.ralph/runs/' >> .gitignore
-git commit -m "refactor: migrate to .ralph/ layout"
-```
+git add -u                           # picks up IMPLEMENTATION_PLAN.md deletion + .ralph/memory/ rmdir tracking
+git commit -m "chore: drop stale IMPLEMENTATION_PLAN.md + remove empty .ralph/memory/
 
-The `~/.ralph/<projectKey>/runs/` directory in your home folder is
-inert under the new ralph-cli — you can `rm -rf ~/.ralph/<your-project-key>/`
-once you've stopped needing the historical run logs.
-```
+IMPLEMENTATION_PLAN.md was the executed plan for ADR-0007's
+original migration; every reference inside it is to a layout
+this revert undoes. Git history preserves it.
 
-- [x] **Step 4: Commit doc cleanup**
-
-```bash
-git add .ralph/CONTEXT.md README.md
-git commit -m "docs: refresh CONTEXT.md path terms; add migration recipe to README"
+.ralph/memory/ slot deprecated by ADR-0008; session-closure files
+now live in .ralph/sessions/."
 ```
 
 ---
 
-## Done criteria
+## Verification — overall
 
-All of the below must be true before declaring the migration complete:
+After all 7 chunks:
 
-- [x] `npx vitest run` — full suite green.
-- [x] `npx tsc --noEmit` — clean.
-- [x] `npm run build` — succeeds; `dist/` artifacts present.
-- [x] `grep -rn 'meditations/illuminations\|meditations/stimuli' src/` — zero hits.
-- [x] `grep -rn 'projectKey\|deriveProjectKey\|RALPH_RUNS_ROOT' src/cli/` — zero hits.
-- [x] `grep -rn 'maybePrintLayoutV2Notice\|findRunAcrossProjects\|listAllProjectRunsRoots' src/cli/` — zero hits (dead-code purge).
-- [x] `grep -rn 'homedir.*\.ralph' src/cli/` — zero hits (daemon code excluded).
-- [x] `.gitignore` contains a `.ralph/runs/` line.
-- [x] `ralph init` on a fresh tempdir scaffolds the full `.ralph/` tree, idempotent on re-run.
-- [x] `ralph init` on a partial-tree directory fills missing subfolders without overwriting.
-- [x] Bundled meditate pipeline runs end-to-end against ralph-cli's migrated repo, writes run state to `.ralph/runs/<runId>/`, illumination (if written) to `.ralph/meditations/illuminations/`.
-- [x] Bundled-fallback resolver works: `pipeline run` succeeds against an `.ralph/`-bare project.
-- [x] `pipeline trace <runId> --project .` surfaces the run.
-- [x] ADR-0007 lives at `.ralph/docs/adr/0007-...`.
-- [x] CONTEXT.md (now at `.ralph/CONTEXT.md`) carries the new "Project-local layout" term and updated path strings.
-- [x] README.md (still at root) mentions `ralph init` in getting-started and the migration recipe in the migration section.
+- `git log --oneline -10` shows 7 commits in order: code edits, pipeline prompts, root-convention moves, ralph-defined moves, doc updates, ADR-0008, cleanup.
+- `npx tsc --noEmit` passes.
+- `npx vitest run` passes.
+- `npm run build` passes.
+- `ralph init` in a temp dir scaffolds the partial-revert layout.
+- `ralph pipeline list .` lists `illumination-to-implementation` and not the smoke scenarios.
+- `grep -rn '\\bmemoryDir\\|docsAdrDir' src/` returns zero hits.
+- `grep -rn '\\.ralph/CONTEXT\\|\\.ralph/VISION\\|\\.ralph/docs/adr' src/ pipelines/ README.md CONTEXT.md VISION.md AGENTS.md` returns zero hits.
+- Third-party doc-aware skills land correctly at root paths.
 
-## Session Notes — 2026-05-04 (Chunk 6)
+---
 
-- 1257 tests passing; build + tsc clean; all static checks (meditations/, projectKey, RALPH_RUNS_ROOT, homedir, dead functions) yield zero hits.
-- Task 6.1 (static checks) and Task 6.2 (smokes) verified as described. Smokes 10 and 11 used `pipeline validate` instead of `pipeline run` (interactive --var input required); resolver verification confirmed against absolute path from /tmp cwd.
-- Task 6.3 doc cleanup applied: "Project-local layout" term added to `.ralph/CONTEXT.md`; "Agent loading" term updated to reference `.ralph/pipelines/<name>/`; "Bootstrap a project" section added near top of README.md; "Migrating an existing ralph project" recipe added near bottom of README.md.
-- Chunk 6 complete. Migration plan fully executed.
+## Rollback notes
 
-## Session Notes — 2026-05-04
+If any chunk fails verification:
 
-- Chunk 5 Task 5.1 shipped at commit 5491175. Big-bang migration: meditations/, docs/adr/, CONTEXT.md, VISION.md → .ralph/. Bundled pipeline path strings updated. ADR-0007 + spec landed in same commit.
-- Catch-up fix at 551faf3: pipeline-preflight.test.ts fixtures updated from <tmpdir>/pipelines/ → <tmpdir>/.ralph/pipelines/ — Chunk 4 had missed this test's fixture.
-- Smoke deviation: Step 12 used `pipeline validate` instead of `pipeline run` to keep the iteration short. Full end-to-end run deferred to Chunk 6 Task 6.2.
-- Implementer noted: pre-create `mkdir -p .ralph/meditations` before `git mv meditations .ralph/meditations` caused nested `.ralph/meditations/meditations/`; corrected with extra git mvs. Net result identical to plan intent. Future big-bangs: skip the meditations subdir in the pre-mkdir.
-- Remaining: Chunk 6 (final verification + doc cleanup).
+- **Chunks 1–4** are independently revertable via `git revert <sha>`. The next chunk's commit may need a fix-up but the partition principle isn't violated.
+- **Chunks 5–7** are doc/ADR/cleanup; revertable without test impact.
+- The hardest revert window is between chunks 3 and 4 — `.ralph/CONTEXT.md` is gone but root `pipelines/` and `memory/` haven't moved yet. The repo is functional but mid-state. Don't pause work for >1 day in that window.
+
+If a critical bug surfaces post-merge: roll forward by adjusting the next ADR (0009+) rather than reverting 0008. The ADR trail must remain append-only.
