@@ -92,7 +92,7 @@ Meditation (restricted insight sessions):
   program
     .command("init [project-folder]")
     .description("Scaffold .ralph/ tree in the project folder (defaults to cwd). Idempotent.")
-    .addHelpText("after", "\nExamples:\n  ralph init             # in cwd\n  ralph init my-app      # in ./my-app\n\nCreates .ralph/{pipelines,meditations,memory,docs/adr,runs}, scaffolds empty\nVISION.md and CONTEXT.md, runs 'git init -b main' if not already a repo, and\nappends .ralph/runs/ to .gitignore. Safe to run on existing projects — never\noverwrites files.\n")
+    .addHelpText("after", "\nExamples:\n  ralph init             # in cwd\n  ralph init my-app      # in ./my-app\n\nCreates .ralph/{pipelines,meditations/{illuminations,stimuli},sessions,runs}\nplus root docs/adr/, scaffolds empty CONTEXT.md, VISION.md, README.md at\nrepo root, runs 'git init -b main' if not already a repo, and appends\n.ralph/runs/ to .gitignore. Safe to run on existing projects — never\noverwrites files.\n")
     .action(async (projectFolder?: string) => {
       await initCommand(projectFolder ?? process.cwd());
     });
@@ -191,7 +191,7 @@ Scans <project>/pipelines/*.dot and prints each workflow's name and goal.
     .description("Render a pipeline as SVG next to the source file")
     .addHelpText("after", `
 Examples:
-  ralph pipeline show pipelines/illumination-to-implementation/pipeline.dot
+  ralph pipeline show .ralph/pipelines/illumination-to-implementation/pipeline.dot
   ralph pipeline show review --project my-app
 
 Validates the DOT file (same gate as 'pipeline validate'). On success, writes

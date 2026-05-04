@@ -17,12 +17,8 @@ export function stimuliDir(projectRoot: string): string {
   return join(meditationsDir(projectRoot), "stimuli");
 }
 
-export function memoryDir(projectRoot: string): string {
-  return join(ralphDir(projectRoot), "memory");
-}
-
-export function docsAdrDir(projectRoot: string): string {
-  return join(ralphDir(projectRoot), "docs", "adr");
+export function sessionsDir(projectRoot: string): string {
+  return join(ralphDir(projectRoot), "sessions");
 }
 
 export function pipelinesDir(projectRoot: string): string {

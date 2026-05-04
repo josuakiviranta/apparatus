@@ -6,8 +6,7 @@ import {
   pipelinesDir,
   illuminationsDir,
   stimuliDir,
-  memoryDir,
-  docsAdrDir,
+  sessionsDir,
 } from "../lib/ralph-paths.js";
 import { join } from "node:path";
 
@@ -17,19 +16,19 @@ export async function initCommand(projectRoot: string): Promise<void> {
     pipelinesDir(projectRoot),
     illuminationsDir(projectRoot),
     stimuliDir(projectRoot),
-    memoryDir(projectRoot),
-    docsAdrDir(projectRoot),
+    sessionsDir(projectRoot),
+    join(projectRoot, "docs", "adr"),
   ];
   for (const d of dirs) {
     mkdirSync(d, { recursive: true });
   }
 
-  const visionPath = join(ralphDir(projectRoot), "VISION.md");
+  const visionPath = join(projectRoot, "VISION.md");
   if (!existsSync(visionPath)) {
     writeFileSync(visionPath, "# Vision\n\n_Describe what this project is and why it exists._\n");
   }
 
-  const contextPath = join(ralphDir(projectRoot), "CONTEXT.md");
+  const contextPath = join(projectRoot, "CONTEXT.md");
   if (!existsSync(contextPath)) {
     writeFileSync(contextPath, "# Domain Language\n\n## Glossary\n\n_Define the terms specific to this project's domain._\n");
   }

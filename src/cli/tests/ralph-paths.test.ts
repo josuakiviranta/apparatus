@@ -5,8 +5,7 @@ import {
   meditationsDir,
   illuminationsDir,
   stimuliDir,
-  memoryDir,
-  docsAdrDir,
+  sessionsDir,
   pipelinesDir,
   runsDir,
   runDir,
@@ -31,11 +30,8 @@ describe("ralph-paths", () => {
       "/abs/project/.ralph/meditations/stimuli",
     );
   });
-  it("memoryDir joins .ralph/memory", () => {
-    expect(memoryDir(project)).toBe("/abs/project/.ralph/memory");
-  });
-  it("docsAdrDir joins .ralph/docs/adr", () => {
-    expect(docsAdrDir(project)).toBe("/abs/project/.ralph/docs/adr");
+  it("sessionsDir joins .ralph/sessions", () => {
+    expect(sessionsDir(project)).toBe("/abs/project/.ralph/sessions");
   });
   it("pipelinesDir joins .ralph/pipelines", () => {
     expect(pipelinesDir(project)).toBe("/abs/project/.ralph/pipelines");

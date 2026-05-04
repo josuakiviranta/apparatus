@@ -28,10 +28,10 @@ describe("ralph init", () => {
     expect(existsSync(join(projectDir, ".ralph/pipelines"))).toBe(true);
     expect(existsSync(join(projectDir, ".ralph/meditations/illuminations"))).toBe(true);
     expect(existsSync(join(projectDir, ".ralph/meditations/stimuli"))).toBe(true);
-    expect(existsSync(join(projectDir, ".ralph/memory"))).toBe(true);
-    expect(existsSync(join(projectDir, ".ralph/docs/adr"))).toBe(true);
-    expect(existsSync(join(projectDir, ".ralph/VISION.md"))).toBe(true);
-    expect(existsSync(join(projectDir, ".ralph/CONTEXT.md"))).toBe(true);
+    expect(existsSync(join(projectDir, ".ralph/sessions"))).toBe(true);
+    expect(existsSync(join(projectDir, "docs/adr"))).toBe(true);
+    expect(existsSync(join(projectDir, "VISION.md"))).toBe(true);
+    expect(existsSync(join(projectDir, "CONTEXT.md"))).toBe(true);
   });
 
   it("scaffolds README.md at root if absent", async () => {
@@ -46,10 +46,9 @@ describe("ralph init", () => {
   });
 
   it("does not overwrite an existing VISION.md", async () => {
-    mkdirSync(join(projectDir, ".ralph"), { recursive: true });
-    writeFileSync(join(projectDir, ".ralph/VISION.md"), "my vision");
+    writeFileSync(join(projectDir, "VISION.md"), "my vision");
     await initCommand(projectDir);
-    expect(readFileSync(join(projectDir, ".ralph/VISION.md"), "utf8")).toBe("my vision");
+    expect(readFileSync(join(projectDir, "VISION.md"), "utf8")).toBe("my vision");
   });
 
   it("appends .ralph/runs/ to .gitignore (creating the file if absent)", async () => {
@@ -69,24 +68,24 @@ describe("ralph init", () => {
   it("is idempotent — running twice yields the same tree", async () => {
     await initCommand(projectDir);
     const firstSnapshot = JSON.stringify({
-      vision: readFileSync(join(projectDir, ".ralph/VISION.md"), "utf8"),
-      context: readFileSync(join(projectDir, ".ralph/CONTEXT.md"), "utf8"),
+      vision: readFileSync(join(projectDir, "VISION.md"), "utf8"),
+      context: readFileSync(join(projectDir, "CONTEXT.md"), "utf8"),
     });
     await initCommand(projectDir);
     const secondSnapshot = JSON.stringify({
-      vision: readFileSync(join(projectDir, ".ralph/VISION.md"), "utf8"),
-      context: readFileSync(join(projectDir, ".ralph/CONTEXT.md"), "utf8"),
+      vision: readFileSync(join(projectDir, "VISION.md"), "utf8"),
+      context: readFileSync(join(projectDir, "CONTEXT.md"), "utf8"),
     });
     expect(secondSnapshot).toBe(firstSnapshot);
   });
 
   it("fills in missing subfolders on a partial existing .ralph/", async () => {
     mkdirSync(join(projectDir, ".ralph/pipelines"), { recursive: true });
-    // .ralph/ exists with only pipelines/; meditations/, memory/, docs/ are missing
+    // .ralph/ exists with only pipelines/; meditations/, sessions/, docs/ are missing
     await initCommand(projectDir);
     expect(existsSync(join(projectDir, ".ralph/meditations/illuminations"))).toBe(true);
-    expect(existsSync(join(projectDir, ".ralph/memory"))).toBe(true);
-    expect(existsSync(join(projectDir, ".ralph/docs/adr"))).toBe(true);
+    expect(existsSync(join(projectDir, ".ralph/sessions"))).toBe(true);
+    expect(existsSync(join(projectDir, "docs/adr"))).toBe(true);
   });
 
   it.skipIf(!gitAvailable())("runs git init if the directory is not a repo", async () => {

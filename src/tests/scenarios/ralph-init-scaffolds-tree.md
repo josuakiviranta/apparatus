@@ -12,10 +12,10 @@
 - directory `init-smoke/.ralph/pipelines` exists
 - directory `init-smoke/.ralph/meditations/illuminations` exists
 - directory `init-smoke/.ralph/meditations/stimuli` exists
-- directory `init-smoke/.ralph/memory` exists
-- directory `init-smoke/.ralph/docs/adr` exists
-- file `init-smoke/.ralph/VISION.md` exists and starts with `# Vision`
-- file `init-smoke/.ralph/CONTEXT.md` exists and starts with `# Domain Language`
+- directory `init-smoke/.ralph/sessions` exists
+- directory `init-smoke/docs/adr` exists
+- file `init-smoke/VISION.md` exists and starts with `# Vision`
+- file `init-smoke/CONTEXT.md` exists and starts with `# Domain Language`
 - file `init-smoke/README.md` exists
 - file `init-smoke/.gitignore` exists and contains a line equal to `.ralph/runs/`
 - directory `init-smoke/.git` exists (git repo was initialized)
