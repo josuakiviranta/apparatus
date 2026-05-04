@@ -99,7 +99,7 @@ Meditation (restricted insight sessions):
 
   program
     .command("meditate <project-folder>")
-    .description("Run a restricted Claude session that writes insights to meditations/illuminations/")
+    .description("Run a restricted Claude session that writes insights to .ralph/meditations/illuminations/")
     .addHelpText("after", "\nExamples:\n  ralph meditate my-app\n\nThe pipeline can be overridden by placing pipelines/meditate/pipeline.dot in your project folder.\n")
     .option("--var <key=value>", "pass caller variable (repeatable, e.g. --var steer=...)", collectKV, {} as Record<string, string>)
     .action(async (projectFolder: string, opts: Record<string, unknown>) => {

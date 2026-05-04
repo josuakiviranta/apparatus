@@ -23,7 +23,7 @@ scenario tests in `<project>/<path>` after the implementer finishes, then
 drives them through a tmux harness — fixing code red-green until they pass
 or the agent judges itself stuck. The flag requires running inside a tmux
 session (preflight check). Scenario test format and discipline are
-documented in `CONTEXT.md` and `docs/adr/0003-scenario-tests-in-implement-pipeline.md`.
+documented in `.ralph/CONTEXT.md` and `.ralph/docs/adr/0003-scenario-tests-in-implement-pipeline.md`.
 
 Each agent turn is annotated with:
 - `→ [read] path`, `→ [write] path`, `→ [edit] path` — file operations
@@ -47,7 +47,7 @@ For unattended workspace hygiene scanning, schedule the bundled janitor pipeline
 ralph heartbeat pipeline janitor --project . --every 720
 ```
 
-The janitor scans source/workspace through a KISS lens — bloat, YAGNI violations, refactor opportunities — and writes one illumination per candidate. It is read-only on code; the only mutating call is `write_illumination`. See `docs/adr/0002-consume-only-illumination-lifecycle.md` for the lifecycle context.
+The janitor scans source/workspace through a KISS lens — bloat, YAGNI violations, refactor opportunities — and writes one illumination per candidate. It is read-only on code; the only mutating call is `write_illumination`. See `.ralph/docs/adr/0002-consume-only-illumination-lifecycle.md` for the lifecycle context.
 
 ```bash
 ralph pipeline run <pipeline.dot> [--var <key=value>...] [--resume]
@@ -59,7 +59,7 @@ ralph pipeline run pipelines/my-pipeline.dot \
   --var meditations_dir=meditations
 ```
 
-Pass `--resume [runId]` to continue a pipeline after Ctrl-C, a node failure, or a crash. The engine checkpoints after every node advance to `~/.ralph/<projectKey>/runs/<runId>/checkpoint.json` — the trace `pipeline.jsonl` lives in the same directory. Bare `--resume` auto-selects when exactly one prior run exists for the project; pass an explicit `<runId>` to disambiguate. Older runs are pruned lazily (last 50 per project, override with `RALPH_RUNS_KEEP`). For `--resume` to be useful, tool-node scripts must be idempotent — a script that hard-requires "state before I act" will fail on retry; detect the desired outcome is already present and exit 0 as a no-op instead.
+Pass `--resume [runId]` to continue a pipeline after Ctrl-C, a node failure, or a crash. The engine checkpoints after every node advance to `<project>/.ralph/runs/<runId>/checkpoint.json` — the trace `pipeline.jsonl` lives in the same directory. Bare `--resume` auto-selects when exactly one prior run exists for the project; pass an explicit `<runId>` to disambiguate. Older runs are pruned lazily (last 50 per project, override with `RALPH_RUNS_KEEP`). For `--resume` to be useful, tool-node scripts must be idempotent — a script that hard-requires "state before I act" will fail on retry; detect the desired outcome is already present and exit 0 as a no-op instead.
 
 ```bash
 ralph pipeline validate <pipeline.dot>
@@ -156,8 +156,8 @@ Press `Ctrl+C`. Ralph cleanly terminates its own claude subprocess without affec
 
 ## Where to look
 
-- **`CONTEXT.md`** — domain language and glossary
-- **`docs/adr/`** — decision records (why things are the way they are)
+- **`.ralph/CONTEXT.md`** — domain language and glossary
+- **`.ralph/docs/adr/`** — decision records (why things are the way they are)
 - **`src/`** — TypeScript source (CLI, pipeline engine, daemon, MCP servers)
 - **`pipelines/`** — project-local `.dot` pipelines (also `src/cli/pipelines/` for bundled ones shipped to consumers)
 
@@ -172,4 +172,4 @@ npm link           # test ralph binary locally
 
 ## Decisions
 
-See [`docs/adr/`](docs/adr/) for accepted decision records.
+See [`.ralph/docs/adr/`](.ralph/docs/adr/) for accepted decision records.

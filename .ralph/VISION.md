@@ -22,15 +22,17 @@ When it works, running a pipeline feels like delegating to someone who already u
 
 Pipelines are the **web**: a graph of agents and information flow, each agent doing one job, some iterating deeply ("spider" agents that eat through a backlog). The bundled `illumination-to-implementation` pipeline is the canonical example.
 
-A pipeline is authored once and run against any target project via `--project <folder>`. The project is the working directory; the pipeline is the orchestration logic.
+Pipelines live in two tiers:
+
+- **Bundled** (`src/cli/pipelines/` in the ralph-cli npm package) — generic, cross-project pipelines like janitor and meditate.
+- **Project-local** (`<project>/.ralph/pipelines/`) — pipelines a specific project owns, can fork from bundled, and can have meditation iterate on.
+
+A target project declares itself ralph-shaped by having a `.ralph/` folder. That folder is the single home for everything ralph-touchable in the project: pipelines, meditations (illuminations + stimuli), memory, ADRs, CONTEXT.md, VISION.md, run state. Agents inside the project read everything from one place — no user-home boundary to cross.
+
+See `.ralph/docs/adr/0007-ralph-folder-as-project-local-home.md` for the full layout.
 
 ## What it is not
 
 - **Not a Claude Code replacement.** Claude is the muscle; ralph is the choreography.
 - **Not multi-tenant.** Single human, single machine. No cloud, no teams, no shared state.
-- **Not per-project bespoke webs.** Earlier framing. Pipelines are cross-project; project-specificity is handled by runtime variables (`--var`), not by storing pipelines per-project.
 - **Opinionated, but extensible.** The primitives are fixed; the graphs you build with them are yours.
-
-## Open
-
-Where pipelines should live (bundled in source, user-home library, somewhere else) and how authoring/iteration should work are still being designed. Current state of the codebase doesn't yet match this revised vision.

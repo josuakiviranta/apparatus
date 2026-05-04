@@ -12,7 +12,7 @@ The runtime path is `loadAgent(name, pipelineDir)` in
 `src/cli/lib/agent-loader.ts`. A missing file fails fast with
 `Agent file not found: <path>`.
 
-Excised on 2026-04-30 (see `docs/adr/0001-agents-live-next-to-pipeline.md`):
+Excised on 2026-04-30 (see `.ralph/docs/adr/0001-agents-live-next-to-pipeline.md`):
 the old `agent-registry.ts` multi-tier resolver, the user-dir tier
 (`~/.ralph/agents/`), the bundled-agents dir (`getBundledAgentsDir`), the
 `ralph agent list/show` CLI subcommands, and the
@@ -26,7 +26,7 @@ pipeline is run against an external target project via `--project <folder>`
 ### Illumination lifecycle
 
 An illumination has two states by location: **alive** (file exists in
-`meditations/illuminations/`) or **consumed** (file deleted). There are no
+`.ralph/meditations/illuminations/`) or **consumed** (file deleted). There are no
 side folders, no `archived` or `implemented` lifecycle directories, no
 in-flight `dispatched` state.
 
@@ -45,14 +45,14 @@ coincidence between illumination and plan is incidental, not relied upon.
 The MCP surface (`src/cli/mcp/illumination-server.ts`):
 
 - `list_illuminations()` — no parameters; returns every file in
-  `meditations/illuminations/`.
+  `.ralph/meditations/illuminations/`.
 - `write_illumination(date, description, body)` — creates an illumination.
 - `consume(filename, reason: "implemented" | "declined")` — deletes +
   commits.
 
-Excised on 2026-04-30 (see `docs/adr/0002-consume-only-illumination-lifecycle.md`):
+Excised on 2026-04-30 (see `.ralph/docs/adr/0002-consume-only-illumination-lifecycle.md`):
 the `mark_dispatched`, `mark_implemented`, `mark_archived` MCP tools; the
-`meditations/archived-illuminations/` and `meditations/implemented-illuminations/`
+`.ralph/meditations/archived-illuminations/` and `.ralph/meditations/implemented-illuminations/`
 directories; the `status` parameter on `list_illuminations`; the
 `pipelines/illumination-to-implementation/mark-archived.mjs` script; the
 dispatch gate path in the illumination-to-implementation pipeline.
@@ -116,7 +116,7 @@ ralph-cli has three documentation channels with disjoint roles:
 
 - **`CONTEXT.md` (this file)** — domain language and glossary. Hand-curated.
   Updated during grill-with-docs sessions and ADR writes. Stable.
-- **`docs/adr/`** — append-only decision records. Each captures a hard-to-reverse
+- **`.ralph/docs/adr/`** — append-only decision records. Each captures a hard-to-reverse
   or surprising-without-context choice with its trade-off. Never edited after
   acceptance.
 - **`src/` and `pipelines/`** — the authoritative description of behavior.
@@ -125,8 +125,8 @@ ralph-cli has three documentation channels with disjoint roles:
 Removed on 2026-05-01: `docs/specs/` (behavioral specs that drifted faster than
 they could be maintained) and `docs/orientation/directory-inventory.md` (a
 curated file-tree summary that drifted on every reorg). See
-`docs/adr/0004-source-and-context-as-truth-no-behavioral-specs.md`.
+`.ralph/docs/adr/0004-source-and-context-as-truth-no-behavioral-specs.md`.
 
 Agents needing workspace orientation discover the project layout at runtime
-(Glob source/docs roots) and read `CONTEXT.md` + `docs/adr/` + `README.md` +
+(Glob source/docs roots) and read `.ralph/CONTEXT.md` + `.ralph/docs/adr/` + `README.md` +
 a live `src/` inventory. No preloaded curated overview.

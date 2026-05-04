@@ -10,7 +10,7 @@ describe("assets", () => {
 
   it("getMetaMeditationsDir returns a path to the stimulus library with all lens files present", () => {
     const p = getMetaMeditationsDir();
-    expect(p).toMatch(/meditations\/stimuli$/);
+    expect(p).toMatch(/\.ralph\/meditations\/stimuli$/);
     expect(existsSync(p)).toBe(true);
     const files = readdirSync(p).filter((f) => f.endsWith(".md"));
     expect(files.length).toBeGreaterThanOrEqual(29);

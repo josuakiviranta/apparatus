@@ -163,8 +163,8 @@ export async function globFiles(projectRoot: string, pattern: string): Promise<s
 const NO_META_MEDITATIONS_MESSAGE =
   "No meta-meditations found. You can still proceed — reflect on the project code " +
   "directly and write your illumination using write_illumination.\n\n" +
-  "To add meta-meditations: create .md files in the meditations/stimuli/ folder of your " +
-  "ralph-cli installation (e.g. ~/.npm-global/lib/node_modules/ralph-cli/meditations/stimuli/). " +
+  "To add meta-meditations: create .md files in the .ralph/meditations/stimuli/ folder of your " +
+  "ralph-cli installation (e.g. ~/.npm-global/lib/node_modules/ralph-cli/.ralph/meditations/stimuli/). " +
   "Each file is a lens the agent will use to reflect on your project.";
 
 export function listMetaMeditations(meditationsDir: string): string {

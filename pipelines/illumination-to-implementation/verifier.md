@@ -80,7 +80,7 @@ A technically accurate illumination that fails project-fit is still a `false` �
    - **Spec / docs / test ripple subagent** — list ADRs, specs, README sections, `CONTEXT.md` entries, and existing test files that would update; name likely-new test paths (`src/tests/unit/...`, `tests/...`).
 
    Aggregate the subagent outputs into a short `Blast radius:` paragraph for `explanation`: rough size (S / M / L), files-touched count, surfaces crossed, breaking-change yes/no, doc/test ripple. Stay read-only — no edits, no test runs, no estimates dressed up as guarantees.
-7. **Verdict.** Emit JSON matching `schemas/verifier.json`. Every claim in `explanation` must trace back to a specific subagent's quoted finding — attribute inline (e.g. "ADR subagent confirmed the resume contract at `docs/adr/0007-…`:23", "files-touched subagent surfaced 4 paths under `src/cli/mcp/`"). If you cannot attribute a sentence to a subagent's read, drop the sentence.
+7. **Verdict.** Emit JSON matching `schemas/verifier.json`. Every claim in `explanation` must trace back to a specific subagent's quoted finding — attribute inline (e.g. "ADR subagent confirmed the resume contract at `.ralph/docs/adr/0007-…`:23", "files-touched subagent surfaced 4 paths under `src/cli/mcp/`"). If you cannot attribute a sentence to a subagent's read, drop the sentence.
 
 # Output
 
