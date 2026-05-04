@@ -1,6 +1,6 @@
 digraph implement {
   goal="Autonomous implementation loop"
-  inputs="llm_model,scenarios_dir"
+  inputs="scenarios_dir"
 
   start [shape=Mdiamond]
 

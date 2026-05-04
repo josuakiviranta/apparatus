@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { writeFileSync, mkdirSync } from "fs";
+import { writeFileSync, mkdirSync, readFileSync } from "fs";
 import { tmpdir } from "os";
-import { join } from "path";
+import { join, dirname, resolve } from "path";
+import { fileURLToPath } from "url";
 import { parseDot, validateGraph } from "../core/graph.js";
 
 function setupAgents(dir: string, files: Record<string, string>) {
@@ -196,5 +197,22 @@ body
     // tool_node.sha is produced via produces="sha"; max_iterations is silenced
     // via default_max_iterations="0" on the consumer. Neither should appear.
     expect(info).toBeUndefined();
+  });
+
+  it("bundled implement pipeline lists scenarios_dir and not llm_model", () => {
+    // Snapshot guard for the bundled implement pipeline's [required_caller_vars]
+    // banner. After the inputs= edit on pipeline.dot:3, llm_model is no longer a
+    // declared input and must not appear in the diagnostic message; scenarios_dir
+    // remains the sole caller-supplied key.
+    const here = dirname(fileURLToPath(import.meta.url));
+    const pipelinePath = resolve(here, "..", "..", "cli", "pipelines", "implement", "pipeline.dot");
+    const dot = readFileSync(pipelinePath, "utf8");
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dirname(pipelinePath));
+    const info = diags.find(d => d.rule === "required_caller_vars");
+    expect(info).toBeDefined();
+    expect(info!.severity).toBe("info");
+    expect(info!.message).toContain("scenarios_dir");
+    expect(info!.message).not.toContain("llm_model");
   });
 });
