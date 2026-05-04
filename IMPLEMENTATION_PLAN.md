@@ -250,7 +250,7 @@ Goal: the `memory-writer` pipeline node, when next invoked, writes to `.ralph/se
 
 ### Tasks
 
-- [ ] **2.1: Update `memory-writer.md` line 49 (write-target path).**
+- [x] **2.1: Update `memory-writer.md` line 49 (write-target path).**
 
 ```
 $project/memory/YYYY-MM-DD-<slug>.md
@@ -258,7 +258,7 @@ $project/memory/YYYY-MM-DD-<slug>.md
 $project/.ralph/sessions/YYYY-MM-DD-<slug>.md
 ```
 
-- [ ] **2.2: Update `memory-writer.md` line 144 (no-writes-outside guard).**
+- [x] **2.2: Update `memory-writer.md` line 144 (no-writes-outside guard).**
 
 ```
 No writes outside $project/memory/
@@ -266,12 +266,12 @@ No writes outside $project/memory/
 No writes outside $project/.ralph/sessions/
 ```
 
-- [ ] **2.3: Verify no other `memory/` references in `memory-writer.md`.**
+- [x] **2.3: Verify no other `memory/` references in `memory-writer.md`.**
 
 Run: `grep -n "memory/" pipelines/illumination-to-implementation/memory-writer.md`
 Expected: zero hits, or only hits inside `.ralph/sessions/` paths.
 
-- [ ] **2.4: Update `verifier.md` line 83 example string.**
+- [x] **2.4: Update `verifier.md` line 83 example string.**
 
 ```
 "ADR subagent confirmed the resume contract at `.ralph/docs/adr/0007-…`"
@@ -279,11 +279,11 @@ Expected: zero hits, or only hits inside `.ralph/sessions/` paths.
 "ADR subagent confirmed the resume contract at `docs/adr/0007-…`"
 ```
 
-- [ ] **2.5: Sanity-read both prompts end-to-end.**
+- [x] **2.5: Sanity-read both prompts end-to-end.**
 
 The narrative around the edited lines must remain coherent. Specifically: in `verifier.md`, line 83 sits inside a longer explanation of attribution; the edit must not break sentence flow.
 
-- [ ] **2.6: Commit.**
+- [x] **2.6: Commit.**
 
 ```bash
 git add pipelines/illumination-to-implementation/memory-writer.md \
