@@ -5,14 +5,14 @@ import { parseDot, validateGraph } from "../../attractor/core/graph.js";
 
 const REPO_ROOT = resolve(__dirname, "../../..");
 
-describe("pipelines/smoke/missing-caller-var/ — chunk-4 per-folder migration", () => {
-  it("pipeline.dot exists at <repo>/pipelines/smoke/missing-caller-var/pipeline.dot", () => {
-    const expected = join(REPO_ROOT, "pipelines", "smoke", "missing-caller-var", "pipeline.dot");
+describe(".ralph/scenarios/missing-caller-var/ — chunk-4 per-folder migration", () => {
+  it("pipeline.dot exists at <repo>/.ralph/scenarios/missing-caller-var/pipeline.dot", () => {
+    const expected = join(REPO_ROOT, ".ralph", "scenarios", "missing-caller-var", "pipeline.dot");
     expect(existsSync(expected)).toBe(true);
   });
 
   it("validateGraph emits zero error-level diagnostics for the migrated pipeline", () => {
-    const dotPath = join(REPO_ROOT, "pipelines", "smoke", "missing-caller-var", "pipeline.dot");
+    const dotPath = join(REPO_ROOT, ".ralph", "scenarios", "missing-caller-var", "pipeline.dot");
     const graph = parseDot(readFileSync(dotPath, "utf-8"));
     const diags = validateGraph(graph, dirname(dotPath));
     const errors = diags.filter((d) => d.severity === "error");

@@ -5,20 +5,20 @@ import { parseDot, validateGraph } from "../../attractor/core/graph.js";
 
 const REPO_ROOT = resolve(__dirname, "../../..");
 
-describe("pipelines/smoke/conditional/ — chunk-4 per-folder migration", () => {
-  it("pipeline.dot exists at <repo>/pipelines/smoke/conditional/pipeline.dot", () => {
-    const expected = join(REPO_ROOT, "pipelines", "smoke", "conditional", "pipeline.dot");
+describe(".ralph/scenarios/conditional/ — chunk-4 per-folder migration", () => {
+  it("pipeline.dot exists at <repo>/.ralph/scenarios/conditional/pipeline.dot", () => {
+    const expected = join(REPO_ROOT, ".ralph", "scenarios", "conditional", "pipeline.dot");
     expect(existsSync(expected)).toBe(true);
   });
 
   it("ships task.md alongside pipeline.dot for project-local agent resolution", () => {
-    const agentPath = join(REPO_ROOT, "pipelines", "smoke", "conditional", "task.md");
+    const agentPath = join(REPO_ROOT, ".ralph", "scenarios", "conditional", "task.md");
     expect(existsSync(agentPath)).toBe(true);
     expect(readFileSync(agentPath, "utf-8")).toContain("name: task");
   });
 
   it("validateGraph emits zero error-level diagnostics for the migrated pipeline", () => {
-    const dotPath = join(REPO_ROOT, "pipelines", "smoke", "conditional", "pipeline.dot");
+    const dotPath = join(REPO_ROOT, ".ralph", "scenarios", "conditional", "pipeline.dot");
     const graph = parseDot(readFileSync(dotPath, "utf-8"));
     const diags = validateGraph(graph, dirname(dotPath));
     const errors = diags.filter((d) => d.severity === "error");

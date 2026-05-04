@@ -416,27 +416,27 @@ Goal: complete ADR-0007's incomplete migration. Root `pipelines/illumination-to-
 
 ### Tasks
 
-- [ ] **4.1: `git mv pipelines/illumination-to-implementation/ .ralph/pipelines/illumination-to-implementation/`.**
+- [x] **4.1: `git mv pipelines/illumination-to-implementation/ .ralph/pipelines/illumination-to-implementation/`.**
 
 ```bash
 mkdir -p .ralph/pipelines
 git mv pipelines/illumination-to-implementation .ralph/pipelines/illumination-to-implementation
 ```
 
-- [ ] **4.2: `git mv pipelines/smoke/ .ralph/scenarios/`.**
+- [x] **4.2: `git mv pipelines/smoke/ .ralph/scenarios/`.**
 
 ```bash
 git mv pipelines/smoke .ralph/scenarios
 ```
 
-- [ ] **4.3: Verify root `pipelines/` is empty; remove if so.**
+- [x] **4.3: Verify root `pipelines/` is empty; remove if so.**
 
 ```bash
 ls pipelines/         # expected: empty
 rmdir pipelines       # safe; only removes if empty
 ```
 
-- [ ] **4.4: `git mv memory/ .ralph/sessions/`.**
+- [x] **4.4: `git mv memory/ .ralph/sessions/`.**
 
 Note: `.ralph/sessions/` doesn't exist yet (created lazily by chunk 1's `init.ts` only when `ralph init` runs). Need to ensure target parent exists.
 
@@ -446,14 +446,14 @@ git mv memory .ralph/sessions
 
 If `git mv` complains about `.ralph/sessions` not existing as a parent: that's expected since `.ralph/` exists but `.ralph/sessions/` does not. The `git mv <src> <dest>` form treats `<dest>` as the new name. Verify with `ls .ralph/sessions/` after — should contain 18 .md files.
 
-- [ ] **4.5: Remove empty `.ralph/memory/` if it exists.**
+- [x] **4.5: Remove empty `.ralph/memory/` if it exists.**
 
 ```bash
 ls .ralph/memory/    # expected: empty (chunk 1 made init.ts not create it, but for ralph-cli's own .ralph/ the dir was created by past ralph init)
 rmdir .ralph/memory  # safe
 ```
 
-- [ ] **4.6: Update `illumination-pipeline-flow.test.ts:8-9`.**
+- [x] **4.6: Update `illumination-pipeline-flow.test.ts:8-9`.**
 
 ```typescript
 // Before:
@@ -465,7 +465,7 @@ const dotPath = resolve(root, ".ralph/pipelines/illumination-to-implementation/p
 const dotDir = resolve(root, ".ralph/pipelines/illumination-to-implementation");
 ```
 
-- [ ] **4.7: Update `dual-parser.test.ts:16`.**
+- [x] **4.7: Update `dual-parser.test.ts:16`.**
 
 ```typescript
 // Before:
@@ -475,7 +475,7 @@ const roots = ["pipelines", "pipelines/smoke"];
 const roots = [".ralph/pipelines", ".ralph/scenarios"];
 ```
 
-- [ ] **4.8: Update each of the 14 `pipeline-smoke-*-folder.test.ts` files — ~4 edit sites per file.**
+- [x] **4.8: Update each of the 14 `pipeline-smoke-*-folder.test.ts` files — ~4 edit sites per file.**
 
 **Important:** each file has FOUR substitutions, not one. Sample structure (from `pipeline-smoke-tool-folder.test.ts`, similar across all 14):
 
@@ -516,7 +516,7 @@ grep -rn 'pipelines/smoke\|"pipelines",\s*"smoke"' src/cli/tests/ src/attractor/
 ```
 Expected: zero hits. (Pattern catches both string-literal forms and array-arg forms.)
 
-- [ ] **4.9: Run all four kinds of tests.**
+- [x] **4.9: Run all four kinds of tests.**
 
 ```bash
 npx vitest run src/attractor/tests/illumination-pipeline-flow.test.ts
@@ -527,7 +527,7 @@ npx vitest run    # full suite
 
 Expected: all PASS.
 
-- [ ] **4.10: Run smoke verification of pipeline list.**
+- [x] **4.10: Run smoke verification of pipeline list.** (deferred to chunk 7 per orchestrator instructions; build artefact may be stale)
 
 ```bash
 npx ralph pipeline list .
@@ -535,7 +535,7 @@ npx ralph pipeline list .
 
 Expected: `illumination-to-implementation` appears; nothing under `.ralph/scenarios/` is listed (subdirs invisible to top-level scan, per spec §3.3).
 
-- [ ] **4.11: Commit.**
+- [x] **4.11: Commit.**
 
 ```bash
 git add .ralph/ src/attractor/tests/illumination-pipeline-flow.test.ts \
