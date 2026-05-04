@@ -14,7 +14,7 @@
 ## Operational Notes
 
 - Commands use `Agent` class from `src/cli/lib/agent.ts` to spawn Claude sessions
-- Agent definitions are markdown files with YAML frontmatter, owned per-pipeline under `pipelines/<name>/<agent>.md`. There is no global registry — see `.ralph/docs/adr/0001-agents-live-next-to-pipeline.md`.
+- Agent definitions are markdown files with YAML frontmatter, owned per-pipeline under `pipelines/<name>/<agent>.md`. There is no global registry — see `docs/adr/0001-agents-live-next-to-pipeline.md`.
 - Pipeline engine uses `AgentHandler` for all agent/codergen nodes — `loop.ts` and `CodergenHandler` have been removed
 - All command output goes through `src/cli/lib/output.ts` — unified Ink output API (`step`, `info`, `warn`, `error`, `success`, `header`, `spinner`, `stream`)
 - Prod/dev detection uses `__RALPH_PROD__` constant injected by tsup `define` at build time. Ambient type in `src/types/globals.d.ts`.
