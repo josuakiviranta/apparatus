@@ -1,7 +1,7 @@
 import { resolve, join, sep } from "path";
 import { existsSync } from "fs";
-import { homedir } from "os";
 import { resolveBundledPipeline } from "./assets.js";
+import { pipelinesDir } from "./ralph-paths.js";
 
 const VALID_NAME = /^[a-zA-Z0-9_-]+$/;
 
@@ -12,7 +12,7 @@ export function isNameShorthand(arg: string): boolean {
 }
 
 export function getPipelinesDir(project: string): string {
-  return join(resolve(project), "pipelines");
+  return pipelinesDir(resolve(project));
 }
 
 export function resolvePipelineArg(arg: string, project: string): string {
@@ -33,14 +33,6 @@ export function resolvePipelineArg(arg: string, project: string): string {
   const projectPath = join(getPipelinesDir(project), `${arg}.dot`);
   if (existsSync(projectPath)) return projectPath;
 
-  // 3. User home — folder-form
-  const userFolderPath = join(homedir(), ".ralph", "pipelines", arg, "pipeline.dot");
-  if (existsSync(userFolderPath)) return userFolderPath;
-
-  // 4. User home — flat-form
-  const userPath = join(homedir(), ".ralph", "pipelines", `${arg}.dot`);
-  if (existsSync(userPath)) return userPath;
-
-  // 5. Bundled
+  // 3. Bundled
   return resolveBundledPipeline(arg);
 }

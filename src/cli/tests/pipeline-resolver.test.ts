@@ -34,15 +34,15 @@ describe("resolvePipelineArg", () => {
 
   it("resolves a plain name to project-local path when it exists", () => {
     mockExists.mockImplementation((p: unknown) =>
-      typeof p === "string" && p.includes(join("/my-app", "pipelines", "review.dot"))
+      typeof p === "string" && p.includes(join("/my-app", ".ralph", "pipelines", "review.dot"))
     );
     const result = resolvePipelineArg("review", "/my-app");
-    expect(result).toBe(join("/my-app", "pipelines", "review.dot"));
+    expect(result).toBe(join("/my-app", ".ralph", "pipelines", "review.dot"));
   });
 
   it("resolves a name with .dot omitted", () => {
     mockExists.mockImplementation((p: unknown) =>
-      typeof p === "string" && p.includes(join("/my-app", "pipelines", "review.dot"))
+      typeof p === "string" && p.includes(join("/my-app", ".ralph", "pipelines", "review.dot"))
     );
     const result = resolvePipelineArg("review", "/my-app");
     expect(result.endsWith(".dot")).toBe(true);
@@ -69,10 +69,10 @@ describe("resolvePipelineArg bundled fallback", () => {
 
   it("prefers project-local pipeline when it exists", () => {
     mockExists.mockImplementation((p: unknown) =>
-      typeof p === "string" && p.includes("/my/project/pipelines/implement.dot")
+      typeof p === "string" && p.includes("/my/project/.ralph/pipelines/implement.dot")
     );
     const result = resolvePipelineArg("implement", "/my/project");
-    expect(result).toContain("/my/project/pipelines/implement.dot");
+    expect(result).toContain("/my/project/.ralph/pipelines/implement.dot");
   });
 
   it("returns absolute path unchanged for non-shorthand args", () => {
@@ -84,8 +84,8 @@ describe("resolvePipelineArg bundled fallback", () => {
 describe("resolvePipelineArg folder-form lookup (Chunk 4: per-pipeline folder)", () => {
   beforeEach(() => mockExists.mockReturnValue(false));
 
-  it("returns <project>/pipelines/<name>/pipeline.dot when folder-form exists and flat-form does not", () => {
-    const folderPath = join("/my-app", "pipelines", "janitor", "pipeline.dot");
+  it("returns <project>/.ralph/pipelines/<name>/pipeline.dot when folder-form exists and flat-form does not", () => {
+    const folderPath = join("/my-app", ".ralph", "pipelines", "janitor", "pipeline.dot");
     mockExists.mockImplementation((p: unknown) =>
       typeof p === "string" && p === folderPath
     );
@@ -93,8 +93,8 @@ describe("resolvePipelineArg folder-form lookup (Chunk 4: per-pipeline folder)",
   });
 
   it("prefers folder-form over flat-form when BOTH exist (folder = SSoT, Decision 1)", () => {
-    const folderPath = join("/my-app", "pipelines", "janitor", "pipeline.dot");
-    const flatPath = join("/my-app", "pipelines", "janitor.dot");
+    const folderPath = join("/my-app", ".ralph", "pipelines", "janitor", "pipeline.dot");
+    const flatPath = join("/my-app", ".ralph", "pipelines", "janitor.dot");
     mockExists.mockImplementation((p: unknown) =>
       typeof p === "string" && (p === folderPath || p === flatPath)
     );
@@ -102,30 +102,16 @@ describe("resolvePipelineArg folder-form lookup (Chunk 4: per-pipeline folder)",
   });
 
   it("falls through to flat-form when only the flat <name>.dot exists (back-compat)", () => {
-    const flatPath = join("/my-app", "pipelines", "legacy.dot");
+    const flatPath = join("/my-app", ".ralph", "pipelines", "legacy.dot");
     mockExists.mockImplementation((p: unknown) =>
       typeof p === "string" && p === flatPath
     );
     expect(resolvePipelineArg("legacy", "/my-app")).toBe(flatPath);
   });
-
-  it("checks folder-form at the user-home layer too", () => {
-    const userFolderPath = join(
-      process.env.HOME || "",
-      ".ralph",
-      "pipelines",
-      "janitor",
-      "pipeline.dot",
-    );
-    mockExists.mockImplementation((p: unknown) =>
-      typeof p === "string" && p === userFolderPath
-    );
-    expect(resolvePipelineArg("janitor", "/my-app")).toBe(userFolderPath);
-  });
 });
 
 describe("getPipelinesDir", () => {
-  it("returns pipelines subfolder of project", () => {
-    expect(getPipelinesDir("/my-app")).toBe(join("/my-app", "pipelines"));
+  it("returns .ralph/pipelines subfolder of project", () => {
+    expect(getPipelinesDir("/my-app")).toBe(join("/my-app", ".ralph", "pipelines"));
   });
 });

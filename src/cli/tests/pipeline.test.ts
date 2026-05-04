@@ -92,8 +92,8 @@ describe("pipelineValidateCommand", () => {
   });
 
   it("resolves name shorthand to pipelines/ path", async () => {
-    mkdirSync(join(dir, "pipelines"));
-    writeFileSync(join(dir, "pipelines", "review.dot"), VALID_DOT);
+    mkdirSync(join(dir, ".ralph", "pipelines"), { recursive: true });
+    writeFileSync(join(dir, ".ralph", "pipelines", "review.dot"), VALID_DOT);
     const code = await pipelineValidateCommand("review", { project: dir });
     expect(code).toBe(0);
   });
@@ -144,8 +144,8 @@ describe("pipelineRunCommand", () => {
   });
 
   it("resolves name shorthand to pipelines/ path", async () => {
-    mkdirSync(join(dir, "pipelines"));
-    writeFileSync(join(dir, "pipelines", "review.dot"), VALID_DOT);
+    mkdirSync(join(dir, ".ralph", "pipelines"), { recursive: true });
+    writeFileSync(join(dir, ".ralph", "pipelines", "review.dot"), VALID_DOT);
     await pipelineRunCommand("review", { project: dir, logsRoot: dir });
     expect(engine.runPipeline).toHaveBeenCalledTimes(1);
   });
@@ -339,16 +339,16 @@ describe("pipelineListCommand", () => {
   });
 
   it("prints message when pipelines/ is empty", async () => {
-    mkdirSync(join(dir, "pipelines"));
+    mkdirSync(join(dir, ".ralph", "pipelines"), { recursive: true });
     await pipelineListCommand({ project: dir });
     expect(out.info).toHaveBeenCalledWith(expect.stringContaining("ralph pipeline create"));
   });
 
   it("lists .dot files with their goal attribute", async () => {
-    mkdirSync(join(dir, "pipelines"));
-    writeFileSync(join(dir, "pipelines", "review.dot"),
+    mkdirSync(join(dir, ".ralph", "pipelines"), { recursive: true });
+    writeFileSync(join(dir, ".ralph", "pipelines", "review.dot"),
       `digraph g {\n  goal="Run review"\n  start [shape=Mdiamond]\n  done [shape=Msquare]\n  start -> done\n}`);
-    writeFileSync(join(dir, "pipelines", "deploy.dot"),
+    writeFileSync(join(dir, ".ralph", "pipelines", "deploy.dot"),
       `digraph g {\n  start [shape=Mdiamond]\n  done [shape=Msquare]\n  start -> done\n}`);
     await pipelineListCommand({ project: dir });
     expect(out.info).toHaveBeenCalledWith(expect.stringContaining("review"));

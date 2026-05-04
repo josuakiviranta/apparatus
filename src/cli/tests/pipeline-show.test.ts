@@ -93,15 +93,15 @@ describe("pipelineShowCommand", () => {
     expect(svg.startsWith("<svg") || svg.startsWith("<?xml")).toBe(true);
   });
 
-  it("resolves a bare name through pipeline-resolver and writes SVG into <project>/pipelines/", async () => {
+  it("resolves a bare name through pipeline-resolver and writes SVG into <project>/.ralph/pipelines/", async () => {
     const { mkdirSync, writeFileSync } = await import("fs");
-    mkdirSync(join(dir, "pipelines"));
+    mkdirSync(join(dir, ".ralph", "pipelines"), { recursive: true });
     writeFileSync(
-      join(dir, "pipelines", "review.dot"),
+      join(dir, ".ralph", "pipelines", "review.dot"),
       `digraph g {\n  start [shape=Mdiamond]\n  done [shape=Msquare]\n  start -> done\n}`,
     );
     const code = await pipelineShowCommand("review", { project: dir });
     expect(code).toBe(0);
-    expect(existsSync(join(dir, "pipelines", "review.svg"))).toBe(true);
+    expect(existsSync(join(dir, ".ralph", "pipelines", "review.svg"))).toBe(true);
   });
 });

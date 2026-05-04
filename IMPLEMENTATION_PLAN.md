@@ -659,21 +659,21 @@ fixture-path assertions update in lockstep."
 - Modify: `src/cli/lib/pipeline-resolver.ts`
 - Modify: `src/cli/tests/pipeline-resolver.test.ts`
 
-- [ ] **Step 1: Read `src/cli/lib/pipeline-resolver.ts` fully**
+- [x] **Step 1: Read `src/cli/lib/pipeline-resolver.ts` fully**
 
 Identify every search-path tier. Confirm sites at lines 37 and 41
 (`userFolderPath`, `userPath` rooted at `homedir() + ".ralph/pipelines/"`).
 
-- [ ] **Step 2: Update tests**
+- [x] **Step 2: Update tests**
 
 Replace fixture paths from `<project>/pipelines/...` to `<project>/.ralph/pipelines/...`. Delete any tests that exercise the user-home `~/.ralph/pipelines/` fallback (the tier is going away).
 
-- [ ] **Step 3: Run tests — expect failure**
+- [x] **Step 3: Run tests — expect failure**
 
 Run: `npx vitest run src/cli/tests/pipeline-resolver.test.ts`
 Expected: FAIL.
 
-- [ ] **Step 4: Update the resolver**
+- [x] **Step 4: Update the resolver**
 
 Import `pipelinesDir` from `../lib/ralph-paths.js`.
 
@@ -681,17 +681,17 @@ Replace:
 - `<project>/pipelines/<name>` search → `pipelinesDir(project)/<name>` (i.e. `<project>/.ralph/pipelines/<name>`)
 - Delete the user-home fallback at lines 37 and 41 (`userFolderPath`, `userPath`). Two-tier resolution: project-local first, bundled second. No user-home tier.
 
-- [ ] **Step 5: Run tests — expect pass**
+- [x] **Step 5: Run tests — expect pass**
 
 Run: `npx vitest run src/cli/tests/pipeline-resolver.test.ts`
 Expected: green.
 
-- [ ] **Step 6: Run full test suite**
+- [x] **Step 6: Run full test suite**
 
 Run: `npx vitest run`
 Expected: full suite green.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/cli/lib/pipeline-resolver.ts src/cli/tests/pipeline-resolver.test.ts
