@@ -226,22 +226,12 @@ export function parsePlanDescription(filePath: string): string {
   }
 }
 
-export function listPlans(projectRoot: string, status?: string): string {
+export function listPlans(projectRoot: string): string {
   const dir = join(projectRoot, "docs", "superpowers", "plans");
   try {
-    let files = readdirSync(dir)
+    const files = readdirSync(dir)
       .filter((f) => f.endsWith(".md"))
       .sort();
-    if (status) {
-      files = files.filter((f) => {
-        const content = readFileSync(join(dir, f), "utf-8");
-        const fmMatch = content.match(/^---\n([\s\S]*?)\n---\n/);
-        if (!fmMatch) return false;
-        const statusMatch = fmMatch[1].match(/^status:\s*(.+)$/m);
-        const fileStatus = statusMatch ? statusMatch[1].trim() : null;
-        return fileStatus === status;
-      });
-    }
     if (files.length === 0) return NO_PLANS_MESSAGE;
     return files
       .map((f) => `${f} — ${parsePlanDescription(join(dir, f))}`)
@@ -249,63 +239,6 @@ export function listPlans(projectRoot: string, status?: string): string {
   } catch {
     return NO_PLANS_MESSAGE;
   }
-}
-
-export function markPlanImplemented(
-  projectRoot: string,
-  planFilename: string,
-):
-  | { success: true; plan_filename: string; previous_status: string; new_status: string }
-  | { success: false; error: string } {
-  const fnErr = validateFilename(planFilename);
-  if (fnErr) return { success: false, error: fnErr };
-
-  const planDir = join(projectRoot, "docs", "superpowers", "plans");
-  const filePath = join(planDir, planFilename);
-
-  if (!existsSync(filePath)) {
-    return { success: false, error: `Plan file not found: ${planFilename}` };
-  }
-
-  const raw = readFileSync(filePath, "utf-8");
-  const fmMatch = raw.match(/^---\n([\s\S]*?)\n---\n/);
-  if (!fmMatch) {
-    return { success: false, error: "No frontmatter found in plan file" };
-  }
-
-  const fmBlock = fmMatch[1];
-  const body = raw.slice(fmMatch[0].length);
-
-  const statusMatch = fmBlock.match(/^status:\s*(.+)$/m);
-  const currentStatus = statusMatch ? statusMatch[1].trim() : null;
-
-  if (currentStatus !== "pending") {
-    return {
-      success: false,
-      error: `Cannot mark as implemented: current status is ${currentStatus ?? "(missing)"}`,
-    };
-  }
-
-  const updatedFm = fmBlock.replace(/^status:\s*.+$/m, "status: implemented");
-  const updatedContent = `---\n${updatedFm}\n---\n${body}`;
-  writeFileSync(filePath, updatedContent);
-
-  try {
-    execSync(`git -C "${projectRoot}" add "${filePath}"`, { stdio: "ignore" });
-    execSync(
-      `git -C "${projectRoot}" commit -m "meditate: mark plan ${planFilename} implemented"`,
-      { stdio: "ignore" },
-    );
-  } catch {
-    // git not available, not a git repo, or nothing to commit (idempotent re-run).
-  }
-
-  return {
-    success: true,
-    plan_filename: planFilename,
-    previous_status: currentStatus,
-    new_status: "implemented",
-  };
 }
 
 export function readMetaMeditation(meditationsDir: string, filename: string): string {
@@ -544,29 +477,11 @@ if (!isTestEnv) {
     server.tool(
       "list_plans",
       "List implementation plans in docs/superpowers/plans/, with their H1 titles. " +
-        "Optionally filter by lifecycle status (pending or implemented). " +
-        "Call this to see what plans remain unimplemented.",
-      {
-        status: z.enum(["pending", "implemented"]).optional(),
-      },
-      async ({ status }: { status?: string }) => {
-        const result = listPlans(projectRoot, status);
+        "No filters — every file in the folder is alive (consumed plans are deleted by consume_plan).",
+      {},
+      async () => {
+        const result = listPlans(projectRoot);
         return { content: [{ type: "text" as const, text: result }] };
-      },
-    );
-
-    server.tool(
-      "mark_plan_implemented",
-      "Mark a plan as implemented. Valid only from status pending. " +
-        "Auto-commits the frontmatter change. Call this when the plan's feature has shipped.",
-      {
-        plan_filename: z.string(),
-      },
-      async ({ plan_filename }: { plan_filename: string }) => {
-        const result = markPlanImplemented(projectRoot, plan_filename);
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
-        };
       },
     );
 

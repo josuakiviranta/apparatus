@@ -1,5 +1,4 @@
 ---
-status: complete
 ---
 
 # Janitor — Delete Dead `parseStructuredOutput` Helper Implementation Plan

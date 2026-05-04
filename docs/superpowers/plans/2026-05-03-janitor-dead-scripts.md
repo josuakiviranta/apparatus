@@ -1,5 +1,4 @@
 ---
-status: complete
 ---
 
 # Janitor — Delete the Dead `scripts/` Folder Implementation Plan

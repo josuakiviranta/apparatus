@@ -11,7 +11,7 @@ vi.mock("node:child_process", () => ({
   execSync: mockExecSync,
 }));
 
-import { validateFilename, validateSlug, composeIlluminationFilename, writeIllumination, assertWithinRoot, readFile, validateGlobPattern, globFiles, projectTree, listMetaMeditations, readMetaMeditation, listIlluminations, listPlans, markPlanImplemented, consume, consumePlan } from "../mcp/illumination-server";
+import { validateFilename, validateSlug, composeIlluminationFilename, writeIllumination, assertWithinRoot, readFile, validateGlobPattern, globFiles, projectTree, listMetaMeditations, readMetaMeditation, listIlluminations, listPlans, consume, consumePlan } from "../mcp/illumination-server";
 
 let tmpDir: string;
 
@@ -517,28 +517,6 @@ describe("listPlans", () => {
     expect(listPlans(tmpDir)).toBe("No plans found.");
   });
 
-  it("filter=pending returns only pending files", () => {
-    writePlanFile("a-pending.md", "status: pending", "# Plan A\n");
-    writePlanFile("b-implemented.md", "status: implemented", "# Plan B\n");
-    writePlanFile("c-no-fm.md", null, "# Plan C\n");
-    const result = listPlans(tmpDir, "pending");
-    expect(result).toBe("a-pending.md — Plan A");
-  });
-
-  it("filter=implemented returns only implemented files", () => {
-    writePlanFile("a-pending.md", "status: pending", "# Plan A\n");
-    writePlanFile("b-implemented.md", "status: implemented", "# Plan B\n");
-    writePlanFile("c-no-fm.md", null, "# Plan C\n");
-    const result = listPlans(tmpDir, "implemented");
-    expect(result).toBe("b-implemented.md — Plan B");
-  });
-
-  it("filter excludes no-frontmatter files from any status", () => {
-    writePlanFile("c-no-fm.md", null, "# Plan C\n");
-    expect(listPlans(tmpDir, "pending")).toBe("No plans found.");
-    expect(listPlans(tmpDir, "implemented")).toBe("No plans found.");
-  });
-
   it("no filter returns all files including no-frontmatter", () => {
     writePlanFile("a-pending.md", "status: pending", "# Plan A\n");
     writePlanFile("b-implemented.md", "status: implemented", "# Plan B\n");
@@ -553,120 +531,6 @@ describe("listPlans", () => {
     writePlanFile("d-no-h1.md", "status: pending", "Body without heading\n");
     const result = listPlans(tmpDir);
     expect(result).toBe("d-no-h1.md — (no description)");
-  });
-});
-
-describe("markPlanImplemented", () => {
-  let tmpDir: string;
-
-  beforeEach(() => {
-    tmpDir = realpathSync(mkdtempSync(join(tmpdir(), "ralph-plan-impl-")));
-    mkdirSync(join(tmpDir, "docs", "superpowers", "plans"), { recursive: true });
-    mockExecSync.mockReset();
-  });
-
-  afterEach(() => {
-    rmSync(tmpDir, { recursive: true, force: true });
-  });
-
-  function writePlanFile(filename: string, frontmatter: string | null, body: string) {
-    const fm = frontmatter === null ? "" : `---\n${frontmatter}\n---\n`;
-    writeFileSync(join(tmpDir, "docs", "superpowers", "plans", filename), fm + body);
-  }
-
-  it("transitions pending to implemented and rewrites frontmatter", () => {
-    writePlanFile(
-      "2026-04-12-meditate-backpressure-guard.md",
-      "status: pending\nillumination_source: 2026-04-12T0900-foo.md",
-      "# Backpressure plan\n\nBody.\n",
-    );
-    const result = markPlanImplemented(tmpDir, "2026-04-12-meditate-backpressure-guard.md");
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.previous_status).toBe("pending");
-      expect(result.new_status).toBe("implemented");
-      expect(result.plan_filename).toBe("2026-04-12-meditate-backpressure-guard.md");
-    }
-    const written = readFileSync(
-      join(tmpDir, "docs", "superpowers", "plans", "2026-04-12-meditate-backpressure-guard.md"),
-      "utf-8",
-    );
-    expect(written).toMatch(/status: implemented/);
-    expect(written).not.toMatch(/status: pending/);
-    expect(written).toMatch(/illumination_source: 2026-04-12T0900-foo\.md/);
-    expect(written).toContain("# Backpressure plan");
-    expect(written).toContain("Body.");
-  });
-
-  it("auto-commits with git add + commit (mirroring markDispatched)", () => {
-    writePlanFile(
-      "T-commit.md",
-      "status: pending",
-      "# Commit test\n",
-    );
-    const result = markPlanImplemented(tmpDir, "T-commit.md");
-    expect(result.success).toBe(true);
-    expect(mockExecSync).toHaveBeenCalledTimes(2);
-    const addCall = mockExecSync.mock.calls[0][0] as string;
-    const commitCall = mockExecSync.mock.calls[1][0] as string;
-    expect(addCall).toContain("git -C");
-    expect(addCall).toContain(tmpDir);
-    expect(addCall).toContain("add");
-    expect(addCall).toContain("T-commit.md");
-    expect(commitCall).toContain("commit");
-    expect(commitCall).toContain("meditate: mark plan T-commit.md implemented");
-  });
-
-  it("rejects already-implemented plan", () => {
-    writePlanFile("T-already-impl.md", "status: implemented", "# Done\n");
-    const result = markPlanImplemented(tmpDir, "T-already-impl.md");
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error).toContain("implemented");
-    }
-  });
-
-  it("rejects plan with no frontmatter", () => {
-    writePlanFile("T-no-fm.md", null, "# Bare\n");
-    const result = markPlanImplemented(tmpDir, "T-no-fm.md");
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error).toBe("No frontmatter found in plan file");
-    }
-  });
-
-  it("rejects missing file", () => {
-    const result = markPlanImplemented(tmpDir, "T-nonexistent.md");
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error).toBe("Plan file not found: T-nonexistent.md");
-    }
-  });
-
-  it("rejects plan with frontmatter but no status field", () => {
-    writePlanFile("T-no-status.md", "illumination_source: foo.md", "# No status field\n");
-    const result = markPlanImplemented(tmpDir, "T-no-status.md");
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error).toContain("(missing)");
-    }
-  });
-
-  it("returns success even when git commands fail (fail-open)", () => {
-    mockExecSync.mockImplementation(() => {
-      throw new Error("git not found");
-    });
-    writePlanFile("T-fail-open.md", "status: pending", "# Fail open\n");
-    const result = markPlanImplemented(tmpDir, "T-fail-open.md");
-    expect(result.success).toBe(true);
-  });
-
-  it("rejects invalid filename via validateFilename", () => {
-    const result = markPlanImplemented(tmpDir, "../escape.md");
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error).toContain("Invalid filename");
-    }
   });
 });
 
