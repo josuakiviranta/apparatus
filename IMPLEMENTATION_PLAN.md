@@ -312,37 +312,37 @@ Goal: `CONTEXT.md`, `VISION.md`, `docs/adr/` return to repo root. AGENTS.md refe
 
 ### Tasks
 
-- [ ] **3.1: Verify `docs/` directory at root currently has only `superpowers/` and `harness/`.**
+- [x] **3.1: Verify `docs/` directory at root currently has only `superpowers/` and `harness/`.**
 
 Run: `ls /Users/josu/Documents/projects/ralph-cli/docs/`
 Expected: `harness  superpowers` (no `adr` yet).
 
-- [ ] **3.2: `git mv .ralph/CONTEXT.md CONTEXT.md`.**
+- [x] **3.2: `git mv .ralph/CONTEXT.md CONTEXT.md`.**
 
 ```bash
 git mv .ralph/CONTEXT.md CONTEXT.md
 ```
 
-- [ ] **3.3: `git mv .ralph/VISION.md VISION.md`.**
+- [x] **3.3: `git mv .ralph/VISION.md VISION.md`.**
 
 ```bash
 git mv .ralph/VISION.md VISION.md
 ```
 
-- [ ] **3.4: `git mv .ralph/docs/adr docs/adr`.**
+- [x] **3.4: `git mv .ralph/docs/adr docs/adr`.**
 
 ```bash
 git mv .ralph/docs/adr docs/adr
 ```
 
-- [ ] **3.5: Verify `.ralph/docs/` is empty after the move; remove if so.**
+- [x] **3.5: Verify `.ralph/docs/` is empty after the move; remove if so.**
 
 ```bash
 ls .ralph/docs/         # expected: empty
 rmdir .ralph/docs       # safe; only removes if empty
 ```
 
-- [ ] **3.6: Update `AGENTS.md` line 17.**
+- [x] **3.6: Update `AGENTS.md` line 17.**
 
 ```
 .ralph/docs/adr/0001-...
@@ -350,7 +350,7 @@ rmdir .ralph/docs       # safe; only removes if empty
 docs/adr/0001-...
 ```
 
-- [ ] **3.7: Local grep sweep — third-party convention paths gone from `.ralph/`.**
+- [x] **3.7: Local grep sweep — third-party convention paths gone from `.ralph/`.**
 
 ```bash
 grep -rn '\.ralph/CONTEXT\.md\|\.ralph/VISION\.md\|\.ralph/docs/adr' \
@@ -359,17 +359,17 @@ grep -rn '\.ralph/CONTEXT\.md\|\.ralph/VISION\.md\|\.ralph/docs/adr' \
 ```
 Expected: hits only in README.md (chunk 5 will fix) and `pipelines/illumination-to-implementation/verifier.md` if not already touched (chunk 2 fixed it). No hits under `src/`. AGENTS.md:17 should already be flipped by step 3.6.
 
-- [ ] **3.8: Run full test suite + tsc.**
+- [x] **3.8: Run full test suite + tsc.**
 
 Run: `npx tsc --noEmit && npx vitest run`
 Expected: PASS. Tests don't reference ralph-cli's own CONTEXT.md/VISION.md/ADR files (init tests use temp dirs); the move is invisible to runtime code.
 
-- [ ] **3.9: Verify ADR file count.**
+- [x] **3.9: Verify ADR file count.**
 
 Run: `ls docs/adr/ | wc -l`
 Expected: `7` (ADR-0001 through ADR-0007).
 
-- [ ] **3.10: Commit.**
+- [x] **3.10: Commit.**
 
 ```bash
 git add CONTEXT.md VISION.md docs/adr/ AGENTS.md
