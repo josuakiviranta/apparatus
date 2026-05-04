@@ -12,7 +12,7 @@ The runtime path is `loadAgent(name, pipelineDir)` in
 `src/cli/lib/agent-loader.ts`. A missing file fails fast with
 `Agent file not found: <path>`.
 
-Excised on 2026-04-30 (see `.ralph/docs/adr/0001-agents-live-next-to-pipeline.md`):
+Excised on 2026-04-30 (see `docs/adr/0001-agents-live-next-to-pipeline.md`):
 the old `agent-registry.ts` multi-tier resolver, the user-dir tier
 (`~/.ralph/agents/`), the bundled-agents dir (`getBundledAgentsDir`), the
 `ralph agent list/show` CLI subcommands, and the
@@ -26,9 +26,29 @@ against an external target project via `--project <folder>`.
 ### Project-local layout
 
 A target project declares itself ralph-shaped by having a `<project>/.ralph/`
-folder. That folder is the single home for everything ralph-touchable in
-the project: pipelines, meditations (illuminations + stimuli), memory,
-ADRs, CONTEXT.md, VISION.md, and run state.
+folder. That folder is the home for ralph-defined project-local artefacts:
+
+```
+.ralph/
+├── pipelines/                ← project-local pipelines
+├── meditations/
+│   ├── illuminations/
+│   └── stimuli/
+├── sessions/                 ← session-closure files (was memory/)
+├── scenarios/                ← smoke-pipeline test fixtures
+└── runs/                     ← pipeline run state + checkpoints
+```
+
+Pre-existing project-doc conventions stay at repo root, where humans, IDE
+doc-outliners, GitHub, and third-party tooling expect them:
+
+```
+<repo root>/
+├── CONTEXT.md      ← domain language (DDD glossary)
+├── VISION.md       ← mission narrative
+├── README.md       ← public-facing entry
+└── docs/adr/       ← MADR-style decision records
+```
 
 Two-tier pipeline read at runtime:
 - **Project-local:** `<project>/.ralph/pipelines/<name>/pipeline.dot`
@@ -37,8 +57,9 @@ Two-tier pipeline read at runtime:
 Two-tier stimuli reads (project-local + bundled) work the same way for
 the meditate pipeline.
 
-See `.ralph/docs/adr/0007-ralph-folder-as-project-local-home.md` for
-the full layout and the trade-off against ADR-0001.
+See `docs/adr/0007-ralph-folder-as-project-local-home.md` and the
+partial-revert refinement in `docs/adr/0008-partial-revert-of-ralph-folder.md`
+for the full layout and partition principle.
 
 ### Illumination lifecycle
 
@@ -67,14 +88,14 @@ The MCP surface (`src/cli/mcp/illumination-server.ts`):
 - `consume(filename, reason: "implemented" | "declined")` — deletes +
   commits.
 
-Excised on 2026-04-30 (see `.ralph/docs/adr/0002-consume-only-illumination-lifecycle.md`):
+Excised on 2026-04-30 (see `docs/adr/0002-consume-only-illumination-lifecycle.md`):
 the `mark_dispatched`, `mark_implemented`, `mark_archived` MCP tools; the
 `.ralph/meditations/archived-illuminations/` and `.ralph/meditations/implemented-illuminations/`
 directories; the `status` parameter on `list_illuminations`; the
 `pipelines/illumination-to-implementation/mark-archived.mjs` script; the
 dispatch gate path in the illumination-to-implementation pipeline.
 
-### Scenario test
+### Harness scenario
 
 A markdown file (typically under `src/tests/scenarios/` in a target project)
 that describes observable behavior of the system from the operator's seat:
@@ -108,6 +129,54 @@ Each scenario file follows a fixed three-section shape:
 bullet against observed reality. Scenarios are **authoritative**: when a clause
 fails, tmux-tester fixes the code, never the scenario.
 
+See also: **Smoke-pipeline scenario**.
+
+### Smoke-pipeline scenario
+
+A pipeline-engine test fixture: a `pipeline.dot` plus its agent `.md` files
+with ralph-specific frontmatter (`outputs:`, `inputs:`, gate prompts, tool
+nodes). Lives at `<repo>/.ralph/scenarios/<name>/`. Consumed by the
+`pipeline-smoke-<name>-folder.test.ts` files in `src/cli/tests/` to verify
+parser, validator, runtime, and per-folder discovery — the engine's own
+test surface, not user-facing operator scenarios.
+
+Renamed from "smoke pipeline" on 2026-05-04 to disambiguate from the
+illumination-to-implementation pipeline (production) and to land them
+under `.ralph/scenarios/` rather than commingled with `.ralph/pipelines/`
+where `pipeline list` would surface them.
+
+See also: **Harness scenario**.
+
+### Session-closure file
+
+A markdown narrative written by the `memory-writer` pipeline node at the
+end of each illumination-to-implementation session. Lives at
+`<project>/.ralph/sessions/<YYYY-MM-DD>-<slug>.md`. Captures what was
+attempted, what shipped, what surprised, and follow-up threads — for
+future-Claude reading on later sessions.
+
+Renamed from "memory" on 2026-05-04 (see ADR-0008): "memory" was
+overloaded across Claude Code's auto-memory feature, ADR-0007's empty
+`.ralph/memory/` slot, and these closure files. "Session-closure file"
+names what the artefact actually is.
+
+### Project-local artefact
+
+A file or directory that meets BOTH clauses of the §1.2 partition principle
+(see ADR-0008):
+
+- **Clause A — ralph-defined.** Format, lifecycle, or discovery semantics
+  specified by ralph (illumination YAML schema, `.dot` files with ralph
+  attributes, run-state checkpoint format, etc.).
+- **Clause B — no pre-existing root convention.** No widely-adopted
+  ecosystem convention places the file at repo root.
+
+Both clauses are required. Project-local artefacts live in
+`<project>/.ralph/`. Pre-existing project-doc conventions (CONTEXT.md,
+VISION.md, docs/adr/, README.md) stay at repo root. See
+`docs/adr/0007-ralph-folder-as-project-local-home.md` and
+`docs/adr/0008-partial-revert-of-ralph-folder.md`.
+
 ### Janitor
 
 A scheduled agent (run via `ralph heartbeat` against
@@ -133,7 +202,7 @@ ralph-cli has three documentation channels with disjoint roles:
 
 - **`CONTEXT.md` (this file)** — domain language and glossary. Hand-curated.
   Updated during grill-with-docs sessions and ADR writes. Stable.
-- **`.ralph/docs/adr/`** — append-only decision records. Each captures a hard-to-reverse
+- **`docs/adr/`** — append-only decision records. Each captures a hard-to-reverse
   or surprising-without-context choice with its trade-off. Never edited after
   acceptance.
 - **`src/` and `pipelines/`** — the authoritative description of behavior.
@@ -142,8 +211,14 @@ ralph-cli has three documentation channels with disjoint roles:
 Removed on 2026-05-01: `docs/specs/` (behavioral specs that drifted faster than
 they could be maintained) and `docs/orientation/directory-inventory.md` (a
 curated file-tree summary that drifted on every reorg). See
-`.ralph/docs/adr/0004-source-and-context-as-truth-no-behavioral-specs.md`.
+`docs/adr/0004-source-and-context-as-truth-no-behavioral-specs.md`.
 
 Agents needing workspace orientation discover the project layout at runtime
-(Glob source/docs roots) and read `.ralph/CONTEXT.md` + `.ralph/docs/adr/` + `README.md` +
+(Glob source/docs roots) and read `CONTEXT.md` + `docs/adr/` + `README.md` +
 a live `src/` inventory. No preloaded curated overview.
+
+---
+
+ADR-0007 (`.ralph/` as project-local home) is partly superseded by
+ADR-0008 (partial revert + partition principle). See
+`docs/adr/0008-partial-revert-of-ralph-folder.md`.

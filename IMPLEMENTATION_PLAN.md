@@ -571,7 +571,7 @@ Goal: README reflects the partial-revert layout. CONTEXT.md (now at root) is rew
 
 ### Tasks
 
-- [ ] **5.1: Update `README.md` line 14 (init description).**
+- [x] **5.1: Update `README.md` line 14 (init description).**
 
 ```
 Before:
@@ -581,7 +581,7 @@ After:
 `ralph init` is idempotent. It creates `.ralph/{pipelines,meditations/{illuminations,stimuli},sessions,runs}` plus root `docs/adr/`, scaffolds empty `VISION.md`, `CONTEXT.md`, and `README.md` at repo root, ...
 ```
 
-- [ ] **5.2: Update `README.md` line 37.**
+- [x] **5.2: Update `README.md` line 37.**
 
 ```
 documented in `.ralph/CONTEXT.md` and `.ralph/docs/adr/0003-...`
@@ -589,7 +589,7 @@ documented in `.ralph/CONTEXT.md` and `.ralph/docs/adr/0003-...`
 documented in `CONTEXT.md` and `docs/adr/0003-...`
 ```
 
-- [ ] **5.3: Update `README.md` line 61.**
+- [x] **5.3: Update `README.md` line 61.**
 
 ```
 See `.ralph/docs/adr/0002-...`
@@ -597,7 +597,7 @@ See `.ralph/docs/adr/0002-...`
 See `docs/adr/0002-...`
 ```
 
-- [ ] **5.4: Update `README.md` lines 170-173 ("Where to look" section).**
+- [x] **5.4: Update `README.md` lines 170-173 ("Where to look" section).**
 
 ```
 - **`.ralph/CONTEXT.md`** — domain language and glossary
@@ -607,11 +607,11 @@ See `docs/adr/0002-...`
 - **`docs/adr/`** — decision records (why things are the way they are)
 ```
 
-- [ ] **5.5: Delete `README.md` lines 184-198 (migration recipe).**
+- [x] **5.5: Delete `README.md` lines 184-198 (migration recipe).**
 
 The "Migrating an existing ralph project to the .ralph/ layout" section described migrating *into* the ADR-0007 layout that this revert undoes. No projects need it; deletion is cleaner than rewriting. Delete the section header (line 184) through the post-recipe paragraph (line 198 — the "~/.ralph/<projectKey>/runs/" inert-dir note).
 
-- [ ] **5.6: Update `README.md` line 202.**
+- [x] **5.6: Update `README.md` line 202.**
 
 ```
 See [`.ralph/docs/adr/`](.ralph/docs/adr/) for accepted decision records.
@@ -619,7 +619,7 @@ See [`.ralph/docs/adr/`](.ralph/docs/adr/) for accepted decision records.
 See [`docs/adr/`](docs/adr/) for accepted decision records.
 ```
 
-- [ ] **5.7: Multi-section rewrite of `CONTEXT.md` (now at repo root).**
+- [x] **5.7: Multi-section rewrite of `CONTEXT.md` (now at repo root).**
 
 Read the file end-to-end first. Then apply:
 
@@ -657,7 +657,7 @@ And add a sibling note: `<repo root>/CONTEXT.md, VISION.md, docs/adr/, README.md
 (e) **ADR supersession footer.**
 At end of file (or natural section break): "ADR-0007 (`.ralph/` as project-local home) is partly superseded by ADR-0008 (partial revert + partition principle). See `docs/adr/0008-partial-revert-of-ralph-folder.md`."
 
-- [ ] **5.8: Update `VISION.md` line 30 + line 32 (post-`git mv`, now at repo root).**
+- [x] **5.8: Update `VISION.md` line 30 + line 32 (post-`git mv`, now at repo root).**
 
 Line 30 narrative: replace the sentence that says `.ralph/` is "the single home for everything ralph-touchable in the project: pipelines, meditations …, memory, ADRs, CONTEXT.md, VISION.md, run state" with:
 
@@ -670,7 +670,7 @@ See `.ralph/docs/adr/0007-ralph-folder-as-project-local-home.md` for the full la
 See `docs/adr/0007-ralph-folder-as-project-local-home.md` (and the partial-revert refinement in `docs/adr/0008-partial-revert-of-ralph-folder.md`) for the layout and partition principle.
 ```
 
-- [ ] **5.9: Run grep sweep.**
+- [x] **5.9: Run grep sweep.**
 
 ```bash
 grep -rn '\.ralph/CONTEXT\.md\|\.ralph/VISION\.md\|\.ralph/docs/adr' \
@@ -679,12 +679,12 @@ grep -rn '\.ralph/CONTEXT\.md\|\.ralph/VISION\.md\|\.ralph/docs/adr' \
 ```
 Expected: zero hits in live files (historical plans/specs under `docs/superpowers/` are exempt).
 
-- [ ] **5.10: Run full test suite.**
+- [x] **5.10: Run full test suite.**
 
 Run: `npx tsc --noEmit && npx vitest run`
 Expected: PASS.
 
-- [ ] **5.11: Commit.**
+- [x] **5.11: Commit.**
 
 ```bash
 git add README.md CONTEXT.md VISION.md

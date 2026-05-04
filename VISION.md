@@ -27,9 +27,9 @@ Pipelines live in two tiers:
 - **Bundled** (`src/cli/pipelines/` in the ralph-cli npm package) — generic, cross-project pipelines like janitor and meditate.
 - **Project-local** (`<project>/.ralph/pipelines/`) — pipelines a specific project owns, can fork from bundled, and can have meditation iterate on.
 
-A target project declares itself ralph-shaped by having a `.ralph/` folder. That folder is the single home for everything ralph-touchable in the project: pipelines, meditations (illuminations + stimuli), memory, ADRs, CONTEXT.md, VISION.md, run state. Agents inside the project read everything from one place — no user-home boundary to cross.
+A target project declares itself ralph-shaped by having a `.ralph/` folder. That folder holds ralph-defined project-local artefacts: pipelines, meditations (illuminations + stimuli), sessions (closure files written by `memory-writer`), scenarios (smoke-pipeline test fixtures), and run state. Project-doc conventions owned by the wider ecosystem — `CONTEXT.md`, `VISION.md`, `docs/adr/`, `README.md` — stay at repo root where humans, IDE doc-outliners, and third-party tooling expect them.
 
-See `.ralph/docs/adr/0007-ralph-folder-as-project-local-home.md` for the full layout.
+See `docs/adr/0007-ralph-folder-as-project-local-home.md` (and the partial-revert refinement in `docs/adr/0008-partial-revert-of-ralph-folder.md`) for the layout and partition principle.
 
 ## What it is not
 

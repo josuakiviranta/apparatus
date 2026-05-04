@@ -11,7 +11,7 @@ mkdir my-app && cd my-app
 ralph init
 ````
 
-`ralph init` is idempotent. It creates `.ralph/{pipelines,meditations/{illuminations,stimuli},memory,docs/adr}`, scaffolds empty `VISION.md` and `CONTEXT.md`, runs `git init -b main` if the directory is not yet a repo, and appends `.ralph/runs/` to `.gitignore`. Re-running it on an existing project fills in any missing subfolders without overwriting your files.
+`ralph init` is idempotent. It creates `.ralph/{pipelines,meditations/{illuminations,stimuli},sessions,runs}` plus root `docs/adr/`, scaffolds empty `CONTEXT.md`, `VISION.md`, and `README.md` at repo root, runs `git init -b main` if the directory is not yet a repo, and appends `.ralph/runs/` to `.gitignore`. Re-running it on an existing project fills in any missing subfolders without overwriting your files.
 
 ## Install
 
@@ -34,7 +34,7 @@ scenario tests in `<project>/<path>` after the implementer finishes, then
 drives them through a tmux harness — fixing code red-green until they pass
 or the agent judges itself stuck. The flag requires running inside a tmux
 session (preflight check). Scenario test format and discipline are
-documented in `.ralph/CONTEXT.md` and `.ralph/docs/adr/0003-scenario-tests-in-implement-pipeline.md`.
+documented in `CONTEXT.md` and `docs/adr/0003-scenario-tests-in-implement-pipeline.md`.
 
 Each agent turn is annotated with:
 - `→ [read] path`, `→ [write] path`, `→ [edit] path` — file operations
@@ -58,7 +58,7 @@ For unattended workspace hygiene scanning, schedule the bundled janitor pipeline
 ralph heartbeat pipeline janitor --project . --every 720
 ```
 
-The janitor scans source/workspace through a KISS lens — bloat, YAGNI violations, refactor opportunities — and writes one illumination per candidate. It is read-only on code; the only mutating call is `write_illumination`. See `.ralph/docs/adr/0002-consume-only-illumination-lifecycle.md` for the lifecycle context.
+The janitor scans source/workspace through a KISS lens — bloat, YAGNI violations, refactor opportunities — and writes one illumination per candidate. It is read-only on code; the only mutating call is `write_illumination`. See `docs/adr/0002-consume-only-illumination-lifecycle.md` for the lifecycle context.
 
 ```bash
 ralph pipeline run <pipeline.dot> [--var <key=value>...] [--resume]
@@ -167,8 +167,8 @@ Press `Ctrl+C`. Ralph cleanly terminates its own claude subprocess without affec
 
 ## Where to look
 
-- **`.ralph/CONTEXT.md`** — domain language and glossary
-- **`.ralph/docs/adr/`** — decision records (why things are the way they are)
+- **`CONTEXT.md`** — domain language and glossary
+- **`docs/adr/`** — decision records (why things are the way they are)
 - **`src/`** — TypeScript source (CLI, pipeline engine, daemon, MCP servers)
 - **`pipelines/`** — project-local `.dot` pipelines (also `src/cli/pipelines/` for bundled ones shipped to consumers)
 
@@ -181,22 +181,6 @@ npm run build      # tsup → dist/
 npm link           # test ralph binary locally
 ```
 
-## Migrating an existing ralph project to the .ralph/ layout
-
-If your project pre-dates the .ralph/ convention:
-
-````bash
-mkdir -p .ralph/pipelines .ralph/memory .ralph/docs
-git mv meditations .ralph/meditations
-[ -d docs/adr ] && git mv docs/adr .ralph/docs/adr
-[ -f CONTEXT.md ] && git mv CONTEXT.md .ralph/CONTEXT.md
-[ -f VISION.md ] && git mv VISION.md .ralph/VISION.md
-echo '.ralph/runs/' >> .gitignore
-git commit -m "refactor: migrate to .ralph/ layout"
-````
-
-The `~/.ralph/<projectKey>/runs/` directory in your home folder is inert under the new ralph-cli — you can `rm -rf ~/.ralph/<your-project-key>/` once you've stopped needing the historical run logs.
-
 ## Decisions
 
-See [`.ralph/docs/adr/`](.ralph/docs/adr/) for accepted decision records.
+See [`docs/adr/`](docs/adr/) for accepted decision records.
