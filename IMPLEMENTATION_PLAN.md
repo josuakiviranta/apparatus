@@ -708,19 +708,19 @@ deleted entirely (per spec §3.3 — two tiers, not three)."
 - Read: `src/daemon/state.ts`, `src/daemon/index.ts`
 - Modify: none expected
 
-- [ ] **Step 1: Read daemon state code**
+- [x] **Step 1: Read daemon state code**
 
 Confirm: state files (`tasks.json`, `pids/`, `logs/`) are user-scoped (track tasks across projects). They stay at `~/.ralph/heartbeat/` (or wherever they live today).
 
-- [ ] **Step 2: Verify no per-project state crept in**
+- [x] **Step 2: Verify no per-project state crept in**
 
 If state.ts writes any **per-project** files (e.g. project-specific run logs), those pieces alone migrate to `<project>/.ralph/runs/`. Otherwise leave untouched.
 
-- [ ] **Step 3: If no migration needed, no commit**
+- [x] **Step 3: If no migration needed, no commit**
 
 If migration is needed (rare), apply the same TDD pattern as Tasks 4.2–4.3 in a separate commit.
 
-- [ ] **Step 4: Note the audit outcome in commit message log**
+- [x] **Step 4: Note the audit outcome in commit message log**
 
 Either commit nothing (skipped) or commit with message `audit(daemon): verified state is user-scoped — no migration`.
 
