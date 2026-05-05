@@ -307,7 +307,7 @@ This temporary mismatch is intentional and uncomfortable; it is the cost of avoi
 
 #### 2.1: Build-config and ambient declaration (TDD-friendly entry point)
 
-- [ ] **2.1.1: Update `src/types/globals.d.ts`.**
+- [x] **2.1.1: Update `src/types/globals.d.ts`.**
 
 Read the file. Replace `__RALPH_PROD__` with `__APPARAT_PROD__`:
 
@@ -319,7 +319,7 @@ declare const __RALPH_PROD__: true | undefined;
 declare const __APPARAT_PROD__: true | undefined;
 ```
 
-- [ ] **2.1.2: Update `tsup.config.ts:14`.**
+- [x] **2.1.2: Update `tsup.config.ts:14`.**
 
 ```typescript
 // Before:
@@ -329,39 +329,39 @@ define: { __RALPH_PROD__: "true" },
 define: { __APPARAT_PROD__: "true" },
 ```
 
-- [ ] **2.1.3: Run `npx tsc --noEmit` — confirms TS guides next edits.**
+- [x] **2.1.3: Run `npx tsc --noEmit` — confirms TS guides next edits.**
 
 Expected: errors at every `__RALPH_PROD__` reference site (lines 8, 9, 12 in `assets.ts`; lines 13, 18 in `daemon/runner.ts`; line 16 in `lib/daemon-client.ts`; line 63 in `attractor/handlers/agent-prep.ts`; lines 21, 260 in tests; lines 24, 30, 31, 32 in `smoke.test.ts`). All flag `Cannot find name '__RALPH_PROD__'`.
 
-- [ ] **2.1.4: Update `src/cli/lib/assets.ts` lines 8, 9, 12.**
+- [x] **2.1.4: Update `src/cli/lib/assets.ts` lines 8, 9, 12.**
 
 Three occurrences. Replace `__RALPH_PROD__` with `__APPARAT_PROD__` in lines 8 (comment), 9 (comment), and 12 (the runtime check `typeof __RALPH_PROD__ !== "undefined"`).
 
-- [ ] **2.1.5: Update `src/daemon/runner.ts` lines 13, 18.**
+- [x] **2.1.5: Update `src/daemon/runner.ts` lines 13, 18.**
 
 Replace `RALPH_PROD__` with `APPARAT_PROD__`.
 
-- [ ] **2.1.6: Update `src/lib/daemon-client.ts` line 16.**
+- [x] **2.1.6: Update `src/lib/daemon-client.ts` line 16.**
 
 Replace `RALPH_PROD__` with `APPARAT_PROD__`.
 
-- [ ] **2.1.7: Update `src/attractor/handlers/agent-prep.ts` line 63.**
+- [x] **2.1.7: Update `src/attractor/handlers/agent-prep.ts` line 63.**
 
 Replace `RALPH_PROD__` with `APPARAT_PROD__`.
 
-- [ ] **2.1.8: Update `src/cli/tests/smoke.test.ts` lines 24, 30, 31, 32.**
+- [x] **2.1.8: Update `src/cli/tests/smoke.test.ts` lines 24, 30, 31, 32.**
 
 Four occurrences. Replace each with `APPARAT_PROD__`.
 
-- [ ] **2.1.9: Update `src/attractor/tests/agent-handler.test.ts` line 260.**
+- [x] **2.1.9: Update `src/attractor/tests/agent-handler.test.ts` line 260.**
 
 Replace with `APPARAT_PROD__`.
 
-- [ ] **2.1.10: Run `npx tsc --noEmit` — confirms zero `__RALPH_PROD__` references remain.**
+- [x] **2.1.10: Run `npx tsc --noEmit` — confirms zero `__RALPH_PROD__` references remain.**
 
 Expected: PASS. (Or one residual `__APPARAT_PROD__` ambient-not-found if `globals.d.ts` was missed — re-check 2.1.1.)
 
-- [ ] **2.1.11: Repo-wide grep verifies the build-constant rename.**
+- [x] **2.1.11: Repo-wide grep verifies the build-constant rename.**
 
 Run:
 ```bash
@@ -371,29 +371,29 @@ Expected: zero hits.
 
 #### 2.2: Other env-var renames
 
-- [ ] **2.2.1: Update `src/cli/commands/pipeline.ts:288` (`RALPH_RUNS_KEEP`).**
+- [x] **2.2.1: Update `src/cli/commands/pipeline.ts:288` (`RALPH_RUNS_KEEP`).**
 
 Replace `RALPH_RUNS_KEEP` with `APPARAT_RUNS_KEEP`.
 
-- [ ] **2.2.2: Update `src/cli/program.ts:129` (`RALPH_RUNS_KEEP`).**
+- [x] **2.2.2: Update `src/cli/program.ts:129` (`RALPH_RUNS_KEEP`).**
 
 Replace `RALPH_RUNS_KEEP` with `APPARAT_RUNS_KEEP`.
 
-- [ ] **2.2.3: Update `src/daemon/runner.ts` (`RALPH_TEST_CMD`).**
+- [x] **2.2.3: Update `src/daemon/runner.ts` (`RALPH_TEST_CMD`).**
 
 Lines 13 and 18 already touched in 2.1.5 for `RALPH_PROD__`. The `RALPH_TEST_CMD` reference is at the same lines (env-var read). Confirm both env-var keys flip in this file.
 
 Replace each `RALPH_TEST_CMD` with `APPARAT_TEST_CMD`.
 
-- [ ] **2.2.4: Update `src/daemon/tests/runner.test.ts` (`RALPH_TEST_CMD`, lines 37, 46, 58, 72, 85, 108).**
+- [x] **2.2.4: Update `src/daemon/tests/runner.test.ts` (`RALPH_TEST_CMD`, lines 37, 46, 58, 72, 85, 108).**
 
 Six occurrences. Replace each with `APPARAT_TEST_CMD`.
 
-- [ ] **2.2.5: Update `src/attractor/tests/engine-onNodeEnd.test.ts:21` (`RALPH_ENGINE_TEST_ALLOW_SPAWN`).**
+- [x] **2.2.5: Update `src/attractor/tests/engine-onNodeEnd.test.ts:21` (`RALPH_ENGINE_TEST_ALLOW_SPAWN`).**
 
 Replace with `APPARAT_ENGINE_TEST_ALLOW_SPAWN`.
 
-- [ ] **2.2.6: Search for remaining `RALPH_` references in source.**
+- [x] **2.2.6: Search for remaining `RALPH_` references in source.**
 
 Run:
 ```bash
@@ -401,19 +401,19 @@ grep -rn 'RALPH_' src/ 2>/dev/null
 ```
 Expected: zero hits. If `RALPH_MEDITATE_MAX_OPEN` or other env vars surface — flip them too. (The grill identified `RALPH_MEDITATE_MAX_OPEN` referenced only in `.ralph/meditations/stimuli/.triage/...chat-notes.md`, which is frozen prose; if it appears in source, this step catches it.)
 
-- [ ] **2.2.7: Run vitest — confirms env-var renames are wired through.**
+- [x] **2.2.7: Run vitest — confirms env-var renames are wired through.**
 
 Run: `npx vitest run`
 Expected: PASS. Tests now read/write `APPARAT_*` env vars; source code emits `APPARAT_*`.
 
-- [ ] **2.2.8: Run `npm run build` — confirms the build constant rename works end-to-end.**
+- [x] **2.2.8: Run `npm run build` — confirms the build constant rename works end-to-end.**
 
 Run: `npm run build`
 Expected: PASS. `dist/cli/index.js` is bundled with `__APPARAT_PROD__: "true"` injected by tsup.
 
 #### 2.3: package.json field renames
 
-- [ ] **2.3.1: Update `package.json`.**
+- [x] **2.3.1: Update `package.json`.**
 
 Read the file. Apply three edits:
 
@@ -437,17 +437,17 @@ Read the file. Apply three edits:
 
 (npm name is provisional per spec §9; `apparat-cli` mirrors current `ralph-cli` shape and is post-merge editable.)
 
-- [ ] **2.3.2: Run `npm install` to update `package-lock.json` with the new package name.**
+- [x] **2.3.2: Run `npm install` to update `package-lock.json` with the new package name.**
 
 Run: `npm install`
 Expected: `package-lock.json` updates the `name` field; no other deltas. If `node_modules` symlinks break, that is an `npm link` issue handled in 2.3.4.
 
-- [ ] **2.3.3: Run `npm run build` — verifies tsup still emits with the new bin shape.**
+- [x] **2.3.3: Run `npm run build` — verifies tsup still emits with the new bin shape.**
 
 Run: `npm run build`
 Expected: PASS. The `bin` rename does not affect bundling.
 
-- [ ] **2.3.4: Re-link the binary globally so `apparat` is on PATH.**
+- [x] **2.3.4: Re-link the binary globally so `apparat` is on PATH.**
 
 Run:
 ```bash
@@ -459,7 +459,7 @@ Expected: `which apparat` returns a path under `~/.npm-global/bin/apparat`. The 
 
 #### 2.4: ralph-paths module rename
 
-- [ ] **2.4.1: `git mv` the module and its test.**
+- [x] **2.4.1: `git mv` the module and its test.**
 
 Run:
 ```bash
@@ -468,7 +468,7 @@ git mv src/cli/tests/ralph-paths.test.ts src/cli/tests/apparat-paths.test.ts
 ```
 Expected: both moves recorded as renames; no errors.
 
-- [ ] **2.4.2: Update the renamed module body (`src/cli/lib/apparat-paths.ts`).**
+- [x] **2.4.2: Update the renamed module body (`src/cli/lib/apparat-paths.ts`).**
 
 Read the file. Rename the `ralphDir` export to `apparatDir`. Keep the literal `.ralph` in the body for now (chunk 3 flips this). Update internal callers (`meditationsDir`, `pipelinesDir`, etc.) to call `apparatDir` instead of `ralphDir`.
 
@@ -496,17 +496,17 @@ export function meditationsDir(projectRoot: string): string {
 
 The seven downstream helpers (`meditationsDir`, `illuminationsDir`, `stimuliDir`, `sessionsDir`, `pipelinesDir`, `runsDir`, `runDir`) keep their names; only their bodies update.
 
-- [ ] **2.4.3: Update the renamed test file body (`src/cli/tests/apparat-paths.test.ts`).**
+- [x] **2.4.3: Update the renamed test file body (`src/cli/tests/apparat-paths.test.ts`).**
 
 Replace `import { ralphDir, ... } from "../lib/ralph-paths.js"` with `import { apparatDir, ... } from "../lib/apparat-paths.js"`. Replace every `ralphDir(` callsite with `apparatDir(`. Assertion strings still expect `.ralph` literal until chunk 3 — leave them as `expect(apparatDir("/abs/project")).toBe("/abs/project/.ralph")`.
 
 If the test name or `describe(...)` block contains "ralphDir", flip to "apparatDir".
 
-- [ ] **2.4.4: Run `npx tsc --noEmit` — TS surfaces every importer.**
+- [x] **2.4.4: Run `npx tsc --noEmit` — TS surfaces every importer.**
 
 Expected: errors at every `from "../lib/ralph-paths"`, `from "../../lib/ralph-paths"`, etc. import path, plus every `ralphDir(` callsite outside the renamed test.
 
-- [ ] **2.4.5: Update each importer.**
+- [x] **2.4.5: Update each importer.**
 
 For each file flagged in 2.4.4:
 - Update the import path: `ralph-paths.js` → `apparat-paths.js` (TypeScript module resolution still uses `.js` suffix in ESM).
@@ -525,7 +525,7 @@ Confirmed importer list (verified by `grep -rn '"\.\.\?/lib/ralph-paths' src/`):
 
 Eight importers total. Re-run the grep before editing to confirm the list is current; `tsc --noEmit` between 2.4.4 and 2.4.5 will surface any addition.
 
-- [ ] **2.4.5b: Rename the daemon-home `ralphDir` const in `src/daemon/index.ts:12-14`.**
+- [x] **2.4.5b: Rename the daemon-home `ralphDir` const in `src/daemon/index.ts:12-14`.**
 
 This is a *different* `ralphDir` from the path-helper export — it is a local const naming the daemon's home directory at `~/.ralph/`, not a project-local `<project>/.ralph/`. The two were given the same name in the original code but refer to different roots. To avoid conflation in the rename, give the daemon-home const a distinct name reflecting its referent.
 
@@ -545,7 +545,7 @@ const sockPath = join(apparatHome, "daemon.sock");
 
 The literal `.ralph` flips to `.apparat` here (different from chunk 3's project-folder rename — this is the user-home daemon dir, not on-disk inside a project). Daemons running pre-rename keep their PID file at `~/.ralph/daemon.pid` until they restart; on next daemon start, the new binary writes to `~/.apparat/daemon.pid` and the stale `~/.ralph/daemon.pid` becomes orphaned. The user kills any pre-rename daemon manually before invoking the new binary (see chunk 4 verification).
 
-- [ ] **2.4.5c: Verify no other local `ralphDir` const exists.**
+- [x] **2.4.5c: Verify no other local `ralphDir` const exists.**
 
 Run:
 ```bash
@@ -553,7 +553,7 @@ grep -rn '\bconst ralphDir\b\|\blet ralphDir\b' src/
 ```
 Expected: zero hits.
 
-- [ ] **2.4.5d: Flip the daemon-client `~/.ralph/` references.**
+- [x] **2.4.5d: Flip the daemon-client `~/.ralph/` references.**
 
 `src/lib/daemon-client.ts` has two references to the same daemon-home directory that step 2.4.5b just renamed in `src/daemon/index.ts`. Both must flip in the same chunk to keep client + daemon agreeing on the socket path.
 
@@ -573,7 +573,7 @@ throw new Error("Daemon failed to start — check permissions on ~/.ralph/");
 throw new Error("Daemon failed to start — check permissions on ~/.apparat/");
 ```
 
-- [ ] **2.4.5e: Repo-wide grep — every `~/.ralph/` reference must now be a `~/.apparat/`.**
+- [x] **2.4.5e: Repo-wide grep — every `~/.ralph/` reference must now be a `~/.apparat/`.**
 
 Run:
 ```bash
@@ -581,41 +581,41 @@ grep -rn '~/\.ralph\|"\.ralph"' src/
 ```
 Expected: zero hits in `.ts` files. Any hit signals an unflipped daemon-home reference. Note: project-local `.ralph/` literals (returned by `apparatDir()` and assertion strings) are the deferred work for chunk 3 — those are NOT prefixed with `~/` and are acceptable here.
 
-- [ ] **2.4.6: Run `npx tsc --noEmit` — verifies zero stale imports.**
+- [x] **2.4.6: Run `npx tsc --noEmit` — verifies zero stale imports.**
 
 Expected: PASS.
 
-- [ ] **2.4.7: Run vitest — confirms the module rename did not break runtime.**
+- [x] **2.4.7: Run vitest — confirms the module rename did not break runtime.**
 
 Run: `npx vitest run`
 Expected: PASS. Tests still target `.ralph/` paths because `apparatDir` still returns `.ralph` literal; the module/function rename is internal.
 
 #### 2.5: program.name flip (binary identity)
 
-- [ ] **2.5.1: Update `src/cli/program.ts:19` `program.name("ralph")` → `program.name("apparat")`.**
+- [x] **2.5.1: Update `src/cli/program.ts:19` `program.name("ralph")` → `program.name("apparat")`.**
 
 Read the file. The `program.name(...)` call is on or near line 19 inside `createProgram()`. Replace `"ralph"` with `"apparat"`.
 
 The help-text strings (lines ~27–95 containing `ralph init`, `ralph implement`, `.ralph/` paths) are NOT touched in this chunk — those flip in chunk 4 alongside README/VISION/CONTEXT.
 
-- [ ] **2.5.2: Run vitest — sanity check, nothing depends on the program name.**
+- [x] **2.5.2: Run vitest — sanity check, nothing depends on the program name.**
 
 Run: `npx vitest run`
 Expected: PASS.
 
-- [ ] **2.5.3: Smoke-test the renamed binary.**
+- [x] **2.5.3: Smoke-test the renamed binary.**
 
 Run: `node dist/cli/index.js --help | head -5`
 Expected: top-line shows `Usage: apparat [...]` (the help text below still says "ralph init my-app" — chunk 4 fixes that).
 
 #### 2.6: Commit chunk 2
 
-- [ ] **2.6.1: Run full verification before commit.**
+- [x] **2.6.1: Run full verification before commit.**
 
 Run: `npx tsc --noEmit && npx vitest run && npm run build`
 Expected: all PASS.
 
-- [ ] **2.6.2: Commit.**
+- [x] **2.6.2: Commit.**
 
 ```bash
 git add -A
@@ -645,7 +645,7 @@ EOF
 
 Expected: commit succeeds.
 
-- [ ] **2.6.3: Verify chunk 2 final state.**
+- [x] **2.6.3: Verify chunk 2 final state.**
 
 Run:
 ```bash
@@ -662,6 +662,11 @@ Expected: zero hits. (Verified pre-edit: `package.json` has no `repository`, `ho
 ls src/cli/lib/apparat-paths.ts && ls src/cli/tests/apparat-paths.test.ts
 ```
 Expected: both files exist; old paths gone.
+
+### Chunk-3 prep notes (from chunk-2 review)
+
+- The lone surviving `Ralph`-prefixed identifier is `getRalphCliPath` in `src/daemon/runner.ts:11`. Plan it into chunk 3 alongside the `.ralph` literal flip in `apparatDir()`.
+- Stale unused imports in `src/daemon/tests/runner.test.ts:9` (`getRalphCliPath`, `killSession`) — pre-existing, but worth cleaning up in chunk 3 if convenient.
 
 ---
 
