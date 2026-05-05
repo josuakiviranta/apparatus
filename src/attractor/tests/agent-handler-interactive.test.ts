@@ -88,28 +88,6 @@ describe("AgentHandler — interactive branch", () => {
     process.removeAllListeners("SIGINT");
   });
 
-  it("rejects interactive=true combined with agent config.jsonSchema", async () => {
-    const agent = makeFakeAgent(() => {});
-    const configWithSchema = { ...agent.config, jsonSchema: "{}" };
-    const handler = new InteractiveAgentHandler({
-      loadAgent: () => configWithSchema,
-      createAgent: () => agent,
-    });
-    const tmp = mkdtempSync(join(tmpdir(), "ralph-handler-"));
-    try {
-      const node: Node = {
-        id: "n1",
-        prompt: "chat",
-        interactive: true,
-      };
-      const out = await handler.execute(node, baseCtx(), baseMeta(tmp, tmp));
-      expect(out.status).toBe("fail");
-      expect(out.failureReason).toMatch(/interactive.*outputs|outputs.*interactive/i);
-    } finally {
-      rmSync(tmp, { recursive: true, force: true });
-    }
-  });
-
   it("interactive success path: flattens digest into contextUpdates", async () => {
     const agent = makeFakeAgent((ctrl) => {
       // Simulate: assistant responds, then user ends session

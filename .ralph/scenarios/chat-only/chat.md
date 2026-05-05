@@ -5,8 +5,6 @@ model: sonnet
 permissionMode: dangerouslySkipPermissions
 tools: []
 inputs: []
-outputs:
-  output: string
 ---
 
 You are a helpful assistant.

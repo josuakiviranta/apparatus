@@ -445,6 +445,8 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
     for (const node of nodes.values()) {
       checkAgentMissingOutputs(node, dotDir, diags);
       checkLoopRequiresDoneField(node, dotDir, diags);
+      checkInteractiveWithOutputs(node, dotDir, diags);
+      checkInteractiveWithLoop(node, dotDir, diags);
     }
   }
 
@@ -1051,6 +1053,58 @@ function checkLoopRequiresDoneField(
       location: node.sourceLocation,
     });
   }
+}
+
+function checkInteractiveWithOutputs(
+  node: Node,
+  dotDir: string,
+  diags: Diagnostic[],
+): void {
+  if (!node.agent) return;
+  if (node.interactive !== true && node.interactive !== "true") return;
+  const agentConfig = tryResolveAgent(node, dotDir);
+  if (!agentConfig) return;
+  const hasOutputs = !!(agentConfig.outputs && Object.keys(agentConfig.outputs).length > 0);
+  if (!hasOutputs) return;
+  diags.push({
+    rule: "interactive_with_outputs_forbidden",
+    severity: "error",
+    message: `Node "${node.id}" sets interactive=true but agent "${node.agent}" declares outputs:; structured output is incompatible with live chat streaming`,
+    location: node.sourceLocation,
+  });
+}
+
+function checkInteractiveWithLoop(
+  node: Node,
+  dotDir: string,
+  diags: Diagnostic[],
+): void {
+  if (!node.agent) return;
+  if (node.interactive !== true && node.interactive !== "true") return;
+
+  // Node-level loop signals
+  const nodeLoopOn = node.loop === true || node.loop === "true";
+  const nodeMaxRaw = (node as Record<string, unknown>).maxIterations;
+  const nodeMaxParsed =
+    typeof nodeMaxRaw === "string" ? parseInt(nodeMaxRaw, 10)
+    : typeof nodeMaxRaw === "number" ? nodeMaxRaw
+    : undefined;
+  const nodeMaxLoops = nodeMaxParsed != null && !isNaN(nodeMaxParsed) && nodeMaxParsed > 1;
+
+  // Agent-level loop signals
+  const agentConfig = tryResolveAgent(node, dotDir);
+  const agentLoopOn = agentConfig?.loop === true;
+  const agentMax = agentConfig?.maxIterations;
+  const agentMaxLoops = typeof agentMax === "number" && agentMax > 1;
+
+  if (!(nodeLoopOn || nodeMaxLoops || agentLoopOn || agentMaxLoops)) return;
+
+  diags.push({
+    rule: "interactive_with_loop_forbidden",
+    severity: "error",
+    message: `Node "${node.id}" sets interactive=true with looping (loop=true / maxIterations>1); interactive sessions cannot iterate`,
+    location: node.sourceLocation,
+  });
 }
 
 function checkGateHandlers(

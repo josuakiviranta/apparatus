@@ -25,16 +25,8 @@ export class InteractiveAgentHandler implements NodeHandler {
   async execute(node: Node, ctx: PipelineContext, meta: HandlerExecutionContext): Promise<Outcome> {
     const prep = assembleAgentPrompt(node, ctx, meta, this.load, this.create);
     if ("fail" in prep) return { status: "fail", failureReason: prep.fail };
-    const { agent, jsonSchema, agentVariables, prompt, nodeDir } = prep;
+    const { agent, agentVariables, prompt, nodeDir } = prep;
     const { cwd, onInteractiveRequest } = meta;
-
-    // Runtime guard kept this chunk; dropped in Chunk 3 when validator rule lands.
-    if (jsonSchema) {
-      return {
-        status: "fail",
-        failureReason: "interactive=true cannot be combined with outputs: structured output is incompatible with live chat streaming",
-      };
-    }
 
     const sessionId = randomUUID();
     const session = new Session(sessionId);
