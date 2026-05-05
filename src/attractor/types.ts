@@ -1,4 +1,4 @@
-export type OutcomeStatus = "success" | "retry" | "fail" | "partial_success";
+export type OutcomeStatus = "success" | "retry" | "fail";
 
 export interface SourceLocation {
   line: number;

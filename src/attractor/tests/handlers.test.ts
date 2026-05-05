@@ -1,10 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import type { HandlerExecutionContext } from "../handlers/registry.js";
-import { ConditionalHandler } from "../handlers/conditional.js";
 import { WaitHumanHandler } from "../handlers/wait-human.js";
 import { ToolHandler } from "../handlers/tool.js";
 import { StartHandler, ExitHandler } from "../handlers/start-exit.js";
-import { ParallelHandler, FanInHandler } from "../handlers/parallel.js";
 import { ManagerLoopHandler } from "../handlers/manager-loop.js";
 import { AutoApproveInterviewer } from "../interviewer/auto-approve.js";
 import { QueueInterviewer } from "../interviewer/queue.js";
@@ -16,15 +14,6 @@ const baseCtx = (): PipelineContext => ({ values: {} });
 function makeContext(overrides: Partial<HandlerExecutionContext> = {}): HandlerExecutionContext {
   return { logsRoot: "/tmp", cwd: "/tmp", dotDir: "/tmp", outgoingLabels: [], completedNodes: [], nodeRetries: {}, ...overrides };
 }
-
-describe("ConditionalHandler", () => {
-  it("returns success immediately", async () => {
-    const h = new ConditionalHandler();
-    const node: Node = { id: "c", shape: "diamond" };
-    const outcome = await h.execute(node, baseCtx(), makeContext());
-    expect(outcome.status).toBe("success");
-  });
-});
 
 describe("StartHandler / ExitHandler", () => {
   it("start returns success immediately", async () => {
@@ -112,78 +101,6 @@ describe("ToolHandler", () => {
   // "no toolCommand" check is now performed at validate-time by zod
   // (ToolNodeSchema refine: toolCommand || scriptFile required).
   // The runtime guard was removed in Chunk 4 of the validator trust upgrade.
-});
-
-describe("ParallelHandler", () => {
-  it("returns success and stores parallel.results in contextUpdates", async () => {
-    const h = new ParallelHandler();
-    const node: Node = { id: "fan", shape: "component" };
-    const outcome = await h.execute(node, baseCtx(), makeContext({
-      branchOutcomes: { branch_a: { status: "success" }, branch_b: { status: "success" } },
-    }));
-    expect(outcome.status).toBe("success");
-    expect(outcome.contextUpdates?.["parallel.results"]).toBeDefined();
-  });
-
-  it("serializes branch outcomes as JSON array", async () => {
-    const h = new ParallelHandler();
-    const node: Node = { id: "fan", shape: "component" };
-    const outcome = await h.execute(node, baseCtx(), makeContext({
-      branchOutcomes: { a: { status: "success" }, b: { status: "fail" } },
-    }));
-    const parsed = JSON.parse(outcome.contextUpdates!["parallel.results"] as string);
-    expect(parsed).toHaveLength(2);
-  });
-
-  it("handles empty branchOutcomes gracefully", async () => {
-    const h = new ParallelHandler();
-    const outcome = await h.execute({ id: "fan", shape: "component" }, baseCtx(), makeContext({ branchOutcomes: {} }));
-    expect(outcome.status).toBe("success");
-    expect(outcome.contextUpdates?.["parallel.results"]).toBe("[]");
-  });
-
-  it("handles undefined branchOutcomes (falls back to empty)", async () => {
-    const h = new ParallelHandler();
-    const outcome = await h.execute({ id: "fan", shape: "component" }, baseCtx(), makeContext());
-    expect(outcome.status).toBe("success");
-    expect(outcome.contextUpdates?.["parallel.results"]).toBe("[]");
-  });
-});
-
-describe("FanInHandler", () => {
-  it("aggregates all-success to success", async () => {
-    const h = new FanInHandler();
-    const ctx = { values: { "parallel.results": JSON.stringify([{ status: "success" }, { status: "success" }]) } };
-    const outcome = await h.execute({ id: "join", shape: "tripleoctagon" }, ctx, makeContext());
-    expect(outcome.status).toBe("success");
-  });
-
-  it("aggregates mixed to partial_success", async () => {
-    const h = new FanInHandler();
-    const ctx = { values: { "parallel.results": JSON.stringify([{ status: "success" }, { status: "fail" }]) } };
-    const outcome = await h.execute({ id: "join", shape: "tripleoctagon" }, ctx, makeContext());
-    expect(outcome.status).toBe("partial_success");
-  });
-
-  it("aggregates all-fail to fail", async () => {
-    const h = new FanInHandler();
-    const ctx = { values: { "parallel.results": JSON.stringify([{ status: "fail" }, { status: "fail" }]) } };
-    const outcome = await h.execute({ id: "join", shape: "tripleoctagon" }, ctx, makeContext());
-    expect(outcome.status).toBe("fail");
-  });
-
-  it("returns success for empty results (vacuous truth)", async () => {
-    const h = new FanInHandler();
-    const ctx = { values: { "parallel.results": "[]" } };
-    const outcome = await h.execute({ id: "join", shape: "tripleoctagon" }, ctx, makeContext());
-    expect(outcome.status).toBe("success");
-  });
-
-  it("returns success when parallel.results is missing", async () => {
-    const h = new FanInHandler();
-    const outcome = await h.execute({ id: "join", shape: "tripleoctagon" }, baseCtx(), makeContext());
-    expect(outcome.status).toBe("success");
-  });
 });
 
 describe("ManagerLoopHandler", () => {

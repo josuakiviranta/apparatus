@@ -18,7 +18,6 @@ export interface HandlerExecutionContext {
   outgoingLabels: string[];
   completedNodes: string[];
   nodeRetries: Record<string, number>;
-  branchOutcomes?: Record<string, Outcome>;
   onStdout?: (s: NodeJS.ReadableStream) => Promise<void>;
   onInteractiveRequest?: OnInteractiveRequest;
   /** Called before iteration i (i > 0) — pipeline.ts opens a new TUI block */

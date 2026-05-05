@@ -28,7 +28,7 @@ export function parseDot(src: string): Graph {
 }
 
 const KNOWN_TYPES = new Set([
-  "codergen", "tool", "wait.human", "conditional", "parallel", "parallel.fan_in",
+  "codergen", "tool", "wait.human", "conditional",
   "start", "exit", "store",
   "ralph.implement", "ralph.meditate",
   "agent", "stack.manager_loop",
@@ -36,14 +36,13 @@ const KNOWN_TYPES = new Set([
 
 // Types that pass validation but are not yet implemented — emit errors
 const UNIMPLEMENTED_TYPES = new Set([
-  "parallel", "parallel.fan_in",     // fan-out execution not yet implemented
   "stack.manager_loop",              // no handler registered
 ]);
 
 const SHAPE_TO_TYPE: Record<string, string> = {
   Mdiamond: "start", Msquare: "exit", box: "codergen",
-  hexagon: "wait.human", diamond: "conditional", component: "parallel",
-  tripleoctagon: "parallel.fan_in", parallelogram: "tool", house: "stack.manager_loop",
+  hexagon: "wait.human", diamond: "conditional",
+  parallelogram: "tool", house: "stack.manager_loop",
   circle: "ralph.implement", octagon: "ralph.meditate",
   cylinder: "store",
 };

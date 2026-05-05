@@ -6,12 +6,10 @@ import type { Interviewer } from "../interviewer/index.js";
 import { evaluateCondition } from "./conditions.js";
 import { resolveHandlerType } from "./graph.js";
 import { saveCheckpoint, loadCheckpoint } from "../checkpoint.js";
-import { ConditionalHandler } from "../handlers/conditional.js";
 import { StartHandler, ExitHandler } from "../handlers/start-exit.js";
 import { WaitHumanHandler } from "../handlers/wait-human.js";
 import { ToolHandler } from "../handlers/tool.js";
 import { RalphMeditateHandler } from "../handlers/ralph-meditate.js";
-import { ParallelHandler, FanInHandler } from "../handlers/parallel.js";
 import { InteractiveAgentHandler } from "../handlers/interactive-agent-handler.js";
 import { LoopingAgentHandler } from "../handlers/looping-agent-handler.js";
 import { AgentHandlerDispatch } from "../handlers/agent-dispatch.js";
@@ -54,13 +52,10 @@ function buildHandlerMap(opts: EngineOptions): Map<string, NodeHandler> {
   m.set("start", new StartHandler());
   m.set("exit", new ExitHandler());
   m.set("codergen", agentDispatch);
-  m.set("conditional", new ConditionalHandler());
   m.set("wait.human", new WaitHumanHandler(opts.interviewer, opts.dotDir));
   m.set("tool", new ToolHandler());
   m.set("ralph.implement", agentDispatch);
   m.set("ralph.meditate", new RalphMeditateHandler());
-  m.set("parallel", new ParallelHandler());
-  m.set("parallel.fan_in", new FanInHandler());
   m.set("store", new StoreHandler());
   m.set("agent", agentDispatch);
   return m;
@@ -220,9 +215,12 @@ export async function runPipeline(graph: Graph, opts: EngineOptions): Promise<Pi
     }
 
     const handlerType = resolveHandlerType(node);
-    const handler = handlers.get(handlerType);
-    if (!handler) {
-      return finalize({ status: "fail", completedNodes, context, failureReason: `No handler for type "${handlerType}"` }, opts, runId);
+    let handler: NodeHandler | undefined;
+    if (handlerType !== "conditional") {
+      handler = handlers.get(handlerType);
+      if (!handler) {
+        return finalize({ status: "fail", completedNodes, context, failureReason: `No handler for type "${handlerType}"` }, opts, runId);
+      }
     }
 
     // Gather outgoing labels for wait.human
@@ -254,26 +252,30 @@ export async function runPipeline(graph: Graph, opts: EngineOptions): Promise<Pi
       projectDir: opts.project,
     };
     let outcome: Outcome;
-    try {
-      outcome = await handler.execute(node, ctx, meta);
-    } catch (err) {
-      if (err instanceof UndefinedVariableError) {
-        const pathTaken = [...completedNodes, node.id].join(" → ");
-        const varDump = Object.entries(context)
-          .map(([k, v]) => `  ${k} = ${v === undefined ? "<UNDEFINED>" : JSON.stringify(v)}`)
-          .join("\n");
-        const reason = [
-          `Undefined variable $${err.variableName}`,
-          `Node: ${node.id}`,
-          `Path: ${pathTaken}`,
-          `Variable context at failure:`,
-          varDump,
-        ].join("\n");
-        opts.traceWriter?.onNodeEnd({ nodeReceiveId, node, outcome: { status: "fail", failureReason: reason } });
-        opts.onNodeEnd?.(node, { status: "fail", failureReason: reason });
-        return finalize({ status: "fail", completedNodes, context, failureReason: reason }, opts, runId);
+    if (handlerType === "conditional") {
+      outcome = { status: "success" };
+    } else {
+      try {
+        outcome = await handler!.execute(node, ctx, meta);
+      } catch (err) {
+        if (err instanceof UndefinedVariableError) {
+          const pathTaken = [...completedNodes, node.id].join(" → ");
+          const varDump = Object.entries(context)
+            .map(([k, v]) => `  ${k} = ${v === undefined ? "<UNDEFINED>" : JSON.stringify(v)}`)
+            .join("\n");
+          const reason = [
+            `Undefined variable $${err.variableName}`,
+            `Node: ${node.id}`,
+            `Path: ${pathTaken}`,
+            `Variable context at failure:`,
+            varDump,
+          ].join("\n");
+          opts.traceWriter?.onNodeEnd({ nodeReceiveId, node, outcome: { status: "fail", failureReason: reason } });
+          opts.onNodeEnd?.(node, { status: "fail", failureReason: reason });
+          return finalize({ status: "fail", completedNodes, context, failureReason: reason }, opts, runId);
+        }
+        throw err;
       }
-      throw err; // re-throw non-variable errors
     }
 
     // Merge context updates

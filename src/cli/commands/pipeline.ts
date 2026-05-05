@@ -451,16 +451,13 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
       onNodeEnd: (node, outcome) => {
         if (node.id === abortHandledFor) return;
         if (classifyNode(node) === "marker") return;
-        // Engine OutcomeStatus is "success"|"retry"|"fail"|"partial_success".
-        // Map to the renderer's 3-value union. Abort is only emitted by
+        // Engine OutcomeStatus is "success" | "retry" | "fail". Map to the
+        // renderer's 3-value union (success/fail). Abort is only emitted by
         // the signal handler above, never by the engine itself.
         const status = outcome.status === "success" ? "success" as const : "fail" as const;
         emit({
           kind: "end",
-          outcome: {
-            status,
-            reason: outcome.failureReason ?? (outcome.status === "partial_success" ? "partial success" : undefined),
-          },
+          outcome: { status, reason: outcome.failureReason },
         });
         if (outcome.status !== "success" && outcome.failureReason) {
           lastFailedNodeId = node.id;

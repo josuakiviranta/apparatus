@@ -512,3 +512,28 @@ describe("runPipeline", () => {
     }
   });
 });
+
+describe("engine — conditional inline passthrough", () => {
+  it("treats a diamond-shaped node as success without a registered handler", async () => {
+    const src = `digraph t {
+      start [shape=Mdiamond]
+      router [shape=diamond]
+      done [shape=Msquare]
+      start -> router
+      router -> done
+    }`;
+    const graph = parseDot(src);
+    const logsRoot = mkdtempSync(join(tmpdir(), "ralph-engine-cond-"));
+    try {
+      const result = await runPipeline(graph, {
+        logsRoot,
+        cwd: logsRoot,
+        interviewer: new AutoApproveInterviewer(),
+      });
+      expect(result.status).toBe("success");
+      expect(result.completedNodes).toEqual(expect.arrayContaining(["router"]));
+    } finally {
+      rmSync(logsRoot, { recursive: true });
+    }
+  });
+});

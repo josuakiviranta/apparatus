@@ -457,16 +457,6 @@ describe("validateGraph", () => {
     expect(diags.some(d => d.rule === "condition_syntax")).toBe(true);
   });
 
-  it("errors on parallel node type (not yet implemented)", () => {
-    const g = makeValid();
-    g.nodes.set("par", { id: "par", shape: "component" });
-    g.edges.push({ from: "start", to: "par" });
-    g.edges.push({ from: "par", to: "done" });
-    const diags = validateGraph(g);
-    expect(diags.some(d => d.rule === "type_unsupported" && d.severity === "error")).toBe(true);
-    expect(diags.some(d => d.message.includes("parallel"))).toBe(true);
-  });
-
   it("errors on stack.manager_loop node type (not yet implemented)", () => {
     const g = makeValid();
     g.nodes.set("mgr", { id: "mgr", shape: "house" });
