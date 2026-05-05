@@ -44,7 +44,7 @@ describe("pipeline run — failureReason surfacing", () => {
 
     exitSpy.mockRestore();
 
-    // New layout: <project>/.ralph/runs/<runId>/pipeline.jsonl
+    // New layout: <project>/.apparat/runs/<runId>/pipeline.jsonl
     const projectRunsDir = runsDir(work);
     expect(existsSync(projectRunsDir)).toBe(true);
     const runDirs = readdirSync(projectRunsDir);

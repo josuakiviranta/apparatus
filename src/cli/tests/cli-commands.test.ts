@@ -28,7 +28,7 @@ describe("CLI command structure", () => {
     const program = createProgram();
     const meditateCmd = program.commands.find((c) => c.name() === "meditate");
     expect(meditateCmd).toBeDefined();
-    expect(meditateCmd!.description()).toBe("Run a restricted Claude session that writes insights to .ralph/meditations/illuminations/");
+    expect(meditateCmd!.description()).toBe("Run a restricted Claude session that writes insights to .apparat/meditations/illuminations/");
   });
 });
 

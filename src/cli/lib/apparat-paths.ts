@@ -2,7 +2,7 @@
 import { join } from "node:path";
 
 export function apparatDir(projectRoot: string): string {
-  return join(projectRoot, ".ralph");
+  return join(projectRoot, ".apparat");
 }
 
 export function meditationsDir(projectRoot: string): string {

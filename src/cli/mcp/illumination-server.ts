@@ -163,8 +163,8 @@ export async function globFiles(projectRoot: string, pattern: string): Promise<s
 const NO_META_MEDITATIONS_MESSAGE =
   "No meta-meditations found. You can still proceed — reflect on the project code " +
   "directly and write your illumination using write_illumination.\n\n" +
-  "To add meta-meditations: create .md files in the .ralph/meditations/stimuli/ folder of your " +
-  "ralph-cli installation (e.g. ~/.npm-global/lib/node_modules/ralph-cli/.ralph/meditations/stimuli/). " +
+  "To add meta-meditations: create .md files in the .apparat/meditations/stimuli/ folder of your " +
+  "ralph-cli installation (e.g. ~/.npm-global/lib/node_modules/ralph-cli/.apparat/meditations/stimuli/). " +
   "Each file is a lens the agent will use to reflect on your project.";
 
 export function listMetaMeditations(meditationsDir: string): string {
@@ -335,7 +335,7 @@ if (!isTestEnv) {
 
     server.tool(
       "write_illumination",
-      "Write a meditation illumination file to .ralph/meditations/illuminations/. " +
+      "Write a meditation illumination file to .apparat/meditations/illuminations/. " +
         "Provide a kebab-case `slug` (lowercase alphanumeric + hyphens, e.g. `janitor-doc-drift` or `my-insight`); " +
         "the server prepends the current YYYY-MM-DDTHHMM- timestamp and appends .md — do not include either yourself. " +
         "Provide a one-sentence `description` summarizing the core insight — this is required. " +
@@ -431,7 +431,7 @@ if (!isTestEnv) {
 
     server.tool(
       "list_illuminations",
-      "List illuminations in .ralph/meditations/illuminations/, with descriptions. " +
+      "List illuminations in .apparat/meditations/illuminations/, with descriptions. " +
         "Call this at the start of a session to orient yourself before writing new insights. " +
         "No filters — every file in the folder is alive.",
       {},
@@ -443,7 +443,7 @@ if (!isTestEnv) {
 
     server.tool(
       "consume",
-      "Consume an illumination — delete the file from .ralph/meditations/illuminations/ and commit the deletion. " +
+      "Consume an illumination — delete the file from .apparat/meditations/illuminations/ and commit the deletion. " +
         "Use reason='implemented' after the implement loop succeeds and a memory file has been written. " +
         "Use reason='declined' when the operator rejects an illumination at the gate. " +
         "Commit message format: 'meditate: consume <filename> (<reason>)' — searchable via git log --grep.",

@@ -20,7 +20,7 @@ function runScript(args, cwd) {
 
 function setupRepo() {
   const tmp = mkdtempSync(join(tmpdir(), "consume-test-"));
-  const illumDir = join(tmp, ".ralph", "meditations", "illuminations");
+  const illumDir = join(tmp, ".apparat", "meditations", "illuminations");
   mkdirSync(illumDir, { recursive: true });
   const illumPath = join(illumDir, "2026-04-30T1200-x.md");
   writeFileSync(illumPath, `---\ndate: 2026-04-30\ndescription: test\n---\n\nbody\n`);
@@ -92,8 +92,8 @@ describe("consume.mjs", () => {
 
   it("resolves a verifier-style relative path (legacy 'meditations/illuminations/...' prefix) when run from cwd=$project", () => {
     // Verifier emits illumination_path with the legacy 'meditations/illuminations/' prefix,
-    // but the file actually lives at $project/.ralph/meditations/illuminations/.
-    // Script must locate the file by basename under .ralph/meditations/illuminations/.
+    // but the file actually lives at $project/.apparat/meditations/illuminations/.
+    // Script must locate the file by basename under .apparat/meditations/illuminations/.
     const legacyArg = "meditations/illuminations/2026-04-30T1200-x.md";
     const result = runScript([legacyArg, "declined"], tmp);
     expect(result.status).toBe(0);

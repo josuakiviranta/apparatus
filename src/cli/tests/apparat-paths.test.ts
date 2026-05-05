@@ -14,34 +14,34 @@ import {
 describe("apparat-paths", () => {
   const project = "/abs/project";
 
-  it("apparatDir joins project + .ralph", () => {
-    expect(apparatDir(project)).toBe("/abs/project/.ralph");
+  it("apparatDir joins project + .apparat", () => {
+    expect(apparatDir(project)).toBe("/abs/project/.apparat");
   });
-  it("meditationsDir joins .ralph/meditations", () => {
-    expect(meditationsDir(project)).toBe("/abs/project/.ralph/meditations");
+  it("meditationsDir joins .apparat/meditations", () => {
+    expect(meditationsDir(project)).toBe("/abs/project/.apparat/meditations");
   });
-  it("illuminationsDir joins .ralph/meditations/illuminations", () => {
+  it("illuminationsDir joins .apparat/meditations/illuminations", () => {
     expect(illuminationsDir(project)).toBe(
-      "/abs/project/.ralph/meditations/illuminations",
+      "/abs/project/.apparat/meditations/illuminations",
     );
   });
-  it("stimuliDir joins .ralph/meditations/stimuli", () => {
+  it("stimuliDir joins .apparat/meditations/stimuli", () => {
     expect(stimuliDir(project)).toBe(
-      "/abs/project/.ralph/meditations/stimuli",
+      "/abs/project/.apparat/meditations/stimuli",
     );
   });
-  it("sessionsDir joins .ralph/sessions", () => {
-    expect(sessionsDir(project)).toBe("/abs/project/.ralph/sessions");
+  it("sessionsDir joins .apparat/sessions", () => {
+    expect(sessionsDir(project)).toBe("/abs/project/.apparat/sessions");
   });
-  it("pipelinesDir joins .ralph/pipelines", () => {
-    expect(pipelinesDir(project)).toBe("/abs/project/.ralph/pipelines");
+  it("pipelinesDir joins .apparat/pipelines", () => {
+    expect(pipelinesDir(project)).toBe("/abs/project/.apparat/pipelines");
   });
-  it("runsDir joins .ralph/runs", () => {
-    expect(runsDir(project)).toBe("/abs/project/.ralph/runs");
+  it("runsDir joins .apparat/runs", () => {
+    expect(runsDir(project)).toBe("/abs/project/.apparat/runs");
   });
-  it("runDir joins .ralph/runs/<runId>", () => {
+  it("runDir joins .apparat/runs/<runId>", () => {
     expect(runDir(project, "2026-05-04T12-00")).toBe(
-      "/abs/project/.ralph/runs/2026-05-04T12-00",
+      "/abs/project/.apparat/runs/2026-05-04T12-00",
     );
   });
   it("runDir composes from runsDir", () => {

@@ -45,7 +45,7 @@ gh issue view $prd_number --json body --jq .body
    - **Blocked by**: list of slice indices in THIS list that must complete first (use 0-based indices — the publish step resolves them to real GitHub numbers)
    - **Body** (do NOT include a "Blocked by" section — the script appends it)
 
-4. Write the breakdown to `.ralph/runs/$run_id/proposed-issues.json` (create the dir with `mkdir -p` if missing) as:
+4. Write the breakdown to `.apparat/runs/$run_id/proposed-issues.json` (create the dir with `mkdir -p` if missing) as:
 
 ```json
 [
@@ -78,5 +78,5 @@ gh issue view $prd_number --json body --jq .body
 A single JSON object on its own line as the LAST text response:
 
 ```json
-{ "issues_path": ".ralph/runs/<run_id>/proposed-issues.json", "issue_count": 6 }
+{ "issues_path": ".apparat/runs/<run_id>/proposed-issues.json", "issue_count": 6 }
 ```

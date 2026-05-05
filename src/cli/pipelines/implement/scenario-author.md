@@ -54,7 +54,7 @@ If `$scenarios_dir` does not exist, create it: `mkdir -p $scenarios_dir`. (Use `
 ## Phase 1 — Inventory existing scenarios
 
 `ls $scenarios_dir/*.md 2>/dev/null` and read each file. Build a mental list of:
-- Which commands are already exercised (e.g. "`ralph pipeline run` is covered by 2 files").
+- Which commands are already exercised (e.g. "`apparat pipeline run` is covered by 2 files").
 - Which observable surfaces (flags, outputs, file effects) are already asserted.
 
 Keep this in working memory; you will use it for the subsumption check below.
@@ -117,7 +117,7 @@ Your final response is a brief markdown summary followed by one JSON object on i
 Example final response:
 
 ```
-Considered 3 clusters from 8 commits. Wrote 1 new scenario (implement --scenarios flag), skipped 2 (1 subsumed by ralph-implement-baseline.md, 1 infeasible — pure refactor of agent-loader). Files touched: src/tests/scenarios/implement-with-scenarios-flag.md.
+Considered 3 clusters from 8 commits. Wrote 1 new scenario (implement --scenarios flag), skipped 2 (1 subsumed by apparat-implement-baseline.md, 1 infeasible — pure refactor of agent-loader). Files touched: src/tests/scenarios/implement-with-scenarios-flag.md.
 
 {"tests_written": true}
 ```

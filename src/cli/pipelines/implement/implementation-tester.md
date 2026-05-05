@@ -55,7 +55,7 @@ Source the following bash block in your shell **before** calling any helper. Bin
 SESSION=$(tmux display-message -p '#S')
 WIN="test-$run_id"
 RUN_ID="implementation-tester-$(date +%s)-$$"
-RUN_DIR="$HOME/.ralph/harness/$RUN_ID"
+RUN_DIR="$HOME/.apparat/harness/$RUN_ID"
 CAPTURE_INDEX=0
 mkdir -p "$RUN_DIR"
 ```
@@ -164,7 +164,7 @@ If there are zero scenarios, emit `{"test_result": "pass"}` preceded by the one-
 For each scenario file:
 
 1. **Setup.** If `## Setup` is non-empty, send each setup command via `send_input`, `wait_stable`, `capture`. Read `current.txt` to confirm setup completed cleanly (no error markers).
-2. **Action.** Send the `## Action` command via `send_input`. `wait_stable 60000` (or a reasonable budget for the command — `ralph implement` short runs are fast; `npm test` may need 5 minutes). `capture`.
+2. **Action.** Send the `## Action` command via `send_input`. `wait_stable 60000` (or a reasonable budget for the command — `apparat implement` short runs are fast; `npm test` may need 5 minutes). `capture`.
 3. **Expect.** For each `## Expect` bullet, evaluate it against observed reality:
    - "exit code 0" → check `$?` via a follow-up `send_input` of `echo "exit=$?"`, capture, grep.
    - "<file> exists" → run `[ -e <path> ] && echo OK || echo MISSING` in the window or as a host-side `Bash` call.

@@ -9,11 +9,11 @@ description: meditate.ts owns 5 inline PID utilities that duplicate the daemon's
 
    **Evidence:**
    - `src/cli/commands/meditate.ts:10–34` — five exported functions managing `<project>/.meditate.pid`
-   - `src/daemon/state.ts:46–49` — `getPidFilePath(taskId)` → `~/.ralph/pids/<safeId>.pid`
+   - `src/daemon/state.ts:46–49` — `getPidFilePath(taskId)` → `~/.apparat/pids/<safeId>.pid`
    - `src/daemon/runner.ts:21–31` — `isSessionRunning(task)` reads daemon PID, calls `process.kill(pid, 0)` — identical logic to `isPidAlive()`
    - `src/daemon/runner.ts:33–42` — `killSession(task)` — mirrors `removePid()` + signal
 
-   **Why it matters (KISS lens):** Two independent single-instance guards exist for the same command. When the daemon launches meditate, it writes `~/.ralph/pids/meditate:<project>.pid`; simultaneously, `meditateCommand` writes `<project>/.meditate.pid`. The manual-launch guard (`readPid` / `isPidAlive` at line 70–71) checks only the project PID — it cannot detect a daemon-launched meditate session. A reader tracking "is meditate already running?" must hold two state locations in their head; neither is authoritative.
+   **Why it matters (KISS lens):** Two independent single-instance guards exist for the same command. When the daemon launches meditate, it writes `~/.apparat/pids/meditate:<project>.pid`; simultaneously, `meditateCommand` writes `<project>/.meditate.pid`. The manual-launch guard (`readPid` / `isPidAlive` at line 70–71) checks only the project PID — it cannot detect a daemon-launched meditate session. A reader tracking "is meditate already running?" must hold two state locations in their head; neither is authoritative.
 
    **Suggested action:** Remove the 5 inline PID utilities from `meditate.ts`. Delegate single-instance protection to the daemon by having `meditateCommand` query `daemon-client.request("is_running", ...)` before starting, or accept that the daemon's own dedup (it does not start a task already in `running` state) is sufficient and drop the project-level guard entirely.
 

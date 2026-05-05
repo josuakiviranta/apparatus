@@ -7,7 +7,7 @@ import type { CheckpointState } from "../types.js";
 
 describe("checkpoint", () => {
   let dir: string;
-  beforeEach(() => { dir = mkdtempSync(join(tmpdir(), "ralph-test-")); });
+  beforeEach(() => { dir = mkdtempSync(join(tmpdir(), "apparat-test-")); });
   afterEach(() => { rmSync(dir, { recursive: true }); });
 
   const state: CheckpointState = {

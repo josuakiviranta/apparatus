@@ -53,7 +53,7 @@ Goal: turn the grilling-session decisions into a concise PRD and post it as a Gi
 <what this PRD explicitly does not cover>
 ```
 
-4. Save the rendered PRD to `.ralph/runs/$run_id/prd.md` (create the dir with `mkdir -p` if missing).
+4. Save the rendered PRD to `.apparat/runs/$run_id/prd.md` (create the dir with `mkdir -p` if missing).
 
 5. Publish via `gh`:
 
@@ -61,7 +61,7 @@ Goal: turn the grilling-session decisions into a concise PRD and post it as a Gi
 gh issue create \
   --title "PRD: <short feature name>" \
   --label needs-triage \
-  --body-file .ralph/runs/$run_id/prd.md
+  --body-file .apparat/runs/$run_id/prd.md
 ```
 
 Capture the issue number and URL from the `gh` output (the URL is on stdout).

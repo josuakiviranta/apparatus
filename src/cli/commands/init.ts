@@ -38,7 +38,7 @@ export async function initCommand(projectRoot: string): Promise<void> {
     writeFileSync(readmePath, "# Project\n\n_Top-level entry point for human readers._\n");
   }
 
-  appendGitignoreLine(projectRoot, ".ralph/runs/");
+  appendGitignoreLine(projectRoot, ".apparat/runs/");
 
   if (!existsSync(join(projectRoot, ".git"))) {
     try {
@@ -53,7 +53,7 @@ function appendGitignoreLine(projectRoot: string, line: string): void {
   const path = join(projectRoot, ".gitignore");
   const existing = existsSync(path) ? readFileSync(path, "utf8") : "";
   // Match against trimmed-whole-line equality. This intentionally does NOT
-  // dedupe near-variants like "/.ralph/runs/" or ".ralph/runs" (no trailing
+  // dedupe near-variants like "/.apparat/runs/" or ".apparat/runs" (no trailing
   // slash) — those are distinct gitignore patterns; user owns reconciliation.
   const already = existing.split("\n").some((l) => l.trim() === line);
   if (already) return;

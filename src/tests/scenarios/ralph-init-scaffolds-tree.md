@@ -1,4 +1,4 @@
-# Scenario: `ralph init <project>` scaffolds the .ralph/ tree
+# Scenario: `ralph init <project>` scaffolds the .apparat/ tree
 
 ## Setup
 - A clean working directory; the target folder `init-smoke` does not exist yet.
@@ -9,13 +9,13 @@
 
 ## Expect
 - exit code is 0
-- directory `init-smoke/.ralph/pipelines` exists
-- directory `init-smoke/.ralph/meditations/illuminations` exists
-- directory `init-smoke/.ralph/meditations/stimuli` exists
-- directory `init-smoke/.ralph/sessions` exists
+- directory `init-smoke/.apparat/pipelines` exists
+- directory `init-smoke/.apparat/meditations/illuminations` exists
+- directory `init-smoke/.apparat/meditations/stimuli` exists
+- directory `init-smoke/.apparat/sessions` exists
 - directory `init-smoke/docs/adr` exists
 - file `init-smoke/VISION.md` exists and starts with `# Vision`
 - file `init-smoke/CONTEXT.md` exists and starts with `# Domain Language`
 - file `init-smoke/README.md` exists
-- file `init-smoke/.gitignore` exists and contains a line equal to `.ralph/runs/`
+- file `init-smoke/.gitignore` exists and contains a line equal to `.apparat/runs/`
 - directory `init-smoke/.git` exists (git repo was initialized)

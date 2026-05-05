@@ -692,7 +692,7 @@ After this chunk: `npx tsc --noEmit`, `npx vitest run`, and `npm run build` all 
 
 #### 3.1: Flip the literal inside `apparatDir()`
 
-- [ ] **3.1.1: Update `apparat-paths.test.ts` first (TDD red).**
+- [x] **3.1.1: Update `apparat-paths.test.ts` first (TDD red).**
 
 Read `src/cli/tests/apparat-paths.test.ts`. Flip every assertion string from `.ralph` to `.apparat`:
 
@@ -710,12 +710,12 @@ expect(meditationsDir(project)).toBe("/abs/project/.apparat/meditations");
 
 The `describe("ralph-paths", ...)` (or equivalent) block name should already have flipped to `apparat-paths` in chunk 2 step 2.4.3; if not, flip it now.
 
-- [ ] **3.1.2: Run the test to verify red.**
+- [x] **3.1.2: Run the test to verify red.**
 
 Run: `npx vitest run src/cli/tests/apparat-paths.test.ts`
 Expected: FAIL — assertions expect `.apparat`, source returns `.ralph`.
 
-- [ ] **3.1.3: Update `apparat-paths.ts` body (green).**
+- [x] **3.1.3: Update `apparat-paths.ts` body (green).**
 
 Read `src/cli/lib/apparat-paths.ts`. Flip the literal:
 
@@ -733,19 +733,19 @@ export function apparatDir(projectRoot: string): string {
 
 Other helper bodies (`meditationsDir`, etc.) call `apparatDir` and inherit the new literal automatically — no edit needed.
 
-- [ ] **3.1.4: Run the test to verify green.**
+- [x] **3.1.4: Run the test to verify green.**
 
 Run: `npx vitest run src/cli/tests/apparat-paths.test.ts`
 Expected: PASS.
 
-- [ ] **3.1.5: Run full vitest — confirm what now fails.**
+- [x] **3.1.5: Run full vitest — confirm what now fails.**
 
 Run: `npx vitest run`
 Expected: FAIL across many tests. Tests with hardcoded `.ralph/` path constants now diverge from the live layout (which is still `.ralph/` on disk, but `apparatDir` returns `.apparat/`). This failure surface is the input set for steps 3.4–3.7.
 
 #### 3.2: Flip the `assets.ts:42` literal
 
-- [ ] **3.2.1: Update `src/cli/lib/assets.ts:42`.**
+- [x] **3.2.1: Update `src/cli/lib/assets.ts:42`.**
 
 Read the file. The `getMetaMeditationsDir()` function constructs a hardcoded `.ralph/meditations/stimuli` path:
 
@@ -759,7 +759,7 @@ return join(packageRoot, ".apparat", "meditations", "stimuli");
 
 #### 3.3: Flip remaining source-code `.ralph/` literals
 
-- [ ] **3.3.1: Enumerate `.ralph/` literals in source.**
+- [x] **3.3.1: Enumerate `.ralph/` literals in source.**
 
 Run:
 ```bash
@@ -768,7 +768,7 @@ grep -rn '\.ralph/\|"\.ralph"\|'\''\.ralph'\''' src/ --include='*.ts' \
 ```
 Expected: a list of files in `src/cli/commands/`, `src/cli/mcp/`, possibly `src/attractor/`. The list IS the editing surface for this step.
 
-- [ ] **3.3.2: For each file in the enumeration, replace every `.ralph` literal with `.apparat`.**
+- [x] **3.3.2: For each file in the enumeration, replace every `.ralph` literal with `.apparat`.**
 
 Apply by file using `Edit` with `replace_all: true` per occurrence as appropriate. Examples likely to appear:
 
@@ -783,7 +783,7 @@ The carve-out between chunk 3 and chunk 4 for `program.ts`:
 
 After each file edit: re-run grep on that file to confirm zero `\.ralph/` remain.
 
-- [ ] **3.3.3: Re-run the enumeration grep.**
+- [x] **3.3.3: Re-run the enumeration grep.**
 
 Run:
 ```bash
@@ -793,22 +793,22 @@ Expected: zero hits. Every `.ralph/` path literal is gone, including inside help
 
 #### 3.4: `git mv .ralph .apparat` (the project-self folder rename)
 
-- [ ] **3.4.1: Pre-flight: verify `.apparat/` does not yet exist.**
+- [x] **3.4.1: Pre-flight: verify `.apparat/` does not yet exist.**
 
 Run: `ls -d .apparat 2>/dev/null && echo EXISTS || echo OK`
 Expected: `OK`. If `EXISTS`, abort and inspect — chunk should run on a clean repo state.
 
-- [ ] **3.4.2: Verify `.ralph/` is fully tracked by git (no untracked files inside).**
+- [x] **3.4.2: Verify `.ralph/` is fully tracked by git (no untracked files inside).**
 
 Run: `git status --porcelain .ralph/ | grep -v '^[ M]'`
 Expected: zero output. If untracked files exist (e.g. local run state, scratch notes), commit or stash them before the move; otherwise `git mv` will not move them and the working tree state diverges from index.
 
-- [ ] **3.4.3: `git mv .ralph .apparat`.**
+- [x] **3.4.3: `git mv .ralph .apparat`.**
 
 Run: `git mv .ralph .apparat`
 Expected: success, no errors. Single command moves the entire tree atomically as a rename.
 
-- [ ] **3.4.4: Verify the move.**
+- [x] **3.4.4: Verify the move.**
 
 Run:
 ```bash
@@ -819,7 +819,7 @@ Expected: `.apparat` lists; `.ralph` does not exist; `git status` shows the move
 
 #### 3.5: Flip `.ralph/` literals in test files
 
-- [ ] **3.5.1: Enumerate test files with `.ralph/` literals.**
+- [x] **3.5.1: Enumerate test files with `.ralph/` literals.**
 
 Run:
 ```bash
@@ -827,7 +827,7 @@ grep -rln '\.ralph/\|"\.ralph"' src/ --include='*.test.ts'
 ```
 Expected list (per spec §4): `init.test.ts`, `pipeline.test.ts`, `pipeline-show.test.ts`, the 14 `pipeline-smoke-*-folder.test.ts` files, plus possibly `pipeline-trace-*.test.ts` and others depending on hardcoded fixtures.
 
-- [ ] **3.5.2: For each enumerated test file, replace every `.ralph` literal with `.apparat`.**
+- [x] **3.5.2: For each enumerated test file, replace every `.ralph` literal with `.apparat`.**
 
 Common replacement patterns (apply per file):
 
@@ -852,7 +852,7 @@ For each of the 14 smoke-folder tests, the per-file `<subdir>` token in the path
 
 Process per file: read; identify all `.ralph` occurrences; apply Edit with `replace_all: true` for the literal `.ralph` → `.apparat`; re-grep the file to confirm zero residual hits.
 
-- [ ] **3.5.3: Re-run the enumeration grep.**
+- [x] **3.5.3: Re-run the enumeration grep.**
 
 Run:
 ```bash
@@ -860,14 +860,14 @@ grep -rln '\.ralph/\|"\.ralph"' src/ --include='*.test.ts'
 ```
 Expected: zero files.
 
-- [ ] **3.5.4: Run vitest to verify green.**
+- [x] **3.5.4: Run vitest to verify green.**
 
 Run: `npx vitest run`
 Expected: PASS. Tests now reference `.apparat/` paths and the on-disk directory matches.
 
 #### 3.6: Flip `.ralph/` literals + word-form "ralph" in bundled pipelines
 
-- [ ] **3.6.1: Enumerate every `ralph`/`Ralph`/`RALPH_`/`.ralph/` hit, pinned to file:line with verbatim source.**
+- [x] **3.6.1: Enumerate every `ralph`/`Ralph`/`RALPH_`/`.ralph/` hit, pinned to file:line with verbatim source.**
 
 This is the inventory-first step — judgment per occurrence happens once, against a checklist, not in a streaming edit pass. Run:
 
@@ -893,21 +893,21 @@ Expected: file lists each hit as `<path>:<line>:<verbatim source>`. Read the fil
 
 Annotate the pin file with the chosen replacement for each line. The annotated file is the input to step 3.6.2.
 
-- [ ] **3.6.2: Apply the pinned replacements file-by-file.**
+- [x] **3.6.2: Apply the pinned replacements file-by-file.**
 
 For each file with hits:
 1. Read the file.
 2. Apply each pinned edit (use `Edit` tool with the verbatim source as `old_string` and the chosen replacement as `new_string`).
 3. Re-run `grep -n '\.ralph/\|RALPH_\|\bralph\b\|\bRalph\b' <file>` — expected zero hits.
 
-- [ ] **3.6.3: Re-grep to confirm zero residue across all bundled pipelines.**
+- [x] **3.6.3: Re-grep to confirm zero residue across all bundled pipelines.**
 
 Run: `grep -rn '\.ralph/\|RALPH_\|\bralph\b\|\bRalph\b' src/cli/pipelines/`
 Expected: zero hits.
 
 #### 3.7: Flip `.ralph/runs/` in `.gitignore`
 
-- [ ] **3.7.1: Update `.gitignore` (the project-self gitignore).**
+- [x] **3.7.1: Update `.gitignore` (the project-self gitignore).**
 
 Read the file. Find the line:
 ```
@@ -922,12 +922,12 @@ This is the project-self gitignore. The `init.ts` scaffolder's gitignore-append 
 
 #### 3.8: `sed` pass on live working documents
 
-- [ ] **3.8.1: Identify alive illuminations.**
+- [x] **3.8.1: Identify alive illuminations.**
 
 Run: `ls .apparat/meditations/illuminations/*.md 2>/dev/null | head`
 Expected: the list (post-mv) of currently-alive illumination markdown files. Each is operator-authored prose that may reference `.ralph/` paths the implementer agent reads.
 
-- [ ] **3.8.2: `sed`-replace path strings only in alive illuminations.**
+- [x] **3.8.2: `sed`-replace path strings only in alive illuminations.**
 
 Run:
 ```bash
@@ -939,7 +939,7 @@ find .apparat/meditations/illuminations -maxdepth 1 -name '*.md' -print0 \
 
 This flips only the path-string `.ralph/` → `.apparat/`; the operator-authored body prose is otherwise untouched. The `-maxdepth 1` excludes the `.triage/` subdirectory which contains historical chat notes (frozen prose).
 
-- [ ] **3.8.3: `sed`-replace path strings in `.apparat/scenarios/`.**
+- [x] **3.8.3: `sed`-replace path strings in `.apparat/scenarios/`.**
 
 Run:
 ```bash
@@ -949,7 +949,7 @@ find .apparat/scenarios -type f \( -name '*.md' -o -name '*.dot' -o -name '*.mjs
 
 These are smoke-pipeline test fixtures — live test code, not history — so a path-string flip is required for the engine to find resources.
 
-- [ ] **3.8.4: Verify the sed pass found targets and didn't touch frozen prose.**
+- [x] **3.8.4: Verify the sed pass found targets and didn't touch frozen prose.**
 
 Run:
 ```bash
@@ -960,7 +960,7 @@ Expected: diff stat shows changes only in alive illuminations + scenarios; sessi
 
 #### 3.9: Final verification of chunk 3
 
-- [ ] **3.9.1: Repo-wide invariant grep.**
+- [x] **3.9.1: Repo-wide invariant grep.**
 
 Run:
 ```bash
@@ -971,22 +971,22 @@ grep -rn '\.ralph/' src/ .apparat/scenarios/ .apparat/meditations/illuminations/
 ```
 Expected: zero hits. Every `.ralph/` path literal across source, tests, bundled pipelines, alive illuminations, and scenarios has flipped. Word-form "ralph" (without leading dot) is still expected in `src/cli/program.ts` help text and `README.md`/`VISION.md`/`CONTEXT.md` etc.; chunk 4 finishes those.
 
-- [ ] **3.9.2: TypeScript check.**
+- [x] **3.9.2: TypeScript check.**
 
 Run: `npx tsc --noEmit`
 Expected: PASS.
 
-- [ ] **3.9.3: Full vitest.**
+- [x] **3.9.3: Full vitest.**
 
 Run: `npx vitest run`
 Expected: PASS.
 
-- [ ] **3.9.4: Build.**
+- [x] **3.9.4: Build.**
 
 Run: `npm run build`
 Expected: PASS. `dist/pipelines/` re-emitted from `src/cli/pipelines/` (post-rename); `dist/cli/index.js` bundled with `__APPARAT_PROD__: "true"`.
 
-- [ ] **3.9.5: Smoke — `node dist/cli/index.js init` in a temp dir.**
+- [x] **3.9.5: Smoke — `node dist/cli/index.js init` in a temp dir.**
 
 Run:
 ```bash
@@ -1003,7 +1003,7 @@ Expected: all assertions hold. Init scaffolds the new `.apparat/` layout.
 
 #### 3.10: Commit chunk 3
 
-- [ ] **3.10.1: Commit.**
+- [x] **3.10.1: Commit.**
 
 ```bash
 git add -A
@@ -1033,7 +1033,7 @@ EOF
 
 Expected: commit succeeds; `git log -1 --stat` shows the rename plus dozens of small literal flips.
 
-- [ ] **3.10.2: Verify chunk 3 final state.**
+- [x] **3.10.2: Verify chunk 3 final state.**
 
 Run:
 ```bash

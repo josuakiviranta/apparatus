@@ -47,7 +47,7 @@ You have tools for exploring the project:
   be relative to the project root.
 - `read_file(path)` — read a file by relative path (e.g. `"src/cli/index.ts"`).
 
-You also have tools for meta-meditations — curated lenses from the ralph-cli tool itself:
+You also have tools for meta-meditations — curated lenses from the apparat-cli tool itself:
 
 - `list_meta_meditations` — list available lenses, one per line as `filename — description`. Call this before reading any. Use the descriptions to pick which lenses match what you observed in the project; pass the filename portion (before ` — `) to `read_meta_meditation`.
 - `read_meta_meditation(filename)` — read a specific lens by filename.

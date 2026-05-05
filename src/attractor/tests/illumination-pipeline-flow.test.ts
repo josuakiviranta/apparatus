@@ -6,8 +6,8 @@ import { validateGraph } from "../core/graph-validator.js";
 
 describe("illumination-to-implementation pipeline — full flow validation", () => {
   const root = resolve(__dirname, "../../..");
-  const dotPath = resolve(root, ".ralph/pipelines/illumination-to-implementation/pipeline.dot");
-  const dotDir = resolve(root, ".ralph/pipelines/illumination-to-implementation");
+  const dotPath = resolve(root, ".apparat/pipelines/illumination-to-implementation/pipeline.dot");
+  const dotDir = resolve(root, ".apparat/pipelines/illumination-to-implementation");
   const dot = readFileSync(dotPath, "utf-8");
   const graph = parseDot(dot);
   const diags = validateGraph(graph, dotDir);

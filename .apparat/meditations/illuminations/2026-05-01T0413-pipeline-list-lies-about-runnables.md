@@ -1,11 +1,11 @@
 ---
 date: 2026-05-01
-description: `ralph pipeline list` only scans `<project>/pipelines/*.dot` flat-form files, so it hides every folder-form pipeline, every `~/.ralph/pipelines/` entry, and every bundled pipeline that `resolvePipelineArg` will happily run — discovery diverges from execution from the first command.
+description: `ralph pipeline list` only scans `<project>/pipelines/*.dot` flat-form files, so it hides every folder-form pipeline, every `~/.apparat/pipelines/` entry, and every bundled pipeline that `resolvePipelineArg` will happily run — discovery diverges from execution from the first command.
 ---
 
 ## Core Idea
 
-`ralph pipeline list` and `resolvePipelineArg` disagree about what a pipeline is. The resolver (`src/cli/lib/pipeline-resolver.ts:30-49`) walks five tiers — project folder-form, project flat-form, user-home folder-form, user-home flat-form, bundled — so `ralph pipeline run implement` works from any cwd. The list command (`src/cli/commands/pipeline.ts:380-395`) only does `readdirSync(<project>/pipelines).filter(f => f.endsWith(".dot"))`. Folder-form (`pipelines/foo/pipeline.dot`, the SSoT layout per ADR-0001) is invisible. So is everything in `~/.ralph/` and every bundled pipeline. The empty-state message even tells users to run `ralph pipeline create`, a subcommand that no longer exists. Discovery is broken in three directions at once.
+`ralph pipeline list` and `resolvePipelineArg` disagree about what a pipeline is. The resolver (`src/cli/lib/pipeline-resolver.ts:30-49`) walks five tiers — project folder-form, project flat-form, user-home folder-form, user-home flat-form, bundled — so `ralph pipeline run implement` works from any cwd. The list command (`src/cli/commands/pipeline.ts:380-395`) only does `readdirSync(<project>/pipelines).filter(f => f.endsWith(".dot"))`. Folder-form (`pipelines/foo/pipeline.dot`, the SSoT layout per ADR-0001) is invisible. So is everything in `~/.apparat/` and every bundled pipeline. The empty-state message even tells users to run `ralph pipeline create`, a subcommand that no longer exists. Discovery is broken in three directions at once.
 
 ## Why It Matters
 
@@ -19,7 +19,7 @@ Compounding evidence:
 
 ## Revised Implementation Steps
 
-1. Rewrite `pipelineListCommand` to mirror `resolvePipelineArg`: enumerate (a) project folder-form (`pipelines/*/pipeline.dot`), (b) project flat-form (`pipelines/*.dot`), (c) `~/.ralph/pipelines/` folder-form + flat-form, (d) bundled (`getBundledPipelinesDir()`). Group output by tier with a header per tier; mark project entries that shadow a bundled name.
+1. Rewrite `pipelineListCommand` to mirror `resolvePipelineArg`: enumerate (a) project folder-form (`pipelines/*/pipeline.dot`), (b) project flat-form (`pipelines/*.dot`), (c) `~/.apparat/pipelines/` folder-form + flat-form, (d) bundled (`getBundledPipelinesDir()`). Group output by tier with a header per tier; mark project entries that shadow a bundled name.
 2. Extract a shared `enumerateResolvablePipelines(project)` helper into `pipeline-resolver.ts` so list and any future `pipeline show --all` reuse the same walk; resolver and lister must not drift again.
 3. Drop every `ralph pipeline create` reference from the empty-state strings and from `program.ts` help. Replace with `Author one by adding pipelines/<name>/pipeline.dot — see bundled examples at <getBundledPipelinesDir()>`.
 4. Replace the obsolete DOT anatomy in `program.ts:36-58` with a one-line pointer to a single canonical exemplar (e.g. `src/cli/pipelines/meditate/pipeline.dot`) instead of trying to teach the file format in --help. The format is too rich to summarise truthfully in a help block, and the inline anatomy has been wrong for two pipeline-redesign chunks.

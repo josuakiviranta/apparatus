@@ -8,7 +8,7 @@ const REPO_ROOT = resolve(__dirname, "../../../..");
 const CLI = join(REPO_ROOT, "dist/cli/index.js");
 
 function setupTempProjectWith(files: Record<string, string>): string {
-  const root = mkdtempSync(join(tmpdir(), "ralph-validate-test-"));
+  const root = mkdtempSync(join(tmpdir(), "apparat-validate-test-"));
   for (const [relPath, content] of Object.entries(files)) {
     const abs = join(root, relPath);
     mkdirSync(join(abs, ".."), { recursive: true });

@@ -16,4 +16,4 @@
 - file `idem-smoke/VISION.md` content is exactly `CUSTOM VISION` (not overwritten)
 - file `idem-smoke/CONTEXT.md` content is exactly `CUSTOM CONTEXT` (not overwritten)
 - file `idem-smoke/README.md` content is exactly `CUSTOM README` (not overwritten)
-- file `idem-smoke/.gitignore` contains exactly one line equal to `.ralph/runs/` (no duplicate appended)
+- file `idem-smoke/.gitignore` contains exactly one line equal to `.apparat/runs/` (no duplicate appended)

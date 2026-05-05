@@ -21,14 +21,14 @@ describe("ralph init", () => {
     rmSync(projectDir, { recursive: true, force: true });
   });
 
-  it("scaffolds the .ralph/ tree on a fresh directory", async () => {
+  it("scaffolds the .apparat/ tree on a fresh directory", async () => {
     await initCommand(projectDir);
 
-    expect(existsSync(join(projectDir, ".ralph"))).toBe(true);
-    expect(existsSync(join(projectDir, ".ralph/pipelines"))).toBe(true);
-    expect(existsSync(join(projectDir, ".ralph/meditations/illuminations"))).toBe(true);
-    expect(existsSync(join(projectDir, ".ralph/meditations/stimuli"))).toBe(true);
-    expect(existsSync(join(projectDir, ".ralph/sessions"))).toBe(true);
+    expect(existsSync(join(projectDir, ".apparat"))).toBe(true);
+    expect(existsSync(join(projectDir, ".apparat/pipelines"))).toBe(true);
+    expect(existsSync(join(projectDir, ".apparat/meditations/illuminations"))).toBe(true);
+    expect(existsSync(join(projectDir, ".apparat/meditations/stimuli"))).toBe(true);
+    expect(existsSync(join(projectDir, ".apparat/sessions"))).toBe(true);
     expect(existsSync(join(projectDir, "docs/adr"))).toBe(true);
     expect(existsSync(join(projectDir, "VISION.md"))).toBe(true);
     expect(existsSync(join(projectDir, "CONTEXT.md"))).toBe(true);
@@ -51,17 +51,17 @@ describe("ralph init", () => {
     expect(readFileSync(join(projectDir, "VISION.md"), "utf8")).toBe("my vision");
   });
 
-  it("appends .ralph/runs/ to .gitignore (creating the file if absent)", async () => {
+  it("appends .apparat/runs/ to .gitignore (creating the file if absent)", async () => {
     await initCommand(projectDir);
     const gitignore = readFileSync(join(projectDir, ".gitignore"), "utf8");
-    expect(gitignore).toContain(".ralph/runs/");
+    expect(gitignore).toContain(".apparat/runs/");
   });
 
-  it("does not duplicate the .ralph/runs/ line on second invocation", async () => {
+  it("does not duplicate the .apparat/runs/ line on second invocation", async () => {
     await initCommand(projectDir);
     await initCommand(projectDir);
     const gitignore = readFileSync(join(projectDir, ".gitignore"), "utf8");
-    const matches = gitignore.match(/^\.ralph\/runs\/$/gm) ?? [];
+    const matches = gitignore.match(/^\.apparat\/runs\/$/gm) ?? [];
     expect(matches.length).toBe(1);
   });
 
@@ -79,12 +79,12 @@ describe("ralph init", () => {
     expect(secondSnapshot).toBe(firstSnapshot);
   });
 
-  it("fills in missing subfolders on a partial existing .ralph/", async () => {
-    mkdirSync(join(projectDir, ".ralph/pipelines"), { recursive: true });
-    // .ralph/ exists with only pipelines/; meditations/, sessions/, docs/ are missing
+  it("fills in missing subfolders on a partial existing .apparat/", async () => {
+    mkdirSync(join(projectDir, ".apparat/pipelines"), { recursive: true });
+    // .apparat/ exists with only pipelines/; meditations/, sessions/, docs/ are missing
     await initCommand(projectDir);
-    expect(existsSync(join(projectDir, ".ralph/meditations/illuminations"))).toBe(true);
-    expect(existsSync(join(projectDir, ".ralph/sessions"))).toBe(true);
+    expect(existsSync(join(projectDir, ".apparat/meditations/illuminations"))).toBe(true);
+    expect(existsSync(join(projectDir, ".apparat/sessions"))).toBe(true);
     expect(existsSync(join(projectDir, "docs/adr"))).toBe(true);
   });
 

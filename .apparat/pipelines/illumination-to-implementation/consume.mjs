@@ -14,7 +14,7 @@ if (reason !== "implemented" && reason !== "declined") {
 
 const projectRoot = process.cwd();
 const filename = path.basename(illuminationArg);
-const illuminationPath = path.join(projectRoot, ".ralph", "meditations", "illuminations", filename);
+const illuminationPath = path.join(projectRoot, ".apparat", "meditations", "illuminations", filename);
 
 if (!fs.existsSync(illuminationPath)) {
   console.error(`illumination not found: ${illuminationPath}`);

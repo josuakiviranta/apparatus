@@ -14,7 +14,7 @@ beforeAll(() => {
 });
 
 function writeTempDot(contents: string): string {
-  const dir = mkdtempSync(join(tmpdir(), "ralph-preflight-"));
+  const dir = mkdtempSync(join(tmpdir(), "apparat-preflight-"));
   const path = join(dir, "p.dot");
   writeFileSync(path, contents);
   return path;
@@ -76,8 +76,8 @@ describe("pipeline run pre-flight check", () => {
 
 describe("pipeline list shows requires:", () => {
   it("prints 'requires:' for pipelines with inputs=, omits it for legacy pipelines", () => {
-    const project = mkdtempSync(join(tmpdir(), "ralph-list-"));
-    const pipelinesDir = join(project, ".ralph", "pipelines");
+    const project = mkdtempSync(join(tmpdir(), "apparat-list-"));
+    const pipelinesDir = join(project, ".apparat", "pipelines");
     mkdirSync(pipelinesDir, { recursive: true });
     writeFileSync(join(pipelinesDir, "with-inputs.dot"), `digraph with_inputs {
       goal="declares contract"

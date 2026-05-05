@@ -71,7 +71,7 @@ describe("pipelineRunCommand headless safety", () => {
     exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {
       throw new Error("process.exit called");
     }) as any);
-    dir = mkdtempSync(join(tmpdir(), "ralph-test-"));
+    dir = mkdtempSync(join(tmpdir(), "apparat-test-"));
   });
 
   afterEach(() => {
@@ -129,7 +129,7 @@ describe("pipelineRunCommand headless --project guard", () => {
       throw new Error("process.exit called");
     }) as any);
     stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation((() => true) as any);
-    dir = mkdtempSync(join(tmpdir(), "ralph-test-"));
+    dir = mkdtempSync(join(tmpdir(), "apparat-test-"));
   });
 
   afterEach(() => {

@@ -38,7 +38,7 @@ Memory files are reference documents for future sessions. Keep them dense, scann
 # Inputs you will receive
 
 - `$project` — repo root; cd here for git commit + push.
-- `$run_id` — pipeline run identifier (8-char id; equals the basename of the on-disk run directory). Use it with `ralph pipeline trace $run_id` for the whole-run trace and `ralph pipeline trace $run_id --node-receive <nodeReceiveId>` for a per-node context slice.
+- `$run_id` — pipeline run identifier (8-char id; equals the basename of the on-disk run directory). Use it with `apparat pipeline trace $run_id` for the whole-run trace and `apparat pipeline trace $run_id --node-receive <nodeReceiveId>` for a per-node context slice.
 - `$plan_writer.plan_path` — the implementation plan just executed (use its slug to name the memory file).
 - `$design_writer.design_doc_path` — the design that drove the plan.
 - `$verifier_illumination_path` — the originating illumination.
@@ -46,16 +46,16 @@ Memory files are reference documents for future sessions. Keep them dense, scann
 
 # Procedure
 
-1. **Derive the memory filename.** Strip the date prefix from the plan filename to get the slug. Target path: `$project/.ralph/sessions/YYYY-MM-DD-<slug>.md` using today's date. Keeps the illumination → design → plan → memory naming chain 1:1.
+1. **Derive the memory filename.** Strip the date prefix from the plan filename to get the slug. Target path: `$project/.apparat/sessions/YYYY-MM-DD-<slug>.md` using today's date. Keeps the illumination → design → plan → memory naming chain 1:1.
 
-2. **Read the trace.** Run `ralph pipeline trace $run_id` (whole-run JSONL) — it resolves the trace path internally and prints every node start/end, context update, and failure/retry for this run. For per-node context slices (e.g. exactly what one node received as input), run `ralph pipeline trace $run_id --node-receive <nodeReceiveId>`; the `nodeReceiveId` values are visible in the whole-run output. Scan the trace for:
+2. **Read the trace.** Run `apparat pipeline trace $run_id` (whole-run JSONL) — it resolves the trace path internally and prints every node start/end, context update, and failure/retry for this run. For per-node context slices (e.g. exactly what one node received as input), run `apparat pipeline trace $run_id --node-receive <nodeReceiveId>`; the `nodeReceiveId` values are visible in the whole-run output. Scan the trace for:
    - Node execution order and duration.
    - **Retry events** — when a node failed and re-ran. Biggest learning signal.
    - `agent.success=false` loops on the implement node (unbounded by design). Count them. If the agent repeatedly hit the same error before succeeding, that is a learning.
    - **tmux-tester fix cycles** — how many cycles, what commits the tester made, what remained unfixed.
    - Tool-node failures (consume, push).
 
-   If `ralph pipeline trace $run_id` exits non-zero (e.g. the engine crashed before writing the trace), proceed with artifact-only evidence and note the gap in the `Learnings` section.
+   If `apparat pipeline trace $run_id` exits non-zero (e.g. the engine crashed before writing the trace), proceed with artifact-only evidence and note the gap in the `Learnings` section.
 
 3. **Read the relevant artifacts.**
    - `$design_writer.design_doc_path`, `$plan_writer.plan_path`, `$verifier_illumination_path` — durable outputs this session produced.
@@ -129,7 +129,7 @@ Memory files are reference documents for future sessions. Keep them dense, scann
 
    **7a. Plan side.** If `$plan_writer.plan_path` is set and non-empty, call `consume_plan` with `filename = basename of $plan_writer.plan_path` (strip the directory portion — the tool deletes the file from `docs/superpowers/plans/` and commits `meditate: consume <filename> (implemented)`) and `reason = "implemented"`. On `success: true`, do nothing more — the tool auto-commits its own deletion. On `success: false` (plan file already gone from a prior run, invalid filename), append a single bullet to the memory file's `Learnings from the run` section quoting the `error` field verbatim, then continue. If `$plan_writer.plan_path` is empty or unset, skip 7a and append `- Plan consume skipped: $plan_writer.plan_path was empty` to the memory file.
 
-   **7b. Illumination side.** If `$verifier_illumination_path` is set and non-empty, call `consume` with `filename = basename of $verifier_illumination_path` and `reason = "implemented"` (strip the directory portion — the tool deletes the file from `.ralph/meditations/illuminations/` and commits `meditate: consume <filename> (implemented)`). On `success: true`, do nothing more. On `success: false` (file missing), append a single bullet to the memory file's `Learnings from the run` section quoting the `error` field verbatim, then continue. If `$verifier_illumination_path` is empty or unset, skip 7b and append `- Illumination consume skipped: $verifier_illumination_path was empty` to the memory file.
+   **7b. Illumination side.** If `$verifier_illumination_path` is set and non-empty, call `consume` with `filename = basename of $verifier_illumination_path` and `reason = "implemented"` (strip the directory portion — the tool deletes the file from `.apparat/meditations/illuminations/` and commits `meditate: consume <filename> (implemented)`). On `success: true`, do nothing more. On `success: false` (file missing), append a single bullet to the memory file's `Learnings from the run` section quoting the `error` field verbatim, then continue. If `$verifier_illumination_path` is empty or unset, skip 7b and append `- Illumination consume skipped: $verifier_illumination_path was empty` to the memory file.
 
    Do **not** abort the node on either branch's failure. Push (step 6) and the structured-JSON emit (step 8) are non-negotiable; the lifecycle calls are opportunistic.
 
@@ -141,5 +141,5 @@ Memory files are reference documents for future sessions. Keep them dense, scann
 - The `Learnings from the run` section is **optional**. Only include when the trace reveals a real pattern. Padding dilutes the signal future memory-mining passes rely on.
 - Commit exactly **once** at the end of the node (or skip the commit if nothing is staged). Do not split into multiple commits. `implement` and `tmux-tester` already made per-chunk / per-fix commits earlier.
 - **Push is unconditional.** Prior session commits must reach `origin` even if this node staged nothing new.
-- No writes outside `$project/.ralph/sessions/` and git operations. Do not touch source code, specs, or pipelines from this node.
+- No writes outside `$project/.apparat/sessions/` and git operations. Do not touch source code, specs, or pipelines from this node.
 - Both lifecycle calls — `consume_plan` (step 7a) and `consume` (step 7b) — are **best-effort**. Never abort the node on `success: false` from either. Push (step 6) and the structured-JSON emit (step 8) are non-negotiable; both lifecycle calls in step 7 are opportunistic. A missing plan or illumination file (already consumed by a prior run) must not block finalization.

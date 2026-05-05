@@ -50,7 +50,7 @@ Pipeline engine (DOT-graph workflows):
   ralph pipeline run workflow.dot                  Execute a pipeline
   ralph pipeline run review --project my-app       Run by workflow name
   ralph pipeline run workflow.dot --resume         Continue a pipeline after Ctrl-C or node failure
-                                                   (checkpoint in <project>/.ralph/runs/<runId>/checkpoint.json)
+                                                   (checkpoint in <project>/.apparat/runs/<runId>/checkpoint.json)
 
   DOT file anatomy:
     digraph my_pipeline {
@@ -90,15 +90,15 @@ Meditation (restricted insight sessions):
 
   program
     .command("init [project-folder]")
-    .description("Scaffold .ralph/ tree in the project folder (defaults to cwd). Idempotent.")
-    .addHelpText("after", "\nExamples:\n  ralph init             # in cwd\n  ralph init my-app      # in ./my-app\n\nCreates .ralph/{pipelines,meditations/{illuminations,stimuli},sessions,runs}\nplus root docs/adr/, scaffolds empty CONTEXT.md, VISION.md, README.md at\nrepo root, runs 'git init -b main' if not already a repo, and appends\n.ralph/runs/ to .gitignore. Safe to run on existing projects — never\noverwrites files.\n")
+    .description("Scaffold .apparat/ tree in the project folder (defaults to cwd). Idempotent.")
+    .addHelpText("after", "\nExamples:\n  ralph init             # in cwd\n  ralph init my-app      # in ./my-app\n\nCreates .apparat/{pipelines,meditations/{illuminations,stimuli},sessions,runs}\nplus root docs/adr/, scaffolds empty CONTEXT.md, VISION.md, README.md at\nrepo root, runs 'git init -b main' if not already a repo, and appends\n.apparat/runs/ to .gitignore. Safe to run on existing projects — never\noverwrites files.\n")
     .action(async (projectFolder?: string) => {
       await initCommand(projectFolder ?? process.cwd());
     });
 
   program
     .command("meditate <project-folder>")
-    .description("Run a restricted Claude session that writes insights to .ralph/meditations/illuminations/")
+    .description("Run a restricted Claude session that writes insights to .apparat/meditations/illuminations/")
     .addHelpText("after", "\nExamples:\n  ralph meditate my-app\n\nThe pipeline can be overridden by placing pipelines/meditate/pipeline.dot in your project folder.\n")
     .option("--var <key=value>", "pass caller variable (repeatable, e.g. --var steer=...)", collectKV, {} as Record<string, string>)
     .action(async (projectFolder: string, opts: Record<string, unknown>) => {
@@ -121,7 +121,7 @@ Examples:
 Work nodes (shape=box) require --project to know which codebase to operate on.
 Add max_iterations=N to cap how many agentic loop iterations a node can run.
 
-Checkpoints: the engine writes <project>/.ralph/runs/<runId>/checkpoint.json
+Checkpoints: the engine writes <project>/.apparat/runs/<runId>/checkpoint.json
 after every node advance. --resume loads that checkpoint (currentNode,
 completedNodes, context, nodeRetries) and continues from the node that was about
 to execute when the run stopped. Works after Ctrl-C, node failures, or process
@@ -190,7 +190,7 @@ Scans <project>/pipelines/*.dot and prints each workflow's name and goal.
     .description("Render a pipeline as SVG next to the source file")
     .addHelpText("after", `
 Examples:
-  ralph pipeline show .ralph/pipelines/illumination-to-implementation/pipeline.dot
+  ralph pipeline show .apparat/pipelines/illumination-to-implementation/pipeline.dot
   ralph pipeline show review --project my-app
 
 Validates the DOT file (same gate as 'pipeline validate'). On success, writes

@@ -13,7 +13,7 @@ import type { Graph, Node } from "../types.js";
 
 function collectPipelines(): string[] {
   const out: string[] = [];
-  const roots = [".ralph/pipelines", ".ralph/scenarios"];
+  const roots = [".apparat/pipelines", ".apparat/scenarios"];
   for (const r of roots) {
     if (!existsSync(r)) continue;
     for (const name of readdirSync(r)) {

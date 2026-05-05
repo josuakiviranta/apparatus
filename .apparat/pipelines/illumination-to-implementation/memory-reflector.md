@@ -42,7 +42,7 @@ You produce zero or one illumination per run. You are not a backlog generator �
 
 # Procedure
 
-1. **Idempotency check.** Glob `$project/.ralph/meditations/illuminations/*.md` and grep each match for the line `Pipeline run id: $run_id`. If any file matches, this is a `--resume` re-run and a previous attempt already wrote the illumination. Emit structured JSON with `illumination_path` set to the existing match's absolute path. Exit. (You may state your reasoning as plain prose in the response above the JSON for trace observability — it will be captured in the run trace, but it is not a structured output field.)
+1. **Idempotency check.** Glob `$project/.apparat/meditations/illuminations/*.md` and grep each match for the line `Pipeline run id: $run_id`. If any file matches, this is a `--resume` re-run and a previous attempt already wrote the illumination. Emit structured JSON with `illumination_path` set to the existing match's absolute path. Exit. (You may state your reasoning as plain prose in the response above the JSON for trace observability — it will be captured in the run trace, but it is not a structured output field.)
 
 2. **Read the inputs.** Read `$memory_writer.memory_path` first — it is memory-writer's distillation of the session trace. Then read `$design_writer.design_doc_path`, `$plan_writer.plan_path`, and `$verifier_illumination_path` (if it still exists on disk; if memory-writer's step 7b consumed it, skip) for cross-reference context. Do not re-open the raw `pipeline.jsonl` trace; if the memory file lacks signal, that signal is gone for your purposes.
 

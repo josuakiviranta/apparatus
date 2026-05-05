@@ -9,17 +9,17 @@ node-compile-cache/
 jiti/
 context-mode-guidance-*/
 context-mode-healed-*
-ralph-engine-test-*/
+apparat-engine-test-*/
 scenario-runs/
 # test temp dir leftovers (vitest mkdtemp)
-ralph-preflight-*/
-ralph-list-*/
-ralph-test-*/
-ralph-validate-test-*/
+apparat-preflight-*/
+apparat-list-*/
+apparat-test-*/
+apparat-validate-test-*/
 compose-*/
 S-*/
 # tsx runner cache
 tsx-*/
 meditations/stimuli/.triage/
 .worktrees
-.ralph/runs/
+.apparat/runs/

@@ -6,7 +6,7 @@ import { pipelineRunCommand } from "../commands/pipeline.js";
 
 describe("pipelineRunCommand — $project preflight", () => {
   it("exits with error when pipeline references $project but --project not passed", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "ralph-preflight-"));
+    const dir = mkdtempSync(join(tmpdir(), "apparat-preflight-"));
     const dot = join(dir, "p.dot");
     writeFileSync(dot, `
       digraph p {
@@ -34,7 +34,7 @@ describe("pipelineRunCommand — $project preflight", () => {
   });
 
   it("does not fire preflight when --project is provided", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "ralph-preflight-"));
+    const dir = mkdtempSync(join(tmpdir(), "apparat-preflight-"));
     const dot = join(dir, "p.dot");
     writeFileSync(dot, `
       digraph p {
@@ -52,7 +52,7 @@ describe("pipelineRunCommand — $project preflight", () => {
   });
 
   it("skips preflight when graph does not reference $project", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "ralph-preflight-"));
+    const dir = mkdtempSync(join(tmpdir(), "apparat-preflight-"));
     const dot = join(dir, "p.dot");
     writeFileSync(dot, `
       digraph p {

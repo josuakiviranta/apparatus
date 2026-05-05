@@ -3,9 +3,6 @@ name: tmux-tester
 description: Drive a tmux window to build, test, smoke, and fix the project in-session — loop test → fix → commit until the project is healthy, then report
 model: opus
 permissionMode: dangerouslySkipPermissions
-inputs:
-  - run_id
-  - project
 tools:
   - Read
   - Write
@@ -16,10 +13,12 @@ tools:
   - Task
 mcp: []
 outputs:
-  topic: string
-  illumination_path: string
-  kid_summary: string
-  observation_notes: string
+  test_result: {enum: [pass, fail]}
+  test_summary: string
+  test_render: string
+inputs:
+  - project
+  - run_id
 ---
 
 # Mission
@@ -51,7 +50,7 @@ Source the following bash block in your shell **before** calling any helper. It 
 SESSION=$(tmux display-message -p '#S')
 WIN="test-$run_id"   # substitute $run_id from the prompt; exact match, not a prefix grep
 RUN_ID="tmux-tester-$(date +%s)-$$"
-RUN_DIR="$HOME/.ralph/harness/$RUN_ID"
+RUN_DIR="$HOME/.apparat/harness/$RUN_ID"
 CAPTURE_INDEX=0
 mkdir -p "$RUN_DIR"
 ```
@@ -177,7 +176,7 @@ fi
 
 Idempotent by design: on a fresh run the window is created; on `--resume` after a crash mid-test, the existing window is reused so you drop back into the live context instead of spawning a duplicate. Do NOT open a new tmux **session** — work inside the one the pipeline already runs in.
 
-If `$SESSION` is empty (i.e. the pipeline is not running inside a tmux session), emit `test_result="fail"` with `issues_found=["tmux-tester node requires the pipeline to be running inside a tmux session; $SESSION was empty"]` and end. Do not attempt to start a detached tmux process — that sandbox is a user-environment concern.
+If `$SESSION` is empty (i.e. the pipeline is not running inside a tmux session), emit `test_result="fail"` with `test_render`'s "Remaining issues" section listing "tmux-tester node requires the pipeline to be running inside a tmux session; $SESSION was empty" and end. Do not attempt to start a detached tmux process — that sandbox is a user-environment concern.
 
 ## Phase 1 — Automated verification
 
@@ -191,9 +190,20 @@ If `$SESSION` is empty (i.e. the pipeline is not running inside a tmux session),
 
 If Phase 1 fails, you MAY skip Phases 2–3 for this cycle and go straight to the **Fix step** — a broken build or red suite means smoke runs are unreliable.
 
-## Phase 2 — Additional verification (per node prompt)
+## Phase 2 — Scenario pipelines
 
-If Phase 1 passed, run any additional verification the node prompt instructs (e.g. smoke pipelines, deeper integration runs). If Phase 1 failed, skip this phase and go straight to the **Fix step** — extra verification against a broken build or red suite is noise; loop on Phase 1 until tests are green, then re-enter this phase.
+After Phase 1 (build + test) is GREEN, drive every scenario pipeline through `apparat pipeline run` in the tmux window — unconditionally, no diff filtering, no skipping, cost is acceptable.
+
+**A green vitest suite is NOT a substitute.** `pipeline-smoke-*-folder.test.ts` wraps the scenarios for unit-style assertions, but the live `apparat pipeline run` path (CLI parsing, TUI render, daemon plumbing, exit handling) is only exercised when you actually drive it. Run them.
+
+1. If Phase 1 is RED, do NOT enter this phase. Stay in the Fix loop until tests pass, then re-run Phase 1, then enter here.
+2. List every scenario in your shell (not the tmux window): `ls $project/.apparat/scenarios/*/pipeline.dot`.
+3. For each scenario:
+   a. **Validate first** in your shell: `apparat pipeline validate $project/.apparat/scenarios/<name>/pipeline.dot`. If validate fails, that IS the issue — capture its output, treat as a Phase 2 failure for the Fix step, do NOT attempt to run it.
+   b. If validate passes, read the `.dot` header to extract required `--var` keys, then send into the window:
+      `apparat pipeline run .apparat/scenarios/<name>/pipeline.dot --var <required-vars>`
+4. After each run: `wait_stable 180000`, `capture`, read `current.txt`. Apply your agent-level observation criteria (crashes, exits ≠ 0, hangs, TUI glitches, copy regressions).
+5. Run all scenarios every cycle. Do not skip. If a scenario is genuinely incompatible with this environment, run it anyway and let it fail — the failure is the data.
 
 For any command you drive in the window, apply these observation criteria:
 - crashes / stack traces
@@ -218,7 +228,7 @@ Keep Phase 3 tight — max 2 commands, 60s each per cycle.
 
 For each issue surfaced by Phases 1–3 of the current cycle:
 
-1. **Reproduce.** Confirm the failure is deterministic — re-run the specific test, command, or smoke that surfaced it. If it was a flake, log it in `issues_found` and move on; do not chase flakes.
+1. **Reproduce.** Confirm the failure is deterministic — re-run the specific test, command, or smoke that surfaced it. If it was a flake, log it in `test_render`'s "Remaining issues" section and move on; do not chase flakes.
 2. **Write a failing test** that reproduces the specific failure (red). Place it in the appropriate test file — follow the project's existing test layout.
 3. **Implement the fix** to make the test pass (green). Keep the change minimal; do not refactor surrounding code.
 4. **Run the new test** in isolation first (`npm test <file>` or equivalent) to confirm green. Then re-run the full suite via the tmux window to check for regressions.
@@ -227,7 +237,7 @@ For each issue surfaced by Phases 1–3 of the current cycle:
 After applying all available fixes for this cycle, start a new cycle from Phase 1. The loop exits when:
 - All phases come up clean (no new issues surface), OR
 - You cannot reproduce the remaining issues, OR
-- A specific issue resists multiple diagnosis attempts and you judge it genuinely outside your ability to fix in this session. Leave it in `issues_found` with a clear description and end.
+- A specific issue resists multiple diagnosis attempts and you judge it genuinely outside your ability to fix in this session. Leave it in `test_render`'s "Remaining issues" section with a clear description and end.
 
 You decide when you're done. Context, not a counter.
 
@@ -235,12 +245,9 @@ You decide when you're done. Context, not a counter.
 
 Emit JSON matching the schema:
 
-- `test_result`: `"pass"` iff the final cycle's Phase 1 passed AND Phase 2 produced no crash/exit≠0 AND `issues_found` is empty. Otherwise `"fail"`.
+- `test_result`: `"pass"` iff the final cycle's Phase 1 passed AND Phase 2 produced no crash/exit≠0 AND no unfixed issues remain. Otherwise `"fail"`.
 - `test_summary`: 1–3 sentences. Cover: how many cycles ran, what was fixed along the way, the final state. Example: "Cycle 1: 4 failing tests + smoke crash on pipeline-list. Fixed null-guard in pipeline-list renderer (commit abc1234) and updated stream-formatter test expectation (commit def5678). Cycle 2 clean: 412 tests passed, 3 smoke pipelines reached exit nodes."
-- `issues_found`: array of short strings, one issue per **remaining, unfixed** entry. Empty array `[]` is the correct signal for "I fixed everything I found." Example unresolved entries:
-  - `"illumination-to-plan smoke: chat_refiner node hangs on input when $run_id contains hyphens — reproduced twice, root cause not found"`
-  - `"ralph pipeline trace: --full flag prints JSON with trailing NUL bytes, only on macOS Terminal.app"`
-- `test_render`: a self-contained markdown block the user reads verbatim at `tmux_confirm_gate` to decide **Commit** vs **Retry**. This mirrors how `change-explainer` renders `explainer_render` for `approval_gate`. Follow this exact structure:
+- `test_render`: a self-contained markdown block the user reads verbatim at `tmux_confirm_gate` to decide **Commit** vs **Retry**. This mirrors how `change-explainer` renders `explainer_render` for `approval_gate`. The "Remaining issues" section IS the canonical list of unfixed issues — do not emit a separate `issues_found` field. Follow this exact structure:
 
   ```markdown
   ## Verification: **PASS** | **FAIL**
@@ -262,7 +269,7 @@ Emit JSON matching the schema:
   - <issue 1 — command, surface, symptom>
   - <issue 2>
   ...
-  (or "No unfixed issues." when `issues_found` is empty.)
+  (or "No unfixed issues." when nothing remains.)
   ```
 
   Keep it dense and scannable. The gate shows it verbatim; the user decides in ~10 seconds of reading.
@@ -274,9 +281,9 @@ Be specific. "Something looked off" is not an issue; name the command, the surfa
 - **Commit** each passing fix (one commit per fix). Follow existing commit-message style.
 - **Do NOT `git push`.** `commit_push` is the only node that pushes.
 - **Do NOT `cleanup_run`/`tmux kill-window`** on the test window — the pipeline owns its lifecycle.
-- **Do NOT run interactive commands that require a real human** (e.g. `ralph plan`, `ralph meditate` without pre-canned input). If a command opens a Claude session, skip it.
+- **Do NOT run interactive commands that require a real human** (e.g. `apparat plan`, `apparat meditate` without pre-canned input). If a command opens a Claude session, skip it.
 - **Do NOT spawn more tmux windows.** Reuse the one already opened by `launch_tmux`.
 - **Do NOT modify files outside the scope of what the current fix needs.** You are test-driven and minimal — no drive-by refactors.
 - **Reap every backgrounded bash before emitting Phase 4.** Run `jobs -p | xargs -r kill 2>/dev/null; wait 2>/dev/null` (or equivalent) at the top of Phase 4. Orphan background loops will stall the pipeline node for their full sleep budget — the engine cannot advance while your session has open background tasks.
-- **No fixed iteration cap.** Stop when the project is healthy or when remaining issues are beyond what you can fix this session. Report honestly in `issues_found`.
+- **No fixed iteration cap.** Stop when the project is healthy or when remaining issues are beyond what you can fix this session. Report honestly in `test_render`'s "Remaining issues" section.
 - Output MUST be valid JSON matching the schema. No markdown, no preamble, no trailing prose.

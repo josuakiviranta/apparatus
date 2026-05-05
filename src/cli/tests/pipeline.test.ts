@@ -92,8 +92,8 @@ describe("pipelineValidateCommand", () => {
   });
 
   it("resolves name shorthand to pipelines/ path", async () => {
-    mkdirSync(join(dir, ".ralph", "pipelines"), { recursive: true });
-    writeFileSync(join(dir, ".ralph", "pipelines", "review.dot"), VALID_DOT);
+    mkdirSync(join(dir, ".apparat", "pipelines"), { recursive: true });
+    writeFileSync(join(dir, ".apparat", "pipelines", "review.dot"), VALID_DOT);
     const code = await pipelineValidateCommand("review", { project: dir });
     expect(code).toBe(0);
   });
@@ -144,8 +144,8 @@ describe("pipelineRunCommand", () => {
   });
 
   it("resolves name shorthand to pipelines/ path", async () => {
-    mkdirSync(join(dir, ".ralph", "pipelines"), { recursive: true });
-    writeFileSync(join(dir, ".ralph", "pipelines", "review.dot"), VALID_DOT);
+    mkdirSync(join(dir, ".apparat", "pipelines"), { recursive: true });
+    writeFileSync(join(dir, ".apparat", "pipelines", "review.dot"), VALID_DOT);
     await pipelineRunCommand("review", { project: dir, logsRoot: dir });
     expect(engine.runPipeline).toHaveBeenCalledTimes(1);
   });
@@ -165,15 +165,15 @@ describe("pipelineRunCommand", () => {
     }
   });
 
-  it("places logsRoot under <project>/.ralph/runs/<runId> when none provided", async () => {
+  it("places logsRoot under <project>/.apparat/runs/<runId> when none provided", async () => {
     const dotFile = join(dir, "test.dot");
     writeFileSync(dotFile, VALID_DOT);
     await pipelineRunCommand(dotFile, { project: dir });
     const call = (engine.runPipeline as ReturnType<typeof vi.fn>).mock.calls[0];
     const opts = call[1];
-    // logsRoot shape: <project>/.ralph/runs/<8hex runId>
+    // logsRoot shape: <project>/.apparat/runs/<8hex runId>
     expect(opts.logsRoot).toMatch(
-      new RegExp(`\\.ralph[\\\\/]runs[\\\\/][0-9a-f]{8}$`),
+      new RegExp(`\\.apparat[\\\\/]runs[\\\\/][0-9a-f]{8}$`),
     );
     expect(opts.logsRoot).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
   });
@@ -339,16 +339,16 @@ describe("pipelineListCommand", () => {
   });
 
   it("prints message when pipelines/ is empty", async () => {
-    mkdirSync(join(dir, ".ralph", "pipelines"), { recursive: true });
+    mkdirSync(join(dir, ".apparat", "pipelines"), { recursive: true });
     await pipelineListCommand({ project: dir });
     expect(out.info).toHaveBeenCalledWith(expect.stringContaining("ralph pipeline create"));
   });
 
   it("lists .dot files with their goal attribute", async () => {
-    mkdirSync(join(dir, ".ralph", "pipelines"), { recursive: true });
-    writeFileSync(join(dir, ".ralph", "pipelines", "review.dot"),
+    mkdirSync(join(dir, ".apparat", "pipelines"), { recursive: true });
+    writeFileSync(join(dir, ".apparat", "pipelines", "review.dot"),
       `digraph g {\n  goal="Run review"\n  start [shape=Mdiamond]\n  done [shape=Msquare]\n  start -> done\n}`);
-    writeFileSync(join(dir, ".ralph", "pipelines", "deploy.dot"),
+    writeFileSync(join(dir, ".apparat", "pipelines", "deploy.dot"),
       `digraph g {\n  start [shape=Mdiamond]\n  done [shape=Msquare]\n  start -> done\n}`);
     await pipelineListCommand({ project: dir });
     expect(out.info).toHaveBeenCalledWith(expect.stringContaining("review"));

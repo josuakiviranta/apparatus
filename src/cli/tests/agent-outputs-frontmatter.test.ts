@@ -172,7 +172,7 @@ describe("verifier migration — preserves verifier.json contract", () => {
     const { readFileSync } = require("fs");
     const bundledPath = join(
       __dirname, "..", "..", "..",
-      ".ralph", "pipelines", "illumination-to-implementation", "verifier.md",
+      ".apparat", "pipelines", "illumination-to-implementation", "verifier.md",
     );
     const { attributes, body } = parseFrontmatter(readFileSync(bundledPath, "utf-8"));
     const config = validateAgentConfig({ ...attributes, prompt: body } as any);
