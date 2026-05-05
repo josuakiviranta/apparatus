@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { AgentHandler } from "../handlers/agent-handler.js";
+import { LoopingAgentHandler } from "../handlers/looping-agent-handler.js";
 import type { HandlerExecutionContext } from "../handlers/registry.js";
 import type { Node, PipelineContext } from "../types.js";
 import { readFileSync, mkdtempSync, rmSync } from "fs";
@@ -32,7 +32,7 @@ describe("AgentHandler", () => {
   }
 
   function makeHandler() {
-    return new AgentHandler({
+    return new LoopingAgentHandler({
       loadAgent: mockResolve,
       createAgent: () => ({ run: mockAgentRun, kill: mockAgentKill, config: {} } as any),
     });
@@ -243,7 +243,7 @@ describe("AgentHandler", () => {
     });
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null });
 
-    const handler = new AgentHandler({
+    const handler = new LoopingAgentHandler({
       loadAgent: mockResolve,
       createAgent: (config) => {
         capturedConfig = config;
@@ -267,7 +267,7 @@ describe("AgentHandler", () => {
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null });
 
     let capturedConfig: any = null;
-    const handler = new AgentHandler({
+    const handler = new LoopingAgentHandler({
       loadAgent: mockResolve,
       createAgent: (config) => { capturedConfig = config; return { run: mockAgentRun, kill: mockAgentKill, config } as any; },
     });
@@ -301,7 +301,7 @@ describe("AgentHandler", () => {
     mockResolve.mockReturnValue({ ...baseConfig, prompt: rubric });
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null });
 
-    const handler = new AgentHandler({
+    const handler = new LoopingAgentHandler({
       loadAgent: mockResolve,
       createAgent: (config) => ({ run: mockAgentRun, kill: mockAgentKill, config } as any),
     });
@@ -345,7 +345,7 @@ describe("AgentHandler", () => {
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null });
 
     let capturedConfig: any = null;
-    const handler = new AgentHandler({
+    const handler = new LoopingAgentHandler({
       loadAgent: mockResolve,
       createAgent: (config) => { capturedConfig = config; return { run: mockAgentRun, kill: mockAgentKill, config } as any; },
     });
@@ -381,44 +381,12 @@ describe("AgentHandler", () => {
     );
   });
 
-  it("interactive nodes do not go through legacy agent.run() path", async () => {
-    // Interactive nodes now use the interactive branch (runInteractive + ChatUI).
-    // This test verifies agent.run() is NOT called for interactive nodes.
-    // Full interactive branch coverage is in agent-handler-interactive.test.ts.
-    mockResolve.mockReturnValue({ ...baseConfig });
-    let resolveExited: (v: any) => void;
-    const exitedPromise = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((res) => {
-      resolveExited = res;
-    });
-    const mockRunInteractive = vi.fn().mockReturnValue({
-      sessionId: "s1",
-      events: (async function* () { /* empty */ })(),
-      submit: async () => {},
-      end: async () => { resolveExited!({ code: 0, signal: null }); },
-      kill: async () => { resolveExited!({ code: null, signal: "SIGTERM" }); },
-      exited: exitedPromise,
-    });
-
-    const handler = new AgentHandler({
-      loadAgent: mockResolve,
-      createAgent: () => ({ run: mockAgentRun, kill: mockAgentKill, config: {}, runInteractive: mockRunInteractive } as any),
-    } as any);
-    await handler.execute(
-      makeNode({ interactive: "true" } as any),
-      baseCtx(),
-      makeContext(),
-    );
-
-    expect(mockAgentRun).not.toHaveBeenCalled();
-    expect(mockRunInteractive).toHaveBeenCalled();
-  });
-
   it("delivers context values through Inputs block (auto_inputs path)", async () => {
     mockResolve.mockReturnValue({ ...baseConfig, inputs: ["illumination_path", "summary"] });
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null });
 
     let capturedConfig: any = null;
-    const handler = new AgentHandler({
+    const handler = new LoopingAgentHandler({
       loadAgent: mockResolve,
       createAgent: (config) => { capturedConfig = config; return { run: mockAgentRun, kill: mockAgentKill, config } as any; },
     });
@@ -448,7 +416,7 @@ describe("AgentHandler", () => {
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: JSON.stringify([{ type: "result", result: "", structured_output: { verdict: "true" } }]) });
 
     let capturedConfig: any = null;
-    const handler = new AgentHandler({
+    const handler = new LoopingAgentHandler({
       loadAgent: mockResolve,
       createAgent: (config) => { capturedConfig = config; return { run: mockAgentRun, kill: mockAgentKill, config } as any; },
     });
@@ -476,7 +444,7 @@ describe("AgentHandler", () => {
     ]);
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: "s1", stdout: null, output: jsonArrayOutput });
 
-    const handler = new AgentHandler({
+    const handler = new LoopingAgentHandler({
       loadAgent: mockResolve,
       createAgent: () => ({ run: mockAgentRun, kill: mockAgentKill, config: {} } as any),
     });
@@ -510,7 +478,7 @@ describe("AgentHandler", () => {
     ]);
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: "s1", stdout: null, output: jsonArrayOutput });
 
-    const handler = new AgentHandler({
+    const handler = new LoopingAgentHandler({
       loadAgent: mockResolve,
       createAgent: () => ({ run: mockAgentRun, kill: mockAgentKill, config: {} } as any),
     });
@@ -544,7 +512,7 @@ describe("AgentHandler", () => {
     ]);
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: "s2", stdout: null, output: wrapper });
 
-    const handler = new AgentHandler({
+    const handler = new LoopingAgentHandler({
       loadAgent: mockResolve,
       createAgent: () => ({ run: mockAgentRun, kill: mockAgentKill, config: {} } as any),
     });
@@ -574,7 +542,7 @@ describe("AgentHandler", () => {
     ]);
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: jsonArrayOutput });
 
-    const handler = new AgentHandler({
+    const handler = new LoopingAgentHandler({
       loadAgent: mockResolve,
       createAgent: () => ({ run: mockAgentRun, kill: mockAgentKill, config: {} } as any),
     });
@@ -599,7 +567,7 @@ describe("AgentHandler", () => {
     mockResolve.mockReturnValue({ ...baseConfig, jsonSchema: schema });
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: "not valid json" });
 
-    const handler = new AgentHandler({
+    const handler = new LoopingAgentHandler({
       loadAgent: mockResolve,
       createAgent: () => ({ run: mockAgentRun, kill: mockAgentKill, config: {} } as any),
     });
@@ -630,7 +598,7 @@ describe("AgentHandler", () => {
     ]);
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output });
 
-    const handler = new AgentHandler({
+    const handler = new LoopingAgentHandler({
       loadAgent: mockResolve,
       createAgent: () => ({ run: mockAgentRun, kill: mockAgentKill, config: {} } as any),
     });
@@ -664,7 +632,7 @@ describe("AgentHandler", () => {
     ]);
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output });
 
-    const handler = new AgentHandler({
+    const handler = new LoopingAgentHandler({
       loadAgent: mockResolve,
       createAgent: () => ({ run: mockAgentRun, kill: mockAgentKill, config: {} } as any),
     });
@@ -769,7 +737,7 @@ describe("AgentHandler", () => {
     mockResolve.mockReturnValue({ ...baseConfig, prompt: rubric });
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null });
 
-    const handler = new AgentHandler({
+    const handler = new LoopingAgentHandler({
       loadAgent: mockResolve,
       createAgent: (config) => ({ run: mockAgentRun, kill: mockAgentKill, config } as any),
     });
@@ -800,7 +768,7 @@ describe("AgentHandler", () => {
     mockResolve.mockReturnValue({ ...baseConfig, prompt: "Spider instruction uses $spider_var literally." });
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null });
 
-    const handler = new AgentHandler({
+    const handler = new LoopingAgentHandler({
       loadAgent: mockResolve,
       createAgent: (config) => ({ run: mockAgentRun, kill: mockAgentKill, config } as any),
     });
@@ -826,7 +794,7 @@ describe("AgentHandler", () => {
     mockResolve.mockReturnValue({ ...baseConfig, prompt: "" });
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null });
 
-    const handler = new AgentHandler({
+    const handler = new LoopingAgentHandler({
       loadAgent: mockResolve,
       createAgent: (config) => ({ run: mockAgentRun, kill: mockAgentKill, config } as any),
     });

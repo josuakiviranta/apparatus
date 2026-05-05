@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { mkdtempSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { AgentHandler } from "../handlers/agent-handler.js";
+import { LoopingAgentHandler } from "../handlers/looping-agent-handler.js";
 
 function makeAgent(responses: Array<{ raw: string; sessionId?: string }>) {
   let i = 0;
@@ -46,7 +46,7 @@ describe("AgentHandler — validation retry loop", () => {
       { raw: '{"wrong":"key"}', sessionId: "s-1" },
       { raw: '{"foo":"bar"}', sessionId: "s-1" },
     ]);
-    const handler = new AgentHandler({
+    const handler = new LoopingAgentHandler({
       loadAgent: () => config() as any,
       createAgent: () => fakeAgent as any,
     });
@@ -71,7 +71,7 @@ describe("AgentHandler — validation retry loop", () => {
       { raw: "", sessionId: "s-2" },
       { raw: '{"foo":"x"}', sessionId: "s-2" },
     ]);
-    const handler = new AgentHandler({
+    const handler = new LoopingAgentHandler({
       loadAgent: () => config() as any,
       createAgent: () => fakeAgent as any,
     });
@@ -91,7 +91,7 @@ describe("AgentHandler — validation retry loop", () => {
       { raw: '{"wrong":"b"}', sessionId: "s-3" },
     ]);
     const onValidationFailure = vi.fn();
-    const handler = new AgentHandler({
+    const handler = new LoopingAgentHandler({
       loadAgent: () => config() as any,
       createAgent: () => fakeAgent as any,
     });
@@ -113,7 +113,7 @@ describe("AgentHandler — validation retry loop", () => {
     const fakeAgent = makeAgent([
       { raw: '{"wrong":"a"}', sessionId: "s-4" },
     ]);
-    const handler = new AgentHandler({
+    const handler = new LoopingAgentHandler({
       loadAgent: () => config() as any,
       createAgent: () => fakeAgent as any,
     });

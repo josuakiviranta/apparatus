@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { mkdtempSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { AgentHandler } from "../handlers/agent-handler.js";
+import { LoopingAgentHandler } from "../handlers/looping-agent-handler.js";
 import type { Node, PipelineContext } from "../types.js";
 
 function makeAgentDir(files: Record<string, string>): string {
@@ -32,7 +32,7 @@ You are v.`,
       })),
     };
     const jsonSchema1 = JSON.stringify({ type: "object", properties: { result: { type: "string" } }, required: ["result"] });
-    const handler = new AgentHandler({
+    const handler = new LoopingAgentHandler({
       loadAgent: () => ({
         name: "v",
         description: "t",
@@ -87,7 +87,7 @@ You are v.`,
       })),
     };
     const jsonSchema = JSON.stringify({ type: "object", properties: { result: { type: "string" } }, required: ["result"] });
-    const handler = new AgentHandler({
+    const handler = new LoopingAgentHandler({
       loadAgent: () => ({
         name: "v",
         description: "t",
@@ -128,7 +128,7 @@ You are v.`,
       })),
     };
     const jsonSchema2 = JSON.stringify({ type: "object", properties: { result: { type: "string" } }, required: ["result"] });
-    const handler = new AgentHandler({
+    const handler = new LoopingAgentHandler({
       loadAgent: () => ({
         name: "v",
         description: "t",

@@ -14,7 +14,7 @@ import { computeVarsInScope, computeVarsInAnyScope } from "./flow-analyzer.js";
 import { parseConditionClauses } from "./conditions.js";
 import { resolveGate } from "../../cli/lib/gate-registry.js";
 import { resolveInputDecl } from "../transforms/inputs-resolver.js";
-import { SYSTEM_INJECTED_VARS } from "../handlers/agent-handler.js";
+import { SYSTEM_INJECTED_VARS } from "../handlers/agent-prep.js";
 import { outputsToZod } from "../../cli/lib/outputs-to-zod.js";
 
 const SYSTEM_VARS = new Set<string>(SYSTEM_INJECTED_VARS);

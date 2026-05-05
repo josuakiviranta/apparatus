@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { AgentHandler } from "../handlers/agent-handler.js";
+import { describe, it, expect, afterEach } from "vitest";
+import { InteractiveAgentHandler } from "../handlers/interactive-agent-handler.js";
 import type { OnInteractiveRequest, HandlerExecutionContext } from "../handlers/registry.js";
 import { Session } from "../../cli/lib/session.js";
 import type { ExitReason } from "../../cli/lib/session.js";
@@ -88,31 +88,10 @@ describe("AgentHandler — interactive branch", () => {
     process.removeAllListeners("SIGINT");
   });
 
-  it("passes non-interactive nodes through the legacy path unchanged", async () => {
-    const legacyRun = vi.fn().mockResolvedValue({ exitCode: 0, sessionId: "legacy", stdout: null });
-    const agent = {
-      ...makeFakeAgent(() => {}),
-      run: legacyRun,
-    };
-    const handler = new AgentHandler({
-      loadAgent: () => agent.config,
-      createAgent: () => agent,
-    });
-    const tmp = mkdtempSync(join(tmpdir(), "ralph-handler-"));
-    try {
-      const node: Node = { id: "n1", prompt: "do stuff" };
-      const out = await handler.execute(node, baseCtx(), baseMeta(tmp, tmp));
-      expect(legacyRun).toHaveBeenCalled();
-      expect(out.status).toBe("success");
-    } finally {
-      rmSync(tmp, { recursive: true, force: true });
-    }
-  });
-
   it("rejects interactive=true combined with agent config.jsonSchema", async () => {
     const agent = makeFakeAgent(() => {});
     const configWithSchema = { ...agent.config, jsonSchema: "{}" };
-    const handler = new AgentHandler({
+    const handler = new InteractiveAgentHandler({
       loadAgent: () => configWithSchema,
       createAgent: () => agent,
     });
@@ -145,7 +124,7 @@ describe("AgentHandler — interactive branch", () => {
       }, 5);
     });
 
-    const handler = new AgentHandler({
+    const handler = new InteractiveAgentHandler({
       loadAgent: () => agent.config,
       createAgent: () => agent,
     });
@@ -178,7 +157,7 @@ describe("AgentHandler — interactive branch", () => {
   it("interactive abort path: status='fail', contextUpdates contain partial digest", async () => {
     const agent = makeFakeAgent(() => {});
 
-    const handler = new AgentHandler({
+    const handler = new InteractiveAgentHandler({
       loadAgent: () => agent.config,
       createAgent: () => agent,
     });
@@ -198,7 +177,7 @@ describe("AgentHandler — interactive branch", () => {
   it("interactive=true with string 'true' is handled (DOT attribute coercion)", async () => {
     const agent = makeFakeAgent(() => {});
 
-    const handler = new AgentHandler({
+    const handler = new InteractiveAgentHandler({
       loadAgent: () => agent.config,
       createAgent: () => agent,
     });
@@ -218,7 +197,7 @@ describe("AgentHandler — interactive branch", () => {
   it("writes prompt.md to nodeDir even for interactive nodes", async () => {
     const agent = makeFakeAgent(() => {});
 
-    const handler = new AgentHandler({
+    const handler = new InteractiveAgentHandler({
       loadAgent: () => agent.config,
       createAgent: () => agent,
     });

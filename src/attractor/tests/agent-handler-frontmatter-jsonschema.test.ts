@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { AgentHandler } from "../handlers/agent-handler.js";
+import { LoopingAgentHandler } from "../handlers/looping-agent-handler.js";
 
 describe("AgentHandler — frontmatter outputs activates parse path", () => {
   it("uses config.jsonSchema when node has no json_schema_file", async () => {
@@ -13,7 +13,7 @@ describe("AgentHandler — frontmatter outputs activates parse path", () => {
         ]),
       }),
     };
-    const handler = new AgentHandler({
+    const handler = new LoopingAgentHandler({
       loadAgent: () => ({
         name: "a", description: "d", model: "opus",
         permissionMode: "default", tools: [], mcp: [], prompt: "",

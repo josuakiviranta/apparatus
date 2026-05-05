@@ -12,7 +12,9 @@ import { WaitHumanHandler } from "../handlers/wait-human.js";
 import { ToolHandler } from "../handlers/tool.js";
 import { RalphMeditateHandler } from "../handlers/ralph-meditate.js";
 import { ParallelHandler, FanInHandler } from "../handlers/parallel.js";
-import { AgentHandler } from "../handlers/agent-handler.js";
+import { InteractiveAgentHandler } from "../handlers/interactive-agent-handler.js";
+import { LoopingAgentHandler } from "../handlers/looping-agent-handler.js";
+import { AgentHandlerDispatch } from "../handlers/agent-dispatch.js";
 import { StoreHandler } from "../handlers/store.js";
 import { UndefinedVariableError } from "../transforms/variable-expansion.js";
 import type { NodeHandler, HandlerExecutionContext, OnInteractiveRequest } from "../handlers/registry.js";
@@ -46,19 +48,21 @@ export interface PipelineResult {
 
 function buildHandlerMap(opts: EngineOptions): Map<string, NodeHandler> {
   const m = new Map<string, NodeHandler>();
-  const agentHandler = new AgentHandler();
+  const interactiveAgent = new InteractiveAgentHandler();
+  const loopingAgent = new LoopingAgentHandler();
+  const agentDispatch = new AgentHandlerDispatch(interactiveAgent, loopingAgent);
   m.set("start", new StartHandler());
   m.set("exit", new ExitHandler());
-  m.set("codergen", agentHandler);
+  m.set("codergen", agentDispatch);
   m.set("conditional", new ConditionalHandler());
   m.set("wait.human", new WaitHumanHandler(opts.interviewer, opts.dotDir));
   m.set("tool", new ToolHandler());
-  m.set("ralph.implement", agentHandler);
+  m.set("ralph.implement", agentDispatch);
   m.set("ralph.meditate", new RalphMeditateHandler());
   m.set("parallel", new ParallelHandler());
   m.set("parallel.fan_in", new FanInHandler());
   m.set("store", new StoreHandler());
-  m.set("agent", agentHandler);
+  m.set("agent", agentDispatch);
   return m;
 }
 

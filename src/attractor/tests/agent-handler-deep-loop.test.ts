@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { AgentHandler } from "../handlers/agent-handler.js";
+import { LoopingAgentHandler } from "../handlers/looping-agent-handler.js";
 import type { HandlerExecutionContext } from "../handlers/registry.js";
 import type { Node, PipelineContext } from "../types.js";
 
@@ -37,7 +37,7 @@ describe("AgentHandler deep loop — done break", () => {
   const mockAgentRun = vi.fn();
 
   function makeHandler() {
-    return new AgentHandler({
+    return new LoopingAgentHandler({
       loadAgent: mockResolve,
       createAgent: () => ({ run: mockAgentRun, kill: vi.fn(), config: {} } as any),
     });
@@ -112,7 +112,7 @@ describe("AgentHandler deep loop — crash mid-iteration", () => {
   const mockAgentRun = vi.fn();
 
   function makeHandler() {
-    return new AgentHandler({
+    return new LoopingAgentHandler({
       loadAgent: mockResolve,
       createAgent: () => ({ run: mockAgentRun, kill: vi.fn(), config: {} } as any),
     });
@@ -171,7 +171,7 @@ describe("AgentHandler deep loop — chunk-2 retry composition", () => {
   const mockAgentRun = vi.fn();
 
   function makeHandler() {
-    return new AgentHandler({
+    return new LoopingAgentHandler({
       loadAgent: mockResolve,
       createAgent: () => ({ run: mockAgentRun, kill: vi.fn(), config: {} } as any),
     });
@@ -274,7 +274,7 @@ describe("AgentHandler deep loop — $prev_note carry-over", () => {
   const mockResolve = vi.fn();
   const mockAgentRun = vi.fn();
   function makeHandler() {
-    return new AgentHandler({
+    return new LoopingAgentHandler({
       loadAgent: mockResolve,
       createAgent: () => ({ run: mockAgentRun, kill: vi.fn(), config: {} } as any),
     });
