@@ -369,6 +369,7 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
   try {
     const result = await runPipeline(graph, {
       logsRoot,
+      runId,
       cwd: project,
       dotDir,
       interviewer: process.stdin.isTTY

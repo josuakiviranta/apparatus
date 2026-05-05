@@ -4,6 +4,10 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { pipelineTraceCommand } from "../commands/pipeline.js";
 import { runDir } from "../lib/ralph-paths.js";
+import { runPipeline } from "../../attractor/core/engine.js";
+import { parseDot } from "../../attractor/core/graph.js";
+import { AutoApproveInterviewer } from "../../attractor/interviewer/auto-approve.js";
+import { JsonlPipelineTracer } from "../../attractor/tracer/jsonl-pipeline-tracer.js";
 
 function seedTrace(projectRoot: string, runId: string, pipelineName: string): string {
   const dir = runDir(projectRoot, runId);
@@ -64,5 +68,38 @@ describe("pipelineTraceCommand", () => {
     await expect(pipelineTraceCommand("zzzzzzzz", { project: projectRoot })).rejects.toThrow("__exit__");
     expect(exitCode).toBe(1);
     expect(written).toMatch(/no trace found/i);
+  });
+
+  it("after a real run, $run_id in context equals the on-disk dir name and trace command resolves", async () => {
+    // Inject a deterministic 8-char runId so we can pin both context and on-disk dir.
+    const runId = "abcd1234";
+    const logsRoot = runDir(projectRoot, runId);
+    mkdirSync(logsRoot, { recursive: true });
+    const tracePath = join(logsRoot, "pipeline.jsonl");
+    const tracer = new JsonlPipelineTracer(tracePath);
+
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      done  [shape=Msquare]
+      start -> done
+    }`;
+
+    const result = await runPipeline(parseDot(dot), {
+      logsRoot,
+      cwd: projectRoot,
+      interviewer: new AutoApproveInterviewer(),
+      runId,
+      traceWriter: tracer,
+    });
+
+    expect(result.status).toBe("success");
+    // Load-bearing invariant: $run_id seen by agents == on-disk dir name.
+    expect(result.context.run_id).toBe(runId);
+
+    // Public contract: ralph pipeline trace <$run_id> exits 0.
+    await expect(
+      pipelineTraceCommand(String(result.context.run_id), { project: projectRoot }),
+    ).resolves.toBeUndefined();
+    expect(written).toContain(runId);
   });
 });

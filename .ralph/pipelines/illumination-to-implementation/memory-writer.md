@@ -38,7 +38,7 @@ Memory files are reference documents for future sessions. Keep them dense, scann
 # Inputs you will receive
 
 - `$project` — repo root; cd here for git commit + push.
-- `$run_id` — pipeline run identifier. Trace and checkpoint share the directory `~/.ralph/<projectKey>/runs/$run_id/` (`pipeline.jsonl` + `checkpoint.json` side by side).
+- `$run_id` — pipeline run identifier (8-char id; equals the basename of the on-disk run directory). Use it with `ralph pipeline trace $run_id` for the whole-run trace and `ralph pipeline trace $run_id --node-receive <nodeReceiveId>` for a per-node context slice.
 - `$plan_writer.plan_path` — the implementation plan just executed (use its slug to name the memory file).
 - `$design_writer.design_doc_path` — the design that drove the plan.
 - `$verifier_illumination_path` — the originating illumination.
@@ -48,14 +48,14 @@ Memory files are reference documents for future sessions. Keep them dense, scann
 
 1. **Derive the memory filename.** Strip the date prefix from the plan filename to get the slug. Target path: `$project/.ralph/sessions/YYYY-MM-DD-<slug>.md` using today's date. Keeps the illumination → design → plan → memory naming chain 1:1.
 
-2. **Read the trace.** Open `~/.ralph/<projectKey>/runs/$run_id/pipeline.jsonl` (or pass the runId to `ralph pipeline trace`). It is a structured JSONL log of every node start/end, context update, and failure/retry during this run. Scan it for:
+2. **Read the trace.** Run `ralph pipeline trace $run_id` (whole-run JSONL) — it resolves the trace path internally and prints every node start/end, context update, and failure/retry for this run. For per-node context slices (e.g. exactly what one node received as input), run `ralph pipeline trace $run_id --node-receive <nodeReceiveId>`; the `nodeReceiveId` values are visible in the whole-run output. Scan the trace for:
    - Node execution order and duration.
    - **Retry events** — when a node failed and re-ran. Biggest learning signal.
    - `agent.success=false` loops on the implement node (unbounded by design). Count them. If the agent repeatedly hit the same error before succeeding, that is a learning.
    - **tmux-tester fix cycles** — how many cycles, what commits the tester made, what remained unfixed.
    - Tool-node failures (consume, push).
 
-   If `pipeline.jsonl` is missing or empty, proceed with artifact-only evidence and note the gap in the `Learnings` section.
+   If `ralph pipeline trace $run_id` exits non-zero (e.g. the engine crashed before writing the trace), proceed with artifact-only evidence and note the gap in the `Learnings` section.
 
 3. **Read the relevant artifacts.**
    - `$design_writer.design_doc_path`, `$plan_writer.plan_path`, `$verifier_illumination_path` — durable outputs this session produced.

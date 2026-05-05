@@ -19,6 +19,14 @@ import type { NodeHandler, HandlerExecutionContext, OnInteractiveRequest } from 
 
 export interface EngineOptions {
   logsRoot: string;
+  /**
+   * Optional caller-supplied run identifier. When present, the engine seeds
+   * `context["run_id"]` with this value instead of generating its own. Used by
+   * the CLI (src/cli/commands/pipeline.ts) so the `$run_id` agents observe is
+   * identical to the on-disk run-dir basename. When absent, the engine falls
+   * back to `randomUUID().slice(0, 8)` — same shape as the CLI's id.
+   */
+  runId?: string;
   cwd: string;
   interviewer: Interviewer;
   signal?: AbortSignal;
@@ -139,7 +147,7 @@ export async function runPipeline(graph: Graph, opts: EngineOptions): Promise<Pi
     context["$project"] = opts.project;
   }
   if (opts.callerContext) context = { ...context, ...opts.callerContext };
-  const runId = randomUUID();
+  const runId = opts.runId ?? randomUUID().slice(0, 8);
   context["run_id"] = runId;
   opts.traceWriter?.onPipelineStart({ runId, graph, ctx: { values: context } });
   let nodeRetries: Record<string, number> = {};
