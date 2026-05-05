@@ -3,7 +3,8 @@ import { writeFileSync, mkdirSync, rmSync } from "fs";
 import { mkdtempSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { parseDot, validateGraph } from "../core/graph.js";
+import { parseDot } from "../core/graph.js";
+import { validateGraph } from "../core/graph-validator.js";
 
 // Minimal valid gate .md with type: gate and choices
 function gateFileMd(choices: string[]): string {

@@ -3,7 +3,8 @@ import { writeFileSync, mkdirSync, readFileSync } from "fs";
 import { tmpdir } from "os";
 import { join, dirname, resolve } from "path";
 import { fileURLToPath } from "url";
-import { parseDot, validateGraph } from "../core/graph.js";
+import { parseDot } from "../core/graph.js";
+import { validateGraph } from "../core/graph-validator.js";
 
 function setupAgents(dir: string, files: Record<string, string>) {
   mkdirSync(dir, { recursive: true });

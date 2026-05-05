@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import { writeFileSync, mkdirSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { parseDot, validateGraph } from "../core/graph.js";
+import { parseDot } from "../core/graph.js";
+import { validateGraph } from "../core/graph-validator.js";
 
 describe("validator — missing_input_producer", () => {
   it("errors when an agent's declared input has no producer on every path", () => {

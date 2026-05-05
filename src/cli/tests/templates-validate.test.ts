@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { dirname, join } from "path";
 import { getBundledPipelinesDir } from "../lib/assets.js";
-import { parseDot, validateGraph } from "../../attractor/core/graph.js";
+import { parseDot } from "../../attractor/core/graph.js";
+import { validateGraph } from "../../attractor/core/graph-validator.js";
 
 function loadAndValidate(name: string) {
   const path = join(getBundledPipelinesDir(), name, "pipeline.dot");

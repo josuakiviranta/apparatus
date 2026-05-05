@@ -1,0 +1,102 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`graph-validator byte-identical (Chunk 1 oracle) > pins diagnostics for src/attractor/tests/fixtures/auto-inputs-good/pipeline.dot 1`] = `
+[
+  {
+    "location": {
+      "column": 3,
+      "endColumn": 30,
+      "endLine": 5,
+      "line": 5,
+    },
+    "message": "Agent "consumer" at node "consumer" declares output "summary" but no downstream node consumes it (no agent input, condition=, or $summary reference). Drop "summary" from outputs: or wire it into a consumer.",
+    "rule": "orphan_output",
+    "severity": "warning",
+  },
+  {
+    "location": {
+      "column": 3,
+      "endColumn": 65,
+      "endLine": 6,
+      "line": 6,
+    },
+    "message": "Agent "with-default" at node "with_default" declares output "final" but no downstream node consumes it (no agent input, condition=, or $final reference). Drop "final" from outputs: or wire it into a consumer.",
+    "rule": "orphan_output",
+    "severity": "warning",
+  },
+  {
+    "location": {
+      "column": 3,
+      "endColumn": 24,
+      "endLine": 7,
+      "line": 7,
+    },
+    "message": "Agent "empty" at node "empty" declares output "ack" but no downstream node consumes it (no agent input, condition=, or $ack reference). Drop "ack" from outputs: or wire it into a consumer.",
+    "rule": "orphan_output",
+    "severity": "warning",
+  },
+]
+`;
+
+exports[`graph-validator byte-identical (Chunk 1 oracle) > pins diagnostics for src/attractor/tests/fixtures/pre-migration-tool-node.dot 1`] = `
+[
+  {
+    "location": {
+      "column": 3,
+      "endColumn": 68,
+      "endLine": 3,
+      "line": 3,
+    },
+    "message": "[commit_push] cwd: Required",
+    "rule": "schema_error",
+    "severity": "error",
+  },
+]
+`;
+
+exports[`graph-validator byte-identical (Chunk 1 oracle) > pins diagnostics for src/cli/pipelines/implement/pipeline.dot 1`] = `
+[
+  {
+    "message": "This pipeline requires the following --var keys at runtime: scenarios_dir",
+    "rule": "required_caller_vars",
+    "severity": "info",
+  },
+]
+`;
+
+exports[`graph-validator byte-identical (Chunk 1 oracle) > pins diagnostics for src/cli/pipelines/janitor/pipeline.dot 1`] = `
+[
+  {
+    "location": {
+      "column": 3,
+      "endColumn": 47,
+      "endLine": 13,
+      "line": 13,
+    },
+    "message": "Agent "janitor" at node "janitor" has outputs: {} with no keys. Declare at least one output key, or remove outputs: if this agent intentionally produces nothing.",
+    "rule": "agent_outputs_empty",
+    "severity": "warning",
+  },
+]
+`;
+
+exports[`graph-validator byte-identical (Chunk 1 oracle) > pins diagnostics for src/cli/pipelines/meditate/pipeline.dot 1`] = `
+[
+  {
+    "location": {
+      "column": 3,
+      "endColumn": 42,
+      "endLine": 7,
+      "line": 7,
+    },
+    "message": "Agent "meditate" at node "meditate" has outputs: {} with no keys. Declare at least one output key, or remove outputs: if this agent intentionally produces nothing.",
+    "rule": "agent_outputs_empty",
+    "severity": "warning",
+  },
+  {
+    "message": "This pipeline requires the following --var keys at runtime: steer, vision",
+    "rule": "required_caller_vars",
+    "severity": "info",
+  },
+]
+`;

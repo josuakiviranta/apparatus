@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { join } from "path";
-import { parseDot, validateGraph } from "../core/graph.js";
+import { parseDot } from "../core/graph.js";
+import { validateGraph } from "../core/graph-validator.js";
 import { readFileSync } from "fs";
 
 const fixtureDir = join(
