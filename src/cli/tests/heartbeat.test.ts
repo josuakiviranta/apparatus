@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
 import { resolveHeartbeatPipelineArg } from "../commands/heartbeat.js";
 import { Command } from "commander";
-import { mkdtempSync, writeFileSync, rmSync } from "fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join, resolve as resolveFn } from "path";
 import { registerHeartbeatCommand } from "../commands/heartbeat";
@@ -272,6 +272,73 @@ describe("ralph heartbeat pipeline", () => {
     const combined = s.errSpy.mock.calls.flat().join(" ");
     expect(combined).toContain(bogus);
     s.restore();
+  });
+});
+
+describe("ralph heartbeat pipeline id derivation (folder-form pipelines)", () => {
+  it("uses the parent folder name as id when the dotfile basename is `pipeline.dot`", async () => {
+    const folderDot = join(FIXTURE_DIR, "janitor", "pipeline.dot");
+    mkdirSync(join(FIXTURE_DIR, "janitor"), { recursive: true });
+    writeFileSync(folderDot, "digraph { a -> b; }\n");
+
+    vi.mocked(request).mockResolvedValue({ type: "ok", taskId: "pipeline:janitor" });
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    await makeProgram().parseAsync([
+      "node", "ralph", "heartbeat", "pipeline", folderDot,
+      "--project", FIXTURE_DIR, "--every", "40",
+    ]);
+    expect(request).toHaveBeenCalledWith("register_task", expect.objectContaining({
+      id: "pipeline:janitor",
+    }));
+    logSpy.mockRestore();
+  });
+});
+
+describe("ralph heartbeat pipeline preflight: missing --project when $project referenced", () => {
+  it("rejects registration when pipeline references $project but --project is omitted", async () => {
+    const dot = join(FIXTURE_DIR, "needs-project.dot");
+    writeFileSync(dot, `
+      digraph p {
+        start [shape=Mdiamond]
+        run [type="tool", cwd="$project", toolCommand="echo $project"]
+        done [shape=Msquare]
+        start -> run -> done
+      }
+    `);
+    const s = silence();
+    await expect(
+      makeProgram().parseAsync([
+        "node", "ralph", "heartbeat", "pipeline", dot, "--every", "40",
+      ])
+    ).rejects.toThrow(/exit:1/);
+    expect(request).not.toHaveBeenCalled();
+    const combined = s.errSpy.mock.calls.flat().join(" ");
+    expect(combined).toMatch(/\$project/);
+    expect(combined).toMatch(/--project/);
+    s.restore();
+  });
+
+  it("registers when pipeline references $project AND --project is provided", async () => {
+    const dot = join(FIXTURE_DIR, "needs-project-ok.dot");
+    writeFileSync(dot, `
+      digraph p {
+        start [shape=Mdiamond]
+        run [type="tool", cwd="$project", toolCommand="echo $project"]
+        done [shape=Msquare]
+        start -> run -> done
+      }
+    `);
+    vi.mocked(request).mockResolvedValue({ type: "ok", taskId: "pipeline:needs-project-ok" });
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    await makeProgram().parseAsync([
+      "node", "ralph", "heartbeat", "pipeline", dot,
+      "--project", FIXTURE_DIR, "--every", "40",
+    ]);
+    expect(request).toHaveBeenCalledWith("register_task", expect.objectContaining({
+      command: "pipeline",
+      args: ["run", dot, "--project", FIXTURE_DIR],
+    }));
+    logSpy.mockRestore();
   });
 });
 

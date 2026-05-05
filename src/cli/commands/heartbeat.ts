@@ -1,10 +1,11 @@
 // src/cli/commands/heartbeat.ts
 import { Command } from "commander";
-import { resolve, basename } from "path";
+import { resolve, basename, dirname } from "path";
 import { statSync, Stats, readFileSync } from "fs";
 import { resolvePipelineArg, isNameShorthand } from "../lib/pipeline-resolver.js";
 import { request, stream } from "../../lib/daemon-client";
 import { parseDot } from "../../attractor/core/graph.js";
+import { findVarReferences } from "../../attractor/transforms/variable-expansion.js";
 import type { Task } from "../../daemon/state";
 import * as output from "../lib/output.js";
 import { collectKV } from "../lib/collect-kv.js";
@@ -180,7 +181,28 @@ Examples:
         );
       }
 
-      const stem = basename(absDotFile).replace(/\.dot$/i, "");
+      // Refuse to schedule a pipeline that references $project without a
+      // --project binding — every scheduled run would otherwise fail with
+      // [project_binding_missing] and never produce any output.
+      if (!opts.project) {
+        const refs = findVarReferences(dotGraph, "project");
+        if (refs.length > 0) {
+          console.error(
+            `✗ Pipeline references $project but --project was not passed.\n` +
+            `  Pass --project <folder> to ralph heartbeat pipeline.\n` +
+            `  Nodes referencing $project: ${refs.join(", ")}`
+          );
+          process.exit(1);
+        }
+      }
+
+      // Folder-form pipelines are all named `<folder>/pipeline.dot`; using the
+      // basename alone collapses every one to `pipeline:pipeline` and they
+      // collide. Fall back to the parent folder name in that case.
+      let stem = basename(absDotFile).replace(/\.dot$/i, "");
+      if (stem === "pipeline") {
+        stem = basename(dirname(absDotFile));
+      }
       const id = `pipeline:${stem}`;
       const args: string[] = ["run", absDotFile];
       if (opts.project) {
