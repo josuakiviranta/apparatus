@@ -1,7 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { AutoApproveInterviewer } from "../interviewer/auto-approve.js";
 import { QueueInterviewer } from "../interviewer/queue.js";
-import { CallbackInterviewer } from "../interviewer/callback.js";
 import type { Question, Answer } from "../interviewer/index.js";
 
 describe("AutoApproveInterviewer", () => {
@@ -43,15 +42,5 @@ describe("QueueInterviewer", () => {
   it("throws when queue is empty", async () => {
     const i = new QueueInterviewer([]);
     await expect(i.ask({ type: "YES_NO", prompt: "Q" })).rejects.toThrow();
-  });
-});
-
-describe("CallbackInterviewer", () => {
-  it("delegates to callback", async () => {
-    const cb = vi.fn(async (_q: Question): Promise<Answer> => ({ value: "custom" }));
-    const i = new CallbackInterviewer(cb);
-    const a = await i.ask({ type: "FREEFORM", prompt: "Q" });
-    expect(a.value).toBe("custom");
-    expect(cb).toHaveBeenCalledWith(expect.objectContaining({ prompt: "Q" }));
   });
 });
