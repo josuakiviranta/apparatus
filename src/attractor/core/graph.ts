@@ -1069,7 +1069,7 @@ function checkInteractiveWithOutputs(
   diags.push({
     rule: "interactive_with_outputs_forbidden",
     severity: "error",
-    message: `Node "${node.id}" sets interactive=true but agent "${node.agent}" declares outputs:; structured output is incompatible with live chat streaming`,
+    message: `Node "${node.id}" sets interactive=true but agent "${node.agent}" declares outputs:. Remove the outputs: block from the agent frontmatter, or remove interactive=true from the node.`,
     location: node.sourceLocation,
   });
 }
@@ -1084,7 +1084,7 @@ function checkInteractiveWithLoop(
 
   // Node-level loop signals
   const nodeLoopOn = node.loop === true || node.loop === "true";
-  const nodeMaxRaw = (node as Record<string, unknown>).maxIterations;
+  const nodeMaxRaw = node.maxIterations;
   const nodeMaxParsed =
     typeof nodeMaxRaw === "string" ? parseInt(nodeMaxRaw, 10)
     : typeof nodeMaxRaw === "number" ? nodeMaxRaw
@@ -1102,7 +1102,7 @@ function checkInteractiveWithLoop(
   diags.push({
     rule: "interactive_with_loop_forbidden",
     severity: "error",
-    message: `Node "${node.id}" sets interactive=true with looping (loop=true / maxIterations>1); interactive sessions cannot iterate`,
+    message: `Node "${node.id}" sets interactive=true with looping (loop=true / maxIterations>1). Interactive sessions cannot iterate — remove loop=true / maxIterations from the node or agent, or remove interactive=true.`,
     location: node.sourceLocation,
   });
 }
