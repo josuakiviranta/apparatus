@@ -18,7 +18,7 @@ tools:
 
 # Mission
 
-Read `$project/meditations/illuminations/.triage/$run_id/chat-notes.md` and the illumination at
+Read `$project/.ralph/meditations/illuminations/.triage/$run_id/chat-notes.md` and the illumination at
 $verifier_illumination_path. Merge the latest chat round into the cumulative refinements
 log so design_writer and plan_writer can judge whether to honor each refinement.
 

@@ -4,7 +4,7 @@ import { execFileSync } from "node:child_process";
 
 const [illuminationArg, reason] = process.argv.slice(2);
 if (!illuminationArg || !reason) {
-  console.error("usage: consume.mjs <illumination-path> <implemented|declined>");
+  console.error("usage: consume.mjs <illumination-path-or-filename> <implemented|declined>");
   process.exit(2);
 }
 if (reason !== "implemented" && reason !== "declined") {
@@ -12,15 +12,14 @@ if (reason !== "implemented" && reason !== "declined") {
   process.exit(2);
 }
 
-const illuminationPath = path.resolve(illuminationArg);
+const projectRoot = process.cwd();
+const filename = path.basename(illuminationArg);
+const illuminationPath = path.join(projectRoot, ".ralph", "meditations", "illuminations", filename);
+
 if (!fs.existsSync(illuminationPath)) {
   console.error(`illumination not found: ${illuminationPath}`);
   process.exit(1);
 }
-
-const filename = path.basename(illuminationPath);
-const meditationsDir = path.dirname(path.dirname(illuminationPath));
-const projectRoot = path.dirname(meditationsDir);
 
 fs.rmSync(illuminationPath);
 
