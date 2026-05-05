@@ -363,7 +363,7 @@ This is the mechanical sweep. Two test directories, two import-path patterns.
 
 ### Step 3.1: Inventory the test sweep
 
-- [ ] **Step 3.1.1: List attractor tests that pull validateGraph**
+- [x] **Step 3.1.1: List attractor tests that pull validateGraph**
 
 ```bash
 grep -ln 'validateGraph\|validateOrRaise' src/attractor/tests/*.ts
@@ -393,7 +393,7 @@ src/attractor/tests/illumination-pipeline-flow.test.ts
 
 The actual list may differ — use the `grep` output, not this hand-list, as the work surface.
 
-- [ ] **Step 3.1.2: List CLI smoke tests that pull validateGraph**
+- [x] **Step 3.1.2: List CLI smoke tests that pull validateGraph**
 
 ```bash
 grep -ln 'validateGraph' src/cli/tests/*.ts
@@ -405,7 +405,7 @@ Expected hits include all 16 `pipeline-smoke-*-folder.test.ts` files plus `pipel
 
 Each test file has the same edit pattern. Use it as a template; apply it to every file from Step 3.1.
 
-- [ ] **Step 3.2.1: Edit each attractor test file**
+- [x] **Step 3.2.1: Edit each attractor test file**
 
 For each file in the Step 3.1.1 list, identify the import statement that pulls `validateGraph` (and possibly `validateOrRaise`) from `../core/graph.js`. Two patterns:
 
@@ -438,7 +438,7 @@ If `validateOrRaise` is imported, it goes on the validator-side line. If `Diagno
 
 Use the Edit tool per file with `old_string` matching the full import line for unambiguous replacement.
 
-- [ ] **Step 3.2.2: Edit each CLI smoke test file**
+- [x] **Step 3.2.2: Edit each CLI smoke test file**
 
 For each file in the Step 3.1.2 list, the relative path is `../../attractor/core/graph.js` instead of `../core/graph.js`. Same Pattern A / Pattern B split:
 
@@ -453,7 +453,7 @@ import { parseDot } from "../../attractor/core/graph.js";
 import { validateGraph } from "../../attractor/core/graph-validator.js";
 ```
 
-- [ ] **Step 3.2.3: Run typecheck on the test surface**
+- [x] **Step 3.2.3: Run typecheck on the test surface**
 
 ```bash
 npx tsc --noEmit
@@ -461,7 +461,7 @@ npx tsc --noEmit
 
 Expected: zero errors anywhere.
 
-- [ ] **Step 3.2.4: Run the attractor test suite**
+- [x] **Step 3.2.4: Run the attractor test suite**
 
 ```bash
 npx vitest run src/attractor/tests/
@@ -475,7 +475,7 @@ If a test fails:
 - Import error → an import was missed in Step 3.2.1 / 3.2.2.
 - Behaviour change in a per-rule test → a private helper migrated incorrectly. Verify against Step 1.4.2's helper-move policy.
 
-- [ ] **Step 3.2.5: Run the CLI smoke suite**
+- [x] **Step 3.2.5: Run the CLI smoke suite**
 
 ```bash
 npx vitest run src/cli/tests/
@@ -483,7 +483,7 @@ npx vitest run src/cli/tests/
 
 Expected: all green. Smoke tests assert zero error-level diagnostics on bundled pipelines.
 
-- [ ] **Step 3.2.6: Run the full test suite**
+- [x] **Step 3.2.6: Run the full test suite**
 
 ```bash
 npx vitest run
@@ -491,7 +491,7 @@ npx vitest run
 
 Expected: full green. This is the gate to commit Chunk 3.
 
-- [ ] **Step 3.2.7: Commit checkpoint**
+- [x] **Step 3.2.7: Commit checkpoint**
 
 ```bash
 git add src/attractor/tests/ src/cli/tests/
@@ -524,7 +524,7 @@ The new ADR records the parser/validator split as an instance of ADR-0001 + ADR-
 
 ### Step 4.1: Pick the next ADR number
 
-- [ ] **Step 4.1.1: List existing ADRs**
+- [x] **Step 4.1.1: List existing ADRs**
 
 ```bash
 ls docs/adr/
@@ -534,7 +534,7 @@ Expected: `0001-…` through `0008-…`. Next number is `0009`. If the directory
 
 ### Step 4.2: Write the ADR
 
-- [ ] **Step 4.2.1: Create `docs/adr/0009-parser-validator-split.md`**
+- [x] **Step 4.2.1: Create `docs/adr/0009-parser-validator-split.md`**
 
 Write the file with this content (substitute today's date and adjust the ADR number if the directory advanced):
 
@@ -579,7 +579,7 @@ Public exports (`parseDot`, `resolveHandlerType`, `validateGraph`, `validateOrRa
 
 ### Step 4.3: Final verification
 
-- [ ] **Step 4.3.1: Re-run the full test suite**
+- [x] **Step 4.3.1: Re-run the full test suite**
 
 ```bash
 npx vitest run && npx tsc --noEmit
@@ -587,7 +587,7 @@ npx vitest run && npx tsc --noEmit
 
 Expected: full green.
 
-- [ ] **Step 4.3.2: Re-run a build**
+- [x] **Step 4.3.2: Re-run a build**
 
 ```bash
 npm run build
@@ -601,7 +601,7 @@ ls dist/attractor/core/ | grep graph
 
 Expected: `graph.js`, `graph-validator.js`, `graph-ast.js`, plus the existing siblings.
 
-- [ ] **Step 4.3.3: Smoke against bundled pipelines**
+- [x] **Step 4.3.3: Smoke against bundled pipelines**
 
 ```bash
 ralph pipeline validate src/cli/pipelines/implement
@@ -610,7 +610,7 @@ ralph pipeline validate src/cli/pipelines/janitor-graph-bloat-illumination 2>/de
 
 Expected: identical diagnostic output before vs after — confirmed against the byte-identical snapshot test from Step 1.2.
 
-- [ ] **Step 4.3.4: Negative-case smoke**
+- [x] **Step 4.3.4: Negative-case smoke**
 
 Author or pick one deliberately-invalid `.dot` (e.g. an existing fixture with an orphan output) and run:
 
@@ -622,7 +622,7 @@ Expected: identical `Diagnostic` array (same `code`, `message`, `severity`, `lin
 
 ### Step 4.4: Commit ADR + squash
 
-- [ ] **Step 4.4.1: Commit the ADR**
+- [x] **Step 4.4.1: Commit the ADR**
 
 ```bash
 git add docs/adr/0009-parser-validator-split.md
@@ -635,7 +635,7 @@ and ADR-0004 (source as truth) as predecessors.
 Refs: docs/superpowers/specs/2026-05-05-graph-ts-parser-validator-conflation-design.md"
 ```
 
-- [ ] **Step 4.4.2: Squash the four checkpoint commits into one**
+- [x] **Step 4.4.2: Squash the four checkpoint commits into one**
 
 Design §8 demands a single commit. Run interactive rebase:
 
@@ -691,7 +691,7 @@ git diff --cached --stat
 
 Expected: ~33 modified files (`graph.ts` shrunk, `pipeline.ts` import split, ~30 test files import-split), 4 new files (`graph-validator.ts`, `graph-validator-byte-identical.test.ts`, the snapshot file under `__snapshots__/`, `0009-parser-validator-split.md`), zero deletions of unrelated files.
 
-- [ ] **Step 4.4.3: Run full test suite one more time**
+- [x] **Step 4.4.3: Run full test suite one more time**
 
 ```bash
 npx vitest run && npx tsc --noEmit && npm run build
@@ -699,7 +699,7 @@ npx vitest run && npx tsc --noEmit && npm run build
 
 Expected: full green. This is the merge gate.
 
-- [ ] **Step 4.4.4: Confirm public-export grep guarantees**
+- [x] **Step 4.4.4: Confirm public-export grep guarantees**
 
 Per design §10.1:
 

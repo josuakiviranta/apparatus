@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { validateGraph, parseDot } from "../core/graph.js";
+import { parseDot } from "../core/graph.js";
+import { validateGraph } from "../core/graph-validator.js";
 
 describe("validateGraph portability_heuristic", () => {
   it("warns when prompt hardcodes meditations/ path", () => {

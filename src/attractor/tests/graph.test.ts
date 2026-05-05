@@ -3,7 +3,8 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from "fs"
 import { tmpdir } from "os";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
-import { parseDot, validateGraph, resolveHandlerType } from "../core/graph.js";
+import { parseDot, resolveHandlerType } from "../core/graph.js";
+import { validateGraph } from "../core/graph-validator.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 

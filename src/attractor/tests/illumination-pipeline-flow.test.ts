@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { resolve } from "path";
-import { parseDot, validateGraph } from "../core/graph.js";
+import { parseDot } from "../core/graph.js";
+import { validateGraph } from "../core/graph-validator.js";
 
 describe("illumination-to-implementation pipeline — full flow validation", () => {
   const root = resolve(__dirname, "../../..");

@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { validateGraph, parseDot } from "../core/graph.js";
+import { parseDot } from "../core/graph.js";
+import { validateGraph } from "../core/graph-validator.js";
 
 function setup() {
   const dir = mkdtempSync(join(tmpdir(), "ralph-vrule-"));

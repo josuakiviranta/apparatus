@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { parseDot, validateGraph } from "../../attractor/core/graph.js";
+import { parseDot } from "../../attractor/core/graph.js";
+import { validateGraph } from "../../attractor/core/graph-validator.js";
 
 const REPO_ROOT = resolve(__dirname, "../../..");
 const DOT_PATH = join(REPO_ROOT, "src", "cli", "pipelines", "implement", "pipeline.dot");

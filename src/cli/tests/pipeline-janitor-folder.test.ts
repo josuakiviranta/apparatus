@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { resolvePipelineArg } from "../lib/pipeline-resolver.js";
-import { parseDot, validateGraph } from "../../attractor/core/graph.js";
+import { parseDot } from "../../attractor/core/graph.js";
+import { validateGraph } from "../../attractor/core/graph-validator.js";
 
 const REPO_ROOT = resolve(__dirname, "../../..");
 
