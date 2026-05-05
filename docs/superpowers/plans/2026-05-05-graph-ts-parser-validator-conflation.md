@@ -275,7 +275,7 @@ Two CLI files import the validator: `src/cli/commands/pipeline.ts` (the validate
 
 ### Step 2.1: Re-survey CLI consumers
 
-- [ ] **Step 2.1.1: Find every CLI consumer of validator exports**
+- [x] **Step 2.1.1: Find every CLI consumer of validator exports**
 
 ```bash
 grep -rn 'validateGraph\|validateOrRaise' src/cli --include='*.ts'
@@ -287,7 +287,7 @@ If any non-test CLI file appears beyond `pipeline.ts`, add it to the modify list
 
 ### Step 2.2: Split the import in `pipeline.ts`
 
-- [ ] **Step 2.2.1: Read the current import line**
+- [x] **Step 2.2.1: Read the current import line**
 
 Open `src/cli/commands/pipeline.ts`. Line 6 (verify by `grep -n 'core/graph' src/cli/commands/pipeline.ts`) is:
 
@@ -297,7 +297,7 @@ import { parseDot, validateGraph, validateOrRaise } from "../../attractor/core/g
 
 If extra symbols (e.g. `resolveHandlerType`) are pulled in the same line, preserve them on the parser side.
 
-- [ ] **Step 2.2.2: Edit the import to split**
+- [x] **Step 2.2.2: Edit the import to split**
 
 Replace the single line with two lines:
 
@@ -308,7 +308,7 @@ import { validateGraph, validateOrRaise } from "../../attractor/core/graph-valid
 
 If `resolveHandlerType` was on the original line, keep it on the parser-side line: `import { parseDot, resolveHandlerType } from "../../attractor/core/graph.js";`. Use the Edit tool with the original full line as `old_string` to make the change unambiguous.
 
-- [ ] **Step 2.2.3: Run typecheck**
+- [x] **Step 2.2.3: Run typecheck**
 
 ```bash
 npx tsc --noEmit
@@ -316,7 +316,7 @@ npx tsc --noEmit
 
 Expected: zero errors in `pipeline.ts`. Errors remaining are in test files — Chunk 3.
 
-- [ ] **Step 2.2.4: Smoke-run the validate path**
+- [x] **Step 2.2.4: Smoke-run the validate path**
 
 ```bash
 npx ralph pipeline validate src/cli/pipelines/implement
@@ -332,7 +332,7 @@ npx vitest run src/attractor/tests/graph-validator-byte-identical.test.ts
 
 If the snapshot diffs, the move corrupted a rule body. Bisect by reverting `graph-validator.ts` chunks until green.
 
-- [ ] **Step 2.2.5: Commit checkpoint**
+- [x] **Step 2.2.5: Commit checkpoint**
 
 ```bash
 git add src/cli/commands/pipeline.ts
