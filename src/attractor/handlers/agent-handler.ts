@@ -1,38 +1,17 @@
-import { mkdirSync, writeFileSync } from "fs";
+import { writeFileSync } from "fs";
 import { join } from "path";
 import { randomUUID } from "crypto";
 import type { NodeHandler, HandlerExecutionContext } from "./registry.js";
-import type { Node, Outcome, PipelineContext, CheckpointState } from "../types.js";
+import type { Node, Outcome, PipelineContext } from "../types.js";
 import { Agent, type AgentConfig, type ChildHandle } from "../../cli/lib/agent.js";
 import { loadAgent as defaultLoadAgent } from "../../cli/lib/agent-loader.js";
-import { getIlluminationServerPath, getMetaMeditationsDir } from "../../cli/lib/assets.js";
-import { buildPreamble } from "../transforms/preamble.js";
-import { renderInputsBlock } from "../transforms/inputs-renderer.js";
-import { extractDefaults } from "../transforms/variable-expansion.js";
 import { outputsToZod } from "../../cli/lib/outputs-to-zod.js";
 import { buildCorrectiveMessage } from "../../cli/lib/corrective-message.js";
 import { evaluateAgentOutput } from "./evaluate-agent-output.js";
 import { Session, buildSessionDigest } from "../../cli/lib/session.js";
+import { assembleAgentPrompt, SYSTEM_INJECTED_VARS } from "./agent-prep.js";
 
-/**
- * Keys auto-injected into every agent's variables by the pipeline engine.
- * This is the single source of truth used by both the runtime (buildSystemInjectedVars)
- * and the graph validator (bare_input_not_in_caller_inputs_or_system rule).
- */
-export const SYSTEM_INJECTED_VARS = [
-  "ILLUMINATION_SERVER_PATH",
-  "PROJECT_ROOT",
-  "META_MEDITATIONS_DIR",
-] as const;
-
-/** Build the system-injected variable record for a given project root. */
-function buildSystemInjectedVars(projectRoot: string): Record<(typeof SYSTEM_INJECTED_VARS)[number], string> {
-  return {
-    ILLUMINATION_SERVER_PATH: getIlluminationServerPath(),
-    PROJECT_ROOT: projectRoot,
-    META_MEDITATIONS_DIR: getMetaMeditationsDir(),
-  };
-}
+export { SYSTEM_INJECTED_VARS };
 
 export interface AgentHandlerDeps {
   loadAgent?: (name: string, pipelineDir: string) => AgentConfig;
@@ -49,80 +28,16 @@ export class AgentHandler implements NodeHandler {
   }
 
   async execute(node: Node, ctx: PipelineContext, meta: HandlerExecutionContext): Promise<Outcome> {
-    const agentName = node.agent ?? "implement";
-    if (!agentName) {
-      return { status: "fail", failureReason: "Node has no agent attribute" };
+    const prep = assembleAgentPrompt(node, ctx, meta, this.load, this.create);
+    if ("fail" in prep) {
+      return { status: "fail", failureReason: prep.fail };
     }
-
-    let config: AgentConfig;
-    try {
-      config = this.load(agentName, meta.dotDir);
-    } catch (err) {
-      return { status: "fail", failureReason: `Failed to resolve agent "${agentName}": ${(err as Error).message}` };
-    }
-
-    // Apply node-level overrides
-    if (node.llmModel) config = { ...config, model: node.llmModel as string };
-
-    const { logsRoot, cwd, signal, onStdout, completedNodes, nodeRetries, onInteractiveRequest } = meta;
-
-    // Dev-mode: tsx is needed to run .ts MCP servers (the bundled paths from
-    // getIlluminationServerPath() etc point at .ts in dev, .js in prod).
-    if (typeof __RALPH_PROD__ === "undefined") {
-      config = {
-        ...config,
-        mcp: config.mcp.map((m) => (m.command === "node" ? { ...m, command: "tsx" } : m)),
-      };
-    }
-
-    // Auto-inject standard MCP infra variables so agents using the illumination
-    // server (e.g. meditate, janitor) get their {{ILLUMINATION_SERVER_PATH}} /
-    // {{PROJECT_ROOT}} / {{META_MEDITATIONS_DIR}} placeholders resolved without
-    // every pipeline command re-declaring them. Caller-provided values win.
-    const agentVariables: Record<string, unknown> = {
-      ...buildSystemInjectedVars(meta.projectDir ?? cwd),
-      ...ctx.values,
-    };
-
-    // JSON schema comes exclusively from agent frontmatter outputs:
-    const jsonSchema: string | undefined = config.jsonSchema;
+    const { agent, config, jsonSchema, agentVariables, prompt, nodeDir } = prep;
+    const { cwd, signal, onStdout, onInteractiveRequest } = meta;
     // DOT attributes parse as strings; coerce explicitly to boolean
     const interactive = node.interactive === true || node.interactive === "true";
 
-    // Build prompt with pipeline context preamble
-    const nodeDir = join(logsRoot, node.id);
-    mkdirSync(nodeDir, { recursive: true });
-    const agentInstructions = (config.prompt ?? "").trim();
-
-    const declaredInputs = (config.inputs as string[] | undefined) ?? [];
-    // DOT parser camelCases `default_<key>` → `defaultKey` on the Node, but
-    // inputs-resolver builds `fallbackAttr = default_<localKey>` (snake_case).
-    // Invert via extractDefaults, then re-prefix so renderInputsBlock can find them.
-    const rawDefaults = extractDefaults(node as unknown as Record<string, unknown>);
-    const nodeAttrs: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(rawDefaults)) nodeAttrs[`default_${k}`] = v;
-    const inputsBlock = renderInputsBlock(declaredInputs, ctx.values, nodeAttrs);
-    const steeringRaw = (node.prompt ?? "").trim();
-    const steeringBlock = steeringRaw
-      ? `\n\n## Steering\n\n${steeringRaw}\n`
-      : "";
-    const assembledPrompt = `${agentInstructions}\n\n---\n\n${inputsBlock}${steeringBlock}`;
-
-    const fidelity = (node.fidelity as string | undefined) ?? "compact";
-    const preamble = buildPreamble(
-      { timestamp: "", currentNode: node.id, completedNodes, nodeRetries, context: ctx.values } as CheckpointState,
-      fidelity,
-    );
-    const jsonWrappedPrompt = jsonSchema
-      ? `IMPORTANT: Your FINAL response MUST be valid JSON matching this schema. No markdown, no preamble, output ONLY the JSON object.\nSchema: ${jsonSchema}\n\n${assembledPrompt}\n\nREMINDER: Output MUST be valid JSON matching the schema above. No markdown, no explanation.`
-      : assembledPrompt;
-    const prompt = preamble + jsonWrappedPrompt;
-    writeFileSync(join(nodeDir, "prompt.md"), prompt);
-
-    // Override config.prompt so Agent.run() delivers the assembled preamble + node prompt
-    const agent = this.create({ ...config, prompt, ...(jsonSchema ? { jsonSchema } : {}) });
-
-    // --- Path 1.5: interactive branch ---
+    // --- Path 1.5: interactive branch (verbatim copy of pre-edit agent-handler.ts:126-186) ---
     if (interactive) {
       if (jsonSchema) {
         return {
@@ -225,6 +140,7 @@ export class AgentHandler implements NodeHandler {
     let prevNote = "";
 
     const metaPrefix = node.id;
+    const agentName = node.agent ?? "implement";
 
     for (let i = 0; i < maxIterations; i++) {
       if (signal?.aborted) break;
