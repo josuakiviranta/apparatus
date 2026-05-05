@@ -190,16 +190,20 @@ If `$SESSION` is empty (i.e. the pipeline is not running inside a tmux session),
 
 If Phase 1 fails, you MAY skip Phases 2–3 for this cycle and go straight to the **Fix step** — a broken build or red suite means smoke runs are unreliable.
 
-## Phase 2 — Smoke pipelines
+## Phase 2 — Scenario pipelines
 
-After Phase 1 (build + test) is GREEN, run every smoke pipeline unconditionally — no diff filtering, no skipping, cost is acceptable.
+After Phase 1 (build + test) is GREEN, drive every scenario pipeline through `ralph pipeline run` in the tmux window — unconditionally, no diff filtering, no skipping, cost is acceptable.
 
-1. If Phase 1 is RED, do NOT enter the smoke phase. Stay in the Fix loop until tests pass, then re-run Phase 1, then enter this phase.
-2. List every smoke in your shell (not the tmux window): `ls $project/pipelines/smoke/*.dot`.
-3. For each smoke, read its `.dot` header to extract required `--var` keys, then send into the window:
-   `ralph pipeline run pipelines/smoke/<name>.dot --var <required-vars>`
+**A green vitest suite is NOT a substitute.** `pipeline-smoke-*-folder.test.ts` wraps the scenarios for unit-style assertions, but the live `ralph pipeline run` path (CLI parsing, TUI render, daemon plumbing, exit handling) is only exercised when you actually drive it. Run them.
+
+1. If Phase 1 is RED, do NOT enter this phase. Stay in the Fix loop until tests pass, then re-run Phase 1, then enter here.
+2. List every scenario in your shell (not the tmux window): `ls $project/.ralph/scenarios/*/pipeline.dot`.
+3. For each scenario:
+   a. **Validate first** in your shell: `ralph pipeline validate $project/.ralph/scenarios/<name>/pipeline.dot`. If validate fails, that IS the issue — capture its output, treat as a Phase 2 failure for the Fix step, do NOT attempt to run it.
+   b. If validate passes, read the `.dot` header to extract required `--var` keys, then send into the window:
+      `ralph pipeline run .ralph/scenarios/<name>/pipeline.dot --var <required-vars>`
 4. After each run: `wait_stable 180000`, `capture`, read `current.txt`. Apply your agent-level observation criteria (crashes, exits ≠ 0, hangs, TUI glitches, copy regressions).
-5. Run all smokes every cycle. Do not skip. If a smoke is genuinely incompatible with this environment, run it anyway and let it fail — the failure is the data.
+5. Run all scenarios every cycle. Do not skip. If a scenario is genuinely incompatible with this environment, run it anyway and let it fail — the failure is the data.
 
 For any command you drive in the window, apply these observation criteria:
 - crashes / stack traces
