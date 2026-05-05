@@ -257,7 +257,7 @@ describe("AgentHandler", () => {
       makeContext(),
     );
 
-    // Vitest runs without tsup's __RALPH_PROD__ define, so dev-mode is active.
+    // Vitest runs without tsup's __APPARAT_PROD__ define, so dev-mode is active.
     expect(capturedConfig.mcp[0].command).toBe("tsx");
     expect(capturedConfig.mcp[1].command).toBe("python"); // non-node commands untouched
   });

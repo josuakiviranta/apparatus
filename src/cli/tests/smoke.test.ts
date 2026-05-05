@@ -21,14 +21,14 @@ describe("production smoke", () => {
     expect(result.stdout).toMatch(/\d+\.\d+\.\d+/);
   });
 
-  it("compiled binary has __RALPH_PROD__ inlined (skips if dist not built)", () => {
+  it("compiled binary has __APPARAT_PROD__ inlined (skips if dist not built)", () => {
     if (!existsSync(distBin)) {
       console.warn("Skipping smoke test: dist/cli/index.js not found.");
       return;
     }
     const content = readFileSync(distBin, "utf8");
-    // tsup define replaces __RALPH_PROD__ with "true" at build time,
-    // so the literal string __RALPH_PROD__ should NOT appear in output
-    expect(content).not.toContain("__RALPH_PROD__");
+    // tsup define replaces __APPARAT_PROD__ with "true" at build time,
+    // so the literal string __APPARAT_PROD__ should NOT appear in output
+    expect(content).not.toContain("__APPARAT_PROD__");
   });
 });

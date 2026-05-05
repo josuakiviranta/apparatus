@@ -18,7 +18,7 @@ describe("engine onNodeEnd callback", () => {
   it("fires onNodeEnd after each handler resolves with its outcome", async () => {
     // This test requires a real `claude` binary to be installed.
     // Skip unless explicitly opted in via env var.
-    if (!process.env.RALPH_ENGINE_TEST_ALLOW_SPAWN) return;
+    if (!process.env.APPARAT_ENGINE_TEST_ALLOW_SPAWN) return;
 
     const { parseDot } = await import("../core/graph.js");
     const { runPipeline } = await import("../core/engine.js");

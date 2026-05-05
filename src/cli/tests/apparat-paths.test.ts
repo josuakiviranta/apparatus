@@ -1,7 +1,7 @@
-// src/cli/tests/ralph-paths.test.ts
+// src/cli/tests/apparat-paths.test.ts
 import { describe, it, expect } from "vitest";
 import {
-  ralphDir,
+  apparatDir,
   meditationsDir,
   illuminationsDir,
   stimuliDir,
@@ -9,13 +9,13 @@ import {
   pipelinesDir,
   runsDir,
   runDir,
-} from "../lib/ralph-paths";
+} from "../lib/apparat-paths";
 
-describe("ralph-paths", () => {
+describe("apparat-paths", () => {
   const project = "/abs/project";
 
-  it("ralphDir joins project + .ralph", () => {
-    expect(ralphDir(project)).toBe("/abs/project/.ralph");
+  it("apparatDir joins project + .ralph", () => {
+    expect(apparatDir(project)).toBe("/abs/project/.ralph");
   });
   it("meditationsDir joins .ralph/meditations", () => {
     expect(meditationsDir(project)).toBe("/abs/project/.ralph/meditations");

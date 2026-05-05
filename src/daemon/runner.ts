@@ -10,12 +10,12 @@ import type { Task } from "./state";
 
 export function getRalphCliPath(): { command: string; args: string[]; shell: boolean } {
   // Allow test override
-  const testCmd = process.env.RALPH_TEST_CMD;
+  const testCmd = process.env.APPARAT_TEST_CMD;
   if (testCmd) {
     // Return as shell command to preserve quoting (e.g. node -e "process.exit(1)")
     return { command: testCmd, args: [], shell: true };
   }
-  if (typeof __RALPH_PROD__ !== "undefined") {
+  if (typeof __APPARAT_PROD__ !== "undefined") {
     // production: dist/daemon/ -> dist/cli/index.js
     return { command: process.execPath, args: [join(__dirname, "..", "cli", "index.js")], shell: false };
   }

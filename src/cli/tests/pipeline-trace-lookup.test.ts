@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { pipelineTraceCommand } from "../commands/pipeline.js";
-import { runDir } from "../lib/ralph-paths.js";
+import { runDir } from "../lib/apparat-paths.js";
 import { runPipeline } from "../../attractor/core/engine.js";
 import { parseDot } from "../../attractor/core/graph.js";
 import { AutoApproveInterviewer } from "../../attractor/interviewer/auto-approve.js";

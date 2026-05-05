@@ -8,12 +8,12 @@ import { existsSync } from "fs";
 import { spawn } from "child_process";
 import { homedir } from "os";
 
-const SOCK_PATH = join(process.env.HOME || homedir(), ".ralph", "daemon.sock");
+const SOCK_PATH = join(process.env.HOME || homedir(), ".apparat", "daemon.sock");
 const DAEMON_START_TIMEOUT_MS = 3000;
 const DAEMON_POLL_INTERVAL_MS = 100;
 
 function getDaemonBin(): { command: string; args: string[] } {
-  if (typeof __RALPH_PROD__ !== "undefined") {
+  if (typeof __APPARAT_PROD__ !== "undefined") {
     // prod: code may be in dist/cli/index.js or dist/chunk-*.js (tsup chunking)
     // Walk up from __dirname until we find a dir containing daemon/index.js
     let dir = __dirname;
@@ -37,7 +37,7 @@ async function waitForSocket(timeoutMs: number): Promise<void> {
     if (existsSync(SOCK_PATH)) return;
     await new Promise((r) => setTimeout(r, DAEMON_POLL_INTERVAL_MS));
   }
-  throw new Error("Daemon failed to start — check permissions on ~/.ralph/");
+  throw new Error("Daemon failed to start — check permissions on ~/.apparat/");
 }
 
 async function ensureDaemon(): Promise<void> {

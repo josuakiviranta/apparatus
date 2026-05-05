@@ -28,27 +28,27 @@ export interface LogLine {
   content: string;
 }
 
-export function getRalphDir(): string {
+export function getApparatHome(): string {
   const home = process.env.HOME || homedir();
-  return join(home, ".ralph");
+  return join(home, ".apparat");
 }
 
 export function ensureDirs(): void {
-  mkdirSync(join(getRalphDir(), "logs"), { recursive: true });
-  mkdirSync(join(getRalphDir(), "pids"), { recursive: true });
+  mkdirSync(join(getApparatHome(), "logs"), { recursive: true });
+  mkdirSync(join(getApparatHome(), "pids"), { recursive: true });
 }
 
 export function getPidFilePath(taskId: string): string {
   const safeId = taskId.replace(/[^a-zA-Z0-9]/g, "-");
-  return join(getRalphDir(), "pids", `${safeId}.pid`);
+  return join(getApparatHome(), "pids", `${safeId}.pid`);
 }
 
 function getTasksPath(): string {
-  return join(getRalphDir(), "tasks.json");
+  return join(getApparatHome(), "tasks.json");
 }
 
 function getRunLogPath(taskId: string, runId: string): string {
-  return join(getRalphDir(), "logs", taskId, `${runId}.log`);
+  return join(getApparatHome(), "logs", taskId, `${runId}.log`);
 }
 
 export function readTasks(): Task[] {
@@ -86,7 +86,7 @@ export function deleteTask(id: string): void {
 
 export function createRun(taskId: string, runId: string, startedAt: number): void {
   const logPath = getRunLogPath(taskId, runId);
-  mkdirSync(join(getRalphDir(), "logs", taskId), { recursive: true });
+  mkdirSync(join(getApparatHome(), "logs", taskId), { recursive: true });
   const header: RunHeader = { type: "run", id: runId, taskId, startedAt, endedAt: null, exitCode: null };
   writeFileSync(logPath, JSON.stringify(header) + "\n");
 }
@@ -106,7 +106,7 @@ export function closeRun(taskId: string, runId: string, endedAt: number, exitCod
 }
 
 export function listRuns(taskId: string): string[] {
-  const dir = join(getRalphDir(), "logs", taskId);
+  const dir = join(getApparatHome(), "logs", taskId);
   if (!existsSync(dir)) return [];
   return readdirSync(dir)
     .filter((f) => f.endsWith(".log"))

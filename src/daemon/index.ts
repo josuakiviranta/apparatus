@@ -9,9 +9,9 @@ import { runTask, isSessionRunning, killSession } from "./runner";
 import { createSocketServer } from "./socket";
 import type { Task } from "./state";
 
-const ralphDir = join(process.env.HOME || homedir(), ".ralph");
-const pidPath = join(ralphDir, "daemon.pid");
-const sockPath = join(ralphDir, "daemon.sock");
+const apparatHome = join(process.env.HOME || homedir(), ".apparat");
+const pidPath = join(apparatHome, "daemon.pid");
+const sockPath = join(apparatHome, "daemon.sock");
 
 // ── Prevent duplicate daemons ────────────────────────────────────────────────
 if (existsSync(pidPath)) {

@@ -16,7 +16,7 @@ import {
 import { InkInterviewer } from "../../attractor/interviewer/ink.js";
 import { AutoApproveInterviewer } from "../../attractor/interviewer/auto-approve.js";
 import { getPipelinesDir, resolvePipelineArg, isNameShorthand } from "../lib/pipeline-resolver.js";
-import { runDir, runsDir } from "../lib/ralph-paths.js";
+import { runDir, runsDir } from "../lib/apparat-paths.js";
 import { PassThrough } from "stream";
 import { parseStreamJsonEvents, streamEvents } from "../lib/stream-formatter.js";
 import * as output from "../lib/output.js";
@@ -286,7 +286,7 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
   const runId = randomUUID().slice(0, 8);
   const runsRoot = runsDir(opts.project ?? process.cwd());
   if (!opts.resume) {
-    const keep = Number(process.env.RALPH_RUNS_KEEP ?? "50");
+    const keep = Number(process.env.APPARAT_RUNS_KEEP ?? "50");
     gcOldRuns(runsRoot, Number.isFinite(keep) && keep > 0 ? keep : 50);
   }
   let logsRoot: string;

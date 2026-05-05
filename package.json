@@ -1,10 +1,10 @@
 {
-  "name": "ralph-cli",
+  "name": "apparat-cli",
   "version": "0.2.0",
-  "description": "Agentic loop runner CLI for AI-assisted project development",
+  "description": "Apparatus — agentic loop runner CLI for AI-assisted project development",
   "type": "module",
   "bin": {
-    "ralph": "./dist/cli/index.js"
+    "apparat": "./dist/cli/index.js"
   },
   "scripts": {
     "build": "tsup",

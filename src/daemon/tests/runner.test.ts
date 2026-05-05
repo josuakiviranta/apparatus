@@ -34,7 +34,7 @@ describe("runTask", () => {
   it("returns runId and exitCode after completion", async () => {
     const task = makeTask();
     // Override ralph CLI path to a fast no-op for testing
-    vi.stubEnv("RALPH_TEST_CMD", `${process.execPath} -e "process.exit(0)"`);
+    vi.stubEnv("APPARAT_TEST_CMD", `${process.execPath} -e "process.exit(0)"`);
     const result = await runTask(task);
     expect(result.runId).toBeTruthy();
     expect(result.exitCode).toBe(0);
@@ -43,7 +43,7 @@ describe("runTask", () => {
 
   it("writes run header and system log lines", async () => {
     const task = makeTask();
-    vi.stubEnv("RALPH_TEST_CMD", `${process.execPath} -e "process.exit(0)"`);
+    vi.stubEnv("APPARAT_TEST_CMD", `${process.execPath} -e "process.exit(0)"`);
     const { runId } = await runTask(task);
     const { header, lines } = readRunLogs(task.id, runId);
     expect(header.exitCode).toBe(0);
@@ -55,7 +55,7 @@ describe("runTask", () => {
 
   it("captures non-zero exit code", async () => {
     const task = makeTask();
-    vi.stubEnv("RALPH_TEST_CMD", `${process.execPath} -e "process.exit(1)"`);
+    vi.stubEnv("APPARAT_TEST_CMD", `${process.execPath} -e "process.exit(1)"`);
     const result = await runTask(task);
     expect(result.exitCode).toBe(1);
     vi.unstubAllEnvs();
@@ -69,7 +69,7 @@ describe("env var stripping", () => {
     process.env.CLAUDECODE = "1";
     // Spawned command exits 1 if CLAUDECODE is present, 0 if stripped
     vi.stubEnv(
-      "RALPH_TEST_CMD",
+      "APPARAT_TEST_CMD",
       `${process.execPath} -e "process.exit(process.env.CLAUDECODE ? 1 : 0)"`,
     );
     const result = await runTask(task);
@@ -82,7 +82,7 @@ describe("env var stripping", () => {
     const task = makeTask();
     process.env.CLAUDE_CODE_ENTRYPOINT = "cli";
     vi.stubEnv(
-      "RALPH_TEST_CMD",
+      "APPARAT_TEST_CMD",
       `${process.execPath} -e "process.exit(process.env.CLAUDE_CODE_ENTRYPOINT ? 1 : 0)"`,
     );
     const result = await runTask(task);
@@ -105,7 +105,7 @@ describe("isSessionRunning / killSession", () => {
   it("runTask writes pid file during execution and cleans up after", async () => {
     const task = makeTask();
     vi.stubEnv(
-      "RALPH_TEST_CMD",
+      "APPARAT_TEST_CMD",
       `${process.execPath} -e "setTimeout(() => process.exit(0), 50)"`,
     );
     const runPromise = runTask(task);

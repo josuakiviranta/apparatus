@@ -8,7 +8,7 @@ const testHome = join(tmpdir(), `ralph-state-test-${process.pid}`);
 process.env.HOME = testHome;
 
 import {
-  getRalphDir,
+  getApparatHome,
   ensureDirs,
   readTasks,
   writeTasks,
@@ -39,17 +39,17 @@ function makeTask(overrides: Partial<Task> = {}): Task {
   };
 }
 
-describe("getRalphDir", () => {
+describe("getApparatHome", () => {
   it("returns path under HOME", () => {
-    expect(getRalphDir()).toBe(join(testHome, ".ralph"));
+    expect(getApparatHome()).toBe(join(testHome, ".apparat"));
   });
 });
 
 describe("ensureDirs", () => {
-  it("creates ~/.ralph and ~/.ralph/logs", () => {
+  it("creates ~/.apparat and ~/.apparat/logs", () => {
     ensureDirs();
-    expect(existsSync(join(testHome, ".ralph"))).toBe(true);
-    expect(existsSync(join(testHome, ".ralph", "logs"))).toBe(true);
+    expect(existsSync(join(testHome, ".apparat"))).toBe(true);
+    expect(existsSync(join(testHome, ".apparat", "logs"))).toBe(true);
   });
   it("is idempotent", () => {
     ensureDirs();

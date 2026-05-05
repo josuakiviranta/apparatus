@@ -11,7 +11,7 @@ export default defineConfig({
   format: ["esm"],
   outDir: "dist",
   clean: true,
-  define: { __RALPH_PROD__: "true" },
+  define: { __APPARAT_PROD__: "true" },
   banner: {
     js: "#!/usr/bin/env node",
   },

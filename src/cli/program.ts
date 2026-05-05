@@ -16,7 +16,7 @@ export function createProgram(): Command {
   const program = new Command();
 
   program
-    .name("ralph")
+    .name("apparat")
     .description("Agentic loop runner for AI-assisted project development")
     .version("0.1.1");
 
@@ -126,7 +126,7 @@ after every node advance. --resume loads that checkpoint (currentNode,
 completedNodes, context, nodeRetries) and continues from the node that was about
 to execute when the run stopped. Works after Ctrl-C, node failures, or process
 crashes. Without --resume, a fresh run starts in a new <runId> directory; older
-runs are pruned lazily (keep last 50, override with RALPH_RUNS_KEEP). Scripts
+runs are pruned lazily (keep last 50, override with APPARAT_RUNS_KEEP). Scripts
 called from tool nodes should still be idempotent so --resume can safely
 re-execute the node that failed.
 `)

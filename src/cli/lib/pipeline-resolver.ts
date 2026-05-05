@@ -1,7 +1,7 @@
 import { resolve, join, sep } from "path";
 import { existsSync } from "fs";
 import { resolveBundledPipeline } from "./assets.js";
-import { pipelinesDir } from "./ralph-paths.js";
+import { pipelinesDir } from "./apparat-paths.js";
 
 const VALID_NAME = /^[a-zA-Z0-9_-]+$/;
 

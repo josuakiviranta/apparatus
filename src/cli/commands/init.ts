@@ -2,17 +2,17 @@
 import { mkdirSync, writeFileSync, existsSync, readFileSync, appendFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import {
-  ralphDir,
+  apparatDir,
   pipelinesDir,
   illuminationsDir,
   stimuliDir,
   sessionsDir,
-} from "../lib/ralph-paths.js";
+} from "../lib/apparat-paths.js";
 import { join } from "node:path";
 
 export async function initCommand(projectRoot: string): Promise<void> {
   const dirs = [
-    ralphDir(projectRoot),
+    apparatDir(projectRoot),
     pipelinesDir(projectRoot),
     illuminationsDir(projectRoot),
     stimuliDir(projectRoot),

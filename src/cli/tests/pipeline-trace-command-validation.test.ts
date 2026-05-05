@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pipelineTraceCommand } from "../commands/pipeline.js";
-import { runDir } from "../lib/ralph-paths.js";
+import { runDir } from "../lib/apparat-paths.js";
 
 describe("pipeline trace --node-receive surfaces validation attempts", () => {
   const logs: string[] = [];

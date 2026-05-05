@@ -3,7 +3,7 @@ import { execSync } from "node:child_process";
 import { join, resolve, isAbsolute, relative } from "path";
 import ignore from "ignore";
 import fg from "fast-glob";
-import { illuminationsDir } from "../lib/ralph-paths.js";
+import { illuminationsDir } from "../lib/apparat-paths.js";
 
 // ─── Exported pure helpers (for testing) ──────────────────────────────────────
 

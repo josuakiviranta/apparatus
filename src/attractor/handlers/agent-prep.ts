@@ -60,7 +60,7 @@ export function assembleAgentPrompt(
   const { logsRoot, cwd, completedNodes, nodeRetries } = meta;
 
   // Dev-mode tsx swap (see agent-handler.ts:71-76 for the original justification).
-  if (typeof __RALPH_PROD__ === "undefined") {
+  if (typeof __APPARAT_PROD__ === "undefined") {
     config = {
       ...config,
       mcp: config.mcp.map((m) => (m.command === "node" ? { ...m, command: "tsx" } : m)),

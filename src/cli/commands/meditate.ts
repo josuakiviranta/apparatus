@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from "fs";
 import { join, resolve } from "path";
 import { MCP_CONFIG_GLOB } from "../lib/agent.js";
-import { illuminationsDir } from "../lib/ralph-paths.js";
+import { illuminationsDir } from "../lib/apparat-paths.js";
 import * as output from "../lib/output.js";
 import * as self from "./pipeline.js";
 

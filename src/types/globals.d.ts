@@ -1,1 +1,1 @@
-declare const __RALPH_PROD__: true | undefined;
+declare const __APPARAT_PROD__: true | undefined;

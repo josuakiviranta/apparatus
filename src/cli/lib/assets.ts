@@ -5,11 +5,11 @@ import { existsSync } from "fs";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /**
- * In production (tsup bundle): __RALPH_PROD__ defined → __dirname is dist/cli/
- * In dev (tsx): __RALPH_PROD__ undefined → __dirname is src/cli/lib/
+ * In production (tsup bundle): __APPARAT_PROD__ defined → __dirname is dist/cli/
+ * In dev (tsx): __APPARAT_PROD__ undefined → __dirname is src/cli/lib/
  */
 function isProduction(): boolean {
-  return typeof __RALPH_PROD__ !== "undefined";
+  return typeof __APPARAT_PROD__ !== "undefined";
 }
 
 function getBundledRoot(): string {

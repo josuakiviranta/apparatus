@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync, readFileSync, readdirSync, existsSy
 import { tmpdir } from "os";
 import { join } from "path";
 import { pipelineRunCommand } from "../commands/pipeline.js";
-import { runsDir } from "../lib/ralph-paths.js";
+import { runsDir } from "../lib/apparat-paths.js";
 
 const DOT = `digraph fail_fixture {
   goal="exercise failure-reason surfacing"
