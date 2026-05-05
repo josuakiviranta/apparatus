@@ -1,7 +1,7 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { AutoApproveInterviewer } from "../interviewer/auto-approve.js";
 import { QueueInterviewer } from "../interviewer/queue.js";
-import type { Question, Answer } from "../interviewer/index.js";
+import type { Question } from "../interviewer/index.js";
 
 describe("AutoApproveInterviewer", () => {
   it("always returns first option for MULTIPLE_CHOICE", async () => {
