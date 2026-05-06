@@ -3,13 +3,11 @@ import { implementCommand } from "./commands/implement";
 import { meditateCommand } from "./commands/meditate";
 import { initCommand } from "./commands/init";
 import { registerHeartbeatCommand } from "./commands/heartbeat";
-import {
-  pipelineRunCommand,
-  pipelineValidateCommand,
-  pipelineListCommand,
-  pipelineTraceCommand,
-  pipelineShowCommand,
-} from "./commands/pipeline";
+import { pipelineRunCommand } from "./commands/pipeline/run.js";
+import { pipelineValidateCommand } from "./commands/pipeline/validate.js";
+import { pipelineListCommand } from "./commands/pipeline/list.js";
+import { pipelineTraceCommand } from "./commands/pipeline/trace.js";
+import { pipelineShowCommand } from "./commands/pipeline/show.js";
 import { collectKV } from "./lib/collect-kv.js";
 
 export function createProgram(): Command {
