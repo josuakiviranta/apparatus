@@ -672,7 +672,7 @@ git commit -m "refactor(attractor/validators): extract gate rules to validators/
 
 **Resolution:** `interactive.ts` exports per-node functions only. The orchestrator does NOT call a standalone `interactive.run` — instead, `inputs-refs.ts` (Task 3.4) imports the per-node functions and invokes them inside its `:412-419`-equivalent loop, preserving the round-robin order.
 
-- [ ] **Step 1: Write `interactive.ts` with per-node exports**
+- [x] **Step 1: Write `interactive.ts` with per-node exports**
 
 ```ts
 import type { Node } from "../../types.js";
@@ -692,7 +692,7 @@ export function checkInteractiveWithLoop(ctx: ValidationContext, node: Node): vo
 
 Bodies copied verbatim from the source ranges. Replace `graph` → `ctx.graph`, `dotDir` → `ctx.dotDir`, `diags` → `ctx.diags`. No message-text edits.
 
-- [ ] **Step 2: Delete the three helper definitions from `graph-validator.ts`**
+- [x] **Step 2: Delete the three helper definitions from `graph-validator.ts`**
 
 Delete `function checkLoopRequiresDoneField` (`:997-1024`), `function checkInteractiveWithOutputs` (`:1026-1043`), `function checkInteractiveWithLoop` (`:1045-1076`).
 
@@ -706,12 +706,12 @@ The call sites at `:415-417` are still inline calls — they will be migrated by
 
 and add `import * as interactive from "./validators/interactive.js";` at the top.
 
-- [ ] **Step 3: Type-check, byte-identical, full suite**
+- [x] **Step 3: Type-check, byte-identical, full suite**
 
 Run: `npx tsc --noEmit && npx vitest run src/attractor/tests/graph-validator-byte-identical.test.ts && npx vitest run src/attractor/tests/`
 Expected: all PASS. The interleaving is preserved because the per-node loop and call order at `:412-419` are unchanged — only the function definitions moved.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/attractor/core/validators/interactive.ts src/attractor/core/graph-validator.ts
