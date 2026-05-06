@@ -196,6 +196,8 @@ completed (captured in pre-rewrite commits to `pipelines/janitor/janitor.md`
 and the memory entry at `memory/2026-04-25-state-machine-exists-verifier-ignores-it.md`).
 That role disappeared with the lifecycle simplification.
 
+- `apparat heartbeat meditate` — **Removed 2026-05-06.** The bespoke heartbeat subcommand existed only because the bundled meditate pipeline could not run unattended. The pipeline now self-acquires `vision` via a `read_vision` tool node. Use `apparat heartbeat pipeline meditate --project <folder> --every <n>` instead.
+
 ### Documentation channels
 
 apparatus has three documentation channels with disjoint roles:
