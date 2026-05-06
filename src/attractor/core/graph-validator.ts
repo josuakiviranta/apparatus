@@ -16,6 +16,7 @@ import { resolveInputDecl } from "../transforms/inputs-resolver.js";
 import { SYSTEM_INJECTED_VARS } from "../handlers/agent-prep.js";
 import { outputsToZod } from "../../cli/lib/outputs-to-zod.js";
 import { KNOWN_TYPES, UNIMPLEMENTED_TYPES, isInteractiveAgent, resolveHandlerType } from "./graph.js";
+import { createValidationContext, RESERVED_VARS, type ValidationContext } from "./validators/context.js";
 
 const SYSTEM_VARS = new Set<string>(SYSTEM_INJECTED_VARS);
 
@@ -32,65 +33,10 @@ const INLINE_SCRIPT_PATTERNS: RegExp[] = [
   /<<\s*['"]?[A-Z]/, // heredoc marker
 ];
 
-interface GraphTraversal {
-  hasDefault(node: Node, varName: string): boolean;
-  reachable(source: string, target: string, excluded: Set<string>): boolean;
-  findQualifiedProducer(consumerId: string): string | undefined;
-}
-
-/**
- * Bundle three reachability helpers behind a narrow interface, capturing
- * `graph.nodes`, `adj`, and `resolveHandlerType` as closure state. Replaces
- * the three nested closures that used to live inside `validateGraph`
- * (hasDefault, reachableWithout, findQualifiedProducer) — see design doc §3.3.
- *
- * The rename `reachableWithout` → `reachable` reflects that the exclusion
- * set is now a method parameter, not a free-function name property.
- */
-function createGraphTraversal(
-  graph: Graph,
-  adj: Map<string, string[]>,
-  resolveHandler: (node: Node) => string,
-): GraphTraversal {
-  const { nodes } = graph;
-
-  function hasDefault(node: Node, varName: string): boolean {
-    const key = toCamel("default_" + varName);
-    return node[key] !== undefined;
-  }
-
-  function reachable(source: string, target: string, excluded: Set<string>): boolean {
-    if (source === target) return true;
-    const visited = new Set<string>();
-    const queue = [source];
-    while (queue.length > 0) {
-      const cur = queue.shift()!;
-      if (visited.has(cur)) continue;
-      visited.add(cur);
-      if (cur === target) return true;
-      for (const next of (adj.get(cur) ?? [])) {
-        if (!excluded.has(next)) queue.push(next);
-      }
-    }
-    return false;
-  }
-
-  function findQualifiedProducer(consumerId: string): string | undefined {
-    for (const [id, node] of nodes) {
-      if (id === consumerId) continue;
-      if (resolveHandler(node) !== "tool") continue;
-      if (!node.producesFromStdout) continue;
-      if (!reachable(id, consumerId, new Set())) continue;
-      return id;
-    }
-    return undefined;
-  }
-
-  return { hasDefault, reachable, findQualifiedProducer };
-}
-
 export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
-  const diags: Diagnostic[] = [];
+  const ctx = createValidationContext(graph, dotDir);
+  const { traversal, nodeProduces, callerInputs } = ctx;
+  const diags: Diagnostic[] = ctx.diags;
   for (const node of graph.nodes.values()) {
     diags.push(...validateNode(node));
   }
@@ -183,57 +129,7 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
   }
 
   // variable_coverage — warn when a $variable may not be defined on all paths
-  const RESERVED_VARS = new Set(["goal", "project", "run_id"]);
-  const callerInputs = new Set(graph.inputs ?? []);
   const VAR_RE = /\$([a-zA-Z_][\w.]*)/g;
-
-  // Handler-type implicit productions
-  const TYPE_PRODUCES: Record<string, string[]> = {
-    "tool": ["tool.output"],
-    "store": ["store.path"],
-    "wait.human": ["chat.output", "choice"],
-  };
-
-  // Build adjacency list for forward BFS (shared primitive — see dot-common.ts).
-  const adj = buildForwardAdj(graph);
-  const traversal = createGraphTraversal(graph, adj, resolveHandlerType);
-
-  // Collect what each node produces
-  const nodeProduces = new Map<string, Set<string>>();
-  for (const [id, node] of nodes) {
-    const produced = new Set<string>();
-    const handlerType = resolveHandlerType(node);
-    // Implicit productions from handler type
-    if (TYPE_PRODUCES[handlerType]) {
-      for (const v of TYPE_PRODUCES[handlerType]) produced.add(v);
-    }
-    // Gates write a node-specific choice key in addition to the alias (8cb4eef).
-    if (handlerType === "wait.human") {
-      produced.add(`${id}.choice`);
-    }
-    // Interactive nodes produce chat.output
-    if (node.interactive) produced.add("chat.output");
-    // Explicit produces attribute (comma-separated)
-    if (typeof node.produces === "string") {
-      for (const v of (node.produces as string).split(",").map(s => s.trim()).filter(Boolean)) {
-        produced.add(v);
-      }
-    }
-    // Derive produces from agent file's outputs block when dotDir is available
-    if (node.agent && dotDir) {
-      try {
-        const agentConfig = loadAgent(node.agent as string, dotDir);
-        if (agentConfig.outputs) {
-          for (const key of Object.keys(agentConfig.outputs)) {
-            produced.add(key);
-          }
-        }
-      } catch {
-        // Agent file unresolvable; do not crash the validator.
-      }
-    }
-    nodeProduces.set(id, produced);
-  }
 
   if (startNodes.length === 1) {
     const startId = startNodes[0].id;
