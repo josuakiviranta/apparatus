@@ -6,7 +6,7 @@ import { tmpdir } from "os";
 const testHome = join(tmpdir(), `apparat-runner-test-${process.pid}`);
 process.env.HOME = testHome;
 
-import { runTask, isSessionRunning, killSession, getRalphCliPath } from "../runner";
+import { runTask, isSessionRunning, killSession } from "../runner";
 import { ensureDirs, readRunLogs, getPidFilePath } from "../state";
 import type { Task } from "../state";
 
