@@ -1,4 +1,4 @@
-import { dirname, relative } from "path";
+import { relative } from "path";
 import {
   loadPipeline,
   PipelineLoadError,
@@ -58,7 +58,7 @@ export async function pipelineValidateCommand(
   } catch (err) {
     if (err instanceof PipelineLoadError) {
       if (err.diagnostic) {
-        await output.error(formatPipelineDiag(err.diagnostic, "", err.message));
+        await output.error(formatPipelineDiag(err.diagnostic, err.src ?? "", err.relPath ?? ""));
       } else {
         await output.error(err.message);
       }

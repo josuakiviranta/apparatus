@@ -17,18 +17,16 @@ export interface LoadedPipeline {
 }
 
 export class PipelineLoadError extends Error {
-  readonly kind: "not-found" | "read" | "syntax";
-  readonly diagnostic?: Diagnostic;
-
   constructor(
-    kind: "not-found" | "read" | "syntax",
     message: string,
-    diagnostic?: Diagnostic
+    readonly kind: "not-found" | "read" | "syntax",
+    readonly diagnostic?: Diagnostic,
+    readonly src?: string,
+    readonly absPath?: string,
+    readonly relPath?: string,
   ) {
     super(message);
     this.name = "PipelineLoadError";
-    this.kind = kind;
-    this.diagnostic = diagnostic;
   }
 }
 
@@ -43,14 +41,28 @@ export async function loadPipeline(
   const relPath = relative(projectRoot, absPath);
 
   if (!existsSync(absPath)) {
-    throw new PipelineLoadError("not-found", `Pipeline file not found: ${absPath}`);
+    throw new PipelineLoadError(
+      `Pipeline file not found: ${absPath}`,
+      "not-found",
+      undefined,
+      undefined,
+      absPath,
+      undefined,
+    );
   }
 
   let src: string;
   try {
     src = readFileSync(absPath, "utf8");
   } catch (e) {
-    throw new PipelineLoadError("read", `Failed to read pipeline file: ${absPath}`);
+    throw new PipelineLoadError(
+      `Failed to read pipeline file: ${absPath}`,
+      "read",
+      undefined,
+      undefined,
+      absPath,
+      undefined,
+    );
   }
 
   let graph: Graph;
@@ -64,9 +76,9 @@ export async function loadPipeline(
         message: e.message,
         location: e.location,
       };
-      throw new PipelineLoadError("syntax", e.message, diagnostic);
+      throw new PipelineLoadError(e.message, "syntax", diagnostic, src, absPath, relPath);
     }
-    throw new PipelineLoadError("syntax", String(e));
+    throw new PipelineLoadError(String(e), "syntax", undefined, src, absPath, relPath);
   }
 
   const dotDir = dirname(absPath);
