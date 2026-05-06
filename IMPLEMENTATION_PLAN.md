@@ -29,7 +29,7 @@
 | `src/cli/lib/assets.ts` | modified | 3 `__RALPH_PROD__` references (lines 8, 9, 12) → `__APPARAT_PROD__`. Error string at line 30. Hardcoded `.ralph/meditations/stimuli` literal at line 42. |
 | `src/cli/program.ts` | modified | `program.name("ralph")` line 19. ~30 help-text lines containing `ralph <command>` and `.ralph/` paths. |
 | `src/cli/commands/init.ts` | modified | Scaffolded directory targets (`ralphDir` callsites + `.gitignore`-append rule). |
-| `src/cli/commands/pipeline.ts` | modified | `RALPH_RUNS_KEEP` env var (line 288); any `.ralph/` literals in error messages or log strings. |
+| `src/cli/commands/pipeline/run.ts` | modified | `RALPH_RUNS_KEEP` env var (line 129); any `.ralph/` literals in error messages or log strings. |
 | `src/cli/commands/heartbeat.ts` | modified (if any hits) | `.ralph/` or `ralph` literal flips. |
 | `src/cli/commands/meditate.ts` | modified (if any hits) | Path literals + help strings. |
 | `src/cli/commands/implement.ts` | modified (if any hits) | Path literals + help strings. |
@@ -299,7 +299,7 @@ This temporary mismatch is intentional and uncomfortable; it is the cost of avoi
 - Modify: `src/cli/lib/assets.ts`
 - Modify: `src/cli/program.ts` — only `program.name(...)`; help-text flips happen in chunk 4 (docs).
 - Modify: `src/cli/commands/init.ts` — imports flip from `ralph-paths` to `apparat-paths`; `ralphDir` callsites flip to `apparatDir`.
-- Modify: `src/cli/commands/pipeline.ts` — `RALPH_RUNS_KEEP` env var.
+- Modify: `src/cli/commands/pipeline/run.ts` — `RALPH_RUNS_KEEP` env var.
 - Modify: every other source file with a `RALPH_*` env-var reference (per spec §4 table).
 - Modify: every test file with a `RALPH_*` env-var assertion (per spec §4 table).
 
@@ -371,7 +371,7 @@ Expected: zero hits.
 
 #### 2.2: Other env-var renames
 
-- [x] **2.2.1: Update `src/cli/commands/pipeline.ts:288` (`RALPH_RUNS_KEEP`).**
+- [x] **2.2.1: Update `src/cli/commands/pipeline/run.ts:129` (`RALPH_RUNS_KEEP`).**
 
 Replace `RALPH_RUNS_KEEP` with `APPARAT_RUNS_KEEP`.
 
@@ -515,7 +515,7 @@ For each file flagged in 2.4.4:
 Confirmed importer list (verified by `grep -rn '"\.\.\?/lib/ralph-paths' src/`):
 
 - `src/cli/commands/init.ts:5,10,15` — imports `ralphDir` (and others); call site at line 15.
-- `src/cli/commands/pipeline.ts:19` — imports `runDir, runsDir` (no `ralphDir`; only the import path string flips).
+- `src/cli/commands/pipeline/run.ts:21` (imports `runsDir`) and `src/cli/commands/pipeline/trace.ts:3` (imports `runDir`) — no `ralphDir`; only the import path strings flip.
 - `src/cli/commands/meditate.ts:4` — imports `illuminationsDir` (path-only flip).
 - `src/cli/mcp/illumination-server.ts:6` — imports `illuminationsDir` (path-only flip).
 - `src/cli/lib/pipeline-resolver.ts:4` — imports `pipelinesDir` (path-only flip).
@@ -773,7 +773,7 @@ Expected: a list of files in `src/cli/commands/`, `src/cli/mcp/`, possibly `src/
 Apply by file using `Edit` with `replace_all: true` per occurrence as appropriate. Examples likely to appear:
 
 - `src/cli/commands/init.ts` — the `.gitignore`-append rule writes `.ralph/runs/`. Flip to `.apparat/runs/`.
-- `src/cli/commands/pipeline.ts` — log-line strings or error messages mentioning `.ralph/`.
+- `src/cli/commands/pipeline/` — log-line strings or error messages mentioning `.ralph/`.
 - `src/cli/mcp/illumination-server.ts` — fallback path strings.
 - `src/cli/program.ts` — every `.ralph/` literal in help-text strings (lines ~27–124 mention `.ralph/runs/<runId>/checkpoint.json`, `.ralph/pipelines/...`, etc.). Path literals flip here. Sentence-shaped prose ("Scaffold .ralph/ tree", "ralph project") stays in chunk 4 — that section is the prose-rewrite focus.
 

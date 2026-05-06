@@ -22,7 +22,7 @@ export interface EngineOptions {
   /**
    * Optional caller-supplied run identifier. When present, the engine seeds
    * `context["run_id"]` with this value instead of generating its own. Used by
-   * the CLI (src/cli/commands/pipeline.ts) so the `$run_id` agents observe is
+   * the CLI (src/cli/commands/pipeline/run.ts) so the `$run_id` agents observe is
    * identical to the on-disk run-dir basename. When absent, the engine falls
    * back to `randomUUID().slice(0, 8)` — same shape as the CLI's id.
    */

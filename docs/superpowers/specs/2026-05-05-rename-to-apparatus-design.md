@@ -105,7 +105,7 @@ The rename itself is a single commit (or a small handful of logical commits insi
 | `src/cli/program.ts` | `program.name("ralph")` at line 19 → `program.name("apparat")`. ~30 help-text lines containing `ralph init`, `ralph implement`, `ralph heartbeat`, `ralph meditate`, `ralph pipeline ...`, `.ralph/runs/<runId>/checkpoint.json`, `.ralph/pipelines/...`, `.ralph/meditations/illuminations/`, `Scaffold .ralph/ tree...` — every binary-name and folder-name reference flips. |
 | `src/cli/commands/init.ts` | Help text + scaffolded directory targets all flip from `.ralph/...` to `.apparat/...`. The init scaffolder's `.gitignore`-append line that adds `.ralph/runs/` becomes `.apparat/runs/`. The import of `ralphDir`, `pipelinesDir`, etc. updates to `apparatDir` and the new module path `../lib/apparat-paths.js`. |
 | `src/cli/commands/heartbeat.ts` | Any reference to `.ralph/` or `ralph` literal flips. (Found by grep in §6.) |
-| `src/cli/commands/pipeline.ts` | `RALPH_RUNS_KEEP` env-var read at line 288 → `APPARAT_RUNS_KEEP`. Any `.ralph/` literal in error messages / log strings flips. |
+| `src/cli/commands/pipeline/run.ts` | `RALPH_RUNS_KEEP` env-var read at line 129 → `APPARAT_RUNS_KEEP`. Any `.ralph/` literal in error messages / log strings flips. |
 | `src/cli/commands/meditate.ts`, `src/cli/commands/implement.ts` (if present) | Same pattern: env vars, path literals, help text. |
 | `src/cli/mcp/illumination-server.ts` | Path literals to `.ralph/meditations/illuminations/` flip; any `ralph` in tool descriptions flips. |
 | `src/daemon/runner.ts` | `RALPH_TEST_CMD` (lines 13, 18) → `APPARAT_TEST_CMD`; `RALPH_PROD__` → `APPARAT_PROD__`. |
