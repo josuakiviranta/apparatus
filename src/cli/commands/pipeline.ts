@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync, readdirSync } from "fs";
+import { readFileSync, writeFileSync, existsSync } from "fs";
 import { resolve, join, basename, dirname, relative } from "path";
 import { randomUUID } from "crypto";
 import { JsonlPipelineTracer } from "../../attractor/tracer/jsonl-pipeline-tracer.js";
@@ -15,7 +15,7 @@ import {
 } from "../lib/preflight-format.js";
 import { InkInterviewer } from "../../attractor/interviewer/ink.js";
 import { AutoApproveInterviewer } from "../../attractor/interviewer/auto-approve.js";
-import { getPipelinesDir, resolvePipelineArg, isNameShorthand } from "../lib/pipeline-resolver.js";
+import { resolvePipelineArg, isNameShorthand } from "../lib/pipeline-resolver.js";
 import { runDir, runsDir } from "../lib/apparat-paths.js";
 import { PassThrough } from "stream";
 import { parseStreamJsonEvents, streamEvents } from "../lib/stream-formatter.js";
@@ -481,44 +481,8 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
   }
 }
 
-export interface PipelineListOptions {
-  project?: string;
-}
-
-export async function pipelineListCommand(opts: PipelineListOptions = {}): Promise<void> {
-  const project = resolve(opts.project ?? process.cwd());
-  const pipelinesDir = getPipelinesDir(project);
-
-  if (!existsSync(pipelinesDir)) {
-    await output.info(`No pipelines/ folder found in ${project}.\nCreate one with: apparat pipeline create <name> --project ${project}`);
-    return;
-  }
-
-  const dotFiles = readdirSync(pipelinesDir).filter(f => f.endsWith(".dot"));
-
-  if (dotFiles.length === 0) {
-    await output.info(`No workflows found in ${pipelinesDir}.\nCreate one with: apparat pipeline create <name> --project ${project}`);
-    return;
-  }
-
-  await output.info(`Pipelines in ${pipelinesDir}/`);
-  for (const file of dotFiles.sort()) {
-    const name = basename(file, ".dot");
-    const absFile = join(pipelinesDir, file);
-    let goal = "(no goal defined)";
-    let requires: string[] | undefined;
-    try {
-      const src = readFileSync(absFile, "utf8");
-      const graph = parseDot(src);
-      if (graph.goal) goal = `"${graph.goal}"`;
-      if (graph.inputs && graph.inputs.length > 0) requires = graph.inputs;
-    } catch {
-      goal = "(unreadable)";
-    }
-    await output.info(`  ${name.padEnd(20)} ${goal}`);
-    if (requires) await output.info(`  ${"".padEnd(20)} requires: ${requires.join(", ")}`);
-  }
-}
+export { pipelineListCommand } from "./pipeline/list.js";
+export type { PipelineListOptions } from "./pipeline/list.js";
 
 export async function pipelineTraceCommand(
   runId: string,
