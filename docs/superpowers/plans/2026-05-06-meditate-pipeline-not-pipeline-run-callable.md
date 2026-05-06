@@ -396,7 +396,7 @@ The pipeline now self-acquires `vision`. Remove the wrapper's variable-stuffing 
 **Files:**
 - Modify: `src/cli/commands/meditate.ts`
 
-- [ ] **Step 1: Update meditate.test.ts — flip the vision assertions to the new contract**
+- [x] **Step 1: Update meditate.test.ts — flip the vision assertions to the new contract**
 
 The current `meditate.test.ts:258-278` asserts the wrapper passes `variables.vision`. Replace those two cases with their inverse (the wrapper no longer touches `vision`):
 
@@ -453,7 +453,7 @@ Replace with:
   });
 ```
 
-- [ ] **Step 2: Run the meditate.test.ts file — expected: the two replaced cases fail**
+- [x] **Step 2: Run the meditate.test.ts file — expected: the two replaced cases fail**
 
 Run:
 
@@ -464,7 +464,7 @@ npx vitest run src/cli/tests/meditate.test.ts -t "passes only"
 
 Expected: red. `meditateCommand` still passes `vision: readVisionIfPresent(absPath)`, so `variables.vision` is still set and the new cases fail.
 
-- [ ] **Step 3: Delete `readVisionIfPresent` and the `vision` line in `meditateCommand`**
+- [x] **Step 3: Delete `readVisionIfPresent` and the `vision` line in `meditateCommand`**
 
 In `src/cli/commands/meditate.ts`:
 
@@ -500,7 +500,7 @@ Replace with:
 
 The `import { readFileSync, ... }` line at the top is still needed for the PID-lock helpers (`readPid` reads the PID file). Leave imports alone — `tsc` would catch a stray unused import; verify in step 6.
 
-- [ ] **Step 4: Re-run the meditate.test.ts file — expected: pass**
+- [x] **Step 4: Re-run the meditate.test.ts file — expected: pass**
 
 Run:
 
@@ -510,7 +510,7 @@ npx vitest run src/cli/tests/meditate.test.ts
 
 Expected: all cases pass, including the two replacements.
 
-- [ ] **Step 5: Repo-wide grep — `readVisionIfPresent` should have zero hits in `src/`**
+- [x] **Step 5: Repo-wide grep — `readVisionIfPresent` should have zero hits in `src/`**
 
 Run:
 
@@ -520,7 +520,7 @@ grep -rn "readVisionIfPresent" src/ || echo "OK: zero hits in src/"
 
 Expected output: `OK: zero hits in src/`. Hits in `MEMORY.md`, `docs/`, frozen prose are acceptable (design § 6 marks those as untouched historical record).
 
-- [ ] **Step 6: Typecheck**
+- [x] **Step 6: Typecheck**
 
 Run:
 
@@ -536,7 +536,7 @@ Expected: zero errors. If `readFileSync` becomes unused, TypeScript flags it —
 - Modify: `src/cli/commands/heartbeat.ts`
 - Modify: `src/cli/tests/heartbeat.test.ts`
 
-- [ ] **Step 1: Update heartbeat.test.ts — flip cases to assert the subcommand is gone**
+- [x] **Step 1: Update heartbeat.test.ts — flip cases to assert the subcommand is gone**
 
 The `heartbeat.test.ts:62-131` block currently asserts `apparat heartbeat meditate FIXTURE_DIR --every 5` registers a task. After removal, Commander rejects the unknown subcommand. Replace the entire `describe("apparat heartbeat meditate", () => { ... })` block (lines 62–131) AND the `describe("apparat heartbeat meditate --var", () => { ... })` block (lines 133–159) with a single `describe` asserting the subcommand is gone:
 
@@ -573,7 +573,7 @@ describe("apparat heartbeat meditate (removed subcommand)", () => {
 
 The expectation is a Commander-thrown error (the subcommand does not exist). `program.exitOverride()` in `makeProgram` converts Commander's exit into a thrown error, which `toThrow()` catches without asserting on the exact message — Commander's error text changes between versions and is not a stable contract.
 
-- [ ] **Step 2: Run the heartbeat.test.ts file — expected: the new case fails because the subcommand still exists**
+- [x] **Step 2: Run the heartbeat.test.ts file — expected: the new case fails because the subcommand still exists**
 
 Run:
 
@@ -583,7 +583,7 @@ npx vitest run src/cli/tests/heartbeat.test.ts -t "removed subcommand"
 
 Expected: red. The subcommand is still wired in `heartbeat.ts:102-132`; Commander accepts it; `request` is called; `expect(request).not.toHaveBeenCalled()` fails.
 
-- [ ] **Step 3: Delete the `hb.command("meditate <folder>")` block in heartbeat.ts**
+- [x] **Step 3: Delete the `hb.command("meditate <folder>")` block in heartbeat.ts**
 
 In `src/cli/commands/heartbeat.ts`, find and delete the entire block (lines 102–132):
 
@@ -623,7 +623,7 @@ In `src/cli/commands/heartbeat.ts`, find and delete the entire block (lines 102�
 
 Leave one blank line between the description block (`.addHelpText`) and the next `hb.command("implement <folder>")` block. After deletion, the file should flow `addHelpText("after", …)` → blank → `hb.command("implement <folder>")`.
 
-- [ ] **Step 4: If `collectKV` is now imported but unused, remove the import**
+- [x] **Step 4: If `collectKV` is now imported but unused, remove the import**
 
 Run:
 
@@ -637,7 +637,7 @@ Expected output now: only the import line at the top (no in-file usages remain).
 import { collectKV } from "../lib/collect-kv.js";
 ```
 
-- [ ] **Step 5: Re-run heartbeat.test.ts — expected: pass**
+- [x] **Step 5: Re-run heartbeat.test.ts — expected: pass**
 
 Run:
 
@@ -647,7 +647,7 @@ npx vitest run src/cli/tests/heartbeat.test.ts
 
 Expected: all cases pass, including the new "removed subcommand" assertion.
 
-- [ ] **Step 6: Typecheck**
+- [x] **Step 6: Typecheck**
 
 Run:
 
@@ -657,7 +657,7 @@ npx tsc --noEmit
 
 Expected: zero errors. If `collectKV` was the only thing importing from `../lib/collect-kv.js`, that import deletion is what makes typecheck happy. If TypeScript complains about an unused `Record<string, string>` import, recheck the deletion.
 
-- [ ] **Step 7: Repo grep — `hb.command("meditate <folder>")` should have zero hits in `src/`**
+- [x] **Step 7: Repo grep — `hb.command("meditate <folder>")` should have zero hits in `src/`**
 
 Run:
 
@@ -669,7 +669,7 @@ Expected output: `OK: zero hits in src/`.
 
 ### Task 2.3: Full chunk verification + commit
 
-- [ ] **Step 1: Run the entire vitest suite — expected: pass**
+- [x] **Step 1: Run the entire vitest suite — expected: pass**
 
 Run:
 
@@ -679,7 +679,7 @@ npx vitest run
 
 Expected: full suite green. If a test fails because it asserts `variables.vision` is the old value (other than the two we already updated), update the assertion to `not.toHaveProperty("vision")` — the wrapper no longer supplies it.
 
-- [ ] **Step 2: Repo grep invariants per design § 8**
+- [x] **Step 2: Repo grep invariants per design § 8**
 
 Run:
 
@@ -693,7 +693,7 @@ grep -n 'default_vision=""' src/cli/pipelines/meditate/pipeline.dot || echo "FAI
 
 Expected: first two print `OK:`, last three print a hit (no `FAIL:`).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/cli/commands/meditate.ts \
