@@ -60,6 +60,22 @@ export interface AgentConfig {
   maxIterations?: number;
 }
 
+/**
+ * Renderer-shaped projection of an AgentConfig. See `extractAgentMetadata`
+ * in agent-loader.ts for the projection rules. Consumed by annotate-show.ts
+ * for `apparat pipeline show` labels and available to any future
+ * projection-shaped consumer (MCP introspection, scenario fixtures, JSON-mode
+ * pipeline show) that wants a normalized label set without re-deriving it
+ * from the AgentConfig field shape.
+ *
+ * `outputs` is the keys of AgentConfig.outputs Record — the renderer-visible
+ * label set, not the JSON Schema fragments themselves.
+ */
+export interface AgentMetadata {
+  inputs: string[];
+  outputs: string[];
+}
+
 export interface RunOptions {
   cwd: string;
   signal?: AbortSignal;

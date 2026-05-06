@@ -1,10 +1,6 @@
 import { parse, stringify } from "@ts-graphviz/ast";
 import { loadAgent } from "./agent-loader.js";
-
-interface AgentMeta {
-  inputs: string[];
-  outputs: string[];
-}
+import type { AgentMetadata } from "./agent.js";
 
 function normalizeMultilineQuoted(src: string): string {
   return src.replace(/(\w+)\s*=\s*"((?:\\.|[^"\\])*)"/gs, (m, key, val) => {
@@ -52,7 +48,7 @@ export function annotateDotForShow(src: string, dotDir: string): string {
   const root: any = ast.children.find((c: any) => c.type === "Graph");
   if (!root) return src;
 
-  const agentMeta = new Map<string, AgentMeta>();
+  const agentMeta = new Map<string, AgentMetadata>();
   for (const child of root.children) {
     if (child.type !== "Node") continue;
     const agentAttr = (child.children ?? []).find(
@@ -62,11 +58,10 @@ export function annotateDotForShow(src: string, dotDir: string): string {
     const agentName = agentAttr.value?.value;
     if (!agentName) continue;
     try {
-      const cfg = loadAgent(agentName, dotDir);
-      const inputs = Array.isArray(cfg.inputs) ? cfg.inputs : [];
-      const outputs = cfg.outputs ? Object.keys(cfg.outputs) : [];
-      agentMeta.set(child.id.value, { inputs, outputs });
+      const { metadata } = loadAgent(agentName, dotDir);
+      agentMeta.set(child.id.value, metadata);
     } catch {
+      // loadAgent failure (file not found / parse / validation).
       // Validation step already errors for unresolvable agents; skip silently.
     }
   }
