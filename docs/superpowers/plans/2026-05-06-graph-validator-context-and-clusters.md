@@ -440,7 +440,7 @@ git commit -m "refactor(attractor/validators): extract handler-type rules to val
 
 The script cluster owns `SUPPORTED_SCRIPT_EXTS` (`graph-validator.ts:26`) and `INLINE_SCRIPT_PATTERNS` (`:28-33`). Move both into `scripts.ts`. Rules covered: `script_command_conflict`, `unsupported_script_extension`, `script_file_exists`, `inline_script_smell`.
 
-- [ ] **Step 1: Write `scripts.ts`**
+- [x] **Step 1: Write `scripts.ts`**
 
 Lift the body verbatim from `graph-validator.ts:328-404`. Imports: `existsSync` from `fs`, `resolve as resolvePath, extname` from `path`, `expandVariables, extractDefaults, UndefinedVariableError` from `../../transforms/variable-expansion.js`, `resolveHandlerType` from `../graph.js`. The variable-expansion probe at `:383-390` moves verbatim.
 
@@ -465,23 +465,28 @@ export function run(ctx: ValidationContext): void {
 }
 ```
 
-- [ ] **Step 2: Replace inline block at `graph-validator.ts:328-404` with `scripts.run(ctx)`**
+- [x] **Step 2: Replace inline block at `graph-validator.ts:328-404` with `scripts.run(ctx)`**
 
 Add import: `import * as scripts from "./validators/scripts.js";`
 Delete the inline script-rule block; insert `scripts.run(ctx);`.
 Also delete the now-unused module-level `SUPPORTED_SCRIPT_EXTS` and `INLINE_SCRIPT_PATTERNS` constants in `graph-validator.ts:26-33` plus the now-unused imports of `existsSync`, `resolvePath`, `extname` (if no other rule still inline references them — verify with `grep` before deleting).
 
-- [ ] **Step 3: Type-check, byte-identical, full suite**
+- [x] **Step 3: Type-check, byte-identical, full suite**
 
 Run: `npx tsc --noEmit && npx vitest run src/attractor/tests/graph-validator-byte-identical.test.ts && npx vitest run src/attractor/tests/`
 Expected: all PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/attractor/core/validators/scripts.ts src/attractor/core/graph-validator.ts
 git commit -m "refactor(attractor/validators): extract script-handler rules to validators/scripts.ts"
 ```
+
+**Task 2.3 shipped (2026-05-06):**
+- Commits: `3ef68094` (extract), `15f8d60` (drop unused `exitNodes` after lift), `a1cdea1` (drop WHAT-comments for sibling consistency).
+- `validators/scripts.ts`: 90 LOC. `graph-validator.ts`: 890 LOC (was 975).
+- Byte-identical 5/5, full attractor 574/574, full repo 1306/1306. Reviewer notes: spec-compliant; APPROVED with nits — addressed Nits 1+2 in `a1cdea1`; Nit 3 (split into named sub-fns à la `flow.ts`) deferred until rule N+1 lands.
 
 ### Task 2.4: `validators/variables.ts`
 
