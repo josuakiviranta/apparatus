@@ -37,7 +37,6 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
   const { nodes } = graph;
 
   const startNodes = [...nodes.values()].filter((n) => n.shape === "Mdiamond" || n.id === "start" || n.id === "Start");
-  const exitNodes  = [...nodes.values()].filter((n) => n.shape === "Msquare"  || n.id === "exit"  || n.id === "end");
   flow.run(ctx);
 
   // type_known warning + unimplemented type errors
