@@ -16,10 +16,11 @@ import { resolveInputDecl } from "../transforms/inputs-resolver.js";
 import { SYSTEM_INJECTED_VARS } from "../handlers/agent-prep.js";
 import { outputsToZod } from "../../cli/lib/outputs-to-zod.js";
 import { isInteractiveAgent, resolveHandlerType } from "./graph.js";
-import { createValidationContext, RESERVED_VARS } from "./validators/context.js";
+import { createValidationContext } from "./validators/context.js";
 import * as flow from "./validators/flow.js";
 import * as types from "./validators/types.js";
 import * as scripts from "./validators/scripts.js";
+import * as variables from "./validators/variables.js";
 
 const SYSTEM_VARS = new Set<string>(SYSTEM_INJECTED_VARS);
 
@@ -36,104 +37,12 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
   }
   const { nodes } = graph;
 
-  const startNodes = [...nodes.values()].filter((n) => n.shape === "Mdiamond" || n.id === "start" || n.id === "Start");
   flow.run(ctx);
 
   // type_known warning + unimplemented type errors
   types.run(ctx);
 
-  // variable_coverage — warn when a $variable may not be defined on all paths
-  const VAR_RE = /\$([a-zA-Z_][\w.]*)/g;
-
-  if (startNodes.length === 1) {
-    const startId = startNodes[0].id;
-    for (const [consumerId, consumer] of nodes) {
-      // Walk every string-valued attribute named in STRING_ATTRS for $var refs.
-      const fields = STRING_ATTRS
-        .map((attr) => (consumer as Record<string, unknown>)[attr])
-        .filter((f): f is string => typeof f === "string");
-      const vars = new Set<string>();
-      for (const field of fields) {
-        let m: RegExpExecArray | null;
-        const re = new RegExp(VAR_RE.source, VAR_RE.flags);
-        while ((m = re.exec(field)) !== null) {
-          vars.add(m[1].replace(/\.+$/, ""));
-        }
-      }
-
-      for (const varName of vars) {
-        if (RESERVED_VARS.has(varName)) continue;
-        if (callerInputs.has(varName)) continue;
-
-        // Resolve qualified $node.key into source/localKey pair to look up
-        // outputs declared on the named source node (auto_inputs convention).
-        // Pseudo-keys with dots (tool.output, store.path, chat.output) are
-        // stored verbatim in produced sets — caught by the verbatim match below.
-        let sourceFilter: string | undefined;
-        let lookupKey = varName;
-        const dotIdx = varName.indexOf(".");
-        if (dotIdx !== -1) {
-          sourceFilter = varName.slice(0, dotIdx);
-          lookupKey = varName.slice(dotIdx + 1);
-        }
-
-        if (traversal.hasDefault(consumer, lookupKey) || traversal.hasDefault(consumer, varName)) continue;
-
-        // Find all producer nodes for this variable. Verbatim match handles
-        // pseudo-keys + bare keys; qualified split handles `<node>.<key>` refs
-        // against the named source node's bare-key outputs.
-        const producers = new Set<string>();
-        for (const [nodeId, produced] of nodeProduces) {
-          if (produced.has(varName)) { producers.add(nodeId); continue; }
-          if (sourceFilter !== undefined && nodeId === sourceFilter && produced.has(lookupKey)) {
-            producers.add(nodeId);
-          }
-        }
-
-        // If no producers exist at all, warn
-        if (producers.size === 0) {
-          diags.push({
-            rule: "variable_coverage",
-            severity: "warning",
-            message: `Variable "$${varName}" referenced by node "${consumerId}" has no known producer`,
-            location: consumer.sourceLocation,
-          });
-          continue;
-        }
-
-        // Check: is consumer reachable from start when all producers are removed?
-        // If yes, there's a path that skips all producers → warn
-        if (traversal.reachable(startId, consumerId, producers)) {
-          const producerList = [...producers].join(", ");
-          diags.push({
-            rule: "variable_coverage",
-            severity: "warning",
-            message: `Variable "$${varName}" referenced by node "${consumerId}" may be undefined on path(s) that skip node "${producerList}"`,
-            location: consumer.sourceLocation,
-          });
-        }
-      }
-    }
-  }
-
-  // portability_heuristic — warn when node attributes embed project-specific path substrings
-  const PORTABILITY_PATH_PATTERNS = ["meditations/", "docs/superpowers/"];
-  for (const node of nodes.values()) {
-    const fields = [node.prompt, node.toolCommand].filter((f): f is string => typeof f === "string");
-    for (const field of fields) {
-      for (const pat of PORTABILITY_PATH_PATTERNS) {
-        if (field.includes(pat)) {
-          diags.push({
-            rule: "portability_heuristic",
-            severity: "warning",
-            message: `Node "${node.id}" hardcodes project path "${pat}" — use $variable and declare in inputs=`,
-            location: node.sourceLocation,
-          });
-          break; // one warning per node per field is enough
-        }
-      }
-    }
-  }
+  variables.runEarly(ctx);
 
   scripts.run(ctx);
 
@@ -151,6 +60,9 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
       checkInteractiveWithLoop(node, dotDir, diags);
     }
   }
+
+  // TODO: delete when inputs-refs.ts owns this
+  const VAR_RE = /\$([a-zA-Z_][\w.]*)/g;
 
   // inputs_missing_frontmatter — auto_inputs: true requires explicit inputs: declaration
   // unknown_source_node — qualified inputs must reference existing graph nodes
@@ -295,7 +207,7 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
   }
 
   // required_caller_vars — info banner listing vars that must be supplied via --var
-  checkRequiredCallerVars(graph, nodeProduces, dotDir, diags);
+  variables.runLate(ctx);
 
   if (dotDir) checkGateHandlers(graph, dotDir, diags);
 
@@ -473,67 +385,6 @@ function tryResolveAgent(node: Node, dotDir: string | undefined): AgentConfig | 
   } catch {
     return undefined;
   }
-}
-
-function checkRequiredCallerVars(
-  graph: Graph,
-  nodeProduces: Map<string, Set<string>>,
-  dotDir: string | undefined,
-  diags: Diagnostic[],
-): void {
-  const RESERVED = new Set(["goal", "project", "run_id"]);
-
-  // Gather all vars produced internally (by any node)
-  const internallyProduced = new Set<string>();
-  for (const produced of nodeProduces.values()) {
-    for (const k of produced) internallyProduced.add(k);
-  }
-
-  // Resolve qualified `<node>.<key>` against the named source node's outputs;
-  // bare keys against any internal producer.
-  function isProduced(k: string): boolean {
-    const dot = k.indexOf(".");
-    if (dot !== -1) {
-      const src = k.slice(0, dot);
-      const localKey = k.slice(dot + 1);
-      return nodeProduces.get(src)?.has(localKey) === true;
-    }
-    return internallyProduced.has(k);
-  }
-
-  // Candidate set: callerInputs declared on the digraph header
-  const required = new Set<string>();
-  for (const v of graph.inputs ?? []) {
-    if (!RESERVED.has(v) && !isProduced(v)) required.add(v);
-  }
-
-  // Also include vars consumed via agent inputs: that are not produced internally
-  // (or covered by a default_<localKey>= on the consumer node).
-  if (dotDir) {
-    for (const node of graph.nodes.values()) {
-      if (!node.agent) continue;
-      const cfg = tryResolveAgent(node, dotDir);
-      if (!cfg?.inputs) continue;
-      for (const k of cfg.inputs) {
-        if (RESERVED.has(k)) continue;
-        if (isProduced(k)) continue;
-        let resolved;
-        try { resolved = resolveInputDecl(k); } catch { continue; }
-        const fallbackKey = toCamel("default_" + resolved.localKey);
-        if (node[fallbackKey] !== undefined) continue;
-        required.add(k);
-      }
-    }
-  }
-
-  if (required.size === 0) return;
-
-  const keys = [...required].sort().join(", ");
-  diags.push({
-    rule: "required_caller_vars",
-    severity: "info",
-    message: `This pipeline requires the following --var keys at runtime: ${keys}`,
-  });
 }
 
 /**
