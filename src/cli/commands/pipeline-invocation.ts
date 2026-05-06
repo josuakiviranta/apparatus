@@ -4,6 +4,7 @@ import type { Graph } from "../../attractor/types.js";
 import { parseDot } from "../../attractor/core/graph.js";
 import { DotSyntaxError } from "../../attractor/core/dot-syntax.js";
 import { validateGraph } from "../../attractor/core/graph-validator.js";
+import { isNameShorthand, resolvePipelineArg } from "../lib/pipeline-resolver.js";
 import type { Diagnostic } from "../../attractor/types.js";
 
 export interface LoadedPipeline {
@@ -35,8 +36,10 @@ export async function loadPipeline(
   dotFile: string,
   opts?: { project?: string }
 ): Promise<LoadedPipeline> {
-  const absPath = resolve(dotFile);
   const projectRoot = resolve(opts?.project ?? process.cwd());
+  const absPath = isNameShorthand(dotFile)
+    ? resolvePipelineArg(dotFile, projectRoot)
+    : resolve(dotFile);
   const relPath = relative(projectRoot, absPath);
 
   if (!existsSync(absPath)) {

@@ -36,107 +36,11 @@ export interface PipelineRunOptions {
   variables?: Record<string, string>;
 }
 
-export interface PipelineValidateOptions {
-  project?: string;
-  /** When supplied, diff edge labels against this previous graph and emit
-   *  a warning (or error if the renamed label is still referenced). */
-  previousGraph?: Graph;
-}
-
-interface EdgeDiagnostic { severity: "warning" | "error"; message: string }
-
-
 import { gcOldRuns, resolveResumeLogsRoot } from "./pipeline/runs-gc.js";
 export { gcOldRuns, resolveResumeLogsRoot };
 
-
-export function diffEdgeLabels(prev: Graph, curr: Graph): EdgeDiagnostic[] {
-  const out: EdgeDiagnostic[] = [];
-  const prevEdges = new Map(prev.edges.map(e => [`${e.from}->${e.to}`, e]));
-  const currEdges = new Map(curr.edges.map(e => [`${e.from}->${e.to}`, e]));
-  for (const [key, prevEdge] of prevEdges) {
-    const currEdge = currEdges.get(key);
-    if (!currEdge) continue;
-    const prevLabel = prevEdge.label ?? "";
-    const currLabel = currEdge.label ?? "";
-    if (prevLabel === currLabel) continue;
-    const referenced = labelIsReferenced(prev, prevLabel);
-    out.push({
-      severity: referenced ? "error" : "warning",
-      message:
-        `Edge ${prevEdge.from} → ${prevEdge.to} label renamed: ` +
-        `"${prevLabel}" → "${currLabel}". ` +
-        `Edge labels are routing keys; silent renames break downstream handlers.`,
-    });
-  }
-  return out;
-}
-
-
-function labelIsReferenced(g: Graph, label: string): boolean {
-  if (!label) return false;
-  const needle = `"${label}"`;
-  for (const node of g.nodes.values()) {
-    if (JSON.stringify(node).includes(needle)) return true;
-  }
-  return false;
-}
-
-export async function pipelineValidateCommand(dotFile: string, opts: PipelineValidateOptions = {}): Promise<number> {
-  const project = resolve(opts.project ?? process.cwd());
-  const absPath = isNameShorthand(dotFile)
-    ? resolvePipelineArg(dotFile, project)
-    : resolve(dotFile);
-  if (!existsSync(absPath)) {
-    await output.error(`Dot file not found: ${absPath}`);
-    return 1;
-  }
-  let src: string;
-  try { src = readFileSync(absPath, "utf8"); }
-  catch { await output.error(`Cannot read file: ${absPath}`); return 1; }
-
-  const relPath = relative(process.cwd(), absPath) || absPath;
-  const formatDiag = (d: Diagnostic) => formatPipelineDiag(d, src, relPath);
-
-  let graph: Graph;
-  try { graph = parseDot(src); }
-  catch (e) {
-    if (e instanceof DotSyntaxError) {
-      const diag: Diagnostic = {
-        rule: "syntax",
-        severity: "error",
-        message: e.message,
-        location: e.location,
-      };
-      await output.error(formatDiag(diag));
-      return 1;
-    }
-    throw e;
-  }
-  const diags = validateGraph(graph, dirname(absPath));
-  const infos    = diags.filter(d => d.severity === "info");
-  const errors   = diags.filter(d => d.severity === "error");
-  const warnings = diags.filter(d => d.severity === "warning");
-
-  for (const i of infos)    await output.info(formatDiag(i));
-  for (const w of warnings) await output.warn(formatDiag(w));
-  for (const e of errors)   await output.error(formatDiag(e));
-
-  let diffHasError = false;
-  if (opts.previousGraph) {
-    const diagnostics = diffEdgeLabels(opts.previousGraph, graph);
-    for (const d of diagnostics) {
-      if (d.severity === "error") { await output.error(d.message); diffHasError = true; }
-      else                         await output.warn(d.message);
-    }
-  }
-
-  if (errors.length === 0 && !diffHasError) {
-    await output.success(`Pipeline valid (${graph.nodes.size} nodes, ${graph.edges.length} edges)`);
-    return 0;
-  }
-  return 1;
-}
+export { pipelineValidateCommand, diffEdgeLabels } from "./pipeline/validate.js";
+export type { PipelineValidateOptions } from "./pipeline/validate.js";
 
 
 export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptions = {}): Promise<void> {
