@@ -629,7 +629,7 @@ git commit -m "feat(attractor/validators): add shared tryResolveAgent helper"
 - Create: `src/attractor/core/validators/gates.ts`
 - Modify: `src/attractor/core/graph-validator.ts:1078-1148` and `:566`
 
-- [ ] **Step 1: Write `gates.ts`**
+- [x] **Step 1: Write `gates.ts`**
 
 Path: `src/attractor/core/validators/gates.ts`. Lift the body of `checkGateHandlers` (`graph-validator.ts:1078-1148`) verbatim, with parameter list normalized to `(ctx)`.
 
@@ -644,18 +644,18 @@ export function run(ctx: ValidationContext): void {
 }
 ```
 
-- [ ] **Step 2: Replace `:566` and delete `:1078-1148`**
+- [x] **Step 2: Replace `:566` and delete `:1078-1148`**
 
 Add import: `import * as gates from "./validators/gates.js";`
 - Replace `if (dotDir) checkGateHandlers(graph, dotDir, ctx.diags);` (around `:566`) with `gates.run(ctx);` (the `dotDir` guard moves into `gates.run`).
 - Delete the `function checkGateHandlers(...)` definition at `:1078-1148`.
 
-- [ ] **Step 3: Type-check, byte-identical, full suite**
+- [x] **Step 3: Type-check, byte-identical, full suite**
 
 Run: `npx tsc --noEmit && npx vitest run src/attractor/tests/graph-validator-byte-identical.test.ts && npx vitest run src/attractor/tests/`
 Expected: all PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/attractor/core/validators/gates.ts src/attractor/core/graph-validator.ts
