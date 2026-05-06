@@ -496,7 +496,7 @@ git commit -m "refactor(attractor/validators): extract script-handler rules to v
 
 `variables.ts` lifts two inline blocks (`variable_coverage`, `portability_heuristic`) plus the already-extracted `checkRequiredCallerVars` helper (`:744`). All three share `ctx.traversal`, `ctx.nodeProduces`, `ctx.callerInputs`, `RESERVED_VARS`. The `VAR_RE` constant currently at `:188` moves to module scope in `variables.ts`.
 
-- [ ] **Step 1: Write `variables.ts`**
+- [x] **Step 1: Write `variables.ts`**
 
 ```ts
 import type { ValidationContext } from "./context.js";
@@ -526,7 +526,7 @@ function checkRequiredCallerVars(ctx: ValidationContext): void {
 }
 ```
 
-- [ ] **Step 2: Replace inline blocks in `graph-validator.ts`**
+- [x] **Step 2: Replace inline blocks in `graph-validator.ts`**
 
 Add import: `import * as variables from "./validators/variables.js";`
 - Replace `:238-326` (variable_coverage + portability_heuristic blocks) with `variables.runEarly(ctx);` (see split note below).
@@ -553,17 +553,24 @@ export function runLate(ctx: ValidationContext): void {
 
 `runEarly` lands at the call site where `:238-326` lived (before script rules). `runLate` lands where `checkRequiredCallerVars(...)` was called (after inputs/outputs/dotDir helpers, before `checkGateHandlers`). This two-entry split is the contract carried into Chunk 3's orchestrator (`runAllValidators` calls `variables.runEarly` and `variables.runLate` at distinct points).
 
-- [ ] **Step 3: Type-check, byte-identical, full suite**
+- [x] **Step 3: Type-check, byte-identical, full suite**
 
 Run: `npx tsc --noEmit && npx vitest run src/attractor/tests/graph-validator-byte-identical.test.ts && npx vitest run src/attractor/tests/`
 Expected: all PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/attractor/core/validators/variables.ts src/attractor/core/graph-validator.ts
 git commit -m "refactor(attractor/validators): extract variable-coverage rules to validators/variables.ts"
 ```
+
+**Task 2.4 shipped (2026-05-06):**
+- Commits: `7f045ef` (extract), `c45df47` (docstring + TS7043 fix per reviewer nits 1+2).
+- `validators/variables.ts`: 196 LOC (3 rules + transitional `tryResolveAgent` mirror). `graph-validator.ts`: 734 LOC (was 890).
+- Byte-identical 5/5, full attractor 574/574, `tsc --noEmit` clean.
+- Reviewer assessment: APPROVED-with-nits — addressed nits 1 (`runEarly`/`runLate` rationale docstring) and 2 (TS7043 — annotated `let resolved: ReturnType<typeof resolveInputDecl>`). Nit 3 (RESERVED-set delta comment) skipped — local set is genuinely narrower (only the caller-injectable trio); deferred until next visit.
+- `VAR_RE` retained in `graph-validator.ts:65` under `// TODO: delete when inputs-refs.ts owns this` — `steering_has_var_token` block still inline (Chunk 3 Task 3.4).
 
 ## Verification targets
 
