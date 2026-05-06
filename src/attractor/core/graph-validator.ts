@@ -42,7 +42,7 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
   for (const node of graph.nodes.values()) {
     diags.push(...validateNode(node));
   }
-  const { nodes, edges } = graph;
+  const { nodes } = graph;
 
   const startNodes = [...nodes.values()].filter((n) => n.shape === "Mdiamond" || n.id === "start" || n.id === "Start");
   const exitNodes  = [...nodes.values()].filter((n) => n.shape === "Msquare"  || n.id === "exit"  || n.id === "end");
