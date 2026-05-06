@@ -590,7 +590,7 @@ Goal of this chunk: extract the remaining clusters, introduce `agent-resolver.ts
 **Files:**
 - Create: `src/attractor/core/validators/agent-resolver.ts`
 
-- [ ] **Step 1: Write the helper**
+- [x] **Step 1: Write the helper**
 
 Path: `src/attractor/core/validators/agent-resolver.ts`
 
@@ -611,12 +611,12 @@ export function tryResolveAgent(node: Node, dotDir: string | undefined): AgentCo
 
 (Body matches `graph-validator.ts:735-742` verbatim modulo signature normalization.)
 
-- [ ] **Step 2: Type-check (file unused yet — should still compile)**
+- [x] **Step 2: Type-check (file unused yet — should still compile)**
 
 Run: `npx tsc --noEmit`
 Expected: clean.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/attractor/core/validators/agent-resolver.ts
