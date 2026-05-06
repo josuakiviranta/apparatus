@@ -1,22 +1,24 @@
-# ralph-cli
+# apparatus
+
+<!-- TODO: apparatchik flavor — explain that apparatus = the machine, apparatchik = an agent doing one job in service of the larger goal. -->
 
 Agentic loop runner for AI-assisted project development.
 
 ## Bootstrap a project
 
-Scaffold a fresh ralph-shaped project:
+Scaffold a fresh apparat-shaped project:
 
 ````bash
 mkdir my-app && cd my-app
-ralph init
+apparat init
 ````
 
-`ralph init` is idempotent. It creates `.ralph/{pipelines,meditations/{illuminations,stimuli},sessions,runs}` plus root `docs/adr/`, scaffolds empty `CONTEXT.md`, `VISION.md`, and `README.md` at repo root, runs `git init -b main` if the directory is not yet a repo, and appends `.ralph/runs/` to `.gitignore`. Re-running it on an existing project fills in any missing subfolders without overwriting your files.
+`apparat init` is idempotent. It creates `.apparat/{pipelines,meditations/{illuminations,stimuli},sessions,runs}` plus root `docs/adr/`, scaffolds empty `CONTEXT.md`, `VISION.md`, and `README.md` at repo root, runs `git init -b main` if the directory is not yet a repo, and appends `.apparat/runs/` to `.gitignore`. Re-running it on an existing project fills in any missing subfolders without overwriting your files.
 
 ## Install
 
 ```bash
-npm install -g ralph-cli
+npm install -g apparat-cli
 ```
 
 Requires: Node.js >=18, [`claude` CLI](https://www.npmjs.com/package/@anthropic-ai/claude-code) installed globally.
@@ -24,7 +26,7 @@ Requires: Node.js >=18, [`claude` CLI](https://www.npmjs.com/package/@anthropic-
 ## Commands
 
 ```bash
-ralph implement <project-folder> [--max N] [--scenarios <path>]
+apparat implement <project-folder> [--max N] [--scenarios <path>]
 ```
 Runs the agentic build loop. Claude iterates, commits, and pushes changes until done (or `N` iterations).
 
@@ -42,53 +44,53 @@ Each agent turn is annotated with:
 - `◈ ctx: N tokens` — main agent context window size after each turn
 
 ```bash
-ralph <project-folder>
+apparat <project-folder>
 ```
 Shorthand for `implement`.
 
 ```bash
-ralph meditate <project-folder> [--var steer=<text>]
+apparat meditate <project-folder> [--var steer=<text>]
 ```
 Runs a meditate session against the project's meditations. `--var steer=...` injects an initial steering message at session start. Backed by the bundled folder pipeline `src/cli/pipelines/meditate/`.
 
 For unattended workspace hygiene scanning, schedule the bundled janitor pipeline:
 
 ```bash
-ralph heartbeat pipeline janitor --project . --every 720
+apparat heartbeat pipeline janitor --project . --every 720
 ```
 
 The janitor scans source/workspace through a KISS lens — bloat, YAGNI violations, refactor opportunities — and writes one illumination per candidate. It is read-only on code; the only mutating call is `write_illumination`. See `docs/adr/0002-consume-only-illumination-lifecycle.md` for the lifecycle context.
 
 ```bash
-ralph pipeline run <pipeline.dot> [--var <key=value>...] [--resume]
+apparat pipeline run <pipeline.dot> [--var <key=value>...] [--resume]
 ```
 Execute a `.dot` pipeline file. Use `--var` (repeatable) to pass caller variables:
 
 ```bash
-ralph pipeline run pipelines/my-pipeline.dot \
+apparat pipeline run pipelines/my-pipeline.dot \
   --var meditations_dir=meditations
 ```
 
-Pass `--resume [runId]` to continue a pipeline after Ctrl-C, a node failure, or a crash. The engine checkpoints after every node advance to `<project>/.ralph/runs/<runId>/checkpoint.json` — the trace `pipeline.jsonl` lives in the same directory. Bare `--resume` auto-selects when exactly one prior run exists for the project; pass an explicit `<runId>` to disambiguate. Older runs are pruned lazily (last 50 per project, override with `RALPH_RUNS_KEEP`). For `--resume` to be useful, tool-node scripts must be idempotent — a script that hard-requires "state before I act" will fail on retry; detect the desired outcome is already present and exit 0 as a no-op instead.
+Pass `--resume [runId]` to continue a pipeline after Ctrl-C, a node failure, or a crash. The engine checkpoints after every node advance to `<project>/.apparat/runs/<runId>/checkpoint.json` — the trace `pipeline.jsonl` lives in the same directory. Bare `--resume` auto-selects when exactly one prior run exists for the project; pass an explicit `<runId>` to disambiguate. Older runs are pruned lazily (last 50 per project, override with `APPARAT_RUNS_KEEP`). For `--resume` to be useful, tool-node scripts must be idempotent — a script that hard-requires "state before I act" will fail on retry; detect the desired outcome is already present and exit 0 as a no-op instead.
 
 ```bash
-ralph pipeline validate <pipeline.dot>
+apparat pipeline validate <pipeline.dot>
 ```
 Check a pipeline for structural errors and `portability_heuristic` warnings (hardcoded paths that would break when the pipeline runs in a different environment).
 
 ```bash
-ralph pipeline list <project-folder>
+apparat pipeline list <project-folder>
 ```
 List all `.dot` pipeline files found in the project.
 
 ```bash
-ralph pipeline trace <runId> [--node-receive <nodeId>] [--full]
+apparat pipeline trace <runId> [--node-receive <nodeId>] [--full]
 ```
 Inspect the context and trace logs for a completed pipeline run. `--node-receive` filters to a specific node execution; `--full` shows the raw JSONL trace.
 
 ### Pipeline script files
 
-Tool nodes can externalise their logic into a sibling script file next to `pipeline.dot` rather than embedding shell in the `.dot` file. Reference the script from a node with `script_file="<name>.<ext>"` (resolved relative to the pipeline folder), plus optional `script_args="..."` and `produces_from_stdout="<context-key>"`. See [`.ralph/pipelines/illumination-to-implementation/consume.mjs`](.ralph/pipelines/illumination-to-implementation/consume.mjs) for a working example, and the [design doc](docs/superpowers/specs/2026-04-17-pipeline-script-files-design.md) for the full attribute surface and rationale.
+Tool nodes can externalise their logic into a sibling script file next to `pipeline.dot` rather than embedding shell in the `.dot` file. Reference the script from a node with `script_file="<name>.<ext>"` (resolved relative to the pipeline folder), plus optional `script_args="..."` and `produces_from_stdout="<context-key>"`. See [`.apparat/pipelines/illumination-to-implementation/consume.mjs`](.apparat/pipelines/illumination-to-implementation/consume.mjs) for a working example, and the [design doc](docs/superpowers/specs/2026-04-17-pipeline-script-files-design.md) for the full attribute surface and rationale.
 
 ### Pipeline tool nodes and `cwd=`
 
@@ -162,7 +164,7 @@ exits the loop with `agent.success=false`.
 
 ## Stopping the loop
 
-Press `Ctrl+C`. Ralph cleanly terminates its own claude subprocess without affecting any other running claude sessions.
+Press `Ctrl+C`. apparat cleanly terminates its own claude subprocess without affecting any other running claude sessions.
 
 ## Where to look
 
@@ -177,7 +179,7 @@ Press `Ctrl+C`. Ralph cleanly terminates its own claude subprocess without affec
 npm install
 npm run dev        # tsx watch
 npm run build      # tsup → dist/
-npm link           # test ralph binary locally
+npm link           # test apparat binary locally
 ```
 
 ## Decisions

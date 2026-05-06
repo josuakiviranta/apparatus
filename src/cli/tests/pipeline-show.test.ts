@@ -27,7 +27,7 @@ describe("pipelineShowCommand", () => {
   let dir: string;
   beforeEach(() => {
     vi.clearAllMocks();
-    dir = mkdtempSync(join(tmpdir(), "ralph-pipeline-show-test-"));
+    dir = mkdtempSync(join(tmpdir(), "apparat-pipeline-show-test-"));
   });
   afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
 

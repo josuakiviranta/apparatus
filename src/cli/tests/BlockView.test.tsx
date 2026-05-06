@@ -56,7 +56,7 @@ describe("BlockView", () => {
     const block = makeBlock({
       body: [
         { kind: "text", role: "you", text: "summarize the repo" },
-        { kind: "text", role: "claude", text: "ralph-cli has 4 layers" },
+        { kind: "text", role: "claude", text: "apparat-cli has 4 layers" },
       ],
     });
     const { lastFrame } = render(<BlockView block={block} index={1} />);
@@ -64,7 +64,7 @@ describe("BlockView", () => {
     expect(frame).toContain("you:");
     expect(frame).toContain("summarize the repo");
     expect(frame).toContain("claude:");
-    expect(frame).toContain("ralph-cli has 4 layers");
+    expect(frame).toContain("apparat-cli has 4 layers");
   });
 
   it("renders tool_use lines", () => {

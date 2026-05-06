@@ -1,15 +1,15 @@
-# Scenario: `ralph init` is idempotent and never overwrites existing files
+# Scenario: `apparat init` is idempotent and never overwrites existing files
 
 ## Setup
 - `mkdir -p idem-smoke`
-- `ralph init idem-smoke` (first invocation — creates the tree)
+- `apparat init idem-smoke` (first invocation — creates the tree)
 - Overwrite the scaffolded files with sentinel content:
   - write `CUSTOM VISION` to `idem-smoke/VISION.md`
   - write `CUSTOM CONTEXT` to `idem-smoke/CONTEXT.md`
   - write `CUSTOM README` to `idem-smoke/README.md`
 
 ## Action
-`ralph init idem-smoke`
+`apparat init idem-smoke`
 
 ## Expect
 - exit code is 0

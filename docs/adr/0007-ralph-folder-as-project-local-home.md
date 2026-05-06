@@ -69,3 +69,7 @@ Run state moves from `~/.ralph/<projectKey>/runs/` into
 ---
 
 **Update 2026-05-04:** Partly superseded by [ADR-0008](0008-partial-revert-of-ralph-folder.md). The clauses of this ADR placing `CONTEXT.md`, `VISION.md`, `docs/adr/`, and the unused `memory/` slot under `.ralph/` are reversed; the remainder (project-local pipelines, meditations, run state, two-tier resolver) stands.
+
+---
+
+**Update 2026-05-05:** Naming superseded by [ADR-0010](0010-rename-to-apparatus.md). The folder name `.ralph/` becomes `.apparat/`; the project-local home principle stands. ADR-0008's two-clause partition principle stands.

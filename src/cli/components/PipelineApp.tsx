@@ -233,7 +233,7 @@ export function PipelineApp({ pipelineName, pid, goal, nodes, runId, tracePath, 
             return <Text key={item.id}>{prefix + "━".repeat(pad)}</Text>;
           }
           if (item.kind === "received-context") {
-            const cmd = `ralph pipeline trace ${item.runId} --node-receive ${item.nodeReceiveId}`;
+            const cmd = `apparat pipeline trace ${item.runId} --node-receive ${item.nodeReceiveId}`;
             const suffix = item.hasContext ? "" : "  (empty)";
             return (
               <Text key={item.id} dimColor>

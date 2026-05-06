@@ -22,7 +22,7 @@ describe("formatMissingInputsError", () => {
     expect(out).toContain("$output_dir");
     expect(out).toContain("--var illumination_path=");
     expect(out).toContain("--var output_dir=");
-    expect(out).toContain("ralph pipeline run illumination-to-plan");
+    expect(out).toContain("apparat pipeline run illumination-to-plan");
   });
 
   it("renders Provided as '(none)' when nothing supplied", () => {

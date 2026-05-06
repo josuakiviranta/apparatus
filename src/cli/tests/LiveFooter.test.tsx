@@ -47,7 +47,7 @@ describe("LiveFooter", () => {
     const block = makeLive({
       body: [
         { kind: "text", role: "you", text: "summarize the repo" },
-        { kind: "text", role: "claude", text: "ralph-cli has 4 layers" },
+        { kind: "text", role: "claude", text: "apparat-cli has 4 layers" },
       ],
     });
     const { lastFrame } = render(<LiveFooter block={block} />);

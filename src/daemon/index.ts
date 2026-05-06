@@ -94,7 +94,7 @@ const server = createSocketServer(sockPath, {
 
   stop_task: (taskId) => {
     const task = getTask(taskId);
-    if (!task) throw new Error(`Task not found: ${taskId}. Run 'ralph heartbeat list' to see active tasks.`);
+    if (!task) throw new Error(`Task not found: ${taskId}. Run 'apparat heartbeat list' to see active tasks.`);
     scheduler.unregister(taskId);
     if (isSessionRunning(task)) killSession(task);
     deletedTasks.add(taskId);
@@ -104,7 +104,7 @@ const server = createSocketServer(sockPath, {
 
   pause_task: (taskId) => {
     const task = getTask(taskId);
-    if (!task) throw new Error(`Task not found: ${taskId}. Run 'ralph heartbeat list' to see active tasks.`);
+    if (!task) throw new Error(`Task not found: ${taskId}. Run 'apparat heartbeat list' to see active tasks.`);
     scheduler.pause(taskId);
     const updated = { ...task, status: "paused" as const };
     upsertTask(updated);
@@ -113,7 +113,7 @@ const server = createSocketServer(sockPath, {
 
   resume_task: (taskId) => {
     const task = getTask(taskId);
-    if (!task) throw new Error(`Task not found: ${taskId}. Run 'ralph heartbeat list' to see active tasks.`);
+    if (!task) throw new Error(`Task not found: ${taskId}. Run 'apparat heartbeat list' to see active tasks.`);
     scheduler.resume(taskId);
     const updated = { ...task, status: "active" as const };
     upsertTask(updated);
@@ -122,7 +122,7 @@ const server = createSocketServer(sockPath, {
 
   kill_session: (taskId) => {
     const task = getTask(taskId);
-    if (!task) throw new Error(`Task not found: ${taskId}. Run 'ralph heartbeat list' to see active tasks.`);
+    if (!task) throw new Error(`Task not found: ${taskId}. Run 'apparat heartbeat list' to see active tasks.`);
     if (!killSession(task)) throw new Error(`No active session for: ${taskId}`);
   },
 

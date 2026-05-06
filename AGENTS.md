@@ -14,10 +14,10 @@
 ## Operational Notes
 
 - Commands use `Agent` class from `src/cli/lib/agent.ts` to spawn Claude sessions
-- Agent definitions are markdown files with YAML frontmatter, owned per-pipeline as a sibling of `pipeline.dot`. Two homes: `<project>/.ralph/pipelines/<name>/<agent>.md` (project-local) or `src/cli/pipelines/<name>/<agent>.md` (bundled). There is no global registry — see `docs/adr/0001-agents-live-next-to-pipeline.md`.
+- Agent definitions are markdown files with YAML frontmatter, owned per-pipeline as a sibling of `pipeline.dot`. Two homes: `<project>/.apparat/pipelines/<name>/<agent>.md` (project-local) or `src/cli/pipelines/<name>/<agent>.md` (bundled). There is no global registry — see `docs/adr/0001-agents-live-next-to-pipeline.md`.
 - Pipeline engine uses `AgentHandler` for all agent/codergen nodes — `loop.ts` and `CodergenHandler` have been removed
 - All command output goes through `src/cli/lib/output.ts` — unified Ink output API (`step`, `info`, `warn`, `error`, `success`, `header`, `spinner`, `stream`)
-- Prod/dev detection uses `__RALPH_PROD__` constant injected by tsup `define` at build time. Ambient type in `src/types/globals.d.ts`.
+- Prod/dev detection uses `__APPARAT_PROD__` constant injected by tsup `define` at build time. Ambient type in `src/types/globals.d.ts`.
 
 ### Codebase Patterns
 
@@ -33,8 +33,8 @@
 
 ### Daemon
 
-- Daemon socket: `~/.ralph/daemon.sock`, PID: `~/.ralph/daemon.pid`
-- Task registry: `~/.ralph/tasks.json`, logs: `~/.ralph/logs/<task-id>/<run-id>.log`
+- Daemon socket: `~/.apparat/daemon.sock`, PID: `~/.apparat/daemon.pid`
+- Task registry: `~/.apparat/tasks.json`, logs: `~/.apparat/logs/<task-id>/<run-id>.log`
 - Dev mode daemon start: `tsx src/daemon/index.ts`
 - Prod mode: `node dist/daemon/index.js`
 - The CLI auto-starts the daemon when needed

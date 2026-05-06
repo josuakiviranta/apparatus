@@ -8,7 +8,7 @@ digraph tool_runtime_vars_smoke {
     type="tool",
     cwd="$project",
     shape=parallelogram,
-    tool_command="printf '/tmp/ralph-smoke-tool-rm'"
+    tool_command="printf '/tmp/apparat-smoke-tool-rm'"
   ]
 
   // Runtime variable expansion: $tool.output is set by the seed node above

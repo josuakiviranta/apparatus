@@ -15,7 +15,7 @@ function makeRun(root: string, name: string, mtimeSec: number): string {
 describe("gcOldRuns", () => {
   let root: string;
 
-  beforeEach(() => { root = mkdtempSync(join(tmpdir(), "ralph-gc-")); });
+  beforeEach(() => { root = mkdtempSync(join(tmpdir(), "apparat-gc-")); });
   afterEach(() => { rmSync(root, { recursive: true, force: true }); });
 
   it("is a no-op when fewer than `keep` runs exist", () => {

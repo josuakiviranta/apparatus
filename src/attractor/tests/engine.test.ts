@@ -51,7 +51,7 @@ describe("runPipeline", () => {
   beforeEach(() => {
     mockAgentRun.mockReset();
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: "s1", stdout: null });
-    dir = mkdtempSync(join(tmpdir(), "ralph-engine-test-"));
+    dir = mkdtempSync(join(tmpdir(), "apparat-engine-test-"));
   });
   afterEach(() => { rmSync(dir, { recursive: true }); });
 
@@ -523,7 +523,7 @@ describe("engine — conditional inline passthrough", () => {
       router -> done
     }`;
     const graph = parseDot(src);
-    const logsRoot = mkdtempSync(join(tmpdir(), "ralph-engine-cond-"));
+    const logsRoot = mkdtempSync(join(tmpdir(), "apparat-engine-cond-"));
     try {
       const result = await runPipeline(graph, {
         logsRoot,

@@ -1,10 +1,10 @@
 # Tmux Drive Harness — Patterns
 
-Read this document at the start of any debugging session that needs to observe ralph's Ink TUI. All six patterns below are presented as sections of a single sourceable bash block. Copy the whole block into your shell before calling any pattern individually.
+Read this document at the start of any debugging session that needs to observe apparat's Ink TUI. All six patterns below are presented as sections of a single sourceable bash block. Copy the whole block into your shell before calling any pattern individually.
 
 ## When to use this
 
-Use this harness when debugging ralph's Ink TUI — pipeline display, ChatUI overlay, meditate session, implement loop output — and you need to *observe* what the UI actually does (not what the code says it should do).
+Use this harness when debugging apparat's Ink TUI — pipeline display, ChatUI overlay, meditate session, implement loop output — and you need to *observe* what the UI actually does (not what the code says it should do).
 
 Not for:
 
@@ -20,9 +20,9 @@ named tmux window in the user's current session** so the human can switch
 to it (`Ctrl-b w`) and watch the Ink TUI live while the agent drives it.
 
 **Always pass a descriptive `label` to `start_run`.** The label becomes
-part of the window name (`ralph-<label>-<shortid>`), which is what the
+part of the window name (`apparat-<label>-<shortid>`), which is what the
 human sees in the window list. Unlabeled windows fall back to an opaque
-`ralph-drive-<ts>-<pid>` format that is hard to eyeball when multiple
+`apparat-drive-<ts>-<pid>` format that is hard to eyeball when multiple
 runs coexist.
 
 ## Prerequisites
@@ -30,7 +30,7 @@ runs coexist.
 - **tmux** (any 3.x version).
 - **macOS** (the `screenshot` helper is mac-specific; text patterns are portable but not validated elsewhere).
 - **ripgrep** (`rg`) for Pattern 4 source grep.
-- **Node** (already a ralph dependency) for validating `meta.json` in smoke tests.
+- **Node** (already an apparatus dependency) for validating `meta.json` in smoke tests.
 
 No jq, no Python, no npm packages.
 
@@ -83,9 +83,9 @@ wait_stable() {
 
 # ---------- Pattern 1: start_run ----------
 # Usage: start_run "<command>" [label]
-# If label is given, the window is named "ralph-<label>-<shortid>" (e.g.
-# "ralph-pipe-tmux-tester-8f3c") so you can spot it in `Ctrl-b w`. Without a
-# label it falls back to the legacy "ralph-drive-<ts>-<pid>" format.
+# If label is given, the window is named "apparat-<label>-<shortid>" (e.g.
+# "apparat-pipe-tmux-tester-8f3c") so you can spot it in `Ctrl-b w`. Without a
+# label it falls back to the legacy "apparat-drive-<ts>-<pid>" format.
 # Side effects: sets SESSION, WIN, RUN_DIR, RUN_ID, CAPTURE_INDEX; creates the
 # scratchpad directory; creates a new tmux window in the current session; writes
 # meta.json; launches the command.
@@ -105,11 +105,11 @@ start_run() {
     safe_label=$(printf '%s' "$label" | tr -c 'A-Za-z0-9._-' '-' | sed 's/-\+/-/g; s/^-//; s/-$//')
     local shortid
     shortid=$(printf '%04x' "$((RANDOM * RANDOM & 0xFFFF))")
-    WIN="ralph-${safe_label}-${shortid}"
+    WIN="apparat-${safe_label}-${shortid}"
   else
-    WIN="ralph-$RUN_ID"
+    WIN="apparat-$RUN_ID"
   fi
-  RUN_DIR="$HOME/.ralph/harness/$RUN_ID"
+  RUN_DIR="$HOME/.apparat/harness/$RUN_ID"
   CAPTURE_INDEX=0
   mkdir -p "$RUN_DIR"
 
@@ -274,7 +274,7 @@ screenshot() {
 recover_orphans() {
   local found=0
   local dir
-  for dir in "$HOME/.ralph/harness"/drive-*/; do
+  for dir in "$HOME/.apparat/harness"/drive-*/; do
     [ -d "$dir" ] || continue
     if ! grep -q '"ended"' "$dir/meta.json" 2>/dev/null; then
       found=$((found + 1))
@@ -293,10 +293,10 @@ recover_orphans() {
 
   echo ""
   echo "To kill all orphan windows:"
-  echo "  tmux list-windows -a -F '#S:#W' | grep ':ralph-drive-' | xargs -n1 tmux kill-window -t"
+  echo "  tmux list-windows -a -F '#S:#W' | grep ':apparat-drive-' | xargs -n1 tmux kill-window -t"
   echo ""
   echo "To prune orphan scratch dirs:"
-  echo "  find ~/.ralph/harness -maxdepth 1 -type d -name 'drive-*' \\"
+  echo "  find ~/.apparat/harness -maxdepth 1 -type d -name 'drive-*' \\"
   echo "    -exec sh -c 'grep -q \"\\\"ended\\\"\" \"\$1/meta.json\" 2>/dev/null || rm -rf \"\$1\"' _ {} \\;"
 }
 
@@ -307,7 +307,7 @@ recover_orphans() {
 
 `start_run "<cmd>" [label]` creates a new tmux window in your current session (without stealing focus), waits for the shell to print its prompt, records run metadata, and launches the command.
 
-**Always pass a `label`.** The human watching the session needs to find the window in `Ctrl-b w`; the label is what makes that possible. The window name becomes `ralph-<label>-<shortid>` (e.g. `ralph-pipe-tmux-tester-8f3c`). The unlabeled `ralph-drive-<ts>-<pid>` fallback exists only for legacy callers — do not use it in new work.
+**Always pass a `label`.** The human watching the session needs to find the window in `Ctrl-b w`; the label is what makes that possible. The window name becomes `apparat-<label>-<shortid>` (e.g. `apparat-pipe-tmux-tester-8f3c`). The unlabeled `apparat-drive-<ts>-<pid>` fallback exists only for legacy callers — do not use it in new work.
 
 Label guidance:
 - Use kebab-case, describe what's running (`pipe-illumination-to-plan`, `meditate-session`, `implement-loop`).
@@ -317,8 +317,8 @@ After it returns, these globals are set and are used implicitly by every other p
 
 - `RUN_ID` — `drive-<unix-seconds>-<pid>`, unique even when two runs start in the same second (used for the scratchpad path, not the window name when a label is given).
 - `SESSION` — the tmux session you were attached to.
-- `WIN` — the new window's name. With a label: `ralph-<label>-<shortid>`. Without: `ralph-<run-id>`.
-- `RUN_DIR` — `~/.ralph/harness/<run-id>/`, the scratchpad for this run.
+- `WIN` — the new window's name. With a label: `apparat-<label>-<shortid>`. Without: `apparat-<run-id>`.
+- `RUN_DIR` — `~/.apparat/harness/<run-id>/`, the scratchpad for this run.
 - `CAPTURE_INDEX` — starts at `0`; Pattern 2 increments it.
 
 `meta.json` is written once here. Pattern 6 appends `ended` and `exit_reason` before kill. Embedded `"` characters in the command are escaped with `sed` so the JSON stays valid.
@@ -411,14 +411,14 @@ recover_orphans
 Output looks like:
 
 ```
-orphan: /Users/you/.ralph/harness/drive-1712950000-38291/ window=ralph-drive-1712950000-38291
-orphan: /Users/you/.ralph/harness/drive-1712950123-40104/ window=ralph-drive-1712950123-40104
+orphan: /Users/you/.apparat/harness/drive-1712950000-38291/ window=apparat-drive-1712950000-38291
+orphan: /Users/you/.apparat/harness/drive-1712950123-40104/ window=apparat-drive-1712950123-40104
 
 To kill all orphan windows:
-  tmux list-windows -a -F '#S:#W' | grep ':ralph-' | xargs -n1 tmux kill-window -t
+  tmux list-windows -a -F '#S:#W' | grep ':apparat-' | xargs -n1 tmux kill-window -t
 
 To prune orphan scratch dirs:
-  find ~/.ralph/harness -maxdepth 1 -type d -name 'drive-*' \
+  find ~/.apparat/harness -maxdepth 1 -type d -name 'drive-*' \
     -exec sh -c 'grep -q "\"ended\"" "$1/meta.json" 2>/dev/null || rm -rf "$1"' _ {} \;
 ```
 
@@ -428,14 +428,14 @@ Note on the prune one-liner: the inline `sh -c` wrapper is *required*. A naive `
 
 ## Pruning the scratchpad
 
-Runs accumulate under `~/.ralph/harness/`. The harness never auto-deletes them. Prune manually:
+Runs accumulate under `~/.apparat/harness/`. The harness never auto-deletes them. Prune manually:
 
 ```bash
 # Delete runs older than 7 days
-find ~/.ralph/harness -maxdepth 1 -type d -mtime +7 -exec rm -rf {} +
+find ~/.apparat/harness -maxdepth 1 -type d -mtime +7 -exec rm -rf {} +
 
 # Or delete everything that is definitely orphaned (no "ended" field)
-find ~/.ralph/harness -maxdepth 1 -type d -name 'drive-*' \
+find ~/.apparat/harness -maxdepth 1 -type d -name 'drive-*' \
   -exec sh -c 'grep -q "\"ended\"" "$1/meta.json" 2>/dev/null || rm -rf "$1"' _ {} \;
 ```
 
@@ -445,7 +445,7 @@ find ~/.ralph/harness -maxdepth 1 -type d -name 'drive-*' \
 
 1. **Screenshots require terminal focus.** `screencapture` captures whatever is currently on screen. `screenshot` aborts if the frontmost app is not a known terminal, but even then the capture reflects the current view, not "the harness window in isolation."
 2. **Pane size drifts after start.** `meta.json.pane_size` is the size at window creation. Re-read live via `tmux display-message -t "$SESSION:$WIN" -p '#{pane_width}x#{pane_height}'` when geometry matters.
-3. **`current.txt` is racy with in-flight renders.** Atomic rename on write protects against torn reads of a single file but does nothing for rendering races inside ralph. Always `wait_stable` before treating `current.txt` as authoritative. `current.txt` and `current.ansi` are swapped independently — do not read them as a matched pair.
+3. **`current.txt` is racy with in-flight renders.** Atomic rename on write protects against torn reads of a single file but does nothing for rendering races inside apparat. Always `wait_stable` before treating `current.txt` as authoritative. `current.txt` and `current.ansi` are swapped independently — do not read them as a matched pair.
 4. **`send-keys` is instantaneous.** Ink may not have a reader ready at that moment. Always `wait_stable` before and after `send_input`, and also after `new-window -d` in Pattern 1 before sending the launch command.
 5. **Long payloads need `-l`.** Spaces, quotes, and `$` are parsed by tmux unless `send-keys -l` is used. Control keys must be sent as separate `send-keys` arguments.
 6. **No auto-cleanup of scratchpad.** See "Pruning the scratchpad".

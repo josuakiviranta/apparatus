@@ -7,7 +7,7 @@
 - "Hmm, should we change the modification to support deep modules and leave rest out? What would be the blast radius of this change and does it make sense?"
 - "Did you verify your claims with subagents?"
 - "launch subagents to verify your earlier claims"
-- "So how would the system change after these changes? Anything how commands are used, outputs of pipelines or how system is wired right now between agents, pipelines validations or .ralph subfolder itself?"
+- "So how would the system change after these changes? Anything how commands are used, outputs of pipelines or how system is wired right now between agents, pipelines validations or .apparat subfolder itself?"
 - "And last question does these changes fullfill this idea: 'Deepening opportunities: modules whose interface is large relative to what they hide; a concept implemented twice with no single seam forcing them to agree; wrappers that expose internals instead of concealing them; manager/helper surfaces with little implementation behind them. Suggest collapsing toward a deeper module — smaller interface, more implementation behind it — to raise locality and leverage.'"
 - "so can we leave out the parts that make modules 'shallow'?"
 
@@ -25,9 +25,9 @@
   - Came from: user's "leave out the parts that make modules shallow" combined with the closure-capture subagent finding that naked promotion would create the very shallowness the user wants to avoid.
   - Rationale: only this bundling fulfills the "smaller interface, more implementation behind it" definition; alone among the three pieces, it raises real depth (and as a side-effect, creates the testable seam the original illumination wanted).
 
-- **No user-facing surface change.** Verified from pipeline context (public-contract subagent) + re-confirmed under the revised scope: `parseDot`, `resolveHandlerType`, `validateGraph`, `validateOrRaise` signatures unchanged; diagnostic messages at `graph.ts:301-314` byte-identical; no CLI, MCP, agent contract, pipeline schema, or `.ralph/` layout change. `ralph implement` / `ralph plan` / `ralph new` / `ralph <pipeline>` invocation, flags, exit codes, Ink TUI, `loop.ts`, daemon, stream formatter, bundled pipelines, project-local `templates/` — all untouched.
-  - Came from: user's "how would the system change... commands, outputs of pipelines, how system is wired between agents, pipelines validations or .ralph subfolder?"
-  - Rationale: design doc and plan must frame this as plumbing-under-the-floor, not a feature. End-user running any `ralph` command notices zero. Developer notices: stack traces in validator failures may surface a new file (`graph-traversal.ts`); easier to write unit tests for traversal logic later.
+- **No user-facing surface change.** Verified from pipeline context (public-contract subagent) + re-confirmed under the revised scope: `parseDot`, `resolveHandlerType`, `validateGraph`, `validateOrRaise` signatures unchanged; diagnostic messages at `graph.ts:301-314` byte-identical; no CLI, MCP, agent contract, pipeline schema, or `.apparat/` layout change. `apparat implement` / `apparat plan` / `apparat new` / `apparat <pipeline>` invocation, flags, exit codes, Ink TUI, `loop.ts`, daemon, stream formatter, bundled pipelines, project-local `templates/` — all untouched.
+  - Came from: user's "how would the system change... commands, outputs of pipelines, how system is wired between agents, pipelines validations or .apparat subfolder?"
+  - Rationale: design doc and plan must frame this as plumbing-under-the-floor, not a feature. End-user running any `apparat` command notices zero. Developer notices: stack traces in validator failures may surface a new file (`graph-traversal.ts`); easier to write unit tests for traversal logic later.
 
 - **Doc ripple is minimal under the revised scope.** Subagent verified ADR-0003 has exactly one `graph.ts` reference (line 167, pointing to `checkRequiredCallerVars` at `graph.ts:763-786`). Survives the revised scope unchanged unless `checkRequiredCallerVars` line range slides; promoting closures + adding `buildForwardAdj` does not touch its body. No `flow-analyzer.ts` or `dot-common.ts` line citations exist anywhere in ADRs.
   - Came from: user's "does it make sense?" on the reduced scope, plus the verification dispatch.

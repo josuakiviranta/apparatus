@@ -272,7 +272,7 @@ describe("AgentHandler", () => {
       createAgent: (config) => { capturedConfig = config; return { run: mockAgentRun, kill: mockAgentKill, config } as any; },
     });
 
-    const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-test-"));
+    const logsDir = mkdtempSync(join(tmpdir(), "apparat-ah-test-"));
     try {
       const ctx: PipelineContext = { values: { "meditate.sessionId": "abc", "meditate.illuminations": "3" } };
       await handler.execute(
@@ -306,7 +306,7 @@ describe("AgentHandler", () => {
       createAgent: (config) => ({ run: mockAgentRun, kill: mockAgentKill, config } as any),
     });
 
-    const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-test-"));
+    const logsDir = mkdtempSync(join(tmpdir(), "apparat-ah-test-"));
     try {
       const ctx: PipelineContext = { values: {} };
       await handler.execute(
@@ -350,7 +350,7 @@ describe("AgentHandler", () => {
       createAgent: (config) => { capturedConfig = config; return { run: mockAgentRun, kill: mockAgentKill, config } as any; },
     });
 
-    const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-test-"));
+    const logsDir = mkdtempSync(join(tmpdir(), "apparat-ah-test-"));
     try {
       await handler.execute(
         makeNode({ prompt: "Next step" }),
@@ -391,7 +391,7 @@ describe("AgentHandler", () => {
       createAgent: (config) => { capturedConfig = config; return { run: mockAgentRun, kill: mockAgentKill, config } as any; },
     });
 
-    const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-test-"));
+    const logsDir = mkdtempSync(join(tmpdir(), "apparat-ah-test-"));
     try {
       const ctx: PipelineContext = { values: { "illumination_path": "/meditations/foo.md", "summary": "a bug" } };
       await handler.execute(
@@ -410,7 +410,7 @@ describe("AgentHandler", () => {
 
   it("uses config.jsonSchema (from agent frontmatter outputs:) as schema source", async () => {
     const schema = JSON.stringify({ type: "object", properties: { verdict: { type: "string" } }, required: ["verdict"] });
-    const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-test-"));
+    const logsDir = mkdtempSync(join(tmpdir(), "apparat-ah-test-"));
 
     mockResolve.mockReturnValue({ ...baseConfig, jsonSchema: schema });
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: JSON.stringify([{ type: "result", result: "", structured_output: { verdict: "true" } }]) });
@@ -436,7 +436,7 @@ describe("AgentHandler", () => {
 
   it("merges parsed JSON output into contextUpdates", async () => {
     const schema = JSON.stringify({ type: "object", properties: { verdict: { type: "string" }, path: { type: "string" } } });
-    const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-test-"));
+    const logsDir = mkdtempSync(join(tmpdir(), "apparat-ah-test-"));
 
     mockResolve.mockReturnValue({ ...baseConfig, jsonSchema: schema });
     const jsonArrayOutput = JSON.stringify([
@@ -467,7 +467,7 @@ describe("AgentHandler", () => {
 
   it("unwraps Claude CLI --output-format json array wrapper before parsing", async () => {
     const schema = JSON.stringify({ type: "object", properties: { verdict: { type: "string" }, path: { type: "string" } } });
-    const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-test-"));
+    const logsDir = mkdtempSync(join(tmpdir(), "apparat-ah-test-"));
 
     mockResolve.mockReturnValue({ ...baseConfig, jsonSchema: schema });
     // Real Claude CLI --output-format json: single-line JSON array of events
@@ -502,7 +502,7 @@ describe("AgentHandler", () => {
 
   it("extracts structured_output from result event (real CLI format)", async () => {
     const schema = JSON.stringify({ type: "object", properties: { preferred_label: { type: "string" } } });
-    const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-test-"));
+    const logsDir = mkdtempSync(join(tmpdir(), "apparat-ah-test-"));
 
     mockResolve.mockReturnValue({ ...baseConfig, jsonSchema: schema });
     // Real CLI: result="" with structured_output containing the data
@@ -534,7 +534,7 @@ describe("AgentHandler", () => {
 
   it("sets preferredLabel from parsed JSON preferred_label key", async () => {
     const schema = JSON.stringify({ type: "object", properties: { preferred_label: { type: "string" } } });
-    const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-test-"));
+    const logsDir = mkdtempSync(join(tmpdir(), "apparat-ah-test-"));
 
     mockResolve.mockReturnValue({ ...baseConfig, jsonSchema: schema });
     const jsonArrayOutput = JSON.stringify([
@@ -562,7 +562,7 @@ describe("AgentHandler", () => {
 
   it("returns fail when structured output cannot be parsed", async () => {
     const schema = JSON.stringify({ type: "object" });
-    const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-test-"));
+    const logsDir = mkdtempSync(join(tmpdir(), "apparat-ah-test-"));
 
     mockResolve.mockReturnValue({ ...baseConfig, jsonSchema: schema });
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: "not valid json" });
@@ -588,7 +588,7 @@ describe("AgentHandler", () => {
 
   it("parses JSON from result field when Claude prefixes prose before JSON (stream-json mode)", async () => {
     const schema = JSON.stringify({ type: "object", properties: { preferred_label: { type: "string" }, summary: { type: "string" } } });
-    const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-test-"));
+    const logsDir = mkdtempSync(join(tmpdir(), "apparat-ah-test-"));
 
     mockResolve.mockReturnValue({ ...baseConfig, jsonSchema: schema });
     // stream-json mode: structured_output is absent; result contains prose + JSON
@@ -620,7 +620,7 @@ describe("AgentHandler", () => {
 
   it("parses JSON when prose prefix contains literal ${...} brace markers", async () => {
     const schema = JSON.stringify({ type: "object", properties: { preferred_label: { type: "string" }, summary: { type: "string" } } });
-    const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-test-"));
+    const logsDir = mkdtempSync(join(tmpdir(), "apparat-ah-test-"));
 
     mockResolve.mockReturnValue({ ...baseConfig, jsonSchema: schema });
     // Agent quotes source code containing ${var} template syntax in its prose preamble.
@@ -742,7 +742,7 @@ describe("AgentHandler", () => {
       createAgent: (config) => ({ run: mockAgentRun, kill: mockAgentKill, config } as any),
     });
 
-    const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-test-"));
+    const logsDir = mkdtempSync(join(tmpdir(), "apparat-ah-test-"));
     try {
       const ctx: PipelineContext = { values: { task_var: "EXPANDED_VALUE" } };
       await handler.execute(
@@ -773,7 +773,7 @@ describe("AgentHandler", () => {
       createAgent: (config) => ({ run: mockAgentRun, kill: mockAgentKill, config } as any),
     });
 
-    const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-test-"));
+    const logsDir = mkdtempSync(join(tmpdir(), "apparat-ah-test-"));
     try {
       const ctx: PipelineContext = { values: { spider_var: "SPIDER_VALUE" } };
       await handler.execute(
@@ -799,7 +799,7 @@ describe("AgentHandler", () => {
       createAgent: (config) => ({ run: mockAgentRun, kill: mockAgentKill, config } as any),
     });
 
-    const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-test-"));
+    const logsDir = mkdtempSync(join(tmpdir(), "apparat-ah-test-"));
     try {
       const ctx: PipelineContext = { values: {} };
       await handler.execute(

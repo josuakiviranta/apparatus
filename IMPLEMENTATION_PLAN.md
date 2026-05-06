@@ -1068,7 +1068,7 @@ After this chunk: zero `ralph` / `Ralph` / `RALPH_` / `__RALPH_PROD__` / `\.ralp
 
 Chunk 3 already flipped every `.ralph/` path literal in `program.ts` help text. Chunk 4 finishes the prose-shape rewrites: command names (`ralph init` → `apparat init`) and idiomatic phrases ("ralph project", "ralph-shaped").
 
-- [ ] **4.1.1: Enumerate remaining word-form references.**
+- [x] **4.1.1: Enumerate remaining word-form references.**
 
 Run:
 ```bash
@@ -1076,7 +1076,7 @@ grep -n '\bralph\b' src/cli/program.ts
 ```
 Expected: ~25 hits — `ralph <command>` invocations and standalone "ralph" in prose. Should NOT include `.ralph/` path strings (chunk 3 cleared those).
 
-- [ ] **4.1.2: Flip every `ralph` command and prose word.**
+- [x] **4.1.2: Flip every `ralph` command and prose word.**
 
 Apply patterns (literal find/replace):
 
@@ -1091,18 +1091,18 @@ Apply patterns (literal find/replace):
 
 The `program.name("apparat")` from chunk 2 step 2.5.1 is unchanged.
 
-- [ ] **4.1.3: Verify zero `ralph` references remain in `program.ts`.**
+- [x] **4.1.3: Verify zero `ralph` references remain in `program.ts`.**
 
 Run: `grep -n '\bralph\b\|\bRalph\b\|\.ralph/' src/cli/program.ts`
 Expected: zero hits.
 
 #### 4.2: README.md
 
-- [ ] **4.2.1: Read README end-to-end.**
+- [x] **4.2.1: Read README end-to-end.**
 
 Open `/Users/josu/Documents/projects/ralph-cli/README.md`. Inventory every reference to `ralph`, `Ralph`, `RALPH_`, `.ralph/`, `ralph-cli`.
 
-- [ ] **4.2.2: Apply replacements.**
+- [x] **4.2.2: Apply replacements.**
 
 Patterns (case-sensitive):
 
@@ -1118,7 +1118,7 @@ Patterns (case-sensitive):
 - "ralph cleanly terminates" → "apparat cleanly terminates"
 - The `## Where to look` section's `**`src/`** — TypeScript source (CLI, pipeline engine, daemon, MCP servers)` line and similar — confirm no stale "ralph" word usage.
 
-- [ ] **4.2.3: Add the apparatchik metaphor placeholder.**
+- [x] **4.2.3: Add the apparatchik metaphor placeholder.**
 
 Per spec §9, reserve a slot in the README intro:
 
@@ -1128,18 +1128,18 @@ Per spec §9, reserve a slot in the README intro:
 
 The user fills this in later or leaves the placeholder in place; either is acceptable.
 
-- [ ] **4.2.4: Verify zero `ralph` references remain in README.**
+- [x] **4.2.4: Verify zero `ralph` references remain in README.**
 
 Run: `grep -n '\bralph\|\.ralph/\|RALPH_\|ralph-cli' README.md`
 Expected: zero hits.
 
 #### 4.3: VISION.md
 
-- [ ] **4.3.1: Read VISION end-to-end.**
+- [x] **4.3.1: Read VISION end-to-end.**
 
 Open `/Users/josu/Documents/projects/ralph-cli/VISION.md`. Inventory every `ralph`-bearing reference.
 
-- [ ] **4.3.2: Apply replacements.**
+- [x] **4.3.2: Apply replacements.**
 
 - Title `# ralph-cli — Vision` → `# apparatus — Vision`
 - "ralph is the engine" → "apparatus is the engine"
@@ -1154,18 +1154,18 @@ Open `/Users/josu/Documents/projects/ralph-cli/VISION.md`. Inventory every `ralp
 
   If the user wants to defer the addition, replace with `<!-- TODO: apparatchik flavor -->` instead.
 
-- [ ] **4.3.3: Verify zero `ralph` references remain.**
+- [x] **4.3.3: Verify zero `ralph` references remain.**
 
 Run: `grep -n '\bralph\|\.ralph/\|ralph-cli' VISION.md`
 Expected: zero hits.
 
 #### 4.4: CONTEXT.md
 
-- [ ] **4.4.1: Read CONTEXT end-to-end.**
+- [x] **4.4.1: Read CONTEXT end-to-end.**
 
 Open `/Users/josu/Documents/projects/ralph-cli/CONTEXT.md`. Inventory every `ralph`-bearing reference.
 
-- [ ] **4.4.2: Apply replacements.**
+- [x] **4.4.2: Apply replacements.**
 
 - Title `# ralph-cli — Domain Language` → `# apparatus — Domain Language`
 - §Agent loading paragraph: "Stray `~/.ralph/agents/` files on contributor machines are now inert." → "Stray `~/.apparat/agents/` files on contributor machines are now inert."
@@ -1177,21 +1177,21 @@ Open `/Users/josu/Documents/projects/ralph-cli/CONTEXT.md`. Inventory every `ral
 - ADR cross-references: ADR-0007 + ADR-0008 references gain a parenthetical: `(naming superseded by ADR-0010)`.
 - Closing footer: extend to "ADR-0007 + ADR-0008 are partly superseded by ADR-0010 (naming-only)."
 
-- [ ] **4.4.3: Verify zero `ralph` references remain (excluding historical-fact mentions).**
+- [x] **4.4.3: Verify zero `ralph` references remain (excluding historical-fact mentions).**
 
 Run: `grep -n '\bralph\|\.ralph/' CONTEXT.md`
 Expected: zero hits. CONTEXT describes present-tense domain language; no historical references belong here (history goes in ADRs).
 
 #### 4.5: AGENTS.md and harness docs
 
-- [ ] **4.5.1: Update `AGENTS.md`.**
+- [x] **4.5.1: Update `AGENTS.md`.**
 
 Read the file. Patterns:
 - `RALPH_PROD__` → `APPARAT_PROD__` (line 20).
 - Any `.ralph/` path strings → `.apparat/`.
 - "ralph" word → "apparatus" or "apparat" by context.
 
-- [ ] **4.5.2: Update `docs/harness/README.md`.**
+- [x] **4.5.2: Update `docs/harness/README.md`.**
 
 Read the file. Flip:
 - `.ralph/` paths → `.apparat/`
@@ -1199,18 +1199,18 @@ Read the file. Flip:
 - "ralph-cli" repo references → "apparatus"
 - The `~/.ralph/harness/<run-id>/` scratchpad path mentioned in MEMORY.md → `~/.apparat/harness/<run-id>/`. (Current chunk 2 only flipped daemon-home `~/.ralph/`; the harness scratchpad uses a different code path. Verify by reading the harness setup.)
 
-- [ ] **4.5.3: Update `docs/harness/tmux-drive.md`.**
+- [x] **4.5.3: Update `docs/harness/tmux-drive.md`.**
 
 Same pattern as 4.5.2. The tmux-drive doc contains shell snippets with `ralph` invocations — flip every command name to `apparat`. Path strings to `~/.ralph/harness/...` flip to `~/.apparat/harness/...` if present.
 
-- [ ] **4.5.4: Verify zero `ralph` in harness/AGENTS docs.**
+- [x] **4.5.4: Verify zero `ralph` in harness/AGENTS docs.**
 
 Run: `grep -n '\bralph\|\.ralph/\|RALPH_' AGENTS.md docs/harness/`
 Expected: zero hits.
 
 #### 4.6: Finalize ADR-0010
 
-- [ ] **4.6.1: Flip ADR-0010 status.**
+- [x] **4.6.1: Flip ADR-0010 status.**
 
 Read `docs/adr/0010-rename-to-apparatus.md`. Replace:
 
@@ -1224,7 +1224,7 @@ with:
 **Status:** Accepted (2026-05-05)
 ```
 
-- [ ] **4.6.2: Add ADR-0007 and ADR-0008 footer pointers (one line each).**
+- [x] **4.6.2: Add ADR-0007 and ADR-0008 footer pointers (one line each).**
 
 Append to `docs/adr/0007-ralph-folder-as-project-local-home.md`:
 
@@ -1248,7 +1248,7 @@ Append to `docs/adr/0008-partial-revert-of-ralph-folder.md`:
 
 #### 4.7: Final verification
 
-- [ ] **4.7.1: Repo-wide invariant grep — zero `ralph` in non-frozen surfaces.**
+- [x] **4.7.1: Repo-wide invariant grep — zero `ralph` in non-frozen surfaces.**
 
 Run:
 ```bash
@@ -1261,7 +1261,7 @@ grep -rn '\bralph\b\|\bRalph\b\|RALPH_\|__RALPH_PROD__\|\.ralph/\|ralph-cli\|ral
 ```
 Expected: zero hits.
 
-- [ ] **4.7.2: Frozen-prose unchanged invariant.**
+- [x] **4.7.2: Frozen-prose unchanged invariant.**
 
 Run:
 ```bash
@@ -1270,17 +1270,17 @@ git diff HEAD~4 HEAD --name-only \
 ```
 Expected: only `0007-...md` and `0008-...md` (the footer additions from step 4.6.2). Plans, sessions, runs all absent — never modified by the rename PR.
 
-- [ ] **4.7.3: TypeScript + vitest + build all pass.**
+- [x] **4.7.3: TypeScript + vitest + build all pass.**
 
 Run: `npx tsc --noEmit && npx vitest run && npm run build`
 Expected: all PASS.
 
-- [ ] **4.7.4: Smoke — `apparat --help` is internally coherent.**
+- [x] **4.7.4: Smoke — `apparat --help` is internally coherent.**
 
 Run: `node dist/cli/index.js --help | head -50`
 Expected: every line says `apparat` (no `ralph`); every path says `.apparat/` (no `.ralph/`).
 
-- [ ] **4.7.5: Smoke — `apparat init` in a fresh temp dir.**
+- [x] **4.7.5: Smoke — `apparat init` in a fresh temp dir.**
 
 Run:
 ```bash
@@ -1295,12 +1295,12 @@ rm -rf "$TMPDIR"
 ```
 Expected: three `ok`-style lines.
 
-- [ ] **4.7.6: Smoke — `apparat pipeline list .` from this repo.**
+- [x] **4.7.6: Smoke — `apparat pipeline list .` from this repo.**
 
 Run: `node dist/cli/index.js pipeline list .`
 Expected: lists `illumination-to-implementation` (the bundled pipeline at `.apparat/pipelines/illumination-to-implementation/pipeline.dot` post-rename).
 
-- [ ] **4.7.7: Re-link the binary globally and verify.**
+- [x] **4.7.7: Re-link the binary globally and verify.**
 
 Run:
 ```bash
@@ -1315,7 +1315,7 @@ Expected: `which apparat` resolves; `apparat --help` runs.
 
 #### 4.8: Commit chunk 4
 
-- [ ] **4.8.1: Commit.**
+- [x] **4.8.1: Commit.**
 
 ```bash
 git add -A
@@ -1340,7 +1340,7 @@ EOF
 
 Expected: commit succeeds.
 
-- [ ] **4.8.2: Final state report.**
+- [x] **4.8.2: Final state report.**
 
 Run:
 ```bash

@@ -23,7 +23,7 @@ export function formatMissingInputsError(input: MissingInputsErrorInput): string
   lines.push("");
   lines.push("Supply with:");
   const flags = input.missing.map((n) => `    --var ${n}=<${guessPlaceholder(n)}>`);
-  lines.push(`  ralph pipeline run ${input.invokedAs} \\`);
+  lines.push(`  apparat pipeline run ${input.invokedAs} \\`);
   lines.push(flags.join(" \\\n"));
   return lines.join("\n");
 }

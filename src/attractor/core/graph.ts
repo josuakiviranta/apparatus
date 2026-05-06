@@ -8,7 +8,7 @@ export function parseDot(src: string): Graph {
 export const KNOWN_TYPES = new Set([
   "codergen", "tool", "wait.human", "conditional",
   "start", "exit", "store",
-  "ralph.implement", "ralph.meditate",
+  "apparat.implement", "apparat.meditate",
   "agent", "stack.manager_loop",
 ]);
 
@@ -21,7 +21,7 @@ export const SHAPE_TO_TYPE: Record<string, string> = {
   Mdiamond: "start", Msquare: "exit", box: "codergen",
   hexagon: "wait.human", diamond: "conditional",
   parallelogram: "tool", house: "stack.manager_loop",
-  circle: "ralph.implement", octagon: "ralph.meditate",
+  circle: "apparat.implement", octagon: "apparat.meditate",
   cylinder: "store",
 };
 

@@ -5,7 +5,7 @@ vi.mock("child_process", () => ({
 }));
 
 import { spawnSync } from "child_process";
-import { RalphMeditateHandler } from "../handlers/ralph-meditate.js";
+import { ApparatMeditateHandler } from "../handlers/apparat-meditate.js";
 import type { HandlerExecutionContext } from "../handlers/registry.js";
 import type { Node, PipelineContext } from "../types.js";
 
@@ -21,17 +21,17 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe("RalphMeditateHandler", () => {
-  it("returns success when ralph meditate exits 0", async () => {
+describe("ApparatMeditateHandler", () => {
+  it("returns success when apparat meditate exits 0", async () => {
     mockSpawnSync.mockReturnValue({ status: 0 } as any);
-    const h = new RalphMeditateHandler();
+    const h = new ApparatMeditateHandler();
     const outcome = await h.execute({ id: "med" }, baseCtx(), makeContext());
     expect(outcome.status).toBe("success");
   });
 
-  it("returns fail when ralph meditate exits non-zero", async () => {
+  it("returns fail when apparat meditate exits non-zero", async () => {
     mockSpawnSync.mockReturnValue({ status: 1 } as any);
-    const h = new RalphMeditateHandler();
+    const h = new ApparatMeditateHandler();
     const outcome = await h.execute({ id: "med" }, baseCtx(), makeContext());
     expect(outcome.status).toBe("fail");
     expect(outcome.failureReason).toContain("non-zero");
@@ -39,7 +39,7 @@ describe("RalphMeditateHandler", () => {
 
   it("passes cwd from meta to spawn args", async () => {
     mockSpawnSync.mockReturnValue({ status: 0 } as any);
-    const h = new RalphMeditateHandler();
+    const h = new ApparatMeditateHandler();
     await h.execute({ id: "med" }, baseCtx(), makeContext({ cwd: "/my/project" }));
     const args = mockSpawnSync.mock.calls[0][1] as string[];
     expect(args).toContain("meditate");
@@ -48,7 +48,7 @@ describe("RalphMeditateHandler", () => {
 
   it("forwards --var steer=... when node has steer property", async () => {
     mockSpawnSync.mockReturnValue({ status: 0 } as any);
-    const h = new RalphMeditateHandler();
+    const h = new ApparatMeditateHandler();
     const node: Node = { id: "med", steer: "focus on security" };
     await h.execute(node, baseCtx(), makeContext());
     const args = mockSpawnSync.mock.calls[0][1] as string[];
@@ -58,7 +58,7 @@ describe("RalphMeditateHandler", () => {
 
   it("omits --var when node has no steer property", async () => {
     mockSpawnSync.mockReturnValue({ status: 0 } as any);
-    const h = new RalphMeditateHandler();
+    const h = new ApparatMeditateHandler();
     await h.execute({ id: "med" }, baseCtx(), makeContext());
     const args = mockSpawnSync.mock.calls[0][1] as string[];
     expect(args).not.toContain("--var");
@@ -66,7 +66,7 @@ describe("RalphMeditateHandler", () => {
 
   it("omits --var when steer is not a string", async () => {
     mockSpawnSync.mockReturnValue({ status: 0 } as any);
-    const h = new RalphMeditateHandler();
+    const h = new ApparatMeditateHandler();
     await h.execute({ id: "med", steer: 42 } as any, baseCtx(), makeContext());
     const args = mockSpawnSync.mock.calls[0][1] as string[];
     expect(args).not.toContain("--var");
@@ -74,7 +74,7 @@ describe("RalphMeditateHandler", () => {
 
   it("uses process.execPath and process.argv[1] for spawn", async () => {
     mockSpawnSync.mockReturnValue({ status: 0 } as any);
-    const h = new RalphMeditateHandler();
+    const h = new ApparatMeditateHandler();
     await h.execute({ id: "med" }, baseCtx(), makeContext());
     expect(mockSpawnSync.mock.calls[0][0]).toBe(process.execPath);
     const args = mockSpawnSync.mock.calls[0][1] as string[];

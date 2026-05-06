@@ -8,7 +8,7 @@ describe("agent-loader", () => {
   let pipelineDir: string;
 
   beforeEach(() => {
-    pipelineDir = mkdtempSync(join(tmpdir(), "ralph-pipeline-"));
+    pipelineDir = mkdtempSync(join(tmpdir(), "apparat-pipeline-"));
   });
 
   afterEach(() => {

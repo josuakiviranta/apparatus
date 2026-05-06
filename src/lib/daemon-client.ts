@@ -42,7 +42,7 @@ async function waitForSocket(timeoutMs: number): Promise<void> {
 
 async function ensureDaemon(): Promise<void> {
   if (existsSync(SOCK_PATH)) return;
-  console.error("Starting ralph daemon...");
+  console.error("Starting apparat daemon...");
   const { command, args } = getDaemonBin();
   const child = spawn(command, args, { detached: true, stdio: "ignore" });
   child.unref();

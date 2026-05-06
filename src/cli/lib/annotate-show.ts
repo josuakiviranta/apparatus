@@ -33,11 +33,11 @@ function findAttr(children: any[], name: string): number {
 }
 
 /**
- * Annotate a DOT source for `ralph pipeline show`: inject `label` attributes on
+ * Annotate a DOT source for `apparat pipeline show`: inject `label` attributes on
  * agent nodes with their declared `inputs:` / `outputs:` keys, and on agent→agent
  * data-flow edges with the intersection of upstream outputs ∩ downstream inputs.
  *
- * Why: SVG output of `ralph pipeline show` previously rendered only node ids,
+ * Why: SVG output of `apparat pipeline show` previously rendered only node ids,
  * giving no visibility into the typed contract between nodes. Surfacing
  * inputs/outputs on the diagram makes pipelines self-documenting.
  */

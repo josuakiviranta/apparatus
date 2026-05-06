@@ -1,6 +1,6 @@
 ---
 name: meditate-observer
-description: Drive 'ralph meditate' inside a tmux window, wait for it to finish, and produce the four-field summary (topic / illumination_path / kid_summary / observation_notes)
+description: Drive 'apparat meditate' inside a tmux window, wait for it to finish, and produce the four-field summary (topic / illumination_path / kid_summary / observation_notes)
 model: opus
 permissionMode: dangerouslySkipPermissions
 inputs:
@@ -21,7 +21,7 @@ outputs:
 
 # Mission
 
-Drive 'ralph meditate' inside a pre-opened tmux window, wait for it to finish, read the resulting illumination, and emit the four-field schema summary.
+Drive 'apparat meditate' inside a pre-opened tmux window, wait for it to finish, read the resulting illumination, and emit the four-field schema summary.
 
 Runtime context injected automatically:
 - `$run_id` — identifies the tmux window opened by the prior tool node (window name: `pipe-tmux-tester-inner-$run_id`)
@@ -31,7 +31,7 @@ Steps:
 1. Source the harness helpers from `docs/harness/tmux-drive.md`.
 2. Set `SESSION=$(tmux display-message -p '#S')` and `WIN=pipe-tmux-tester-inner-$run_id`.
 3. Pick a topic from the current project state. Run `git log -5 --oneline` and `git status --short` in `$project` to see recent activity, then choose one short sentence describing something to reflect on. Do not explore deeply — pick fast.
-4. Send into the window via the harness: `ralph meditate . --var steer="<your topic>"`
+4. Send into the window via the harness: `apparat meditate . --var steer="<your topic>"`
 5. Wait for the meditation to finish. Detection: the file `$project/.meditate.pid` is written while meditate is alive and removed on exit. Poll every 10s with a 600000ms (10min) budget. In parallel capture_pane occasionally so you can describe what you saw in the TUI.
 6. After pid file is gone: list `meditations/illuminations/` sorted by mtime, take the newest file, read it.
 
@@ -44,6 +44,6 @@ Produce the four schema fields:
 - observation_notes: 1-2 sentences describing what the meditate TUI showed (which phases you saw, roughly how long it ran).
 
 Rules:
-- Do NOT run 'ralph meditate' yourself synchronously — only via tmux send_keys so it runs inside the window.
+- Do NOT run 'apparat meditate' yourself synchronously — only via tmux send_keys so it runs inside the window.
 - Do NOT git push or modify source files.
 - Do NOT cancel the meditation early.

@@ -1,12 +1,12 @@
 digraph tmux_tester_smoke {
-  graph [goal="Verify an agent can drive ralph meditate in a tmux window and summarise the resulting illumination for a 5-year-old"]
+  graph [goal="Verify an agent can drive apparat meditate in a tmux window and summarise the resulting illumination for a 5-year-old"]
   inputs="run_id, project"
 
   start [shape=Mdiamond]
 
   launch_tmux [type="tool", cwd="$project", tool_command="tmux new-window -c \"$project\" -n \"pipe-tmux-tester-inner-$run_id\""]
 
-  tmux_meditate_observer [agent="meditate-observer", prompt="Window name follows the pattern pipe-tmux-tester-inner-<run_id>. Drive ralph meditate in that window, observe it, and emit the four-field summary."]
+  tmux_meditate_observer [agent="meditate-observer", prompt="Window name follows the pattern pipe-tmux-tester-inner-<run_id>. Drive apparat meditate in that window, observe it, and emit the four-field summary."]
 
   done [shape=Msquare]
 

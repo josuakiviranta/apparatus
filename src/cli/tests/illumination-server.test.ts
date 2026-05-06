@@ -506,7 +506,7 @@ describe("listPlans", () => {
   let tmpDir: string;
 
   beforeEach(() => {
-    tmpDir = realpathSync(mkdtempSync(join(tmpdir(), "ralph-plan-test-")));
+    tmpDir = realpathSync(mkdtempSync(join(tmpdir(), "apparat-plan-test-")));
     mkdirSync(join(tmpDir, "docs", "superpowers", "plans"), { recursive: true });
   });
 

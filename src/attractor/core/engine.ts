@@ -9,7 +9,7 @@ import { saveCheckpoint, loadCheckpoint } from "../checkpoint.js";
 import { StartHandler, ExitHandler } from "../handlers/start-exit.js";
 import { WaitHumanHandler } from "../handlers/wait-human.js";
 import { ToolHandler } from "../handlers/tool.js";
-import { RalphMeditateHandler } from "../handlers/ralph-meditate.js";
+import { ApparatMeditateHandler } from "../handlers/apparat-meditate.js";
 import { InteractiveAgentHandler } from "../handlers/interactive-agent-handler.js";
 import { LoopingAgentHandler } from "../handlers/looping-agent-handler.js";
 import { AgentHandlerDispatch } from "../handlers/agent-dispatch.js";
@@ -62,8 +62,8 @@ function buildHandlerMap(opts: EngineOptions): Map<string, NodeHandler> {
   m.set("codergen", agentDispatch);
   m.set("wait.human", new WaitHumanHandler(opts.interviewer, opts.dotDir));
   m.set("tool", new ToolHandler());
-  m.set("ralph.implement", agentDispatch);
-  m.set("ralph.meditate", new RalphMeditateHandler());
+  m.set("apparat.implement", agentDispatch);
+  m.set("apparat.meditate", new ApparatMeditateHandler());
   m.set("store", new StoreHandler());
   m.set("agent", agentDispatch);
   return m;
@@ -161,7 +161,7 @@ export async function runPipeline(graph: Graph, opts: EngineOptions): Promise<Pi
       context = { ...context, ...cp.context };
       nodeRetries = cp.nodeRetries;
     } else {
-      console.warn("[ralph] --resume: no checkpoint found, starting from beginning");
+      console.warn("[apparat] --resume: no checkpoint found, starting from beginning");
     }
   }
 

@@ -42,7 +42,7 @@ export function classifyNode(node: Node): BlockKind {
   if (t === "wait-human" || t === "wait.human") return "wait-human";
   if (t === "conditional") return "conditional";
 
-  // Anything else (codergen, parallel, start, exit, ralph.*, stack.*, etc.) is
+  // Anything else (codergen, parallel, start, exit, apparat.*, stack.*, etc.) is
   // treated as a marker — no trace path, no streaming body, just a structural
   // line in the rendered output.
   return "marker";

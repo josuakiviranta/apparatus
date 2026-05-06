@@ -32,7 +32,7 @@ function makeMeta(cwd: string, logsRoot: string): HandlerExecutionContext {
 
 describe("assembleAgentPrompt", () => {
   it("returns prep object with prompt, agent, config, jsonSchema, agentVariables, nodeDir", async () => {
-    const tmp = mkdtempSync(join(tmpdir(), "ralph-prep-"));
+    const tmp = mkdtempSync(join(tmpdir(), "apparat-prep-"));
     try {
       const cfg = makeConfig();
       const node: Node = { id: "n1", prompt: "STEERING", agent: "fake" };
@@ -63,7 +63,7 @@ describe("assembleAgentPrompt", () => {
   });
 
   it("returns { fail } when loadAgent throws", () => {
-    const tmp = mkdtempSync(join(tmpdir(), "ralph-prep-"));
+    const tmp = mkdtempSync(join(tmpdir(), "apparat-prep-"));
     try {
       const node: Node = { id: "n1", agent: "missing" };
       const ctx: PipelineContext = { values: {} };
@@ -83,7 +83,7 @@ describe("assembleAgentPrompt", () => {
   });
 
   it("wraps prompt with JSON-schema framing when config.jsonSchema is set", () => {
-    const tmp = mkdtempSync(join(tmpdir(), "ralph-prep-"));
+    const tmp = mkdtempSync(join(tmpdir(), "apparat-prep-"));
     try {
       const cfg = { ...makeConfig(), jsonSchema: '{"type":"object"}' };
       const node: Node = { id: "n1", prompt: "p", agent: "fake" };

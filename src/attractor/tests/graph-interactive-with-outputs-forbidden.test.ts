@@ -6,7 +6,7 @@ import { parseDot } from "../core/graph.js";
 import { validateGraph } from "../core/graph-validator.js";
 
 function setup() {
-  const dir = mkdtempSync(join(tmpdir(), "ralph-vrule-"));
+  const dir = mkdtempSync(join(tmpdir(), "apparat-vrule-"));
   return {
     dir,
     cleanup: () => rmSync(dir, { recursive: true, force: true }),

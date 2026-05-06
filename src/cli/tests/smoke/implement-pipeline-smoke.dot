@@ -9,7 +9,7 @@ digraph implement_pipeline_smoke {
   // (assets.ts: __dirname = src/cli/lib/ → up one → src/cli/ → pipelines/implement/pipeline.dot)
   check_bundled_exists [
     shape=parallelogram,
-    tool_command="test -f /Users/josu/Documents/projects/ralph-cli/src/cli/pipelines/implement/pipeline.dot && echo 'bundled-pipeline-exists: ok'"
+    tool_command="test -f $project/src/cli/pipelines/implement/pipeline.dot && echo 'bundled-pipeline-exists: ok'"
   ]
 
   // 2. Verify the bundled implement.dot contains the max_iterations variable reference.
@@ -18,13 +18,13 @@ digraph implement_pipeline_smoke {
   // a shell variable assigned outside pipeline expansion instead.
   check_var_expansion [
     shape=parallelogram,
-    tool_command="grep -qF 'max_iterations=' /Users/josu/Documents/projects/ralph-cli/src/cli/pipelines/implement/pipeline.dot && echo 'variable-expansion-wiring: ok'"
+    tool_command="grep -qF 'max_iterations=' $project/src/cli/pipelines/implement/pipeline.dot && echo 'variable-expansion-wiring: ok'"
   ]
 
   // 3. Verify the bundled pipeline contains the expected agent node declaration
   check_agent_node [
     shape=parallelogram,
-    tool_command="grep -q 'agent=\"implement\"' /Users/josu/Documents/projects/ralph-cli/src/cli/pipelines/implement/pipeline.dot && echo 'agent-node: ok'"
+    tool_command="grep -q 'agent=\"implement\"' $project/src/cli/pipelines/implement/pipeline.dot && echo 'agent-node: ok'"
   ]
 
   // 4. Verify project-local tier: this project has no pipelines/implement.dot at root

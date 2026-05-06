@@ -4,7 +4,7 @@ import { join } from "path";
 import { tmpdir } from "os";
 
 // Override HOME for tests
-const testHome = join(tmpdir(), `ralph-state-test-${process.pid}`);
+const testHome = join(tmpdir(), `apparat-state-test-${process.pid}`);
 process.env.HOME = testHome;
 
 import {

@@ -1,4 +1,4 @@
-# ralph-cli — Domain Language
+# apparatus — Domain Language
 
 ## Glossary
 
@@ -14,22 +14,22 @@ The runtime path is `loadAgent(name, pipelineDir)` in
 
 Excised on 2026-04-30 (see `docs/adr/0001-agents-live-next-to-pipeline.md`):
 the old `agent-registry.ts` multi-tier resolver, the user-dir tier
-(`~/.ralph/agents/`), the bundled-agents dir (`getBundledAgentsDir`), the
-`ralph agent list/show` CLI subcommands, and the
+(`~/.apparat/agents/`), the bundled-agents dir (`getBundledAgentsDir`), the
+`apparat agent list/show` CLI subcommands, and the
 `allowBundledFallback`/`RegistryOptions` shape. Stray
-`~/.ralph/agents/` files on contributor machines are now inert.
+`~/.apparat/agents/` files on contributor machines are now inert.
 
 All pipelines live in this repo (`src/cli/pipelines/` for bundled) or in
-a target project's `.ralph/pipelines/<name>/` folder. A pipeline is run
+a target project's `.apparat/pipelines/<name>/` folder. A pipeline is run
 against an external target project via `--project <folder>`.
 
 ### Project-local layout
 
-A target project declares itself ralph-shaped by having a `<project>/.ralph/`
-folder. That folder is the home for ralph-defined project-local artefacts:
+A target project declares itself apparat-shaped by having a `<project>/.apparat/`
+folder. That folder is the home for apparat-defined project-local artefacts:
 
 ```
-.ralph/
+.apparat/
 ├── pipelines/                ← project-local pipelines
 ├── meditations/
 │   ├── illuminations/
@@ -51,20 +51,20 @@ doc-outliners, GitHub, and third-party tooling expect them:
 ```
 
 Two-tier pipeline read at runtime:
-- **Project-local:** `<project>/.ralph/pipelines/<name>/pipeline.dot`
+- **Project-local:** `<project>/.apparat/pipelines/<name>/pipeline.dot`
 - **Bundled fallback:** `src/cli/pipelines/<name>/pipeline.dot` (in npm package)
 
 Two-tier stimuli reads (project-local + bundled) work the same way for
 the meditate pipeline.
 
-See `docs/adr/0007-ralph-folder-as-project-local-home.md` and the
-partial-revert refinement in `docs/adr/0008-partial-revert-of-ralph-folder.md`
+See `docs/adr/0007-ralph-folder-as-project-local-home.md` (naming superseded by ADR-0010) and the
+partial-revert refinement in `docs/adr/0008-partial-revert-of-ralph-folder.md` (naming superseded by ADR-0010)
 for the full layout and partition principle.
 
 ### Illumination lifecycle
 
 An illumination has two states by location: **alive** (file exists in
-`.ralph/meditations/illuminations/`) or **consumed** (file deleted). There are no
+`.apparat/meditations/illuminations/`) or **consumed** (file deleted). There are no
 side folders, no `archived` or `implemented` lifecycle directories, no
 in-flight `dispatched` state.
 
@@ -83,14 +83,14 @@ coincidence between illumination and plan is incidental, not relied upon.
 The MCP surface (`src/cli/mcp/illumination-server.ts`):
 
 - `list_illuminations()` — no parameters; returns every file in
-  `.ralph/meditations/illuminations/`.
+  `.apparat/meditations/illuminations/`.
 - `write_illumination(date, description, body)` — creates an illumination.
 - `consume(filename, reason: "implemented" | "declined")` — deletes +
   commits.
 
 Excised on 2026-04-30 (see `docs/adr/0002-consume-only-illumination-lifecycle.md`):
 the `mark_dispatched`, `mark_implemented`, `mark_archived` MCP tools; the
-`.ralph/meditations/archived-illuminations/` and `.ralph/meditations/implemented-illuminations/`
+`.apparat/meditations/archived-illuminations/` and `.apparat/meditations/implemented-illuminations/`
 directories; the `status` parameter on `list_illuminations`; the
 `pipelines/illumination-to-implementation/mark-archived.mjs` script; the
 dispatch gate path in the illumination-to-implementation pipeline.
@@ -134,15 +134,15 @@ See also: **Smoke-pipeline scenario**.
 ### Smoke-pipeline scenario
 
 A pipeline-engine test fixture: a `pipeline.dot` plus its agent `.md` files
-with ralph-specific frontmatter (`outputs:`, `inputs:`, gate prompts, tool
-nodes). Lives at `<repo>/.ralph/scenarios/<name>/`. Consumed by the
+with apparat-specific frontmatter (`outputs:`, `inputs:`, gate prompts, tool
+nodes). Lives at `<repo>/.apparat/scenarios/<name>/`. Consumed by the
 `pipeline-smoke-<name>-folder.test.ts` files in `src/cli/tests/` to verify
 parser, validator, runtime, and per-folder discovery — the engine's own
 test surface, not user-facing operator scenarios.
 
 Renamed from "smoke pipeline" on 2026-05-04 to disambiguate from the
 illumination-to-implementation pipeline (production) and to land them
-under `.ralph/scenarios/` rather than commingled with `.ralph/pipelines/`
+under `.apparat/scenarios/` rather than commingled with `.apparat/pipelines/`
 where `pipeline list` would surface them.
 
 See also: **Harness scenario**.
@@ -151,13 +151,13 @@ See also: **Harness scenario**.
 
 A markdown narrative written by the `memory-writer` pipeline node at the
 end of each illumination-to-implementation session. Lives at
-`<project>/.ralph/sessions/<YYYY-MM-DD>-<slug>.md`. Captures what was
+`<project>/.apparat/sessions/<YYYY-MM-DD>-<slug>.md`. Captures what was
 attempted, what shipped, what surprised, and follow-up threads — for
 future-Claude reading on later sessions.
 
 Renamed from "memory" on 2026-05-04 (see ADR-0008): "memory" was
 overloaded across Claude Code's auto-memory feature, ADR-0007's empty
-`.ralph/memory/` slot, and these closure files. "Session-closure file"
+`.apparat/memory/` slot, and these closure files. "Session-closure file"
 names what the artefact actually is.
 
 ### Project-local artefact
@@ -165,21 +165,21 @@ names what the artefact actually is.
 A file or directory that meets BOTH clauses of the §1.2 partition principle
 (see ADR-0008):
 
-- **Clause A — ralph-defined.** Format, lifecycle, or discovery semantics
-  specified by ralph (illumination YAML schema, `.dot` files with ralph
+- **Clause A — apparat-defined.** Format, lifecycle, or discovery semantics
+  specified by apparatus (illumination YAML schema, `.dot` files with apparat
   attributes, run-state checkpoint format, etc.).
 - **Clause B — no pre-existing root convention.** No widely-adopted
   ecosystem convention places the file at repo root.
 
 Both clauses are required. Project-local artefacts live in
-`<project>/.ralph/`. Pre-existing project-doc conventions (CONTEXT.md,
+`<project>/.apparat/`. Pre-existing project-doc conventions (CONTEXT.md,
 VISION.md, docs/adr/, README.md) stay at repo root. See
-`docs/adr/0007-ralph-folder-as-project-local-home.md` and
-`docs/adr/0008-partial-revert-of-ralph-folder.md`.
+`docs/adr/0007-ralph-folder-as-project-local-home.md` (naming superseded by ADR-0010) and
+`docs/adr/0008-partial-revert-of-ralph-folder.md` (naming superseded by ADR-0010).
 
 ### Janitor
 
-A scheduled agent (run via `ralph heartbeat` against
+A scheduled agent (run via `apparat heartbeat` against
 `src/cli/pipelines/janitor/pipeline.dot`) that scans the workspace through a KISS
 lens — identifies bloat, YAGNI-violating abstractions, and refactor
 opportunities — and writes one illumination per candidate via
@@ -198,7 +198,7 @@ That role disappeared with the lifecycle simplification.
 
 ### Documentation channels
 
-ralph-cli has three documentation channels with disjoint roles:
+apparatus has three documentation channels with disjoint roles:
 
 - **`CONTEXT.md` (this file)** — domain language and glossary. Hand-curated.
   Updated during grill-with-docs sessions and ADR writes. Stable.
@@ -219,6 +219,6 @@ a live `src/` inventory. No preloaded curated overview.
 
 ---
 
-ADR-0007 (`.ralph/` as project-local home) is partly superseded by
+ADR-0007 (`.apparat/` as project-local home) is partly superseded by
 ADR-0008 (partial revert + partition principle). See
-`docs/adr/0008-partial-revert-of-ralph-folder.md`.
+`docs/adr/0008-partial-revert-of-ralph-folder.md`. ADR-0007 + ADR-0008 are partly superseded by ADR-0010 (naming-only).

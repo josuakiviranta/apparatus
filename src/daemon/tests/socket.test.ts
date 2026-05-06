@@ -6,7 +6,7 @@ import net from "net";
 import { createSocketServer } from "../socket";
 import type { RequestHandlers } from "../socket";
 
-const testDir = join(tmpdir(), `ralph-socket-test-${process.pid}`);
+const testDir = join(tmpdir(), `apparat-socket-test-${process.pid}`);
 const sockPath = join(testDir, "test.sock");
 
 function makeHandlers(overrides: Partial<RequestHandlers> = {}): RequestHandlers {

@@ -17,7 +17,7 @@ import { request } from "../../lib/daemon-client";
 
 // Real fixture directory that exists on disk — used by tests that exercise
 // the happy path of commands that validate the folder exists.
-const FIXTURE_DIR = mkdtempSync(join(tmpdir(), "ralph-hb-test-"));
+const FIXTURE_DIR = mkdtempSync(join(tmpdir(), "apparat-hb-test-"));
 const FIXTURE_DOT = join(FIXTURE_DIR, "smoke.dot");
 writeFileSync(FIXTURE_DOT, 'digraph { a -> b; }\n');
 
@@ -49,22 +49,22 @@ function silence() {
   }};
 }
 
-describe("ralph heartbeat list", () => {
+describe("apparat heartbeat list", () => {
   it("calls list_tasks and prints table", async () => {
     vi.mocked(request).mockResolvedValue({ type: "tasks", data: [] });
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-    await makeProgram().parseAsync(["node", "ralph", "heartbeat", "list"]);
+    await makeProgram().parseAsync(["node", "apparat", "heartbeat", "list"]);
     expect(request).toHaveBeenCalledWith("list_tasks");
     logSpy.mockRestore();
   });
 });
 
-describe("ralph heartbeat meditate", () => {
+describe("apparat heartbeat meditate", () => {
   it("sends register_task with correct args", async () => {
     vi.mocked(request).mockResolvedValue({ type: "ok", taskId: "meditate:proj" });
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     await makeProgram().parseAsync([
-      "node", "ralph", "heartbeat", "meditate", FIXTURE_DIR, "--every", "5",
+      "node", "apparat", "heartbeat", "meditate", FIXTURE_DIR, "--every", "5",
     ]);
     expect(request).toHaveBeenCalledWith("register_task", {
       command: "meditate",
@@ -77,7 +77,7 @@ describe("ralph heartbeat meditate", () => {
   it("errors when --every is missing", async () => {
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     await expect(
-      makeProgram().parseAsync(["node", "ralph", "heartbeat", "meditate", FIXTURE_DIR])
+      makeProgram().parseAsync(["node", "apparat", "heartbeat", "meditate", FIXTURE_DIR])
     ).rejects.toThrow();
     errSpy.mockRestore();
   });
@@ -87,7 +87,7 @@ describe("ralph heartbeat meditate", () => {
     const bogus = join(FIXTURE_DIR, "does-not-exist");
     await expect(
       makeProgram().parseAsync([
-        "node", "ralph", "heartbeat", "meditate", bogus, "--every", "5",
+        "node", "apparat", "heartbeat", "meditate", bogus, "--every", "5",
       ])
     ).rejects.toThrow(/exit:1/);
     expect(request).not.toHaveBeenCalled();
@@ -97,9 +97,9 @@ describe("ralph heartbeat meditate", () => {
   });
 
   it("rejects the double-join case and reports both original arg and resolved path", async () => {
-    // Reproduces the original bug: user inside /.../ralph-cli runs
-    // `ralph heartbeat meditate ralph-cli` and resolve() produces
-    // /.../ralph-cli/ralph-cli which does not exist. A relative arg that
+    // Reproduces the original bug: user inside /.../apparat-cli runs
+    // `apparat heartbeat meditate apparat-cli` and resolve() produces
+    // /.../apparat-cli/apparat-cli which does not exist. A relative arg that
     // does not exist under the current cwd triggers the same code path.
     // (vitest workers disallow process.chdir so we use the test runner's cwd.)
     const s = silence();
@@ -107,7 +107,7 @@ describe("ralph heartbeat meditate", () => {
     const expectedAbs = resolveFn(relArg);
     await expect(
       makeProgram().parseAsync([
-        "node", "ralph", "heartbeat", "meditate", relArg, "--every", "5",
+        "node", "apparat", "heartbeat", "meditate", relArg, "--every", "5",
       ])
     ).rejects.toThrow(/exit:1/);
     expect(request).not.toHaveBeenCalled();
@@ -122,7 +122,7 @@ describe("ralph heartbeat meditate", () => {
     const s = silence();
     await expect(
       makeProgram().parseAsync([
-        "node", "ralph", "heartbeat", "meditate", FIXTURE_DOT, "--every", "5",
+        "node", "apparat", "heartbeat", "meditate", FIXTURE_DOT, "--every", "5",
       ])
     ).rejects.toThrow(/exit:1/);
     expect(request).not.toHaveBeenCalled();
@@ -130,12 +130,12 @@ describe("ralph heartbeat meditate", () => {
   });
 });
 
-describe("ralph heartbeat meditate --var", () => {
+describe("apparat heartbeat meditate --var", () => {
   it("includes --var steer=... in args when provided", async () => {
     vi.mocked(request).mockResolvedValue({ type: "ok", taskId: "meditate:test" });
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     await makeProgram().parseAsync([
-      "node", "ralph", "heartbeat", "meditate", FIXTURE_DIR,
+      "node", "apparat", "heartbeat", "meditate", FIXTURE_DIR,
       "--every", "30", "--var", "steer=focus on auth",
     ]);
     expect(request).toHaveBeenCalledWith("register_task", {
@@ -150,7 +150,7 @@ describe("ralph heartbeat meditate --var", () => {
     vi.mocked(request).mockResolvedValue({ type: "ok", taskId: "meditate:test" });
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     await makeProgram().parseAsync([
-      "node", "ralph", "heartbeat", "meditate", FIXTURE_DIR, "--every", "30",
+      "node", "apparat", "heartbeat", "meditate", FIXTURE_DIR, "--every", "30",
     ]);
     const callArgs = (vi.mocked(request).mock.calls[0][1] as any).args as string[];
     expect(callArgs).not.toContain("--var");
@@ -158,20 +158,20 @@ describe("ralph heartbeat meditate --var", () => {
   });
 });
 
-describe("ralph heartbeat stop", () => {
+describe("apparat heartbeat stop", () => {
   it("sends stop_task", async () => {
     vi.mocked(request).mockResolvedValue({ type: "ok" });
-    await makeProgram().parseAsync(["node", "ralph", "heartbeat", "stop", "meditate:proj"]);
+    await makeProgram().parseAsync(["node", "apparat", "heartbeat", "stop", "meditate:proj"]);
     expect(request).toHaveBeenCalledWith("stop_task", { taskId: "meditate:proj" });
   });
 });
 
-describe("ralph heartbeat implement", () => {
+describe("apparat heartbeat implement", () => {
   it("sends register_task with correct args", async () => {
     vi.mocked(request).mockResolvedValue({ type: "ok", taskId: "implement:proj" });
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     await makeProgram().parseAsync([
-      "node", "ralph", "heartbeat", "implement", FIXTURE_DIR, "--every", "10",
+      "node", "apparat", "heartbeat", "implement", FIXTURE_DIR, "--every", "10",
     ]);
     expect(request).toHaveBeenCalledWith("register_task", {
       command: "implement",
@@ -184,7 +184,7 @@ describe("ralph heartbeat implement", () => {
   it("errors when --every is missing", async () => {
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     await expect(
-      makeProgram().parseAsync(["node", "ralph", "heartbeat", "implement", FIXTURE_DIR])
+      makeProgram().parseAsync(["node", "apparat", "heartbeat", "implement", FIXTURE_DIR])
     ).rejects.toThrow();
     errSpy.mockRestore();
   });
@@ -194,7 +194,7 @@ describe("ralph heartbeat implement", () => {
     const bogus = join(FIXTURE_DIR, "does-not-exist");
     await expect(
       makeProgram().parseAsync([
-        "node", "ralph", "heartbeat", "implement", bogus, "--every", "10",
+        "node", "apparat", "heartbeat", "implement", bogus, "--every", "10",
       ])
     ).rejects.toThrow(/exit:1/);
     expect(request).not.toHaveBeenCalled();
@@ -204,12 +204,12 @@ describe("ralph heartbeat implement", () => {
   });
 });
 
-describe("ralph heartbeat pipeline", () => {
+describe("apparat heartbeat pipeline", () => {
   it("sends register_task with run subcommand args and computed id", async () => {
     vi.mocked(request).mockResolvedValue({ type: "ok", taskId: "pipeline:smoke" });
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     await makeProgram().parseAsync([
-      "node", "ralph", "heartbeat", "pipeline", FIXTURE_DOT,
+      "node", "apparat", "heartbeat", "pipeline", FIXTURE_DOT,
       "--project", FIXTURE_DIR, "--every", "30",
     ]);
     expect(request).toHaveBeenCalledWith("register_task", {
@@ -225,7 +225,7 @@ describe("ralph heartbeat pipeline", () => {
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     await expect(
       makeProgram().parseAsync([
-        "node", "ralph", "heartbeat", "pipeline", FIXTURE_DOT,
+        "node", "apparat", "heartbeat", "pipeline", FIXTURE_DOT,
         "--project", FIXTURE_DIR,
       ])
     ).rejects.toThrow();
@@ -236,7 +236,7 @@ describe("ralph heartbeat pipeline", () => {
     vi.mocked(request).mockResolvedValue({ type: "ok", taskId: "pipeline:smoke" });
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     await makeProgram().parseAsync([
-      "node", "ralph", "heartbeat", "pipeline", FIXTURE_DOT, "--every", "30",
+      "node", "apparat", "heartbeat", "pipeline", FIXTURE_DOT, "--every", "30",
     ]);
     expect(request).toHaveBeenCalledWith("register_task", expect.objectContaining({
       command: "pipeline",
@@ -250,7 +250,7 @@ describe("ralph heartbeat pipeline", () => {
     const bogus = join(FIXTURE_DIR, "does-not-exist.dot");
     await expect(
       makeProgram().parseAsync([
-        "node", "ralph", "heartbeat", "pipeline", bogus, "--every", "30",
+        "node", "apparat", "heartbeat", "pipeline", bogus, "--every", "30",
       ])
     ).rejects.toThrow(/exit:1/);
     expect(request).not.toHaveBeenCalled();
@@ -264,7 +264,7 @@ describe("ralph heartbeat pipeline", () => {
     const bogus = join(FIXTURE_DIR, "missing-project");
     await expect(
       makeProgram().parseAsync([
-        "node", "ralph", "heartbeat", "pipeline", FIXTURE_DOT,
+        "node", "apparat", "heartbeat", "pipeline", FIXTURE_DOT,
         "--project", bogus, "--every", "30",
       ])
     ).rejects.toThrow(/exit:1/);
@@ -275,7 +275,7 @@ describe("ralph heartbeat pipeline", () => {
   });
 });
 
-describe("ralph heartbeat pipeline id derivation (folder-form pipelines)", () => {
+describe("apparat heartbeat pipeline id derivation (folder-form pipelines)", () => {
   it("uses the parent folder name as id when the dotfile basename is `pipeline.dot`", async () => {
     const folderDot = join(FIXTURE_DIR, "janitor", "pipeline.dot");
     mkdirSync(join(FIXTURE_DIR, "janitor"), { recursive: true });
@@ -284,7 +284,7 @@ describe("ralph heartbeat pipeline id derivation (folder-form pipelines)", () =>
     vi.mocked(request).mockResolvedValue({ type: "ok", taskId: "pipeline:janitor" });
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     await makeProgram().parseAsync([
-      "node", "ralph", "heartbeat", "pipeline", folderDot,
+      "node", "apparat", "heartbeat", "pipeline", folderDot,
       "--project", FIXTURE_DIR, "--every", "40",
     ]);
     expect(request).toHaveBeenCalledWith("register_task", expect.objectContaining({
@@ -294,7 +294,7 @@ describe("ralph heartbeat pipeline id derivation (folder-form pipelines)", () =>
   });
 });
 
-describe("ralph heartbeat pipeline preflight: missing --project when $project referenced", () => {
+describe("apparat heartbeat pipeline preflight: missing --project when $project referenced", () => {
   it("rejects registration when pipeline references $project but --project is omitted", async () => {
     const dot = join(FIXTURE_DIR, "needs-project.dot");
     writeFileSync(dot, `
@@ -308,7 +308,7 @@ describe("ralph heartbeat pipeline preflight: missing --project when $project re
     const s = silence();
     await expect(
       makeProgram().parseAsync([
-        "node", "ralph", "heartbeat", "pipeline", dot, "--every", "40",
+        "node", "apparat", "heartbeat", "pipeline", dot, "--every", "40",
       ])
     ).rejects.toThrow(/exit:1/);
     expect(request).not.toHaveBeenCalled();
@@ -331,7 +331,7 @@ describe("ralph heartbeat pipeline preflight: missing --project when $project re
     vi.mocked(request).mockResolvedValue({ type: "ok", taskId: "pipeline:needs-project-ok" });
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     await makeProgram().parseAsync([
-      "node", "ralph", "heartbeat", "pipeline", dot,
+      "node", "apparat", "heartbeat", "pipeline", dot,
       "--project", FIXTURE_DIR, "--every", "40",
     ]);
     expect(request).toHaveBeenCalledWith("register_task", expect.objectContaining({

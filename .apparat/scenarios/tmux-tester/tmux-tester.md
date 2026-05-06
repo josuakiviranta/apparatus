@@ -239,7 +239,7 @@ Emit JSON matching the schema:
 - `test_summary`: 1–3 sentences. Cover: how many cycles ran, what was fixed along the way, the final state. Example: "Cycle 1: 4 failing tests + smoke crash on pipeline-list. Fixed null-guard in pipeline-list renderer (commit abc1234) and updated stream-formatter test expectation (commit def5678). Cycle 2 clean: 412 tests passed, 3 smoke pipelines reached exit nodes."
 - `issues_found`: array of short strings, one issue per **remaining, unfixed** entry. Empty array `[]` is the correct signal for "I fixed everything I found." Example unresolved entries:
   - `"illumination-to-plan smoke: chat_refiner node hangs on input when $run_id contains hyphens — reproduced twice, root cause not found"`
-  - `"ralph pipeline trace: --full flag prints JSON with trailing NUL bytes, only on macOS Terminal.app"`
+  - `"apparat pipeline trace: --full flag prints JSON with trailing NUL bytes, only on macOS Terminal.app"`
 - `test_render`: a self-contained markdown block the user reads verbatim at `tmux_confirm_gate` to decide **Commit** vs **Retry**. This mirrors how `change-explainer` renders `explainer_render` for `approval_gate`. Follow this exact structure:
 
   ```markdown
@@ -274,7 +274,7 @@ Be specific. "Something looked off" is not an issue; name the command, the surfa
 - **Commit** each passing fix (one commit per fix). Follow existing commit-message style.
 - **Do NOT `git push`.** `commit_push` is the only node that pushes.
 - **Do NOT `cleanup_run`/`tmux kill-window`** on the test window — the pipeline owns its lifecycle.
-- **Do NOT run interactive commands that require a real human** (e.g. `ralph plan`, `ralph meditate` without pre-canned input). If a command opens a Claude session, skip it.
+- **Do NOT run interactive commands that require a real human** (e.g. `apparat plan`, `apparat meditate` without pre-canned input). If a command opens a Claude session, skip it.
 - **Do NOT spawn more tmux windows.** Reuse the one already opened by `launch_tmux`.
 - **Do NOT modify files outside the scope of what the current fix needs.** You are test-driven and minimal — no drive-by refactors.
 - **Reap every backgrounded bash before emitting Phase 4.** Run `jobs -p | xargs -r kill 2>/dev/null; wait 2>/dev/null` (or equivalent) at the top of Phase 4. Orphan background loops will stall the pipeline node for their full sleep budget — the engine cannot advance while your session has open background tasks.

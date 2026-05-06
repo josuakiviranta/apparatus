@@ -29,7 +29,7 @@ import {
 let tmpDir: string;
 
 beforeEach(() => {
-  tmpDir = mkdtempSync(join(tmpdir(), "ralph-meditate-test-"));
+  tmpDir = mkdtempSync(join(tmpdir(), "apparat-meditate-test-"));
 });
 
 afterEach(() => {
@@ -49,7 +49,7 @@ describe("ensureMeditationDirs", () => {
   });
 
   it("creates only the meditations/illuminations/ directory (no side folders)", () => {
-    const tmp = mkdtempSync(join(tmpdir(), "ralph-meditate-dirs-"));
+    const tmp = mkdtempSync(join(tmpdir(), "apparat-meditate-dirs-"));
     try {
       ensureMeditationDirs(tmp);
       expect(existsSync(join(tmp, ".apparat", "meditations", "illuminations"))).toBe(true);

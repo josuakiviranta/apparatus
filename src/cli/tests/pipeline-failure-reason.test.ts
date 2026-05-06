@@ -19,7 +19,7 @@ describe("pipeline run — failureReason surfacing", () => {
   let writtenStderr = "";
 
   beforeEach(() => {
-    work = mkdtempSync(join(tmpdir(), "ralph-failreason-"));
+    work = mkdtempSync(join(tmpdir(), "apparat-failreason-"));
     writeFileSync(join(work, "fail.dot"), DOT);
     writtenStderr = "";
     stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation((chunk: unknown) => {

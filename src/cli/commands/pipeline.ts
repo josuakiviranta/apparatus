@@ -61,7 +61,7 @@ export function resolveResumeLogsRoot(
   if (typeof resume === "string") {
     const dir = join(runsRoot, resume);
     if (!existsSync(dir)) {
-      process.stderr.write(`[ralph] --resume ${resume}: run dir not found: ${dir}\n`);
+      process.stderr.write(`[apparat] --resume ${resume}: run dir not found: ${dir}\n`);
       process.exit(1);
     }
     return dir;
@@ -83,7 +83,7 @@ export function resolveResumeLogsRoot(
     .map(e => `  ${e.name}  (${new Date(e.mtime).toISOString()})`)
     .join("\n");
   process.stderr.write(
-    "[ralph] multiple runs exist for this project; pass --resume <runId> to disambiguate:\n" + list + "\n",
+    "[apparat] multiple runs exist for this project; pass --resume <runId> to disambiguate:\n" + list + "\n",
   );
   process.exit(1);
   return null;
@@ -269,7 +269,7 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
   if (graph.headlessSafe === false && !process.stdin.isTTY) {
     await output.error(
       `This pipeline has headless_safe=false and cannot run without a TTY.\n` +
-      `Run it interactively: ralph pipeline run ${dotFile}`
+      `Run it interactively: apparat pipeline run ${dotFile}`
     );
     process.exit(1);
   }
@@ -278,7 +278,7 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
   // so refuse rather than silently using process.cwd() as the project key.
   if (!process.stdin.isTTY && !opts.project) {
     process.stderr.write(
-      "[ralph] Headless runs require --project; cwd is ambiguous when invoked from cron/daemon.\n",
+      "[apparat] Headless runs require --project; cwd is ambiguous when invoked from cron/daemon.\n",
     );
     process.exit(1);
   }
@@ -552,14 +552,14 @@ export async function pipelineListCommand(opts: PipelineListOptions = {}): Promi
   const pipelinesDir = getPipelinesDir(project);
 
   if (!existsSync(pipelinesDir)) {
-    await output.info(`No pipelines/ folder found in ${project}.\nCreate one with: ralph pipeline create <name> --project ${project}`);
+    await output.info(`No pipelines/ folder found in ${project}.\nCreate one with: apparat pipeline create <name> --project ${project}`);
     return;
   }
 
   const dotFiles = readdirSync(pipelinesDir).filter(f => f.endsWith(".dot"));
 
   if (dotFiles.length === 0) {
-    await output.info(`No workflows found in ${pipelinesDir}.\nCreate one with: ralph pipeline create <name> --project ${project}`);
+    await output.info(`No workflows found in ${pipelinesDir}.\nCreate one with: apparat pipeline create <name> --project ${project}`);
     return;
   }
 

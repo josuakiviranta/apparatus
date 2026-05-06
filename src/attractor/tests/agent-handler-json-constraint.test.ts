@@ -54,7 +54,7 @@ describe("AgentHandler – JSON constraint injection", () => {
 
   it("prepends JSON constraint to prompt when jsonSchema is set", async () => {
     const schema = JSON.stringify({ type: "object", properties: { verdict: { type: "string" } }, required: ["verdict"] });
-    const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-json-constraint-"));
+    const logsDir = mkdtempSync(join(tmpdir(), "apparat-ah-json-constraint-"));
 
     mockResolve.mockReturnValue({ ...baseConfig, jsonSchema: schema });
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: JSON.stringify([{ type: "result", result: "", structured_output: { verdict: "pass" } }]) });
@@ -85,7 +85,7 @@ describe("AgentHandler – JSON constraint injection", () => {
 
   it("appends JSON constraint to prompt when jsonSchema is set", async () => {
     const schema = JSON.stringify({ type: "object", properties: { verdict: { type: "string" } }, required: ["verdict"] });
-    const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-json-constraint-"));
+    const logsDir = mkdtempSync(join(tmpdir(), "apparat-ah-json-constraint-"));
 
     mockResolve.mockReturnValue({ ...baseConfig, jsonSchema: schema });
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null, output: JSON.stringify([{ type: "result", result: "", structured_output: { verdict: "pass" } }]) });
@@ -122,7 +122,7 @@ describe("AgentHandler – JSON constraint injection", () => {
       createAgent: (config) => { capturedConfig = config; return { run: mockAgentRun, kill: mockAgentKill, config } as any; },
     });
 
-    const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-json-constraint-"));
+    const logsDir = mkdtempSync(join(tmpdir(), "apparat-ah-json-constraint-"));
     try {
       await handler.execute(
         makeNode({ prompt: "Verify the implementation" }),
@@ -142,7 +142,7 @@ describe("AgentHandler – JSON constraint injection", () => {
     // Parse-repair (Change 2) MUST NOT be applied — it would cause this test to pass silently
     // with garbled data instead of surfacing the failure to the pipeline.
     const schema = JSON.stringify({ type: "object", properties: { verdict: { type: "string" } } });
-    const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-json-constraint-"));
+    const logsDir = mkdtempSync(join(tmpdir(), "apparat-ah-json-constraint-"));
 
     mockResolve.mockReturnValue({ ...baseConfig, jsonSchema: schema });
     // Simulate the real failure: model returns markdown despite --json-schema flag
@@ -175,7 +175,7 @@ describe("AgentHandler – JSON constraint injection", () => {
 
   it("parses JSON array output and extracts structured_output from result event", async () => {
     const schema = JSON.stringify({ type: "object", properties: { verdict: { type: "string" } } });
-    const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-json-constraint-"));
+    const logsDir = mkdtempSync(join(tmpdir(), "apparat-ah-json-constraint-"));
 
     mockResolve.mockReturnValue({ ...baseConfig, jsonSchema: schema });
     // Real Claude CLI --output-format json: JSON array with structured_output
@@ -208,7 +208,7 @@ describe("AgentHandler – JSON constraint injection", () => {
 
   it("returns descriptive failure when output has no {type:'result'} event", async () => {
     const schema = JSON.stringify({ type: "object", properties: { verdict: { type: "string" } } });
-    const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-json-constraint-"));
+    const logsDir = mkdtempSync(join(tmpdir(), "apparat-ah-json-constraint-"));
 
     mockResolve.mockReturnValue({ ...baseConfig, jsonSchema: schema });
     // Truncated session: JSON array with events but no result
@@ -239,7 +239,7 @@ describe("AgentHandler – JSON constraint injection", () => {
 
   it("parses structured_output when it is a raw object", async () => {
     const schema = JSON.stringify({ type: "object", properties: { verdict: { type: "string" } } });
-    const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-json-constraint-"));
+    const logsDir = mkdtempSync(join(tmpdir(), "apparat-ah-json-constraint-"));
 
     mockResolve.mockReturnValue({ ...baseConfig, jsonSchema: schema });
     // structured_output as raw object (not stringified) — exercises the non-string branch
@@ -270,7 +270,7 @@ describe("AgentHandler – JSON constraint injection", () => {
 
   it("writes raw-attempt-1.txt to nodeDir when jsonSchema output is present", async () => {
     const schema = JSON.stringify({ type: "object", properties: { verdict: { type: "string" } } });
-    const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-json-constraint-"));
+    const logsDir = mkdtempSync(join(tmpdir(), "apparat-ah-json-constraint-"));
 
     mockResolve.mockReturnValue({ ...baseConfig, jsonSchema: schema });
     const jsonArray = JSON.stringify([
@@ -299,8 +299,8 @@ describe("AgentHandler – JSON constraint injection", () => {
 
   it("uses config.jsonSchema (from agent frontmatter) independent of dotDir/cwd", async () => {
     const schema = JSON.stringify({ type: "object", properties: { verdict: { type: "string" } }, required: ["verdict"] });
-    const dotDir = mkdtempSync(join(tmpdir(), "ralph-dotdir-"));
-    const projectDir = mkdtempSync(join(tmpdir(), "ralph-project-"));
+    const dotDir = mkdtempSync(join(tmpdir(), "apparat-dotdir-"));
+    const projectDir = mkdtempSync(join(tmpdir(), "apparat-project-"));
     // NOTE: schema is passed via config.jsonSchema — no file needed in any dir
 
     mockResolve.mockReturnValue({ ...baseConfig, jsonSchema: schema });
@@ -330,7 +330,7 @@ describe("AgentHandler – JSON constraint injection", () => {
 
   it("returns descriptive failure when agent produces no output", async () => {
     const schema = JSON.stringify({ type: "object", properties: { verdict: { type: "string" } } });
-    const logsDir = mkdtempSync(join(tmpdir(), "ralph-ah-json-constraint-"));
+    const logsDir = mkdtempSync(join(tmpdir(), "apparat-ah-json-constraint-"));
 
     mockResolve.mockReturnValue({ ...baseConfig, jsonSchema: schema });
     // Simulate timeout: agent exits without producing output

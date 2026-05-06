@@ -1,11 +1,11 @@
-# Scenario: `ralph init <project>` scaffolds the .apparat/ tree
+# Scenario: `apparat init <project>` scaffolds the .apparat/ tree
 
 ## Setup
 - A clean working directory; the target folder `init-smoke` does not exist yet.
 - `mkdir -p init-smoke`
 
 ## Action
-`ralph init init-smoke`
+`apparat init init-smoke`
 
 ## Expect
 - exit code is 0

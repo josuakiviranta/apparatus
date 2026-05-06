@@ -3,7 +3,7 @@ import { mkdirSync, rmSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 
-const testHome = join(tmpdir(), `ralph-runner-test-${process.pid}`);
+const testHome = join(tmpdir(), `apparat-runner-test-${process.pid}`);
 process.env.HOME = testHome;
 
 import { runTask, isSessionRunning, killSession, getRalphCliPath } from "../runner";
@@ -33,7 +33,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
 describe("runTask", () => {
   it("returns runId and exitCode after completion", async () => {
     const task = makeTask();
-    // Override ralph CLI path to a fast no-op for testing
+    // Override apparat CLI path to a fast no-op for testing
     vi.stubEnv("APPARAT_TEST_CMD", `${process.execPath} -e "process.exit(0)"`);
     const result = await runTask(task);
     expect(result.runId).toBeTruthy();

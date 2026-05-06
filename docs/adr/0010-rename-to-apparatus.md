@@ -1,6 +1,6 @@
 # 0010 — Rename `ralph` → `apparatus`
 
-**Status:** Draft (pending rename PR completion)
+**Status:** Accepted (2026-05-05)
 
 **Supersedes (in part):** ADR-0007 (`.ralph/` as project-local home) and ADR-0008 (partial revert + partition principle), but only their *naming*. The project-local layout principle and the §1.2 two-clause partition rule both still hold; only the folder name `.ralph/` becomes `.apparat/` and the brand `ralph` becomes `apparatus` (binary `apparat`).
 

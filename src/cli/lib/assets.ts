@@ -27,7 +27,7 @@ export function resolveBundledPipeline(name: string): string {
   if (!existsSync(path)) {
     throw new Error(
       `Bundled pipeline not found: "${name}" (expected ${path}). ` +
-        `Available pipelines ship under pipelines/ at the ralph-cli repo root.`,
+        `Available pipelines ship under pipelines/ at the apparat-cli repo root.`,
     );
   }
   return path;

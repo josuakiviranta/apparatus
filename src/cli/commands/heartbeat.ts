@@ -27,8 +27,8 @@ export function resolveHeartbeatPipelineArg(arg: string, project: string): strin
  * Writes a clear message to stderr and exits the process before the daemon is
  * contacted. The error deliberately shows BOTH the original arg and the
  * resolved absolute path so that the common "double-join" mistake (running
- * `ralph heartbeat meditate ralph-cli` from inside a folder already named
- * `ralph-cli`) is obvious at a glance.
+ * `apparat heartbeat meditate apparat-cli` from inside a folder already named
+ * `apparat-cli`) is obvious at a glance.
  *
  * Not using output.error() here because Ink rendering is async and can be
  * truncated by an immediate process.exit(); errors also belong on stderr.
@@ -96,13 +96,13 @@ export function registerHeartbeatCommand(program: Command): void {
     .description("Manage background scheduled tasks (daemon-backed; persists across terminal sessions)")
     .addHelpText("after", `
 Examples:
-  ralph heartbeat list
-  ralph heartbeat watch`);
+  apparat heartbeat list
+  apparat heartbeat watch`);
 
   hb
     .command("meditate <folder>")
     .description("Schedule meditate to run on a project folder at a fixed interval")
-    .addHelpText("after", "\nExamples:\n  ralph heartbeat meditate my-app --every 30\n")
+    .addHelpText("after", "\nExamples:\n  apparat heartbeat meditate my-app --every 30\n")
     .requiredOption("--every <n>", "interval in minutes", (v) => {
       const n = parseInt(v, 10);
       if (isNaN(n) || n < 1) throw new Error("--every must be a positive integer");
@@ -134,7 +134,7 @@ Examples:
   hb
     .command("implement <folder>")
     .description("Schedule the agentic build loop to run on a project folder at a fixed interval")
-    .addHelpText("after", "\nExamples:\n  ralph heartbeat implement my-app --every 60\n")
+    .addHelpText("after", "\nExamples:\n  apparat heartbeat implement my-app --every 60\n")
     .requiredOption("--every <n>", "interval in minutes", (v) => {
       const n = parseInt(v, 10);
       if (isNaN(n) || n < 1) throw new Error("--every must be a positive integer");
@@ -159,7 +159,7 @@ Examples:
   hb
     .command("pipeline <dotfile>")
     .description("Schedule a DOT-graph pipeline to run at a fixed interval")
-    .addHelpText("after", "\nExamples:\n  ralph heartbeat pipeline workflow.dot --project my-app --every 60\n  ralph heartbeat pipeline janitor      --project my-app --every 720\n")
+    .addHelpText("after", "\nExamples:\n  apparat heartbeat pipeline workflow.dot --project my-app --every 60\n  apparat heartbeat pipeline janitor      --project my-app --every 720\n")
     .option("--project <folder>", "project folder passed to the pipeline")
     .requiredOption("--every <n>", "interval in minutes", (v) => {
       const n = parseInt(v, 10);
@@ -189,7 +189,7 @@ Examples:
         if (refs.length > 0) {
           console.error(
             `✗ Pipeline references $project but --project was not passed.\n` +
-            `  Pass --project <folder> to ralph heartbeat pipeline.\n` +
+            `  Pass --project <folder> to apparat heartbeat pipeline.\n` +
             `  Nodes referencing $project: ${refs.join(", ")}`
           );
           process.exit(1);
@@ -240,7 +240,7 @@ Examples:
   hb
     .command("stop <id>")
     .description("Remove a task from the schedule and kill any running session")
-    .addHelpText("after", "\nExamples:\n  ralph heartbeat stop meditate:my-app\n")
+    .addHelpText("after", "\nExamples:\n  apparat heartbeat stop meditate:my-app\n")
     .action(async (id: string) => {
       try {
         await request("stop_task", { taskId: id });
@@ -254,7 +254,7 @@ Examples:
   hb
     .command("pause <id>")
     .description("Suspend scheduling for a task without removing it")
-    .addHelpText("after", "\nExamples:\n  ralph heartbeat pause meditate:my-app\n")
+    .addHelpText("after", "\nExamples:\n  apparat heartbeat pause meditate:my-app\n")
     .action(async (id: string) => {
       try {
         await request("pause_task", { taskId: id });
@@ -268,7 +268,7 @@ Examples:
   hb
     .command("resume <id>")
     .description("Re-enable scheduling for a paused task")
-    .addHelpText("after", "\nExamples:\n  ralph heartbeat resume meditate:my-app\n")
+    .addHelpText("after", "\nExamples:\n  apparat heartbeat resume meditate:my-app\n")
     .action(async (id: string) => {
       try {
         await request("resume_task", { taskId: id });
@@ -282,7 +282,7 @@ Examples:
   hb
     .command("kill <id>")
     .description("Kill the currently running session for a task; schedule is preserved")
-    .addHelpText("after", "\nExamples:\n  ralph heartbeat kill meditate:my-app\n")
+    .addHelpText("after", "\nExamples:\n  apparat heartbeat kill meditate:my-app\n")
     .action(async (id: string) => {
       try {
         await request("kill_session", { taskId: id });
@@ -296,7 +296,7 @@ Examples:
   hb
     .command("logs <id>")
     .description("Print logs for a task; use --follow to stream live output")
-    .addHelpText("after", "\nExamples:\n  ralph heartbeat logs meditate:my-app\n  ralph heartbeat logs meditate:my-app --follow\n")
+    .addHelpText("after", "\nExamples:\n  apparat heartbeat logs meditate:my-app\n  apparat heartbeat logs meditate:my-app --follow\n")
     .option("--follow", "stream live output")
     .action(async (id: string, opts: { follow?: boolean }) => {
       try {

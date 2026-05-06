@@ -959,7 +959,7 @@ describe("validateGraph — script_file rules", () => {
   let tmp: string;
 
   beforeEach(() => {
-    tmp = mkdtempSync(join(tmpdir(), "ralph-graph-validate-"));
+    tmp = mkdtempSync(join(tmpdir(), "apparat-graph-validate-"));
   });
   afterEach(() => {
     rmSync(tmp, { recursive: true, force: true });

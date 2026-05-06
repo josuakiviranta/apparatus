@@ -82,3 +82,7 @@ The `.ralph/memory/` slot is removed. Session-closure files written by the `memo
 - ADR-0007: `.ralph/` as project-local home for ralph-touchable state.
 - Spec: `docs/superpowers/specs/2026-05-04-ralph-folder-partial-revert-design.md` — full design and operational test.
 - Plan: `docs/superpowers/plans/2026-05-04-ralph-folder-partial-revert.md` — implementation plan.
+
+---
+
+**Update 2026-05-05:** Naming superseded by [ADR-0010](0010-rename-to-apparatus.md). The folder name `.ralph/` becomes `.apparat/`; the two-clause partition principle stands.

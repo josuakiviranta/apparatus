@@ -164,7 +164,7 @@ const NO_META_MEDITATIONS_MESSAGE =
   "No meta-meditations found. You can still proceed — reflect on the project code " +
   "directly and write your illumination using write_illumination.\n\n" +
   "To add meta-meditations: create .md files in the .apparat/meditations/stimuli/ folder of your " +
-  "ralph-cli installation (e.g. ~/.npm-global/lib/node_modules/ralph-cli/.apparat/meditations/stimuli/). " +
+  "apparat-cli installation (e.g. ~/.npm-global/lib/node_modules/apparat-cli/.apparat/meditations/stimuli/). " +
   "Each file is a lens the agent will use to reflect on your project.";
 
 export function listMetaMeditations(meditationsDir: string): string {
@@ -409,7 +409,7 @@ if (!isTestEnv) {
 
     server.tool(
       "list_meta_meditations",
-      "List available meta-meditation lens files from the ralph-cli installation. " +
+      "List available meta-meditation lens files from the apparat-cli installation. " +
         "Call this first to see which lenses are available before reading any.",
       {},
       async () => {

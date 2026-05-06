@@ -20,7 +20,7 @@ This affects every memory-writer / memory-reflector invocation, and it has likel
 
 ## Revised Implementation Steps
 
-1. **Reproduce the gap deterministically.** Run a fresh `illumination-to-implementation` pipeline end-to-end on a tiny illumination. Before memory-writer fires, snapshot `find ~/.ralph -name pipeline.jsonl -newer <pipeline-start-marker>`. Confirm whether the trace file exists at all, and if so, at what path scheme.
+1. **Reproduce the gap deterministically.** Run a fresh `illumination-to-implementation` pipeline end-to-end on a tiny illumination. Before memory-writer fires, snapshot `find ~/.apparat -name pipeline.jsonl -newer <pipeline-start-marker>`. Confirm whether the trace file exists at all, and if so, at what path scheme.
 2. **Locate the daemon's actual write path.** Grep `src/daemon/` and `src/cli/` for `pipeline.jsonl` writes (`fs.appendFile`, `createWriteStream`, etc.). Capture the exact path-construction code and the identifier it keys on (`run_id`? `session_id`? a hash?).
 3. **Locate memory-writer's read path.** Grep the `templates/memory-writer/` (or equivalent) agent prompt + tool wiring for the trace-lookup glob. Capture the path scheme it expects.
 4. **Compare.** Diff the daemon's write path against the agent's read path. The mismatch is the bug. Possible shapes: different identifier, different base directory, different filename, ordering / flush race.

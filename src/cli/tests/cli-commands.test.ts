@@ -33,7 +33,7 @@ describe("CLI command structure", () => {
 });
 
 describe("CLI parseAsync routing", () => {
-  it("ralph meditate <folder> calls the meditate action with folder arg", async () => {
+  it("apparat meditate <folder> calls the meditate action with folder arg", async () => {
     const program = createProgram();
     program.exitOverride();
 
@@ -41,7 +41,7 @@ describe("CLI parseAsync routing", () => {
     const actionFn = vi.fn();
     meditateCmd!.action(actionFn);
 
-    await program.parseAsync(["node", "ralph", "meditate", "./myproject"]);
+    await program.parseAsync(["node", "apparat", "meditate", "./myproject"]);
     expect(actionFn).toHaveBeenCalled();
     expect(actionFn.mock.calls[0][0]).toBe("./myproject");
   });

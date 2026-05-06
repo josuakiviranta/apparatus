@@ -23,7 +23,7 @@ describe("JsonlPipelineTracer", () => {
   let tracePath: string;
 
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "ralph-tracer-test-"));
+    dir = mkdtempSync(join(tmpdir(), "apparat-tracer-test-"));
     tracePath = join(dir, "pipeline.jsonl");
   });
   afterEach(() => { rmSync(dir, { recursive: true }); });

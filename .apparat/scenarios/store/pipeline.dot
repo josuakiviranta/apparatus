@@ -13,13 +13,13 @@ digraph store_smoke {
   save [
     shape=cylinder,
     store_key="tool.output",
-    store_file="/tmp/ralph-store-smoke.md"
+    store_file="/tmp/apparat-store-smoke.md"
   ]
 
   // verify the file was written
   verify [
     shape=parallelogram,
-    tool_command="cat /tmp/ralph-store-smoke.md"
+    tool_command="cat /tmp/apparat-store-smoke.md"
   ]
 
   done [shape=Msquare]

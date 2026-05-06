@@ -11,11 +11,11 @@ function gitAvailable(): boolean {
   catch { return false; }
 }
 
-describe("ralph init", () => {
+describe("apparat init", () => {
   let projectDir: string;
 
   beforeEach(() => {
-    projectDir = mkdtempSync(join(tmpdir(), "ralph-init-test-"));
+    projectDir = mkdtempSync(join(tmpdir(), "apparat-init-test-"));
   });
   afterEach(() => {
     rmSync(projectDir, { recursive: true, force: true });

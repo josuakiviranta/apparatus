@@ -26,7 +26,7 @@ describe("pipelineTraceCommand", () => {
   let written = "";
 
   beforeEach(() => {
-    projectRoot = mkdtempSync(join(tmpdir(), "ralph-trace-cmd-"));
+    projectRoot = mkdtempSync(join(tmpdir(), "apparat-trace-cmd-"));
     exitCode = null;
     written = "";
     vi.spyOn(process, "exit").mockImplementation(((c?: number) => {
@@ -96,7 +96,7 @@ describe("pipelineTraceCommand", () => {
     // Load-bearing invariant: $run_id seen by agents == on-disk dir name.
     expect(result.context.run_id).toBe(runId);
 
-    // Public contract: ralph pipeline trace <$run_id> exits 0.
+    // Public contract: apparat pipeline trace <$run_id> exits 0.
     await expect(
       pipelineTraceCommand(String(result.context.run_id), { project: projectRoot }),
     ).resolves.toBeUndefined();

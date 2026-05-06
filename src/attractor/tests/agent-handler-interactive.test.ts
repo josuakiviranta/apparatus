@@ -107,7 +107,7 @@ describe("AgentHandler — interactive branch", () => {
       createAgent: () => agent,
     });
 
-    const tmp = mkdtempSync(join(tmpdir(), "ralph-handler-"));
+    const tmp = mkdtempSync(join(tmpdir(), "apparat-handler-"));
     try {
       const node: Node = {
         id: "chat_node",
@@ -140,7 +140,7 @@ describe("AgentHandler — interactive branch", () => {
       createAgent: () => agent,
     });
 
-    const tmp = mkdtempSync(join(tmpdir(), "ralph-handler-"));
+    const tmp = mkdtempSync(join(tmpdir(), "apparat-handler-"));
     try {
       const node: Node = { id: "chat_node", prompt: "p", interactive: true };
       const out = await handler.execute(node, baseCtx(), baseMeta(tmp, tmp, makeInteractiveStub("abort")));
@@ -160,7 +160,7 @@ describe("AgentHandler — interactive branch", () => {
       createAgent: () => agent,
     });
 
-    const tmp = mkdtempSync(join(tmpdir(), "ralph-handler-"));
+    const tmp = mkdtempSync(join(tmpdir(), "apparat-handler-"));
     try {
       // DOT attributes parse as strings, so interactive="true" is common
       const node: Node = { id: "chat", prompt: "hi", interactive: "true" };
@@ -180,7 +180,7 @@ describe("AgentHandler — interactive branch", () => {
       createAgent: () => agent,
     });
 
-    const tmp = mkdtempSync(join(tmpdir(), "ralph-handler-"));
+    const tmp = mkdtempSync(join(tmpdir(), "apparat-handler-"));
     try {
       const node: Node = { id: "chat", prompt: "talk about testing", interactive: true };
       const ctx: PipelineContext = { values: { topic: "testing" } };

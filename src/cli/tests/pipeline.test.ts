@@ -66,7 +66,7 @@ describe("pipelineValidateCommand", () => {
   let dir: string;
   beforeEach(() => {
     vi.clearAllMocks();
-    dir = mkdtempSync(join(tmpdir(), "ralph-pipeline-test-"));
+    dir = mkdtempSync(join(tmpdir(), "apparat-pipeline-test-"));
   });
   afterEach(() => { rmSync(dir, { recursive: true }); });
 
@@ -121,7 +121,7 @@ describe("pipelineRunCommand", () => {
   let dir: string;
   beforeEach(() => {
     vi.clearAllMocks();
-    dir = mkdtempSync(join(tmpdir(), "ralph-pipeline-test-"));
+    dir = mkdtempSync(join(tmpdir(), "apparat-pipeline-test-"));
   });
   afterEach(() => { rmSync(dir, { recursive: true }); });
 
@@ -218,7 +218,7 @@ describe("pipelineRunCommand — --resume resolution", () => {
   let dir: string;
   beforeEach(() => {
     vi.clearAllMocks();
-    dir = mkdtempSync(join(tmpdir(), "ralph-pipeline-resume-"));
+    dir = mkdtempSync(join(tmpdir(), "apparat-pipeline-resume-"));
   });
   afterEach(() => {
     rmSync(dir, { recursive: true });
@@ -284,7 +284,7 @@ describe("pipelineRunCommand — onInteractiveRequest", () => {
   let dir: string;
   beforeEach(() => {
     vi.clearAllMocks();
-    dir = mkdtempSync(join(tmpdir(), "ralph-pipeline-test-"));
+    dir = mkdtempSync(join(tmpdir(), "apparat-pipeline-test-"));
   });
   afterEach(() => { rmSync(dir, { recursive: true }); });
 
@@ -329,19 +329,19 @@ describe("pipelineListCommand", () => {
   let dir: string;
   beforeEach(() => {
     vi.clearAllMocks();
-    dir = mkdtempSync(join(tmpdir(), "ralph-pipeline-test-"));
+    dir = mkdtempSync(join(tmpdir(), "apparat-pipeline-test-"));
   });
   afterEach(() => { rmSync(dir, { recursive: true }); });
 
   it("prints message when pipelines/ does not exist", async () => {
     await pipelineListCommand({ project: dir });
-    expect(out.info).toHaveBeenCalledWith(expect.stringContaining("ralph pipeline create"));
+    expect(out.info).toHaveBeenCalledWith(expect.stringContaining("apparat pipeline create"));
   });
 
   it("prints message when pipelines/ is empty", async () => {
     mkdirSync(join(dir, ".apparat", "pipelines"), { recursive: true });
     await pipelineListCommand({ project: dir });
-    expect(out.info).toHaveBeenCalledWith(expect.stringContaining("ralph pipeline create"));
+    expect(out.info).toHaveBeenCalledWith(expect.stringContaining("apparat pipeline create"));
   });
 
   it("lists .dot files with their goal attribute", async () => {
@@ -363,7 +363,7 @@ describe("pipelineValidateCommand — edge-label diff", () => {
   let dotPath: string;
   beforeEach(() => {
     vi.clearAllMocks();
-    dir = mkdtempSync(join(tmpdir(), "ralph-pipeline-diff-"));
+    dir = mkdtempSync(join(tmpdir(), "apparat-pipeline-diff-"));
     dotPath = join(dir, "test.dot");
     writeFileSync(dotPath, VALID_DOT);
   });

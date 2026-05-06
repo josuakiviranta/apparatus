@@ -169,7 +169,7 @@ describe("WaitHumanHandler — .md fallback", () => {
   });
 
   it("happy path: loads prompt and choices from sibling .md file", async () => {
-    const tmp = mkdtempSync(join(tmpdir(), "ralph-gate-test-"));
+    const tmp = mkdtempSync(join(tmpdir(), "apparat-gate-test-"));
     try {
       writeFileSync(
         join(tmp, "foo_gate.md"),
@@ -191,7 +191,7 @@ describe("WaitHumanHandler — .md fallback", () => {
   });
 
   it("prompt is variable-expanded from .md body", async () => {
-    const tmp = mkdtempSync(join(tmpdir(), "ralph-gate-test-"));
+    const tmp = mkdtempSync(join(tmpdir(), "apparat-gate-test-"));
     try {
       writeFileSync(
         join(tmp, "approve_gate.md"),
@@ -215,7 +215,7 @@ describe("WaitHumanHandler — .md fallback", () => {
   });
 
   it("choices come from frontmatter, not edge labels", async () => {
-    const tmp = mkdtempSync(join(tmpdir(), "ralph-gate-test-"));
+    const tmp = mkdtempSync(join(tmpdir(), "apparat-gate-test-"));
     try {
       writeFileSync(
         join(tmp, "pick_gate.md"),
@@ -238,7 +238,7 @@ describe("WaitHumanHandler — .md fallback", () => {
   });
 
   it("missing .md → fail with Gate file not found", async () => {
-    const tmp = mkdtempSync(join(tmpdir(), "ralph-gate-test-"));
+    const tmp = mkdtempSync(join(tmpdir(), "apparat-gate-test-"));
     try {
       const handler = new WaitHumanHandler(makeInterviewer("Yes"), tmp);
       const node: Node = { id: "missing_gate" };
@@ -260,7 +260,7 @@ describe("WaitHumanHandler — .md fallback", () => {
   });
 
   it("regression: inline label still works when dotDir provided", async () => {
-    const tmp = mkdtempSync(join(tmpdir(), "ralph-gate-test-"));
+    const tmp = mkdtempSync(join(tmpdir(), "apparat-gate-test-"));
     try {
       const captured: Question[] = [];
       const interviewer: Interviewer = {

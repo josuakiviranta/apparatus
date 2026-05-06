@@ -24,33 +24,33 @@ export function createProgram(): Command {
     "after",
     `
 Bootstrap a project:
-  mkdir my-app && cd my-app && ralph init    Scaffold a fresh ralph project
-  ralph init                                  Initialize cwd as a ralph project
+  mkdir my-app && cd my-app && apparat init    Scaffold a fresh apparat-shaped project
+  apparat init                                  Initialize cwd as an apparat-shaped project
 
 Getting started (typical workflow):
-  ralph implement my-app                  Run the agentic build loop (Ctrl-C to stop)
-  ralph implement my-app --max 3          Run at most 3 iterations
+  apparat implement my-app                  Run the agentic build loop (Ctrl-C to stop)
+  apparat implement my-app --max 3          Run at most 3 iterations
 
 Background scheduling (heartbeat):
-  ralph heartbeat meditate my-app --every 30            Run meditate on my-app every 30 min
-  ralph heartbeat implement my-app --every 60           Run implement on my-app every 60 min
-  ralph heartbeat pipeline workflow.dot --project my-app --every 60   Run a pipeline every 60 min
-  ralph heartbeat list                                  Show all scheduled tasks
-  ralph heartbeat logs meditate:my-app --follow         Stream live logs for a task
-  ralph heartbeat watch                                 Live TUI dashboard
-  ralph heartbeat pause meditate:my-app                 Suspend scheduling without removing
-  ralph heartbeat resume meditate:my-app                Re-enable a paused task
-  ralph heartbeat stop meditate:my-app                  Remove task and kill any running session
+  apparat heartbeat meditate my-app --every 30            Run meditate on my-app every 30 min
+  apparat heartbeat implement my-app --every 60           Run implement on my-app every 60 min
+  apparat heartbeat pipeline workflow.dot --project my-app --every 60   Run a pipeline every 60 min
+  apparat heartbeat list                                  Show all scheduled tasks
+  apparat heartbeat logs meditate:my-app --follow         Stream live logs for a task
+  apparat heartbeat watch                                 Live TUI dashboard
+  apparat heartbeat pause meditate:my-app                 Suspend scheduling without removing
+  apparat heartbeat resume meditate:my-app                Re-enable a paused task
+  apparat heartbeat stop meditate:my-app                  Remove task and kill any running session
 
 Pipeline engine (DOT-graph workflows):
-  ralph pipeline list --project my-app             List workflows in a project
-  ralph pipeline validate workflow.dot             Check a pipeline file for errors
-  ralph pipeline validate review --project my-app  Validate by workflow name
-  ralph pipeline show workflow.dot                 Render a pipeline as SVG next to the source
-  ralph pipeline run workflow.dot                  Execute a pipeline
-  ralph pipeline run review --project my-app       Run by workflow name
-  ralph pipeline run workflow.dot --resume         Continue a pipeline after Ctrl-C or node failure
-                                                   (checkpoint in <project>/.apparat/runs/<runId>/checkpoint.json)
+  apparat pipeline list --project my-app             List workflows in a project
+  apparat pipeline validate workflow.dot             Check a pipeline file for errors
+  apparat pipeline validate review --project my-app  Validate by workflow name
+  apparat pipeline show workflow.dot                 Render a pipeline as SVG next to the source
+  apparat pipeline run workflow.dot                  Execute a pipeline
+  apparat pipeline run review --project my-app       Run by workflow name
+  apparat pipeline run workflow.dot --resume         Continue a pipeline after Ctrl-C or node failure
+                                                     (checkpoint in <project>/.apparat/runs/<runId>/checkpoint.json)
 
   DOT file anatomy:
     digraph my_pipeline {
@@ -75,13 +75,13 @@ Pipeline engine (DOT-graph workflows):
     diamond    Conditional — branches without human input (condition= on edges)
 
 Meditation (restricted insight sessions):
-  ralph meditate my-app                   Run a one-shot meditation session`
+  apparat meditate my-app                   Run a one-shot meditation session`
   );
 
   program
     .command("implement <project-folder>")
     .description("Run the implement pipeline — Claude reads prompts, writes code, commits, and pushes")
-    .addHelpText("after", "\nExamples:\n  ralph implement my-app\n  ralph implement my-app --max 5\n  ralph implement my-app --max 0   # unlimited iterations\n  ralph implement my-app --scenarios src/tests/scenarios   # write & verify scenario tests (requires tmux)\n\nThe pipeline can be overridden by placing pipelines/implement.dot in your project folder.\n")
+    .addHelpText("after", "\nExamples:\n  apparat implement my-app\n  apparat implement my-app --max 5\n  apparat implement my-app --max 0   # unlimited iterations\n  apparat implement my-app --scenarios src/tests/scenarios   # write & verify scenario tests (requires tmux)\n\nThe pipeline can be overridden by placing pipelines/implement.dot in your project folder.\n")
     .option("--max <n>", "Maximum iterations (0 = unlimited, default: 0)", parseInt)
     .option("--scenarios <path>", "Relative path under <project-folder> for scenario tests; enables scenario-author + tester branch (requires tmux)")
     .action(async (projectFolder: string, options: { max?: number; scenarios?: string }) => {
@@ -91,7 +91,7 @@ Meditation (restricted insight sessions):
   program
     .command("init [project-folder]")
     .description("Scaffold .apparat/ tree in the project folder (defaults to cwd). Idempotent.")
-    .addHelpText("after", "\nExamples:\n  ralph init             # in cwd\n  ralph init my-app      # in ./my-app\n\nCreates .apparat/{pipelines,meditations/{illuminations,stimuli},sessions,runs}\nplus root docs/adr/, scaffolds empty CONTEXT.md, VISION.md, README.md at\nrepo root, runs 'git init -b main' if not already a repo, and appends\n.apparat/runs/ to .gitignore. Safe to run on existing projects — never\noverwrites files.\n")
+    .addHelpText("after", "\nExamples:\n  apparat init             # in cwd\n  apparat init my-app      # in ./my-app\n\nCreates .apparat/{pipelines,meditations/{illuminations,stimuli},sessions,runs}\nplus root docs/adr/, scaffolds empty CONTEXT.md, VISION.md, README.md at\nrepo root, runs 'git init -b main' if not already a repo, and appends\n.apparat/runs/ to .gitignore. Safe to run on existing projects — never\noverwrites files.\n")
     .action(async (projectFolder?: string) => {
       await initCommand(projectFolder ?? process.cwd());
     });
@@ -99,7 +99,7 @@ Meditation (restricted insight sessions):
   program
     .command("meditate <project-folder>")
     .description("Run a restricted Claude session that writes insights to .apparat/meditations/illuminations/")
-    .addHelpText("after", "\nExamples:\n  ralph meditate my-app\n\nThe pipeline can be overridden by placing pipelines/meditate/pipeline.dot in your project folder.\n")
+    .addHelpText("after", "\nExamples:\n  apparat meditate my-app\n\nThe pipeline can be overridden by placing pipelines/meditate/pipeline.dot in your project folder.\n")
     .option("--var <key=value>", "pass caller variable (repeatable, e.g. --var steer=...)", collectKV, {} as Record<string, string>)
     .action(async (projectFolder: string, opts: Record<string, unknown>) => {
       const variables = opts["var"] as Record<string, string> | undefined;
@@ -113,10 +113,10 @@ Meditation (restricted insight sessions):
     .description("Run a .dot pipeline file")
     .addHelpText("after", `
 Examples:
-  ralph pipeline run smoke.dot                          # smoke test — no work nodes
-  ralph pipeline run workflow.dot --project ./my-app   # work nodes operate on my-app
-  ralph pipeline run workflow.dot --resume             # continue after Ctrl-C or node failure
-  ralph pipeline run workflow.dot --var key=value      # pass caller variables (repeatable)
+  apparat pipeline run smoke.dot                          # smoke test — no work nodes
+  apparat pipeline run workflow.dot --project ./my-app   # work nodes operate on my-app
+  apparat pipeline run workflow.dot --resume             # continue after Ctrl-C or node failure
+  apparat pipeline run workflow.dot --var key=value      # pass caller variables (repeatable)
 
 Work nodes (shape=box) require --project to know which codebase to operate on.
 Add max_iterations=N to cap how many agentic loop iterations a node can run.
@@ -146,8 +146,8 @@ re-execute the node that failed.
     .description("Validate a .dot pipeline file (accepts name shorthand or path)")
     .addHelpText("after", `
 Examples:
-  ralph pipeline validate workflow.dot
-  ralph pipeline validate review --project my-app
+  apparat pipeline validate workflow.dot
+  apparat pipeline validate review --project my-app
 
 Checks for: missing start/exit nodes, unknown node shapes, edges referencing
 undeclared nodes, and other structural errors. Exits 0 on success, 1 on errors.
@@ -165,8 +165,8 @@ When a plain name is given (no path separators or .dot extension), resolves to
     .description("List pipeline workflows in a project")
     .addHelpText("after", `
 Examples:
-  ralph pipeline list --project my-app
-  ralph pipeline list
+  apparat pipeline list --project my-app
+  apparat pipeline list
 
 Scans <project>/pipelines/*.dot and prints each workflow's name and goal.
 `)
@@ -190,8 +190,8 @@ Scans <project>/pipelines/*.dot and prints each workflow's name and goal.
     .description("Render a pipeline as SVG next to the source file")
     .addHelpText("after", `
 Examples:
-  ralph pipeline show .apparat/pipelines/illumination-to-implementation/pipeline.dot
-  ralph pipeline show review --project my-app
+  apparat pipeline show .apparat/pipelines/illumination-to-implementation/pipeline.dot
+  apparat pipeline show review --project my-app
 
 Validates the DOT file (same gate as 'pipeline validate'). On success, writes
 <basename>.svg next to the source file using the bundled WASM graphviz —
