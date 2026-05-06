@@ -22,6 +22,10 @@ export function getBundledPipelinesDir(): string {
   return join(getBundledRoot(), "pipelines");
 }
 
+export function getBundledSkillsDir(): string {
+  return join(getBundledRoot(), "skills");
+}
+
 export function resolveBundledPipeline(name: string): string {
   const path = join(getBundledPipelinesDir(), name, "pipeline.dot");
   if (!existsSync(path)) {

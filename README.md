@@ -13,7 +13,9 @@ mkdir my-app && cd my-app
 apparat init
 ````
 
-`apparat init` is idempotent. It creates `.apparat/{pipelines,meditations/{illuminations,stimuli},sessions,runs}` plus root `docs/adr/`, scaffolds empty `CONTEXT.md`, `VISION.md`, and `README.md` at repo root, runs `git init -b main` if the directory is not yet a repo, and appends `.apparat/runs/` to `.gitignore`. Re-running it on an existing project fills in any missing subfolders without overwriting your files.
+`apparat init` is idempotent. It creates `.apparat/{pipelines,meditations/{illuminations,stimuli},sessions,runs}` plus root `docs/adr/`, scaffolds empty `CONTEXT.md`, `VISION.md`, and `README.md` at repo root, runs `git init -b main` if the directory is not yet a repo, and appends `.apparat/runs/` to `.gitignore`. It also drops a Claude Code skill shim at `.claude/skills/apparatus/SKILL.md` so that any `claude` session in the project knows how to drive apparat (run, validate, trace, author pipelines). Re-running it on an existing project fills in any missing subfolders without overwriting your files — including the skill shim, which is preserved if you've customised it.
+
+The skill shim points Claude at a deeper authoring reference (`pipelines.md`) that lives **inside the installed `apparat-cli` npm package**, not in your repo. That keeps the reference always in sync with your pinned CLI version while keeping your project tree free of churn on apparat upgrades. See [`docs/adr/0011-skill-as-shim-plus-live-reference.md`](docs/adr/0011-skill-as-shim-plus-live-reference.md).
 
 ## Install
 
@@ -51,7 +53,7 @@ Shorthand for `implement`.
 ```bash
 apparat meditate <project-folder> [--var steer=<text>]
 ```
-Runs a meditate session against the project's meditations. `--var steer=...` injects an initial steering message at session start. Backed by the bundled folder pipeline `src/cli/pipelines/meditate/`.
+Runs a meditate session against the project's meditations. `--var steer=...` injects an initial steering message at session start. Backed by the bundled folder pipeline `src/cli/pipelines/meditate/`. Equivalent to `apparat pipeline run meditate --project <project-folder>` — the shorthand only adds a PID lock and `.gitignore` entries.
 
 For unattended workspace hygiene scanning, schedule the bundled janitor pipeline:
 

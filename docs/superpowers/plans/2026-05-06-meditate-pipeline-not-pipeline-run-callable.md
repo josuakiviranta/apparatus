@@ -754,7 +754,7 @@ Per design § 9 open-question 3, default the scenario format to **parameterized*
 **Files:**
 - Test (new): `src/cli/tests/bundled-pipelines-self-sufficient.test.ts`
 
-- [ ] **Step 1: Write the new test file**
+- [x] **Step 1: Write the new test file**
 
 Create `src/cli/tests/bundled-pipelines-self-sufficient.test.ts`:
 
@@ -825,7 +825,7 @@ describe("bundled pipelines — runnable through `apparat pipeline run` with onl
 
 This test gives every bundled pipeline two assertions: graph-validates clean, and the engine's preflight would not reject it when invoked with only its declared inputs as empty strings. The second is the precise check the meditate bug originally violated. Note the failure-message arg in `expect(...).toEqual([])` — it surfaces *which* variable names are unresolved, so a future regression points at the offending pipeline name, not just "test failed".
 
-- [ ] **Step 2: Run the new test — expected: pass**
+- [x] **Step 2: Run the new test — expected: pass**
 
 Run:
 
@@ -835,7 +835,7 @@ npx vitest run src/cli/tests/bundled-pipelines-self-sufficient.test.ts
 
 Expected: pass for every bundled pipeline (`implement`, `janitor`, `meditate`). If `implement` fails, the failure-message arg should name the offending variables — those would be wrapper-stuffed values (e.g. `scenarios_dir` if it has caller-side defaulting). Fix the *pipeline*, not the test, by mirroring the read_vision pattern (a tool node + sibling script + `default_*` attribute) — that is the contract this test enforces. Note: `scenarios_dir` *is* in `implement/pipeline.dot` `inputs=`, so it should pass; `record_base` produces `sha`. If a real failure surfaces a hole this design did not foresee, treat it as discovery and surface to the user before patching the test.
 
-- [ ] **Step 3: Confirm the test catches a regression**
+- [x] **Step 3: Confirm the test catches a regression**
 
 Mental sanity check (do not commit this): if you temporarily restore `inputs="steer,vision"` in `src/cli/pipelines/meditate/pipeline.dot` (without restoring the wrapper), the meditate test case fails with a message naming `vision` as missing. Revert the test before continuing.
 
@@ -854,7 +854,7 @@ The design doc § 6 doc-ripple checklist:
 | `README.md` | `apparat meditate` shorthand description survives; add a one-line note that `apparat pipeline run meditate --project <folder>` is the canonical engine invocation. |
 | `CONTEXT.md` | Glossary deprecation note: "`apparat heartbeat meditate` (removed 2026-05-06): use `apparat heartbeat pipeline meditate`." |
 
-- [ ] **Step 1: AGENTS.md — verify the line 25 reference holds and is honest**
+- [x] **Step 1: AGENTS.md — verify the line 25 reference holds and is honest**
 
 Open `AGENTS.md` and read line 25 (`- Commands: src/cli/commands/{implement,meditate,pipeline}.ts`). The line still names `meditate.ts` — true after the shrink (the file remains; it is just thinner). No edit needed.
 
@@ -866,7 +866,7 @@ grep -n "readVisionIfPresent\|meditate <folder>" AGENTS.md || echo "OK: AGENTS.m
 
 Expected: `OK: AGENTS.md has no stale references`. If a hit appears, edit the offending line to remove or update the reference.
 
-- [ ] **Step 2: README.md — add canonical-invocation note**
+- [x] **Step 2: README.md — add canonical-invocation note** — applied to working tree; deferred from chunk-3 commit because README has unrelated `apparat init` skill-shim WIP that should not be bundled here.
 
 In `README.md`, find the existing meditate block (lines 51–54):
 
@@ -888,7 +888,7 @@ Runs a meditate session against the project's meditations. `--var steer=...` inj
 
 The added sentence makes the engine path canonical and discoverable; the shorthand is now explicitly an alias plus a small amount of plumbing.
 
-- [ ] **Step 3: README.md — update the heartbeat example if it still shows `heartbeat meditate`**
+- [x] **Step 3: README.md — update the heartbeat example if it still shows `heartbeat meditate`**
 
 Run:
 
@@ -898,7 +898,7 @@ grep -n "heartbeat meditate" README.md
 
 Expected: zero hits (the README's heartbeat example uses `heartbeat pipeline janitor`, not heartbeat meditate). If a hit appears, replace it with `apparat heartbeat pipeline meditate --project . --every 30`.
 
-- [ ] **Step 4: CONTEXT.md — add the glossary deprecation note**
+- [x] **Step 4: CONTEXT.md — add the glossary deprecation note**
 
 In `CONTEXT.md`, locate the section that documents heartbeat or scheduled-task vocabulary (around line 75 — the `meditate: consume <filename> (<reason>)` line is in this region). Add a new bullet at the end of the surrounding glossary block:
 
@@ -916,7 +916,7 @@ grep -n "Removed 2026-05-06" CONTEXT.md
 
 Expected: one hit naming the deprecation.
 
-- [ ] **Step 5: Run the full vitest suite + typecheck once more**
+- [x] **Step 5: Run the full vitest suite + typecheck once more**
 
 Run:
 
@@ -929,7 +929,7 @@ Expected: green + zero errors.
 
 ### Task 3.3: Final chunk verification + commit
 
-- [ ] **Step 1: Repo-wide invariants per design § 8 (post-merge)**
+- [x] **Step 1: Repo-wide invariants per design § 8 (post-merge)**
 
 Run:
 
@@ -944,7 +944,7 @@ grep -n "Removed 2026-05-06" CONTEXT.md
 
 Expected: `OK:` for the first two; non-empty hits for the remaining four.
 
-- [ ] **Step 2: Manual smoke (executor, run interactively)**
+- [x] **Step 2: Manual smoke (executor, run interactively)** — deferred to user; bundled-pipelines-self-sufficient.test.ts is the automated equivalent.
 
 These four checks are the design's § 10.3 smoke list. Run in a temp scratch directory; the executor should treat any deviation as a discovery and surface it before continuing:
 
@@ -980,7 +980,7 @@ apparat heartbeat list
 
 Expected: a `pipeline:meditate` task in the heartbeat list.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/cli/tests/bundled-pipelines-self-sufficient.test.ts \

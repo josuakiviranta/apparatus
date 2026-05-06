@@ -99,4 +99,27 @@ describe("apparat init", () => {
     await initCommand(projectDir);
     expect(readFileSync(join(projectDir, ".git/sentinel"), "utf8")).toBe("marker");
   });
+
+  it("copies the apparatus SKILL.md shim to .claude/skills/apparatus/", async () => {
+    await initCommand(projectDir);
+    const skillPath = join(projectDir, ".claude/skills/apparatus/SKILL.md");
+    expect(existsSync(skillPath)).toBe(true);
+    const body = readFileSync(skillPath, "utf8");
+    expect(body).toContain("name: apparatus");
+    expect(body).toContain("apparat pipeline run");
+  });
+
+  it("does not overwrite a customised SKILL.md on re-init", async () => {
+    const skillPath = join(projectDir, ".claude/skills/apparatus/SKILL.md");
+    mkdirSync(join(projectDir, ".claude/skills/apparatus"), { recursive: true });
+    writeFileSync(skillPath, "custom skill content");
+    await initCommand(projectDir);
+    expect(readFileSync(skillPath, "utf8")).toBe("custom skill content");
+  });
+
+  it("does not copy the pipelines.md live reference into the project", async () => {
+    await initCommand(projectDir);
+    const refPath = join(projectDir, ".claude/skills/apparatus/pipelines.md");
+    expect(existsSync(refPath)).toBe(false);
+  });
 });

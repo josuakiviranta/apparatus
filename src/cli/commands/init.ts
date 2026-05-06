@@ -1,5 +1,5 @@
 // src/cli/commands/init.ts
-import { mkdirSync, writeFileSync, existsSync, readFileSync, appendFileSync } from "node:fs";
+import { mkdirSync, writeFileSync, existsSync, readFileSync, appendFileSync, copyFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import {
   apparatDir,
@@ -8,6 +8,7 @@ import {
   stimuliDir,
   sessionsDir,
 } from "../lib/apparat-paths.js";
+import { getBundledSkillsDir } from "../lib/assets.js";
 import { join } from "node:path";
 
 export async function initCommand(projectRoot: string): Promise<void> {
@@ -40,6 +41,8 @@ export async function initCommand(projectRoot: string): Promise<void> {
 
   appendGitignoreLine(projectRoot, ".apparat/runs/");
 
+  copyApparatusSkillShim(projectRoot);
+
   if (!existsSync(join(projectRoot, ".git"))) {
     try {
       execSync(`git -C "${projectRoot}" init -b main`, { stdio: "ignore" });
@@ -47,6 +50,15 @@ export async function initCommand(projectRoot: string): Promise<void> {
       // git unavailable — non-fatal; user can run git init manually
     }
   }
+}
+
+function copyApparatusSkillShim(projectRoot: string): void {
+  const dest = join(projectRoot, ".claude", "skills", "apparatus", "SKILL.md");
+  if (existsSync(dest)) return;
+  const src = join(getBundledSkillsDir(), "apparatus", "SKILL.md");
+  if (!existsSync(src)) return;
+  mkdirSync(join(projectRoot, ".claude", "skills", "apparatus"), { recursive: true });
+  copyFileSync(src, dest);
 }
 
 function appendGitignoreLine(projectRoot: string, line: string): void {

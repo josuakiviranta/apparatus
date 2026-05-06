@@ -19,6 +19,7 @@ export default defineConfig({
     // Copy entire src/cli/pipelines/ tree to dist/pipelines/.
     // After Chunk 2, every bundled pipeline is folder-form there.
     cpSync("src/cli/pipelines", "dist/pipelines", { recursive: true });
+    cpSync("src/cli/skills", "dist/skills", { recursive: true });
     console.log("Assets copied to dist/");
   },
 });
