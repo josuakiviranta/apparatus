@@ -15,7 +15,7 @@ import { resolveGate } from "../../cli/lib/gate-registry.js";
 import { resolveInputDecl } from "../transforms/inputs-resolver.js";
 import { SYSTEM_INJECTED_VARS } from "../handlers/agent-prep.js";
 import { outputsToZod } from "../../cli/lib/outputs-to-zod.js";
-import { KNOWN_TYPES, UNIMPLEMENTED_TYPES, resolveHandlerType } from "./graph.js";
+import { KNOWN_TYPES, UNIMPLEMENTED_TYPES, isInteractiveAgent, resolveHandlerType } from "./graph.js";
 
 const SYSTEM_VARS = new Set<string>(SYSTEM_INJECTED_VARS);
 
@@ -967,7 +967,7 @@ function checkAgentMissingOutputs(
   if (!node.agent) return;
 
   // Interactive agents are exempt — they produce chat.output implicitly.
-  if (node.interactive === true || node.interactive === "true") return;
+  if (isInteractiveAgent(node)) return;
 
   const agentConfig = tryResolveAgent(node, dotDir);
   if (!agentConfig) return; // unresolvable agent — other rules handle this
@@ -1000,7 +1000,7 @@ function checkLoopRequiresDoneField(
   diags: Diagnostic[],
 ): void {
   if (!node.agent) return;
-  if (node.interactive === true || node.interactive === "true") return;
+  if (isInteractiveAgent(node)) return;
 
   const agentConfig = tryResolveAgent(node, dotDir);
   if (!agentConfig) return;
@@ -1029,7 +1029,7 @@ function checkInteractiveWithOutputs(
   diags: Diagnostic[],
 ): void {
   if (!node.agent) return;
-  if (node.interactive !== true && node.interactive !== "true") return;
+  if (!isInteractiveAgent(node)) return;
   const agentConfig = tryResolveAgent(node, dotDir);
   if (!agentConfig) return;
   const hasOutputs = !!(agentConfig.outputs && Object.keys(agentConfig.outputs).length > 0);
@@ -1048,7 +1048,7 @@ function checkInteractiveWithLoop(
   diags: Diagnostic[],
 ): void {
   if (!node.agent) return;
-  if (node.interactive !== true && node.interactive !== "true") return;
+  if (!isInteractiveAgent(node)) return;
 
   // Node-level loop signals
   const nodeLoopOn = node.loop === true || node.loop === "true";

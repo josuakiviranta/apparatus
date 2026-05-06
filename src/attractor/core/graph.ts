@@ -31,3 +31,16 @@ export function resolveHandlerType(node: Node): string {
   if (node.shape && SHAPE_TO_TYPE[node.shape]) return SHAPE_TO_TYPE[node.shape];
   return "codergen";
 }
+
+/**
+ * Canonical predicate for the "interactive agent" runtime rule.
+ *
+ * DOT attributes parse as strings; the schema (src/attractor/core/schemas.ts:26)
+ * accepts boolean, "true", or "false". This predicate is the single reader of
+ * that union — call sites import it instead of re-coding the coercion.
+ *
+ * @returns true iff node.interactive is boolean true or string "true".
+ */
+export function isInteractiveAgent(node: Node): boolean {
+  return node.interactive === true || node.interactive === "true";
+}

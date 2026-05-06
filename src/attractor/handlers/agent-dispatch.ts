@@ -1,5 +1,6 @@
 import type { NodeHandler, HandlerExecutionContext } from "./registry.js";
 import type { Node, Outcome, PipelineContext } from "../types.js";
+import { isInteractiveAgent } from "../core/graph.js";
 
 export class AgentHandlerDispatch implements NodeHandler {
   constructor(
@@ -8,9 +9,7 @@ export class AgentHandlerDispatch implements NodeHandler {
   ) {}
 
   async execute(node: Node, ctx: PipelineContext, meta: HandlerExecutionContext): Promise<Outcome> {
-    // DOT attributes parse as strings; coerce explicitly to boolean.
-    const isInteractive = node.interactive === true || node.interactive === "true";
-    return isInteractive
+    return isInteractiveAgent(node)
       ? this.interactive.execute(node, ctx, meta)
       : this.looping.execute(node, ctx, meta);
   }

@@ -1,5 +1,5 @@
 import type { Node } from "../../attractor/types.js";
-import { resolveHandlerType } from "../../attractor/core/graph.js";
+import { isInteractiveAgent, resolveHandlerType } from "../../attractor/core/graph.js";
 
 export type BlockKind =
   | "agent"
@@ -32,8 +32,7 @@ export function classifyNode(node: Node): BlockKind {
   const t = resolveHandlerType(node);
 
   if (t === "agent") {
-    const interactive = node.interactive === true || node.interactive === "true";
-    return interactive ? "interactive-agent" : "agent";
+    return isInteractiveAgent(node) ? "interactive-agent" : "agent";
   }
   if (t === "tool") return "tool";
   if (t === "store") return "store";
