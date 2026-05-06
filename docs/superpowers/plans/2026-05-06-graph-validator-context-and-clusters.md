@@ -732,7 +732,7 @@ This cluster lifts the four discrete regions of the original validator:
 
 **The interactive interleaving stays inside this cluster** — `inputs-refs.ts` imports `interactive`'s per-node functions (Task 3.3) and dispatches them inside the second per-node loop, preserving today's per-node round-robin emission order.
 
-- [ ] **Step 1: Write `inputs-refs.ts` with all 16 rules + interactive dispatch**
+- [x] **Step 1: Write `inputs-refs.ts` with all 16 rules + interactive dispatch**
 
 ```ts
 import type { Node } from "../../types.js";
@@ -807,7 +807,7 @@ function checkOutputsSchemaShape(ctx: ValidationContext): void {
 
 `tryResolveAgent` is imported from `./agent-resolver.js` (Task 3.1).
 
-- [ ] **Step 2: Replace `:407-563` with a single call**
+- [x] **Step 2: Replace `:407-563` with a single call**
 
 Add import: `import * as inputsRefs from "./validators/inputs-refs.js";`
 Replace the entire `:407-563` region of `graph-validator.ts` with:
@@ -818,18 +818,18 @@ Replace the entire `:407-563` region of `graph-validator.ts` with:
 
 This single call subsumes loops 1, 2, 3 and block 4 in their original interleaving.
 
-- [ ] **Step 3: Delete the now-unused helper definitions in the validator**
+- [x] **Step 3: Delete the now-unused helper definitions in the validator**
 
 Delete: `checkOrphanOutput` (`:571-663`), `checkOutputsSchemaShape` (`:665-686`), `checkInputTypeMismatch` (`:688-733`), local `tryResolveAgent` (`:735-742`), `checkMissingInputProducer` (`:841-910`), `checkAgentOutputsConflict` (`:912-960`), `checkAgentMissingOutputs` (`:962-995`). Also delete the local `const VAR_RE = …` at `:188` (Task 2.4 deferred this if `inputs-refs.ts` had not been written yet — now do it). Verify with `grep '\bVAR_RE\b' src/attractor/core/graph-validator.ts` — expected zero hits.
 
 Also delete the `import * as interactive from …` line added in Task 3.3 Step 2 — `graph-validator.ts` no longer references `interactive` directly (the dispatch moved into `inputs-refs.ts`).
 
-- [ ] **Step 4: Type-check, byte-identical, full suite**
+- [x] **Step 4: Type-check, byte-identical, full suite**
 
 Run: `npx tsc --noEmit && npx vitest run src/attractor/tests/graph-validator-byte-identical.test.ts && npx vitest run src/attractor/tests/`
 Expected: all PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/attractor/core/validators/inputs-refs.ts src/attractor/core/graph-validator.ts
