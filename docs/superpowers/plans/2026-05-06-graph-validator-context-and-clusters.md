@@ -300,12 +300,12 @@ Goal of this chunk: extract the four clusters whose rules don't depend on `dotDi
 - Create: `src/attractor/core/validators/flow.ts`
 - Modify: `src/attractor/core/graph-validator.ts:99-176`
 
-- [ ] **Step 1: Confirm baseline test green**
+- [x] **Step 1: Confirm baseline test green**
 
 Run: `npx vitest run src/attractor/tests/graph-validator-byte-identical.test.ts`
 Expected: PASS.
 
-- [ ] **Step 2: Write `flow.ts`**
+- [x] **Step 2: Write `flow.ts`**
 
 Path: `src/attractor/core/validators/flow.ts`
 
@@ -344,7 +344,7 @@ export function run(ctx: ValidationContext): void {
 
 Each function: copy the corresponding source range verbatim into a function body taking `(ctx: ValidationContext)`. Inside, destructure what the original block reads (`const { graph: { nodes, edges }, diags } = ctx;` etc.). Rewrite `nodes` / `edges` / `diags` references; do NOT alter message text, severity, location field order, or rule string spelling. The byte-identical test fails on a trailing space, comma, or punctuation drift.
 
-- [ ] **Step 3: Replace inline block in `graph-validator.ts:99-176` with `flow.run(ctx)`**
+- [x] **Step 3: Replace inline block in `graph-validator.ts:99-176` with `flow.run(ctx)`**
 
 In `src/attractor/core/graph-validator.ts`:
 - Add import: `import * as flow from "./validators/flow.js";` near the other imports.
@@ -364,22 +364,22 @@ The inline references to `startNodes` (used later at `:238`'s variable_coverage 
 
 `flow.ts` recomputes its own predicate locally; the validator keeps its own copy for the variable_coverage block. The two filter calls produce identical sets. **Cleanup later:** Task 2.4 lifts variable_coverage out of the validator; at that point delete the `startNodes` / `exitNodes` locals from `graph-validator.ts` (Task 2.4 Step 2 calls this out).
 
-- [ ] **Step 4: Type-check**
+- [x] **Step 4: Type-check**
 
 Run: `npx tsc --noEmit`
 Expected: clean.
 
-- [ ] **Step 5: Run byte-identical test**
+- [x] **Step 5: Run byte-identical test**
 
 Run: `npx vitest run src/attractor/tests/graph-validator-byte-identical.test.ts`
 Expected: PASS — diagnostic stream byte-identical.
 
-- [ ] **Step 6: Run full validator suite**
+- [x] **Step 6: Run full validator suite**
 
 Run: `npx vitest run src/attractor/tests/`
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/attractor/core/validators/flow.ts src/attractor/core/graph-validator.ts
@@ -392,7 +392,7 @@ git commit -m "refactor(attractor/validators): extract flow rules to validators/
 - Create: `src/attractor/core/validators/types.ts`
 - Modify: `src/attractor/core/graph-validator.ts:179-183`
 
-- [ ] **Step 1: Write `types.ts`**
+- [x] **Step 1: Write `types.ts`**
 
 ```ts
 import type { ValidationContext } from "./context.js";
@@ -411,7 +411,7 @@ export function run(ctx: ValidationContext): void {
 }
 ```
 
-- [ ] **Step 2: Replace inline block at `graph-validator.ts:179-183` with `types.run(ctx)`**
+- [x] **Step 2: Replace inline block at `graph-validator.ts:179-183` with `types.run(ctx)`**
 
 Add import: `import * as types from "./validators/types.js";`
 Replace the `for (const node of nodes.values()) { … type_known / type_unsupported … }` block with:
@@ -420,12 +420,12 @@ Replace the `for (const node of nodes.values()) { … type_known / type_unsuppor
   types.run(ctx);
 ```
 
-- [ ] **Step 3: Type-check, byte-identical, full suite**
+- [x] **Step 3: Type-check, byte-identical, full suite**
 
 Run: `npx tsc --noEmit && npx vitest run src/attractor/tests/graph-validator-byte-identical.test.ts && npx vitest run src/attractor/tests/`
 Expected: all PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/attractor/core/validators/types.ts src/attractor/core/graph-validator.ts

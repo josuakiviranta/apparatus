@@ -15,9 +15,10 @@ import { resolveGate } from "../../cli/lib/gate-registry.js";
 import { resolveInputDecl } from "../transforms/inputs-resolver.js";
 import { SYSTEM_INJECTED_VARS } from "../handlers/agent-prep.js";
 import { outputsToZod } from "../../cli/lib/outputs-to-zod.js";
-import { KNOWN_TYPES, UNIMPLEMENTED_TYPES, isInteractiveAgent, resolveHandlerType } from "./graph.js";
+import { isInteractiveAgent, resolveHandlerType } from "./graph.js";
 import { createValidationContext, RESERVED_VARS } from "./validators/context.js";
 import * as flow from "./validators/flow.js";
+import * as types from "./validators/types.js";
 
 const SYSTEM_VARS = new Set<string>(SYSTEM_INJECTED_VARS);
 
@@ -48,11 +49,7 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
   flow.run(ctx);
 
   // type_known warning + unimplemented type errors
-  for (const node of nodes.values()) {
-    const t = resolveHandlerType(node);
-    if (!KNOWN_TYPES.has(t)) diags.push({ rule: "type_known", severity: "warning", message: `Unknown handler type "${t}" on node "${node.id}"`, location: node.sourceLocation });
-    if (UNIMPLEMENTED_TYPES.has(t)) diags.push({ rule: "type_unsupported", severity: "error", message: `Node type "${t}" is declared but not yet implemented (node "${node.id}")`, location: node.sourceLocation });
-  }
+  types.run(ctx);
 
   // variable_coverage — warn when a $variable may not be defined on all paths
   const VAR_RE = /\$([a-zA-Z_][\w.]*)/g;
