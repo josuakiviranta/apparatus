@@ -970,12 +970,12 @@ Goal of this chunk: document `ValidationContext` and the cluster layout in ADR-0
 **Files:**
 - Create: `docs/adr/0012-validation-context.md`
 
-- [ ] **Step 1: Confirm ADR template / numbering**
+- [x] **Step 1: Confirm ADR template / numbering**
 
 Run: `ls docs/adr/`
 Expected: latest ADR is 0009, 0010, or 0011 — confirm the next free integer is `0012`. If a higher-numbered ADR exists, use the next free integer and adjust references in this plan accordingly. (The design assumed 0012 was free; verify before writing.)
 
-- [ ] **Step 2: Write the ADR**
+- [x] **Step 2: Write the ADR**
 
 Path: `docs/adr/0012-validation-context.md`. Use the same Markdown layout as `docs/adr/0009-parser-validator-split.md` (read it for the heading style and front-matter convention). Sections to include:
 
@@ -1009,7 +1009,7 @@ Path: `docs/adr/0012-validation-context.md`. Use the same Markdown layout as `do
 - Predecessor: docs/adr/0009-parser-validator-split.md
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add docs/adr/0012-validation-context.md
@@ -1018,7 +1018,7 @@ git commit -m "docs(adr): ADR-0012 ValidationContext + clustered validators"
 
 ### Task 4.2: Final constraints verification (design §8)
 
-- [ ] **Step 1: Static checks**
+- [x] **Step 1: Static checks**
 
 Run: `npx tsc --noEmit`
 Expected: clean.
@@ -1029,7 +1029,7 @@ Expected: < 60.
 Run: `ls src/attractor/core/validators/`
 Expected: `agent-resolver.ts context.ts flow.ts gates.ts index.ts interactive.ts inputs-refs.ts scripts.ts types.ts variables.ts` (10 files).
 
-- [ ] **Step 2: Rule-string set count**
+- [x] **Step 2: Rule-string set count**
 
 Run: `grep -roE 'rule:\s*"[^"]+"' src/attractor/core/validators/ | sort -u | wc -l`
 Expected: `41` (matches pre-refactor).
@@ -1037,12 +1037,12 @@ Expected: `41` (matches pre-refactor).
 Run: `grep -oE 'rule:\s*"[^"]+"' src/attractor/core/graph-validator.ts | sort -u | wc -l`
 Expected: `0` (façade no longer emits diagnostics directly).
 
-- [ ] **Step 3: Import-site check**
+- [x] **Step 3: Import-site check**
 
 Run: `grep -r 'from ".*graph-validator.js"' src/`
 Expected: same hit set as Chunk 1 Task 1.3 Step 2 — every test and consumer still imports `validateGraph` / `validateOrRaise` from the unchanged path.
 
-- [ ] **Step 4: Test suite**
+- [x] **Step 4: Test suite**
 
 Run: `npx vitest run src/attractor/tests/graph-validator-byte-identical.test.ts`
 Expected: PASS — the structural guard.
@@ -1053,7 +1053,7 @@ Expected: PASS (16 validator-coverage tests + byte-identical + every other attra
 Run: `npx vitest run`
 Expected: PASS (full repo).
 
-- [ ] **Step 5: Smoke**
+- [x] **Step 5: Smoke**
 
 Run: `npm run build && node dist/cli/index.js pipeline validate <good.dot>`
 Expected: exit 0, stdout/stderr byte-identical to pre-refactor.
@@ -1063,7 +1063,7 @@ Expected: exit 1, diagnostic format and ordering byte-identical.
 
 If a `pipeline run` fixture exists in the repo's smoke tests, also run: `node dist/cli/index.js pipeline run <broken.dot>` — `validateOrRaise` should throw with the byte-identical formatted error string.
 
-- [ ] **Step 6: No-op verification commit (optional)**
+- [x] **Step 6: No-op verification commit (optional)**
 
 If the constraints all pass, no further code changes are needed. If a final tidy commit is warranted (e.g., remove a leftover unused import), make it now:
 
