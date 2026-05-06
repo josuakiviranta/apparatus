@@ -255,7 +255,7 @@ describe("meditateCommand (shim)", () => {
     expect(existsSync(pidPath(tmpDir))).toBe(false);
   });
 
-  it("reads <project>/VISION.md and passes it as the vision variable", async () => {
+  it("does NOT pass `vision` as a caller variable — the pipeline's read_vision tool node owns it", async () => {
     const visionContent = "# Project Vision\n\nNorth-star content for the meditate agent.";
     writeFileSync(join(tmpDir, "VISION.md"), visionContent);
     const calls: Array<{ dotFile: string; opts: any }> = [];
@@ -264,17 +264,18 @@ describe("meditateCommand (shim)", () => {
     });
     await meditateCommand(tmpDir);
     expect(calls).toHaveLength(1);
-    expect(calls[0].opts.variables.vision).toBe(visionContent);
+    expect(calls[0].opts.variables).not.toHaveProperty("vision");
   });
 
-  it("passes empty vision string when VISION.md is absent", async () => {
+  it("passes only `steer` (the single declared caller input) when --var is empty", async () => {
     const calls: Array<{ dotFile: string; opts: any }> = [];
     vi.spyOn(pipelineMod, "pipelineRunCommand").mockImplementation(async (dotFile, opts) => {
       calls.push({ dotFile, opts });
     });
     await meditateCommand(tmpDir);
     expect(calls).toHaveLength(1);
-    expect(calls[0].opts.variables.vision).toBe("");
+    expect(Object.keys(calls[0].opts.variables)).toEqual(["steer"]);
+    expect(calls[0].opts.variables.steer).toBe("");
   });
 
   it("does NOT pass specs_dir to pipeline runtime", async () => {

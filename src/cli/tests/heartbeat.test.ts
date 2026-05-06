@@ -59,102 +59,18 @@ describe("apparat heartbeat list", () => {
   });
 });
 
-describe("apparat heartbeat meditate", () => {
-  it("sends register_task with correct args", async () => {
-    vi.mocked(request).mockResolvedValue({ type: "ok", taskId: "meditate:proj" });
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-    await makeProgram().parseAsync([
-      "node", "apparat", "heartbeat", "meditate", FIXTURE_DIR, "--every", "5",
-    ]);
-    expect(request).toHaveBeenCalledWith("register_task", {
-      command: "meditate",
-      args: [FIXTURE_DIR],
-      interval: 5,
-    });
-    logSpy.mockRestore();
-  });
-
-  it("errors when --every is missing", async () => {
+describe("apparat heartbeat meditate (removed subcommand)", () => {
+  it("Commander rejects `heartbeat meditate <folder>` — replacement is `heartbeat pipeline meditate`", async () => {
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const writeSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     await expect(
-      makeProgram().parseAsync(["node", "apparat", "heartbeat", "meditate", FIXTURE_DIR])
+      makeProgram().parseAsync([
+        "node", "apparat", "heartbeat", "meditate", FIXTURE_DIR, "--every", "5",
+      ])
     ).rejects.toThrow();
+    expect(request).not.toHaveBeenCalled();
     errSpy.mockRestore();
-  });
-
-  it("rejects a nonexistent folder before calling the daemon", async () => {
-    const s = silence();
-    const bogus = join(FIXTURE_DIR, "does-not-exist");
-    await expect(
-      makeProgram().parseAsync([
-        "node", "apparat", "heartbeat", "meditate", bogus, "--every", "5",
-      ])
-    ).rejects.toThrow(/exit:1/);
-    expect(request).not.toHaveBeenCalled();
-    const combined = s.errSpy.mock.calls.flat().join(" ");
-    expect(combined).toContain(bogus);
-    s.restore();
-  });
-
-  it("rejects the double-join case and reports both original arg and resolved path", async () => {
-    // Reproduces the original bug: user inside /.../apparat-cli runs
-    // `apparat heartbeat meditate apparat-cli` and resolve() produces
-    // /.../apparat-cli/apparat-cli which does not exist. A relative arg that
-    // does not exist under the current cwd triggers the same code path.
-    // (vitest workers disallow process.chdir so we use the test runner's cwd.)
-    const s = silence();
-    const relArg = "this-folder-should-definitely-not-exist-zzz";
-    const expectedAbs = resolveFn(relArg);
-    await expect(
-      makeProgram().parseAsync([
-        "node", "apparat", "heartbeat", "meditate", relArg, "--every", "5",
-      ])
-    ).rejects.toThrow(/exit:1/);
-    expect(request).not.toHaveBeenCalled();
-    const combined = s.errSpy.mock.calls.flat().join(" ");
-    expect(combined).toContain(expectedAbs);   // shows the resolved absolute path
-    expect(combined).toContain(relArg);        // shows the original arg
-    expect(combined).toContain(process.cwd()); // and the cwd for diagnosis
-    s.restore();
-  });
-
-  it("rejects when the folder arg points at a file instead of a directory", async () => {
-    const s = silence();
-    await expect(
-      makeProgram().parseAsync([
-        "node", "apparat", "heartbeat", "meditate", FIXTURE_DOT, "--every", "5",
-      ])
-    ).rejects.toThrow(/exit:1/);
-    expect(request).not.toHaveBeenCalled();
-    s.restore();
-  });
-});
-
-describe("apparat heartbeat meditate --var", () => {
-  it("includes --var steer=... in args when provided", async () => {
-    vi.mocked(request).mockResolvedValue({ type: "ok", taskId: "meditate:test" });
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-    await makeProgram().parseAsync([
-      "node", "apparat", "heartbeat", "meditate", FIXTURE_DIR,
-      "--every", "30", "--var", "steer=focus on auth",
-    ]);
-    expect(request).toHaveBeenCalledWith("register_task", {
-      command: "meditate",
-      args: [FIXTURE_DIR, "--var", "steer=focus on auth"],
-      interval: 30,
-    });
-    logSpy.mockRestore();
-  });
-
-  it("omits --var from args when not provided", async () => {
-    vi.mocked(request).mockResolvedValue({ type: "ok", taskId: "meditate:test" });
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-    await makeProgram().parseAsync([
-      "node", "apparat", "heartbeat", "meditate", FIXTURE_DIR, "--every", "30",
-    ]);
-    const callArgs = (vi.mocked(request).mock.calls[0][1] as any).args as string[];
-    expect(callArgs).not.toContain("--var");
-    logSpy.mockRestore();
+    writeSpy.mockRestore();
   });
 });
 

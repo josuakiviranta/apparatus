@@ -8,7 +8,6 @@ import { parseDot } from "../../attractor/core/graph.js";
 import { findVarReferences } from "../../attractor/transforms/variable-expansion.js";
 import type { Task } from "../../daemon/state";
 import * as output from "../lib/output.js";
-import { collectKV } from "../lib/collect-kv.js";
 
 /**
  * Resolves the heartbeat `pipeline` positional arg. Shorthand (e.g. `janitor`)
@@ -98,38 +97,6 @@ export function registerHeartbeatCommand(program: Command): void {
 Examples:
   apparat heartbeat list
   apparat heartbeat watch`);
-
-  hb
-    .command("meditate <folder>")
-    .description("Schedule meditate to run on a project folder at a fixed interval")
-    .addHelpText("after", "\nExamples:\n  apparat heartbeat meditate my-app --every 30\n")
-    .requiredOption("--every <n>", "interval in minutes", (v) => {
-      const n = parseInt(v, 10);
-      if (isNaN(n) || n < 1) throw new Error("--every must be a positive integer");
-      return n;
-    })
-    .option("--var <key=value>", "pass caller variable (repeatable, e.g. --var steer=...)", collectKV, {} as Record<string, string>)
-    .action(async (folder: string, opts: Record<string, unknown>) => {
-      const every = opts.every as number;
-      const variables = (opts["var"] as Record<string, string> | undefined) ?? {};
-      const absPath = resolve(folder);
-      validatePathArg(folder, absPath, "directory", "Project folder");
-      try {
-        const taskArgs: string[] = [absPath];
-        for (const [k, v] of Object.entries(variables)) {
-          taskArgs.push("--var", `${k}=${v}`);
-        }
-        const res = await request("register_task", {
-          command: "meditate",
-          args: taskArgs,
-          interval: every,
-        });
-        await output.success(`Registered: ${res.taskId} (every ${every} min)`);
-      } catch (err: any) {
-        await output.error(`Error: ${err.message}`);
-        process.exit(1);
-      }
-    });
 
   hb
     .command("implement <folder>")

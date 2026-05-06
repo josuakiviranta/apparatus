@@ -36,11 +36,6 @@ export function isPidAlive(pid: number): boolean {
   }
 }
 
-export function readVisionIfPresent(projectFolder: string): string {
-  const p = join(projectFolder, "VISION.md");
-  return existsSync(p) ? readFileSync(p, "utf8") : "";
-}
-
 export function ensureMeditationDirs(projectFolder: string): void {
   mkdirSync(illuminationsDir(projectFolder), { recursive: true });
 }
@@ -78,10 +73,7 @@ export async function meditateCommand(
   try {
     return await self.pipelineRunCommand("meditate", {
       project: absPath,
-      variables: {
-        steer: opts.variables?.steer ?? "",
-        vision: readVisionIfPresent(absPath),
-      },
+      variables: { steer: opts.variables?.steer ?? "" },
     });
   } finally {
     removePid(absPath);
