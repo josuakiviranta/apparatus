@@ -1,11 +1,10 @@
-import { readFileSync, writeFileSync, existsSync } from "fs";
-import { resolve, join, basename, dirname, relative } from "path";
+import { readFileSync, existsSync } from "fs";
+import { resolve, join, dirname } from "path";
 import { randomUUID } from "crypto";
 import { JsonlPipelineTracer } from "../../attractor/tracer/jsonl-pipeline-tracer.js";
 import type { PipelineTracer } from "../../attractor/tracer/pipeline-tracer.js";
 import { parseDot } from "../../attractor/core/graph.js";
-import { validateGraph, validateOrRaise } from "../../attractor/core/graph-validator.js";
-import type { Graph } from "../../attractor/types.js";
+import { validateOrRaise } from "../../attractor/core/graph-validator.js";
 import { runPipeline } from "../../attractor/core/engine.js";
 import { variableExpansionTransform, scanUndeclaredCallerVars, findVarReferences, expandVariables, extractDefaults } from "../../attractor/transforms/variable-expansion.js";
 import {
@@ -20,13 +19,9 @@ import { runsDir } from "../lib/apparat-paths.js";
 import { PassThrough } from "stream";
 import { parseStreamJsonEvents, streamEvents } from "../lib/stream-formatter.js";
 import * as output from "../lib/output.js";
-import { formatPipelineDiag } from "../lib/pipeline-diag-format.js";
-import type { Diagnostic } from "../../attractor/types.js";
-import { DotSyntaxError } from "../../attractor/core/dot-syntax.js";
 import { renderPipelineApp } from "../components/PipelineApp.js";
 import { classifyNode } from "../lib/classifyNode.js";
 import { parseClaudeEvent } from "../lib/parseClaudeEvent.js";
-import { annotateDotForShow } from "../lib/annotate-show.js";
 
 export interface PipelineRunOptions {
   project?: string;
@@ -390,80 +385,5 @@ export type { PipelineListOptions } from "./pipeline/list.js";
 
 export { pipelineTraceCommand } from "./pipeline/trace.js";
 
-export interface PipelineShowOptions {
-  /** Project folder used for name-shorthand resolution (mirrors validate/run). */
-  project?: string;
-}
-
-async function renderDotToSvg(dotSrc: string): Promise<string> {
-  const { Graphviz } = await import("@hpcc-js/wasm-graphviz");
-  const gv = await Graphviz.load();
-  return gv.dot(dotSrc);
-}
-
-export async function pipelineShowCommand(
-  dotFile: string,
-  opts: PipelineShowOptions = {},
-): Promise<number> {
-  const project = resolve(opts.project ?? process.cwd());
-  const absPath = isNameShorthand(dotFile)
-    ? resolvePipelineArg(dotFile, project)
-    : resolve(dotFile);
-
-  if (!existsSync(absPath)) {
-    await output.error(`Dot file not found: ${absPath}`);
-    return 1;
-  }
-
-  let src: string;
-  try { src = readFileSync(absPath, "utf8"); }
-  catch { await output.error(`Cannot read file: ${absPath}`); return 1; }
-
-  const relPath = relative(process.cwd(), absPath) || absPath;
-  const formatDiag = (d: Diagnostic) => formatPipelineDiag(d, src, relPath);
-
-  let graph: Graph;
-  try { graph = parseDot(src); }
-  catch (e) {
-    if (e instanceof DotSyntaxError) {
-      const diag: Diagnostic = {
-        rule: "syntax",
-        severity: "error",
-        message: e.message,
-        location: e.location,
-      };
-      await output.error(formatDiag(diag));
-      return 1;
-    }
-    throw e;
-  }
-
-  const diags = validateGraph(graph, dirname(absPath));
-  const errors = diags.filter(d => d.severity === "error");
-  for (const w of diags.filter(d => d.severity === "warning")) await output.warn(formatDiag(w));
-  for (const e of errors) await output.error(formatDiag(e));
-  if (errors.length > 0) return 1;
-
-  const annotated = annotateDotForShow(src, dirname(absPath));
-  let svg: string;
-  try {
-    svg = await renderDotToSvg(annotated);
-  } catch (err) {
-    await output.error(`graphviz render failed: ${(err as Error).message}`);
-    return 1;
-  }
-
-  const svgPath = join(dirname(absPath), basename(absPath, ".dot") + ".svg");
-  try {
-    writeFileSync(svgPath, svg);
-  } catch (err) {
-    await output.error(`Failed to write ${svgPath}: ${(err as Error).message}`);
-    return 1;
-  }
-
-  await output.success(
-    `Wrote ${relative(process.cwd(), svgPath) || svgPath} ` +
-    `(${graph.nodes.size} nodes, ${graph.edges.length} edges)`,
-  );
-  return 0;
-}
+export { pipelineShowCommand } from "./pipeline/show.js";
+export type { PipelineShowOptions } from "./pipeline/show.js";
