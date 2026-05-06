@@ -9,6 +9,10 @@ import { resolveInputDecl } from "../../transforms/inputs-resolver.js";
 
 const VAR_RE = /\$([a-zA-Z_][\w.]*)/g;
 
+// `runEarly` and `runLate` are two entry points because the byte-identical
+// oracle test pins emission order: variable_coverage / portability fire before
+// scripts.run, while required_caller_vars must fire after the dotDir-gated
+// agent-outputs / inputs blocks. See plan §Chunk 2 Task 2.4 ordering note.
 export function runEarly(ctx: ValidationContext): void {
   checkVariableCoverage(ctx);
   checkPortabilityHeuristic(ctx);
@@ -158,7 +162,7 @@ function checkRequiredCallerVars(ctx: ValidationContext): void {
       for (const k of cfg.inputs) {
         if (RESERVED.has(k)) continue;
         if (isProduced(k)) continue;
-        let resolved;
+        let resolved: ReturnType<typeof resolveInputDecl>;
         try { resolved = resolveInputDecl(k); } catch { continue; }
         const fallbackKey = toCamel("default_" + resolved.localKey);
         if (node[fallbackKey] !== undefined) continue;
