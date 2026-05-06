@@ -14,14 +14,12 @@ const INLINE_SCRIPT_PATTERNS: RegExp[] = [
 ];
 
 export function run(ctx: ValidationContext): void {
-  // Script-file + inline-script rules (tool-handler nodes only)
   for (const node of ctx.graph.nodes.values()) {
     if (resolveHandlerType(node) !== "tool") continue;
 
     const scriptFile = typeof node.scriptFile === "string" ? node.scriptFile : undefined;
     const toolCommand = typeof node.toolCommand === "string" ? node.toolCommand : undefined;
 
-    // script_command_conflict — mutually exclusive
     if (scriptFile && toolCommand) {
       ctx.diags.push({
         rule: "script_command_conflict",
@@ -32,7 +30,6 @@ export function run(ctx: ValidationContext): void {
     }
 
     if (scriptFile) {
-      // unsupported_script_extension
       const ext = extname(scriptFile).toLowerCase();
       if (!SUPPORTED_SCRIPT_EXTS.includes(ext)) {
         ctx.diags.push({
@@ -45,7 +42,7 @@ export function run(ctx: ValidationContext): void {
         });
       }
 
-      // script_file_exists — only when dotDir is available
+      // only when dotDir is available
       if (ctx.dotDir) {
         const resolved = resolvePath(ctx.dotDir, scriptFile);
         if (!existsSync(resolved)) {
@@ -59,7 +56,6 @@ export function run(ctx: ValidationContext): void {
       }
     }
 
-    // inline_script_smell — heuristics on tool_command=
     if (toolCommand) {
       let flagged = false;
       for (const re of INLINE_SCRIPT_PATTERNS) {
