@@ -85,16 +85,16 @@ exports[`graph-validator byte-identical (Chunk 1 oracle) > pins diagnostics for 
   {
     "location": {
       "column": 3,
-      "endColumn": 42,
-      "endLine": 7,
-      "line": 7,
+      "endColumn": 61,
+      "endLine": 12,
+      "line": 12,
     },
     "message": "Agent "meditate" at node "meditate" has outputs: {} with no keys. Declare at least one output key, or remove outputs: if this agent intentionally produces nothing.",
     "rule": "agent_outputs_empty",
     "severity": "warning",
   },
   {
-    "message": "This pipeline requires the following --var keys at runtime: steer, vision",
+    "message": "This pipeline requires the following --var keys at runtime: steer",
     "rule": "required_caller_vars",
     "severity": "info",
   },

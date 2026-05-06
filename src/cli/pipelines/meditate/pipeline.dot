@@ -1,10 +1,15 @@
 digraph meditate {
-  inputs="steer,vision"
+  inputs="steer"
 
   start [shape=Mdiamond];
   end   [shape=Msquare];
 
-  meditate [shape=box, agent="meditate"];
+  read_vision [type="tool",
+               cwd="$project",
+               script_file="read-vision.mjs",
+               produces_from_stdout=true]
 
-  start -> meditate -> end;
+  meditate [shape=box, agent="meditate", default_vision=""];
+
+  start -> read_vision -> meditate -> end;
 }

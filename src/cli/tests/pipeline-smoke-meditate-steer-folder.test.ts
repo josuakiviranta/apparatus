@@ -20,3 +20,19 @@ describe(".apparat/scenarios/meditate-steer/ — chunk-4 per-folder migration", 
     expect(errors).toEqual([]);
   });
 });
+
+describe("src/cli/pipelines/meditate/ — bundled pipeline self-sufficiency", () => {
+  it("declares only steer as caller-supplied input (vision is now graph-internal)", () => {
+    const dotPath = join(REPO_ROOT, "src", "cli", "pipelines", "meditate", "pipeline.dot");
+    const graph = parseDot(readFileSync(dotPath, "utf-8"));
+    expect(graph.inputs).toEqual(["steer"]);
+  });
+
+  it("validateGraph emits zero error-level diagnostics", () => {
+    const dotPath = join(REPO_ROOT, "src", "cli", "pipelines", "meditate", "pipeline.dot");
+    const graph = parseDot(readFileSync(dotPath, "utf-8"));
+    const diags = validateGraph(graph, dirname(dotPath));
+    const errors = diags.filter((d) => d.severity === "error");
+    expect(errors).toEqual([]);
+  });
+});
