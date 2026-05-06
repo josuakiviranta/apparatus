@@ -841,7 +841,7 @@ git commit -m "refactor(attractor/validators): extract inputs/outputs reference 
 **Files:**
 - Create: `src/attractor/core/validators/index.ts`
 
-- [ ] **Step 1: Write the orchestrator**
+- [x] **Step 1: Write the orchestrator**
 
 ```ts
 import type { ValidationContext } from "./context.js";
@@ -879,12 +879,12 @@ The order matches the original `validateGraph` body:
 
 **`interactive` is NOT called standalone** — its three rules fire from within `inputs-refs.ts`'s second per-node loop. The orchestrator's import list omits `interactive` for that reason. (Per-node interactive functions remain exported from `interactive.ts` for `inputs-refs.ts` to call.)
 
-- [ ] **Step 2: Type-check (orchestrator unused yet)**
+- [x] **Step 2: Type-check (orchestrator unused yet)**
 
 Run: `npx tsc --noEmit`
 Expected: clean.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/attractor/core/validators/index.ts
@@ -896,7 +896,7 @@ git commit -m "feat(attractor/validators): add runAllValidators orchestrator"
 **Files:**
 - Modify: `src/attractor/core/graph-validator.ts` (final form: façade only)
 
-- [ ] **Step 1: Replace the file content**
+- [x] **Step 1: Replace the file content**
 
 Path: `src/attractor/core/graph-validator.ts`. Replace the whole file with the façade. **Important:** the body of `validateOrRaise` must produce a byte-identical thrown error message to the current implementation at `:1150-1156`. Open `:1150-1156` first, copy the body verbatim into the new façade, and only adjust whitespace if no `\n` boundary inside the message string changes. The example below is illustrative — the actual final form is "whatever today's `:1150-1156` says, transcribed":
 
@@ -925,27 +925,27 @@ export function validateOrRaise(graph: Graph): void {
 
 After writing, `diff` the new `validateOrRaise` body against the original. Whitespace inside the throw string (newlines, indentation, separators) must match. Wrapping the `throw new Error(...)` call across multiple lines is fine as long as the resulting string content is identical.
 
-- [ ] **Step 2: Verify file size**
+- [x] **Step 2: Verify file size**
 
 Run: `wc -l src/attractor/core/graph-validator.ts`
 Expected: < 60 lines.
 
-- [ ] **Step 3: Type-check, byte-identical, full suite**
+- [x] **Step 3: Type-check, byte-identical, full suite**
 
 Run: `npx tsc --noEmit && npx vitest run src/attractor/tests/graph-validator-byte-identical.test.ts && npx vitest run src/attractor/tests/`
 Expected: all PASS.
 
-- [ ] **Step 4: Run full repo test suite**
+- [x] **Step 4: Run full repo test suite**
 
 Run: `npx vitest run`
 Expected: all PASS — no consumer (engine, CLI, MCP) sees a surface change.
 
-- [ ] **Step 5: Smoke validate**
+- [x] **Step 5: Smoke validate**
 
 Run: `npm run build && node dist/cli/index.js pipeline validate src/attractor/tests/fixtures/<good-fixture>.dot` (use any `.dot` fixture under `src/attractor/tests/fixtures/`).
 Expected: exit code 0, stderr/stdout byte-identical to a pre-refactor capture (capture in Chunk 1 Task 1.2 Step 1 baseline if not already; otherwise compare against a stash of `git stash; <capture>; git stash pop`).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/attractor/core/graph-validator.ts
