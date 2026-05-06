@@ -20,6 +20,7 @@ import * as types from "./validators/types.js";
 import * as scripts from "./validators/scripts.js";
 import * as variables from "./validators/variables.js";
 import * as gates from "./validators/gates.js";
+import * as interactive from "./validators/interactive.js";
 
 const SYSTEM_VARS = new Set<string>(SYSTEM_INJECTED_VARS);
 
@@ -54,9 +55,9 @@ export function validateGraph(graph: Graph, dotDir?: string): Diagnostic[] {
   if (dotDir) {
     for (const node of nodes.values()) {
       checkAgentMissingOutputs(node, dotDir, diags);
-      checkLoopRequiresDoneField(node, dotDir, diags);
-      checkInteractiveWithOutputs(node, dotDir, diags);
-      checkInteractiveWithLoop(node, dotDir, diags);
+      interactive.checkLoopRequiresDoneField(ctx, node);
+      interactive.checkInteractiveWithOutputs(ctx, node);
+      interactive.checkInteractiveWithLoop(ctx, node);
     }
   }
 
@@ -576,87 +577,6 @@ function checkAgentMissingOutputs(
       location: node.sourceLocation,
     });
   }
-}
-
-function checkLoopRequiresDoneField(
-  node: Node,
-  dotDir: string,
-  diags: Diagnostic[],
-): void {
-  if (!node.agent) return;
-  if (isInteractiveAgent(node)) return;
-
-  const agentConfig = tryResolveAgent(node, dotDir);
-  if (!agentConfig) return;
-  if (agentConfig.loop !== true) return;
-
-  const outputs = agentConfig.outputs ?? {};
-  const doneShape = (outputs as Record<string, unknown>).done;
-  const ok =
-    doneShape === "boolean" ||
-    (typeof doneShape === "object" && doneShape !== null &&
-     (doneShape as { type?: string }).type === "boolean");
-
-  if (!ok) {
-    diags.push({
-      rule: "loop_missing_done_field",
-      severity: "error",
-      message: `Agent "${node.agent}" at node "${node.id}" declares loop:true but its outputs: lacks a done:boolean field. Add 'done: boolean' to the agent's outputs frontmatter.`,
-      location: node.sourceLocation,
-    });
-  }
-}
-
-function checkInteractiveWithOutputs(
-  node: Node,
-  dotDir: string,
-  diags: Diagnostic[],
-): void {
-  if (!node.agent) return;
-  if (!isInteractiveAgent(node)) return;
-  const agentConfig = tryResolveAgent(node, dotDir);
-  if (!agentConfig) return;
-  const hasOutputs = !!(agentConfig.outputs && Object.keys(agentConfig.outputs).length > 0);
-  if (!hasOutputs) return;
-  diags.push({
-    rule: "interactive_with_outputs_forbidden",
-    severity: "error",
-    message: `Node "${node.id}" sets interactive=true but agent "${node.agent}" declares outputs:. Remove the outputs: block from the agent frontmatter, or remove interactive=true from the node.`,
-    location: node.sourceLocation,
-  });
-}
-
-function checkInteractiveWithLoop(
-  node: Node,
-  dotDir: string,
-  diags: Diagnostic[],
-): void {
-  if (!node.agent) return;
-  if (!isInteractiveAgent(node)) return;
-
-  // Node-level loop signals
-  const nodeLoopOn = node.loop === true || node.loop === "true";
-  const nodeMaxRaw = node.maxIterations;
-  const nodeMaxParsed =
-    typeof nodeMaxRaw === "string" ? parseInt(nodeMaxRaw, 10)
-    : typeof nodeMaxRaw === "number" ? nodeMaxRaw
-    : undefined;
-  const nodeMaxLoops = nodeMaxParsed != null && !isNaN(nodeMaxParsed) && nodeMaxParsed > 1;
-
-  // Agent-level loop signals
-  const agentConfig = tryResolveAgent(node, dotDir);
-  const agentLoopOn = agentConfig?.loop === true;
-  const agentMax = agentConfig?.maxIterations;
-  const agentMaxLoops = typeof agentMax === "number" && agentMax > 1;
-
-  if (!(nodeLoopOn || nodeMaxLoops || agentLoopOn || agentMaxLoops)) return;
-
-  diags.push({
-    rule: "interactive_with_loop_forbidden",
-    severity: "error",
-    message: `Node "${node.id}" sets interactive=true with looping (loop=true / maxIterations>1). Interactive sessions cannot iterate — remove loop=true / maxIterations from the node or agent, or remove interactive=true.`,
-    location: node.sourceLocation,
-  });
 }
 
 export function validateOrRaise(graph: Graph): void {
