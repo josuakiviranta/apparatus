@@ -16,7 +16,7 @@ import { resolveInputDecl } from "../transforms/inputs-resolver.js";
 import { SYSTEM_INJECTED_VARS } from "../handlers/agent-prep.js";
 import { outputsToZod } from "../../cli/lib/outputs-to-zod.js";
 import { KNOWN_TYPES, UNIMPLEMENTED_TYPES, isInteractiveAgent, resolveHandlerType } from "./graph.js";
-import { createValidationContext, RESERVED_VARS, type ValidationContext } from "./validators/context.js";
+import { createValidationContext, RESERVED_VARS } from "./validators/context.js";
 
 const SYSTEM_VARS = new Set<string>(SYSTEM_INJECTED_VARS);
 
