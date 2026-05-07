@@ -189,6 +189,43 @@ describe("apparat heartbeat pipeline", () => {
     expect(combined).toContain(bogus);
     s.restore();
   });
+
+  it("forwards a single --var key=value into register_task args", async () => {
+    vi.mocked(request).mockResolvedValue({ type: "ok", taskId: "pipeline:smoke" });
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    await makeProgram().parseAsync([
+      "node", "apparat", "heartbeat", "pipeline", FIXTURE_DOT,
+      "--project", FIXTURE_DIR, "--every", "30",
+      "--var", "steer=focus on logging",
+    ]);
+    expect(request).toHaveBeenCalledWith("register_task", {
+      id: "pipeline:smoke",
+      command: "pipeline",
+      args: ["run", FIXTURE_DOT, "--project", FIXTURE_DIR, "--var", "steer=focus on logging"],
+      interval: 30,
+    });
+    logSpy.mockRestore();
+  });
+
+  it("accumulates multiple --var flags and forwards each as its own pair", async () => {
+    vi.mocked(request).mockResolvedValue({ type: "ok", taskId: "pipeline:smoke" });
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    await makeProgram().parseAsync([
+      "node", "apparat", "heartbeat", "pipeline", FIXTURE_DOT,
+      "--project", FIXTURE_DIR, "--every", "30",
+      "--var", "steer=focus on logging",
+      "--var", "scope=src/cli",
+    ]);
+    const call = vi.mocked(request).mock.calls[0];
+    expect(call[0]).toBe("register_task");
+    const payload = call[1] as { args: string[] };
+    expect(payload.args).toEqual([
+      "run", FIXTURE_DOT, "--project", FIXTURE_DIR,
+      "--var", "steer=focus on logging",
+      "--var", "scope=src/cli",
+    ]);
+    logSpy.mockRestore();
+  });
 });
 
 describe("apparat heartbeat pipeline id derivation (folder-form pipelines)", () => {

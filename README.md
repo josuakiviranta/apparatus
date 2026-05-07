@@ -63,6 +63,12 @@ apparat heartbeat pipeline janitor --project . --every 720
 
 The janitor scans source/workspace through a KISS lens — bloat, YAGNI violations, refactor opportunities — and writes one illumination per candidate. It is read-only on code; the only mutating call is `write_illumination`. See `docs/adr/0002-consume-only-illumination-lifecycle.md` for the lifecycle context.
 
+Pass `--var key=value` (repeatable) to steer scheduled pipelines the same way `apparat pipeline run` does — every scheduled execution will receive the same caller variables:
+
+```bash
+apparat heartbeat pipeline janitor --project . --every 720 --var lens=tests
+```
+
 ```bash
 apparat pipeline run <pipeline.dot> [--var <key=value>...] [--resume]
 ```

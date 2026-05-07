@@ -3,6 +3,7 @@ import { Command } from "commander";
 import { resolve, basename, dirname } from "path";
 import { statSync, Stats, readFileSync } from "fs";
 import { resolvePipelineArg, isNameShorthand } from "../lib/pipeline-resolver.js";
+import { collectKV } from "../lib/collect-kv.js";
 import { request, stream } from "../../lib/daemon-client";
 import { parseDot } from "../../attractor/core/graph.js";
 import { findVarReferences } from "../../attractor/transforms/variable-expansion.js";
@@ -128,12 +129,13 @@ Examples:
     .description("Schedule a DOT-graph pipeline to run at a fixed interval")
     .addHelpText("after", "\nExamples:\n  apparat heartbeat pipeline workflow.dot --project my-app --every 60\n  apparat heartbeat pipeline janitor      --project my-app --every 720\n")
     .option("--project <folder>", "project folder passed to the pipeline")
+    .option("--var <key=value>", "pass caller variable (repeatable, e.g. --var steer=...)", collectKV, {} as Record<string, string>)
     .requiredOption("--every <n>", "interval in minutes", (v) => {
       const n = parseInt(v, 10);
       if (isNaN(n) || n < 1) throw new Error("--every must be a positive integer");
       return n;
     })
-    .action(async (dotfile: string, opts: { project?: string; every: number }) => {
+    .action(async (dotfile: string, opts: { project?: string; every: number; var: Record<string, string> }) => {
       const projectForResolver = opts.project ? resolve(opts.project) : process.cwd();
       const absDotFile = resolveHeartbeatPipelineArg(dotfile, projectForResolver);
       validatePathArg(dotfile, absDotFile, "file", "Pipeline dotfile");
@@ -176,6 +178,9 @@ Examples:
         const absProject = resolve(opts.project);
         validatePathArg(opts.project, absProject, "directory", "Project folder");
         args.push("--project", absProject);
+      }
+      for (const [k, v] of Object.entries(opts.var ?? {})) {
+        args.push("--var", `${k}=${v}`);
       }
       try {
         const res = await request("register_task", {
