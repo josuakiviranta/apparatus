@@ -1,0 +1,9 @@
+{"type":"system","session_id":"sess-1","subtype":"init"}
+{"type":"assistant","message":{"id":"msg-1","content":[{"type":"text","text":"hello"}],"usage":{"input_tokens":10,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}}}
+{"type":"assistant","message":{"id":"msg-2","content":[{"type":"tool_use","id":"tool_abc","name":"Agent","input":{"description":"sub-task","prompt":"do thing"}}],"usage":{"input_tokens":11,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}}}
+{"type":"assistant","parent_tool_use_id":"tool_abc","message":{"id":"msg-3","content":[{"type":"text","text":"sub-text"},{"type":"tool_use","id":"tool_xyz","name":"Read","input":{"file_path":"/tmp/a"}}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"tool_abc","content":"ok"}]}}
+{"type":"assistant","message":{"id":"msg-4","content":[{"type":"text","text":"after sub"}],"usage":{"input_tokens":15,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}}}
+{"type":"result","stop_reason":"end_turn","result":"done","usage":{"input_tokens":15,"output_tokens":4}}
+not-json-malformed-line
+{"type":"foo","payload":1}

@@ -1,4 +1,5 @@
 import * as readline from "readline";
+import { classifyLine, classifyBlock } from "./classify-stream.js";
 
 export type StreamEvent =
   | { type: "main_agent_open" }
@@ -95,13 +96,11 @@ export async function* streamEvents(
 
   for await (const line of rl) {
     if (!sessionIdEmitted && opts?.onSessionId) {
-      try {
-        const parsed = JSON.parse(line) as Record<string, unknown>;
-        if (typeof parsed.session_id === "string") {
-          opts.onSessionId(parsed.session_id);
-          sessionIdEmitted = true;
-        }
-      } catch {}
+      const sniff = classifyLine(line);
+      if (sniff.kind === "system" && typeof sniff.sessionId === "string") {
+        opts.onSessionId(sniff.sessionId);
+        sessionIdEmitted = true;
+      }
     }
     const { events, nextState } = processLine(line, state);
     state = nextState;
@@ -121,27 +120,32 @@ export function processLine(
   line: string,
   state: FormatterState
 ): { events: StreamEvent[]; nextState: FormatterState } {
-  let event: Record<string, unknown>;
-  try {
-    event = JSON.parse(line) as Record<string, unknown>;
-  } catch {
+  const ev = classifyLine(line);
+
+  // Non-actionable line kinds: parse_error, system, result, unknown.
+  // Today's TUI swallows JSON parse failures (returns empty events) and
+  // does not render system/result/unknown — preserve that.
+  if (
+    ev.kind === "parse_error" ||
+    ev.kind === "system" ||
+    ev.kind === "result" ||
+    ev.kind === "unknown"
+  ) {
     return { events: [], nextState: state };
   }
 
-  // Handle user-wrapped tool_result events (subagent close)
-  if (event.type === "user") {
-    const msg = event.message as { content?: unknown[] } | undefined;
-    const userContent = msg?.content ?? [];
+  // user-wrapped tool_result events (subagent close)
+  if (ev.kind === "user") {
     const events: StreamEvent[] = [];
     const nextPending = new Set(state.pendingSubagentIds);
     const nextBuffers = new Map(state.subagentBuffers);
     const nextDescriptions = new Map(state.subagentDescriptions);
     const nextMainAgentOpen = state.mainAgentOpen;
 
-    for (const item of userContent) {
-      const block = item as Record<string, unknown>;
-      if (block.type === "tool_result") {
-        const id = String(block.tool_use_id ?? "");
+    for (const item of ev.content) {
+      const block = classifyBlock(item);
+      if (block.kind === "tool_result") {
+        const id = block.toolUseId;
         if (nextPending.has(id)) {
           const desc = nextDescriptions.get(id) ?? "";
           const buf = nextBuffers.get(id) ?? [];
@@ -167,22 +171,18 @@ export function processLine(
     };
   }
 
-  if (event.type !== "assistant") {
-    return { events: [], nextState: state };
-  }
-
-  const msg = event.message as { content?: unknown[]; usage?: Usage } | undefined;
-  const content = msg?.content ?? [];
-  const usage = msg?.usage;
-  const parentToolUseId = event.parent_tool_use_id as string | undefined;
+  // assistant
+  const content = ev.content;
+  const usage = ev.usage as Usage | undefined;
+  const parentToolUseId = ev.parentToolUseId;
 
   // Subagent assistant events: buffer instead of emitting
   if (parentToolUseId) {
     const hasContent = content.some((b) => {
-      const block = b as Record<string, unknown>;
+      const block = classifyBlock(b);
       return (
-        block.type === "tool_use" ||
-        (block.type === "text" && String(block.text ?? "").trim().length > 0)
+        block.kind === "tool_use" ||
+        (block.kind === "text" && block.text.trim().length > 0)
       );
     });
     if (!hasContent) return { events: [], nextState: state };
@@ -190,14 +190,13 @@ export function processLine(
     const nextBuffers = new Map(state.subagentBuffers);
     let buf = nextBuffers.get(parentToolUseId) ?? [];
     buf = [...buf]; // clone
-    for (const block of content) {
-      const b = block as Record<string, unknown>;
-      if (b.type === "text") {
-        buf.push({ type: "text", content: unwrapStructuredText(String(b.text)), indented: true });
-      } else if (b.type === "tool_use") {
-        const name = String(b.name);
-        const input = (b.input ?? {}) as Record<string, unknown>;
-        const toolEvent = formatToolUse(name, input);
+    for (const raw of content) {
+      const block = classifyBlock(raw);
+      if (block.kind === "text") {
+        buf.push({ type: "text", content: unwrapStructuredText(block.text), indented: true });
+      } else if (block.kind === "tool_use") {
+        const input = (block.input ?? {}) as Record<string, unknown>;
+        const toolEvent = formatToolUse(block.name, input);
         buf.push({ ...toolEvent, indented: true });
       }
     }
@@ -218,10 +217,10 @@ export function processLine(
 
   // Skip events with no substantive content (no visible text or tool calls)
   const hasContent = content.some((b) => {
-    const block = b as Record<string, unknown>;
+    const block = classifyBlock(b);
     return (
-      block.type === "tool_use" ||
-      (block.type === "text" && String(block.text ?? "").trim().length > 0)
+      block.kind === "tool_use" ||
+      (block.kind === "text" && block.text.trim().length > 0)
     );
   });
 
@@ -238,40 +237,39 @@ export function processLine(
     };
   }
 
-  // Check if any content blocks are non-Agent (text or non-Agent tool_use)
+  // Open main agent block when any content is non-Agent
   const hasNonAgentContent = content.some((b) => {
-    const block = b as Record<string, unknown>;
-    return block.type !== "tool_use" || String((block as any).name) !== "Agent";
+    const block = classifyBlock(b);
+    return block.kind !== "tool_use" || block.name !== "Agent";
   });
   if (hasNonAgentContent && !nextMainAgentOpen) {
     events.push({ type: "main_agent_open" });
     nextMainAgentOpen = true;
   }
 
-  for (const block of content) {
-    const b = block as Record<string, unknown>;
-    if (b.type === "text") {
-      events.push({ type: "text", content: unwrapStructuredText(String(b.text)) });
-    } else if (b.type === "tool_use") {
-      const name = String(b.name);
-      const input = (b.input ?? {}) as Record<string, unknown>;
-      if (name === "Agent") {
+  for (const raw of content) {
+    const block = classifyBlock(raw);
+    if (block.kind === "text") {
+      events.push({ type: "text", content: unwrapStructuredText(block.text) });
+    } else if (block.kind === "tool_use") {
+      const input = (block.input ?? {}) as Record<string, unknown>;
+      if (block.name === "Agent") {
         const desc = String(input.description ?? input.prompt ?? "");
         if (nextMainAgentOpen) {
           events.push({ type: "main_agent_close" });
           nextMainAgentOpen = false;
         }
         // Subagent header is deferred to close time
-        nextPending.add(String(b.id));
-        nextDescriptions.set(String(b.id), desc);
-        nextBuffers.set(String(b.id), []);
+        nextPending.add(block.id);
+        nextDescriptions.set(block.id, desc);
+        nextBuffers.set(block.id, []);
       } else {
-        events.push(formatToolUse(name, input));
+        events.push(formatToolUse(block.name, input));
       }
     }
   }
 
-  // Gate ctx line on growth -- only emit when total increases and main agent is open
+  // Gate ctx line on growth — only emit when total increases and main agent is open
   if (nextMainAgentOpen && typeof usage?.input_tokens === "number") {
     const total =
       (usage.input_tokens ?? 0) +
@@ -356,65 +354,65 @@ export async function* parseStreamJsonEvents(
   for await (const line of rl) {
     if (!line.trim()) continue;
 
-    let event: Record<string, unknown>;
-    try {
-      event = JSON.parse(line) as Record<string, unknown>;
-    } catch (err) {
-      yield { type: "parse_error", rawLine: line, error: (err as Error).message };
+    const ev = classifyLine(line);
+
+    if (ev.kind === "parse_error") {
+      yield { type: "parse_error", rawLine: ev.rawLine, error: ev.error };
       continue;
     }
 
-    const t = event.type;
-    if (t === "system") {
-      yield {
-        type: "system",
-        sessionId: typeof event.session_id === "string" ? event.session_id : undefined,
-        raw: event,
-      };
-    } else if (t === "assistant") {
-      const msg = (event.message ?? {}) as Record<string, unknown>;
-      const messageId = typeof msg.id === "string" ? msg.id : undefined;
-      const content = Array.isArray(msg.content) ? (msg.content as unknown[]) : [];
-      for (const block of content) {
-        const b = block as Record<string, unknown>;
-        if (b.type === "text" && typeof b.text === "string") {
-          yield { type: "assistant_delta", textDelta: b.text, messageId };
-        } else if (b.type === "tool_use") {
+    if (ev.kind === "system") {
+      yield { type: "system", sessionId: ev.sessionId, raw: ev.raw };
+      continue;
+    }
+
+    if (ev.kind === "assistant") {
+      for (const raw of ev.content) {
+        const block = classifyBlock(raw);
+        if (block.kind === "text") {
+          yield { type: "assistant_delta", textDelta: block.text, messageId: ev.messageId };
+        } else if (block.kind === "tool_use") {
           yield {
             type: "tool_use",
-            toolCall: {
-              id: String(b.id ?? ""),
-              name: String(b.name ?? ""),
-              input: b.input,
-            },
-            messageId,
+            toolCall: { id: block.id, name: block.name, input: block.input },
+            messageId: ev.messageId,
           };
         }
       }
-    } else if (t === "user") {
-      const msg = (event.message ?? {}) as Record<string, unknown>;
-      const content = Array.isArray(msg.content) ? (msg.content as unknown[]) : [];
-      for (const block of content) {
-        const b = block as Record<string, unknown>;
-        if (b.type === "tool_result") {
+      continue;
+    }
+
+    if (ev.kind === "user") {
+      for (const raw of ev.content) {
+        const block = classifyBlock(raw);
+        if (block.kind === "tool_result") {
           yield {
             type: "tool_result",
-            toolCallId: String(b.tool_use_id ?? ""),
-            content: typeof b.content === "string" ? b.content : JSON.stringify(b.content ?? ""),
-            isError: b.is_error === true,
+            toolCallId: block.toolUseId,
+            content:
+              typeof block.content === "string"
+                ? block.content
+                : JSON.stringify(block.content ?? ""),
+            isError: block.isError,
           };
         }
       }
-    } else if (t === "result") {
+      continue;
+    }
+
+    if (ev.kind === "result") {
       yield {
         type: "result",
-        stopReason: typeof event.stop_reason === "string" ? event.stop_reason : "end_turn",
-        text: typeof event.result === "string" ? event.result : "",
-        usage: coerceSessionUsage(event.usage),
-        raw: event,
+        stopReason: ev.stopReason || "end_turn",
+        text: ev.text,
+        usage: coerceSessionUsage(ev.usage),
+        raw: ev.raw,
       };
+      continue;
     }
-    // unknown event types are silently ignored — forward-compat with CLI updates
+
+    // ev.kind === "unknown" — forward-compat with CLI updates (matches the
+    // pre-rewire silent fall-through at the old :417).
   }
 }
 

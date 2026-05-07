@@ -1,0 +1,128 @@
+{
+  "streamEvents": [
+    {
+      "type": "main_agent_open"
+    },
+    {
+      "type": "text",
+      "content": "hello"
+    },
+    {
+      "type": "ctx",
+      "tokens": 10
+    },
+    {
+      "type": "main_agent_close"
+    },
+    {
+      "type": "subagent_open",
+      "description": "sub-task"
+    },
+    {
+      "type": "text",
+      "content": "sub-text",
+      "indented": true
+    },
+    {
+      "type": "tool",
+      "name": "read",
+      "label": "/tmp/a",
+      "indented": true
+    },
+    {
+      "type": "subagent_close"
+    },
+    {
+      "type": "main_agent_open"
+    },
+    {
+      "type": "text",
+      "content": "after sub"
+    },
+    {
+      "type": "ctx",
+      "tokens": 15
+    },
+    {
+      "type": "main_agent_close"
+    }
+  ],
+  "streamJsonEvents": [
+    {
+      "type": "system",
+      "sessionId": "sess-1",
+      "raw": {
+        "type": "system",
+        "session_id": "sess-1",
+        "subtype": "init"
+      }
+    },
+    {
+      "type": "assistant_delta",
+      "textDelta": "hello",
+      "messageId": "msg-1"
+    },
+    {
+      "type": "tool_use",
+      "toolCall": {
+        "id": "tool_abc",
+        "name": "Agent",
+        "input": {
+          "description": "sub-task",
+          "prompt": "do thing"
+        }
+      },
+      "messageId": "msg-2"
+    },
+    {
+      "type": "assistant_delta",
+      "textDelta": "sub-text",
+      "messageId": "msg-3"
+    },
+    {
+      "type": "tool_use",
+      "toolCall": {
+        "id": "tool_xyz",
+        "name": "Read",
+        "input": {
+          "file_path": "/tmp/a"
+        }
+      },
+      "messageId": "msg-3"
+    },
+    {
+      "type": "tool_result",
+      "toolCallId": "tool_abc",
+      "content": "ok",
+      "isError": false
+    },
+    {
+      "type": "assistant_delta",
+      "textDelta": "after sub",
+      "messageId": "msg-4"
+    },
+    {
+      "type": "result",
+      "stopReason": "end_turn",
+      "text": "done",
+      "usage": {
+        "inputTokens": 15,
+        "outputTokens": 4
+      },
+      "raw": {
+        "type": "result",
+        "stop_reason": "end_turn",
+        "result": "done",
+        "usage": {
+          "input_tokens": 15,
+          "output_tokens": 4
+        }
+      }
+    },
+    {
+      "type": "parse_error",
+      "rawLine": "not-json-malformed-line",
+      "error": "Unexpected token 'o', \"not-json-ma\"... is not valid JSON"
+    }
+  ]
+}
