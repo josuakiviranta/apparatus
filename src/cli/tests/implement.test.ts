@@ -66,11 +66,11 @@ describe("implementCommand", () => {
     const prev = process.env.TMUX;
     process.env.TMUX = "/tmp/tmux-1000/default,1234,0";
     try {
-      await implementCommand("/my/project", { scenarios: "src/tests/scenarios" });
+      await implementCommand("/my/project", { scenarios: ".apparat/scenarios" });
       expect(mockPipeline).toHaveBeenCalledWith(
         "implement",
         expect.objectContaining({
-          variables: expect.objectContaining({ scenarios_dir: "src/tests/scenarios" }),
+          variables: expect.objectContaining({ scenarios_dir: ".apparat/scenarios" }),
         })
       );
     } finally {
@@ -86,7 +86,7 @@ describe("implementCommand", () => {
     }) as never);
     try {
       await expect(
-        implementCommand("/my/project", { scenarios: "src/tests/scenarios" })
+        implementCommand("/my/project", { scenarios: ".apparat/scenarios" })
       ).rejects.toThrow(/process\.exit\(1\)/);
       expect(mockPipeline).not.toHaveBeenCalled();
     } finally {

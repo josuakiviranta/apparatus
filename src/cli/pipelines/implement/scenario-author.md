@@ -117,7 +117,7 @@ Your final response is a brief markdown summary followed by one JSON object on i
 Example final response:
 
 ```
-Considered 3 clusters from 8 commits. Wrote 1 new scenario (implement --scenarios flag), skipped 2 (1 subsumed by apparat-implement-baseline.md, 1 infeasible — pure refactor of agent-loader). Files touched: src/tests/scenarios/implement-with-scenarios-flag.md.
+Considered 3 clusters from 8 commits. Wrote 1 new scenario (implement --scenarios flag), skipped 2 (1 subsumed by apparat-implement-baseline.md, 1 infeasible — pure refactor of agent-loader). Files touched: .apparat/scenarios/implement-with-scenarios-flag.md.
 
 {"tests_written": true}
 ```

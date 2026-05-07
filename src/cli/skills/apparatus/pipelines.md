@@ -374,7 +374,7 @@ Sibling files in the same folder: `implement.md`, `scenario-author.md`, `impleme
 
 | Class | Source | Example |
 |---|---|---|
-| **Caller-supplied** | `--var k=v` on the CLI; declared via graph-level `inputs="k"` | `--var scenarios_dir=src/tests/scenarios` |
+| **Caller-supplied** | `--var k=v` on the CLI; declared via graph-level `inputs="k"` | `--var scenarios_dir=.apparat/scenarios` |
 | **Reserved** | Provided by the runtime; never declared as inputs | `$project`, `$run_id` |
 | **Graph-produced** | Emitted by an upstream agent's `outputs:` or a tool's `produces=` / `produces_from_stdout=` | `$sha` (from `record_base`), `$drafter.summary` |
 | **Cross-iteration** | Deep-loop agents only | `$prev_note` (last iteration's `note`) |

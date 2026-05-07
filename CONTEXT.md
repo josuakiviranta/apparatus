@@ -97,7 +97,7 @@ dispatch gate path in the illumination-to-implementation pipeline.
 
 ### Harness scenario
 
-A markdown file (typically under `src/tests/scenarios/` in a target project)
+A markdown file (typically under `.apparat/scenarios/` in a target project)
 that describes observable behavior of the system from the operator's seat:
 command invocations and expected effects. Not executable code; consumed by an
 agent — `tmux-tester` — which reads each clause and drives the real CLI/UI to
@@ -128,6 +128,8 @@ Each scenario file follows a fixed three-section shape:
 `tmux-tester` parses each file, drives `## Action`, then checks each `## Expect`
 bullet against observed reality. Scenarios are **authoritative**: when a clause
 fails, tmux-tester fixes the code, never the scenario.
+
+Co-located under `.apparat/scenarios/` — operator scenarios at root, smoke fixtures in subdirs.
 
 See also: **Smoke-pipeline scenario**.
 

@@ -29,7 +29,7 @@ Pipelines live in two tiers:
 - **Bundled** (`src/cli/pipelines/` in the apparat-cli npm package) — generic, cross-project pipelines like janitor and meditate.
 - **Project-local** (`<project>/.apparat/pipelines/`) — pipelines a specific project owns, can fork from bundled, and can have meditation iterate on.
 
-A target project declares itself apparat-shaped by having a `.apparat/` folder. That folder holds apparat-defined project-local artefacts: pipelines, meditations (illuminations + stimuli), sessions (closure files written by `memory-writer`), scenarios (smoke-pipeline test fixtures), and run state. Project-doc conventions owned by the wider ecosystem — `CONTEXT.md`, `VISION.md`, `docs/adr/`, `README.md` — stay at repo root where humans, IDE doc-outliners, and third-party tooling expect them.
+A target project declares itself apparat-shaped by having a `.apparat/` folder. That folder holds apparat-defined project-local artefacts: pipelines, meditations (illuminations + stimuli), sessions (closure files written by `memory-writer`), scenarios (operator scenarios + smoke-pipeline test fixtures), and run state. Project-doc conventions owned by the wider ecosystem — `CONTEXT.md`, `VISION.md`, `docs/adr/`, `README.md` — stay at repo root where humans, IDE doc-outliners, and third-party tooling expect them.
 
 See `docs/adr/0007-ralph-folder-as-project-local-home.md` (naming superseded by ADR-0010) (and the partial-revert refinement in `docs/adr/0008-partial-revert-of-ralph-folder.md` (naming superseded by ADR-0010)) for the layout and partition principle.
 
