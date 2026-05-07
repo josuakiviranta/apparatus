@@ -125,11 +125,20 @@ Memory files are reference documents for future sessions. Keep them dense, scann
 
    Even if step 5 staged nothing, prior commits from `implement` and `tmux-tester` may not have been pushed yet. Push is idempotent — already-pushed refs are a no-op at the remote.
 
-7. **Mark the lifecycle artifacts complete (best-effort, both halves).** Run them in this order:
+7. **Mark the lifecycle artifacts complete (best-effort, both halves) — only when verification did not fail.**
 
-   **7a. Plan side.** If `$plan_writer.plan_path` is set and non-empty, call `consume_plan` with `filename = basename of $plan_writer.plan_path` (strip the directory portion — the tool deletes the file from `docs/superpowers/plans/` and commits `meditate: consume <filename> (implemented)`) and `reason = "implemented"`. On `success: true`, do nothing more — the tool auto-commits its own deletion. On `success: false` (plan file already gone from a prior run, invalid filename), append a single bullet to the memory file's `Learnings from the run` section quoting the `error` field verbatim, then continue. If `$plan_writer.plan_path` is empty or unset, skip 7a and append `- Plan consume skipped: $plan_writer.plan_path was empty` to the memory file.
+   **Pre-check.** If `$tmux_tester_test_result` equals the literal string `"fail"`, **skip both 7a and 7b entirely.** Failed verification means the implement node produced no shippable diff (or shipped broken code); deleting the plan and illumination would destroy the only artefacts the next run needs to recover. Append two bullets to the memory file's `Learnings from the run` section:
 
-   **7b. Illumination side.** If `$verifier_illumination_path` is set and non-empty, call `consume` with `filename = basename of $verifier_illumination_path` and `reason = "implemented"` (strip the directory portion — the tool deletes the file from `.apparat/meditations/illuminations/` and commits `meditate: consume <filename> (implemented)`). On `success: true`, do nothing more. On `success: false` (file missing), append a single bullet to the memory file's `Learnings from the run` section quoting the `error` field verbatim, then continue. If `$verifier_illumination_path` is empty or unset, skip 7b and append `- Illumination consume skipped: $verifier_illumination_path was empty` to the memory file.
+   - `Plan consume skipped: tmux_tester.test_result=fail (artefacts preserved for re-run)`
+   - `Illumination consume skipped: tmux_tester.test_result=fail (artefacts preserved for re-run)`
+
+   Then continue to step 8. The pre-check is a hard gate — no override, no opportunistic-on-fail behavior.
+
+   When `$tmux_tester_test_result` is `"pass"`, empty, or any non-`"fail"` value (review_gate→Approve path skips tmux entirely and leaves the field empty), proceed in this order:
+
+   **7a. Plan side.** If `$plan_writer_plan_path` is set and non-empty, call `consume_plan` with `filename = basename of $plan_writer_plan_path` (strip the directory portion — the tool deletes the file from `docs/superpowers/plans/` and commits `meditate: consume <filename> (implemented)`) and `reason = "implemented"`. On `success: true`, do nothing more — the tool auto-commits its own deletion. On `success: false` (plan file already gone from a prior run, invalid filename), append a single bullet to the memory file's `Learnings from the run` section quoting the `error` field verbatim, then continue. If `$plan_writer_plan_path` is empty or unset, skip 7a and append `- Plan consume skipped: plan_writer.plan_path was empty` to the memory file.
+
+   **7b. Illumination side.** If `$verifier_illumination_path` is set and non-empty, call `consume` with `filename = basename of $verifier_illumination_path` and `reason = "implemented"` (strip the directory portion — the tool deletes the file from `.apparat/meditations/illuminations/` and commits `meditate: consume <filename> (implemented)`). On `success: true`, do nothing more. On `success: false` (file missing), append a single bullet to the memory file's `Learnings from the run` section quoting the `error` field verbatim, then continue. If `$verifier_illumination_path` is empty or unset, skip 7b and append `- Illumination consume skipped: verifier.illumination_path was empty` to the memory file.
 
    Do **not** abort the node on either branch's failure. Push (step 6) and the structured-JSON emit (step 8) are non-negotiable; the lifecycle calls are opportunistic.
 
@@ -142,4 +151,5 @@ Memory files are reference documents for future sessions. Keep them dense, scann
 - Commit exactly **once** at the end of the node (or skip the commit if nothing is staged). Do not split into multiple commits. `implement` and `tmux-tester` already made per-chunk / per-fix commits earlier.
 - **Push is unconditional.** Prior session commits must reach `origin` even if this node staged nothing new.
 - No writes outside `$project/.apparat/sessions/` and git operations. Do not touch source code, specs, or pipelines from this node.
-- Both lifecycle calls — `consume_plan` (step 7a) and `consume` (step 7b) — are **best-effort**. Never abort the node on `success: false` from either. Push (step 6) and the structured-JSON emit (step 8) are non-negotiable; both lifecycle calls in step 7 are opportunistic. A missing plan or illumination file (already consumed by a prior run) must not block finalization.
+- Both lifecycle calls — `consume_plan` (step 7a) and `consume` (step 7b) — are **best-effort once authorised**. They are authorised only when `$tmux_tester_test_result` is not the literal string `"fail"`. On `tmux_tester_test_result=fail`, both calls are unconditionally suppressed (see step 7 pre-check) — destroying the plan or illumination after a failed run is a data-loss bug, not an opportunistic cleanup.
+- When authorised, neither call may abort the node on `success: false` from the underlying tool. Push (step 6) and the structured-JSON emit (step 8) are non-negotiable; both lifecycle calls in step 7 are opportunistic in that direction. A missing plan or illumination file (already consumed by a prior run) must not block finalization.
