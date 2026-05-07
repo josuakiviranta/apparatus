@@ -844,22 +844,22 @@ git commit -m "docs: update CONTEXT.md + add ADR-0013 for project-local-only sti
 
 ### Task 4.1: Acceptance gates from the spec
 
-- [ ] **Step 1: Build**
+- [x] **Step 1: Build**
 
 Run: `npm run build`
 Expected: success.
 
-- [ ] **Step 2: Type-check**
+- [x] **Step 2: Type-check**
 
 Run: `npx tsc --noEmit`
 Expected: no errors.
 
-- [ ] **Step 3: Test suite**
+- [x] **Step 3: Test suite**
 
 Run: `npx vitest run`
 Expected: all PASS.
 
-- [ ] **Step 4: Greps return clean**
+- [x] **Step 4: Greps return clean**
 
 Run: `grep -rn "meta_meditation\|MetaMeditation" src/ docs/adr/0013*.md CONTEXT.md package.json || echo "clean"`
 Expected: `clean`.
@@ -870,7 +870,7 @@ Expected: `clean`.
 Run: `grep -rn "getMetaMeditationsDir" src/ || echo "clean"`
 Expected: `clean`.
 
-- [ ] **Step 5: Smoke-test against a fresh project**
+- [x] **Step 5: Smoke-test against a fresh project**
 
 Run:
 ```bash
@@ -880,14 +880,14 @@ ls "$TMP/.apparat/meditations/stimuli/"
 ```
 Expected: directory exists and is empty.
 
-- [ ] **Step 6: Smoke-test the apparat-self meditate**
+- [x] **Step 6: Smoke-test the apparat-self meditate**
 
 Run: `node dist/cli/index.js pipeline validate src/cli/pipelines/meditate/pipeline.dot`
 Expected: validation passes.
 
 **Deferred manual smoke (out-of-CI):** spec §7 last bullet asks for an `apparat meditate .` run against the apparat repo itself loading the 32 lens files. The pipeline-validate above proves the static plumbing; the runtime path through `listStimuli(projectRoot)` is covered by `illumination-server.test.ts` against a tmp project. A genuine end-to-end `apparat meditate .` is interactive and requires the `claude` CLI — execute manually when convenient before merging the PR. Record the result in the PR description if run.
 
-- [ ] **Step 7: Push branch and open PR**
+- [x] **Step 7: Push branch and open PR** (skipped — chunks 1-3 landed directly on main)
 
 ```bash
 git push -u origin <branch-name>
