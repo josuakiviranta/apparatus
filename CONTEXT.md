@@ -54,8 +54,10 @@ Two-tier pipeline read at runtime:
 - **Project-local:** `<project>/.apparat/pipelines/<name>/pipeline.dot`
 - **Bundled fallback:** `src/cli/pipelines/<name>/pipeline.dot` (in npm package)
 
-Two-tier stimuli reads (project-local + bundled) work the same way for
-the meditate pipeline.
+Stimuli are project-local only. The meditate pipeline reads from
+`<project>/.apparat/meditations/stimuli/` exclusively — there is no
+bundled fallback. Each project curates its own lens library; an
+`apparat init` scaffolds an empty `stimuli/` directory.
 
 See `docs/adr/0007-ralph-folder-as-project-local-home.md` (naming superseded by ADR-0010) and the
 partial-revert refinement in `docs/adr/0008-partial-revert-of-ralph-folder.md` (naming superseded by ADR-0010)

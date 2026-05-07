@@ -4,7 +4,7 @@
 
 **Goal:** Rename the `meta_meditations` MCP/code surface to `stimuli` and excise the dead bundled-stimuli plumbing so each project's `<project>/.apparat/meditations/stimuli/` is the sole source.
 
-**Architecture:** Three logical commits in one PR. Commit 1 is independent cleanup (`package.json:files`). Commit 2 is an **atomic refactor** that touches the MCP server, agent-prep, the meditate pipeline frontmatter, the `assets.ts` helper, and every test that references the old names — split would yield a silent runtime failure where the server still expects `argv[3]` while the frontmatter no longer supplies it. Commit 3 updates `CONTEXT.md` and adds ADR-0012.
+**Architecture:** Three logical commits in one PR. Commit 1 is independent cleanup (`package.json:files`). Commit 2 is an **atomic refactor** that touches the MCP server, agent-prep, the meditate pipeline frontmatter, the `assets.ts` helper, and every test that references the old names — split would yield a silent runtime failure where the server still expects `argv[3]` while the frontmatter no longer supplies it. Commit 3 updates `CONTEXT.md` and adds ADR-0013.
 
 **Tech Stack:** TypeScript (Node 18+), tsup, vitest, MCP server SDK, dot-pipeline runtime, gray-matter.
 
@@ -734,7 +734,7 @@ git commit -m "refactor: rename meta_meditations to stimuli + drop bundled-stimu
 **Files:**
 - Modify: `CONTEXT.md:53-58`
 
-- [ ] **Step 1: Replace the paragraph**
+- [x] **Step 1: Replace the paragraph**
 
 Use Edit. Replace:
 ```
@@ -757,27 +757,27 @@ bundled fallback. Each project curates its own lens library; an
 `apparat init` scaffolds an empty `stimuli/` directory.
 ```
 
-- [ ] **Step 2: Verify nothing else in CONTEXT.md references bundled stimuli**
+- [x] **Step 2: Verify nothing else in CONTEXT.md references bundled stimuli**
 
 Run: `grep -n "bundled.*stimuli\|stimuli.*bundle\|meta.meditation" CONTEXT.md || echo "clean"`
 Expected: `clean`.
 
-### Task 3.2: Create ADR-0012
+### Task 3.2: Create ADR-0013
 
 **Files:**
-- Create: `docs/adr/0012-stimuli-project-local-only.md`
+- Create: `docs/adr/0013-stimuli-project-local-only.md`
 
-- [ ] **Step 1: Read existing ADR style**
+- [x] **Step 1: Read existing ADR style**
 
 Run: `ls docs/adr/`
 Pick a recent one (e.g. `0011-skill-as-shim-plus-live-reference.md`) and use Read to inspect its structure.
 
-- [ ] **Step 2: Write ADR-0012**
+- [x] **Step 2: Write ADR-0013**
 
 Use Write tool. Content:
 
 ```markdown
-# ADR-0012: Stimuli are project-local only
+# ADR-0013: Stimuli are project-local only
 
 **Status:** Accepted
 **Date:** 2026-05-07
@@ -824,18 +824,18 @@ preamble. The MCP server resolves the stimuli directory internally from the proj
   functional.
 ```
 
-- [ ] **Step 3: Verify ADR is well-formed**
+- [x] **Step 3: Verify ADR is well-formed**
 
-Run: `head -5 docs/adr/0012-stimuli-project-local-only.md`
+Run: `head -5 docs/adr/0013-stimuli-project-local-only.md`
 Expected: title heading, status, date, supersedes.
 
 ### Task 3.3: Commit docs
 
-- [ ] **Step 1: Stage and commit**
+- [x] **Step 1: Stage and commit**
 
 ```bash
-git add CONTEXT.md docs/adr/0012-stimuli-project-local-only.md
-git commit -m "docs: update CONTEXT.md + add ADR-0012 for project-local-only stimuli"
+git add CONTEXT.md docs/adr/0013-stimuli-project-local-only.md
+git commit -m "docs: update CONTEXT.md + add ADR-0013 for project-local-only stimuli"
 ```
 
 ---
@@ -861,7 +861,7 @@ Expected: all PASS.
 
 - [ ] **Step 4: Greps return clean**
 
-Run: `grep -rn "meta_meditation\|MetaMeditation" src/ docs/adr/0012*.md CONTEXT.md package.json || echo "clean"`
+Run: `grep -rn "meta_meditation\|MetaMeditation" src/ docs/adr/0013*.md CONTEXT.md package.json || echo "clean"`
 Expected: `clean`.
 
 Run: `grep -rn "META_MEDITATIONS_DIR" src/ || echo "clean"`
@@ -896,7 +896,7 @@ gh pr create --title "refactor: rename meta_meditations to stimuli; drop bundled
 - Rename MCP tools `list_meta_meditations` / `read_meta_meditation` → `list_stimuli` / `read_stimulus`
 - Drop the dead bundled-stimuli code path; resolve from `stimuliDir(projectRoot)` only
 - Drop stale `"meditations"` from `package.json:files`
-- Add ADR-0012; update `CONTEXT.md`
+- Add ADR-0013; update `CONTEXT.md`
 
 Spec: `docs/superpowers/specs/2026-05-07-stimuli-rename-and-project-local-only-design.md`
 
