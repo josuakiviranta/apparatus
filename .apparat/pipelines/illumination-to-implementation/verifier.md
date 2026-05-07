@@ -17,7 +17,7 @@ mcp:
       - "{{ILLUMINATION_SERVER_PATH}}"
       - "{{PROJECT_ROOT}}"
 inputs:
-  - verifier.illumination_path
+  - chat_summarizer.illumination_path
   - chat_summarizer.refinements
   - run_id
 outputs:
@@ -57,9 +57,9 @@ A technically accurate illumination that fails project-fit is still a `false` �
 # Procedure
 
 1. **Enumerate or re-enter.** (See Hard rules above — MCP-only for this step.)
-   - If `$verifier_illumination_path` is non-empty in the injected context (re-entry after a scope-changing chat round), skip enumeration — that file has already been selected by an earlier verifier pass. Verify it directly against the current (refined) scope.
+   - If `$chat_summarizer_illumination_path` is non-empty in the injected context (re-entry after a scope-changing chat round), skip enumeration — that file has already been selected by the prior verifier pass and pinned across the loop by chat_summarizer. Verify the SAME file again against the current (refined) scope. Re-listing on re-entry is a contract violation — the user just discussed a specific illumination, and switching to a different one mid-loop silently throws away their refinements.
    - Otherwise: call `mcp__illumination__list_illuminations` (no parameters). The tool returns one `<filename> — <description>` line per illumination in `.apparat/meditations/illuminations/`, or the literal string `No illuminations found.` when empty.
-2. **Pick one.** If the tool returned `No illuminations found.` → emit `preferred_label: empty`, empty paths, summary "No illuminations found", explanation "No illuminations remain in `.apparat/meditations/illuminations/`." (Skip on re-entry — the path is already set.) Otherwise pick one filename and construct `illumination_path` as `.apparat/meditations/illuminations/<filename>`.
+2. **Pick one.** If the tool returned `No illuminations found.` → emit `preferred_label: empty`, empty paths, summary "No illuminations found", explanation "No illuminations remain in `.apparat/meditations/illuminations/`." (Skip on re-entry — the path is already set in `$chat_summarizer_illumination_path`.) Otherwise pick one filename and construct `illumination_path` as `.apparat/meditations/illuminations/<filename>`.
 3. **Read the chosen illumination in full.** Use `mcp__illumination__read_file` with just the bare `<filename>` (no directory prefix); the MCP server resolves the dir based on lifecycle status. Do NOT prepend `.apparat/meditations/illuminations/` for the read — that path is only for the produced `illumination_path` field that downstream pipeline nodes consume.
 4. **Orientation pass (mandatory — minimum 4 parallel subagents).** Discover the project layout first: Glob `$project` for `src/` / `lib/` / `app/` / `pkg/` / `cmd/` / `internal/` and `docs/` / `documentation/` / `architecture/` and the ADR dir (`adr/` or `decisions/`) underneath it. Then dispatch parallel `Task` subagents — at least one per item below — and wait for all of them before judging project-fit:
    - **CONTEXT subagent** — read `$project/CONTEXT.md` if it exists; return the domain glossary and the project's stated mission.

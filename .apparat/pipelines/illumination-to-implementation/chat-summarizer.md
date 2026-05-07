@@ -10,6 +10,7 @@ inputs:
 outputs:
   refinements: string
   scope_changed: boolean
+  illumination_path: string
 model: opus
 permissionMode: dangerouslySkipPermissions
 tools:
@@ -48,6 +49,12 @@ log so design_writer and plan_writer can judge whether to honor each refinement.
 4. Set `scope_changed: true` only if the latest round materially altered scope
    (new files in/out, new behavior, removed behavior). Cosmetic clarifications
    keep the flag false.
+
+5. Pass the illumination identity forward. Set `illumination_path` to the
+   verbatim value of `$verifier_illumination_path` from your inputs. This
+   pins the illumination across the chat → verifier loop-back so the next
+   verifier pass re-verifies the SAME file the user just discussed, never a
+   different one the verifier might pick by re-listing.
 
 ## Output
 
