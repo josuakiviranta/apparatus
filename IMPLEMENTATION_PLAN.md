@@ -77,7 +77,7 @@ git commit -m "chore: drop stale \"meditations\" entry from package.json files a
 **Files:**
 - Modify: `src/cli/tests/meditate.test.ts`
 
-- [ ] **Step 1: Add a failing test pinning the new `mcp.args` shape**
+- [x] **Step 1: Add a failing test pinning the new `mcp.args` shape**
 
 Use Edit tool. Inside the existing `describe("meditate template agent tool whitelist", ...)` block in `src/cli/tests/meditate.test.ts`, after the existing `whitelists exactly the 7 reflective-only tools` test (around line 167), insert:
 
@@ -94,19 +94,19 @@ Use Edit tool. Inside the existing `describe("meditate template agent tool white
   });
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `npx vitest run src/cli/tests/meditate.test.ts -t "mcp.args is exactly two entries"`
 Expected: FAIL with `expected ["{{ILLUMINATION_SERVER_PATH}}", "{{PROJECT_ROOT}}", "{{META_MEDITATIONS_DIR}}"] to equal ["{{ILLUMINATION_SERVER_PATH}}", "{{PROJECT_ROOT}}"]`. Confirms the existing frontmatter has the third arg.
 
-- [ ] **Step 3: Do NOT commit yet** — this test is part of the atomic refactor commit.
+- [x] **Step 3: Do NOT commit yet** — this test is part of the atomic refactor commit.
 
 ### Task 2.2: Update the existing tools-whitelist test for new tool names
 
 **Files:**
 - Modify: `src/cli/tests/meditate.test.ts:161-162`
 
-- [ ] **Step 1: Edit the expected list**
+- [x] **Step 1: Edit the expected list**
 
 Use Edit tool. Replace lines 161–162:
 ```typescript
@@ -119,19 +119,19 @@ with:
       "mcp__illumination__read_stimulus",
 ```
 
-- [ ] **Step 2: Run the test, verify it now fails**
+- [x] **Step 2: Run the test, verify it now fails**
 
 Run: `npx vitest run src/cli/tests/meditate.test.ts -t "whitelists exactly the 7 reflective-only tools"`
 Expected: FAIL. The existing `meditate.md` still has the old names, so the new expected list does not match.
 
-- [ ] **Step 3: Do NOT commit yet**.
+- [x] **Step 3: Do NOT commit yet**.
 
 ### Task 2.3: Update the body-prose-no-removed-tool-name test
 
 **Files:**
 - Modify: `src/cli/tests/meditate.test.ts` (the `body does not reference any removed lifecycle tool name` test, around lines 190–206)
 
-- [ ] **Step 1: Add a parallel test that asserts removed legacy names**
+- [x] **Step 1: Add a parallel test that asserts removed legacy names**
 
 Use Edit. After the existing `body does not reference any removed lifecycle tool name` test, add:
 
@@ -149,7 +149,7 @@ Use Edit. After the existing `body does not reference any removed lifecycle tool
   });
 ```
 
-- [ ] **Step 2: Run, verify failure**
+- [x] **Step 2: Run, verify failure**
 
 Run: `npx vitest run src/cli/tests/meditate.test.ts -t "body does not reference legacy meta-meditation tool names"`
 Expected: FAIL — body still references the legacy names.
@@ -159,7 +159,7 @@ Expected: FAIL — body still references the legacy names.
 **Files:**
 - Modify: `src/cli/pipelines/meditate/meditate.md:10-24, 50-53, 70`
 
-- [ ] **Step 1: Replace `tools:` entries**
+- [x] **Step 1: Replace `tools:` entries**
 
 Use Edit. Replace:
 ```
@@ -172,7 +172,7 @@ with:
   - mcp__illumination__read_stimulus
 ```
 
-- [ ] **Step 2: Drop the third `mcp.args` entry**
+- [x] **Step 2: Drop the third `mcp.args` entry**
 
 Use Edit. Replace:
 ```
@@ -188,7 +188,7 @@ with:
       - "{{PROJECT_ROOT}}"
 ```
 
-- [ ] **Step 3: Update body prose at lines 50–53**
+- [x] **Step 3: Update body prose at lines 50–53**
 
 Use Edit. Replace:
 ```
@@ -205,7 +205,7 @@ You also have tools for stimuli — interpretive lenses for this project:
 - `read_stimulus(filename)` — read a specific lens by filename.
 ```
 
-- [ ] **Step 4: Update body prose at line 60 (working-context bullet)**
+- [x] **Step 4: Update body prose at line 60 (working-context bullet)**
 
 Use Edit. Replace:
 ```
@@ -216,7 +216,7 @@ with:
 - Stimuli are interpretive lenses — themes, patterns, and questions to focus your reflection
 ```
 
-- [ ] **Step 5: Update the numbered task step at line 70**
+- [x] **Step 5: Update the numbered task step at line 70**
 
 Use Edit. Replace:
 ```
@@ -229,12 +229,12 @@ with:
 5. If no stimuli are available, reflect on the code directly — you can still produce a valuable illumination
 ```
 
-- [ ] **Step 6: Verify no other `meta-meditation` references remain in the file**
+- [x] **Step 6: Verify no other `meta-meditation` references remain in the file**
 
 Run: `grep -n "meta.meditation" src/cli/pipelines/meditate/meditate.md || echo "clean"`
 Expected: `clean`.
 
-- [ ] **Step 7: Run the three meditate.md tests**
+- [x] **Step 7: Run the three meditate.md tests**
 
 Run: `npx vitest run src/cli/tests/meditate.test.ts -t "whitelists exactly the 7"`
 Run: `npx vitest run src/cli/tests/meditate.test.ts -t "mcp.args is exactly two entries"`
@@ -246,7 +246,7 @@ Expected: all three PASS.
 **Files:**
 - Modify: `src/cli/tests/illumination-server.test.ts`
 
-- [ ] **Step 1: Replace the import line**
+- [x] **Step 1: Replace the import line**
 
 Use Edit. Replace:
 ```typescript
@@ -257,7 +257,7 @@ with:
 import { validateFilename, validateSlug, composeIlluminationFilename, writeIllumination, assertWithinRoot, readFile, validateGlobPattern, globFiles, projectTree, listStimuli, readStimulus, listIlluminations, listPlans, consume, consumePlan } from "../mcp/illumination-server";
 ```
 
-- [ ] **Step 2: Replace the `describe("listMetaMeditations", ...)` block**
+- [x] **Step 2: Replace the `describe("listMetaMeditations", ...)` block**
 
 Use Edit. Replace the entire `describe("listMetaMeditations", ...)` block (around lines 398–431) with:
 
@@ -310,7 +310,7 @@ describe("listStimuli", () => {
 });
 ```
 
-- [ ] **Step 3: Replace the `describe("readMetaMeditation", ...)` block**
+- [x] **Step 3: Replace the `describe("readMetaMeditation", ...)` block**
 
 Use Edit. Replace the existing block (around lines 433–454) with:
 
@@ -345,7 +345,7 @@ describe("readStimulus", () => {
 });
 ```
 
-- [ ] **Step 4: Run tests, verify a module-load error**
+- [x] **Step 4: Run tests, verify a module-load error**
 
 Run: `npx vitest run src/cli/tests/illumination-server.test.ts`
 Expected: vitest reports a single module-load failure (not 9 individually-failing tests) — the test file fails to import `listStimuli` / `readStimulus` because those symbols don't exist yet. Output looks like `Error: No matching export in "src/cli/mcp/illumination-server.ts" for import "listStimuli"`. This is the intended red-state for the file as a whole; per-test failures will only materialise after Task 2.6 implements the new exports.
@@ -355,7 +355,7 @@ Expected: vitest reports a single module-load failure (not 9 individually-failin
 **Files:**
 - Modify: `src/cli/mcp/illumination-server.ts` — multiple surgical edits (line numbers shift across edits; rely on `old_string` content matching, not absolute line numbers)
 
-- [ ] **Step 1: Add `stimuliDir` import**
+- [x] **Step 1: Add `stimuliDir` import**
 
 Use Edit. Replace:
 ```typescript
@@ -366,7 +366,7 @@ with:
 import { illuminationsDir, stimuliDir } from "../lib/apparat-paths.js";
 ```
 
-- [ ] **Step 2: Rename and rewrite the sentinel constant**
+- [x] **Step 2: Rename and rewrite the sentinel constant**
 
 Use Edit. Replace:
 ```typescript
@@ -386,7 +386,7 @@ const NO_STIMULI_MESSAGE =
   "folder. Each file is a lens the agent will use to reflect on your project.";
 ```
 
-- [ ] **Step 3: Replace `listMetaMeditations` with `listStimuli`**
+- [x] **Step 3: Replace `listMetaMeditations` with `listStimuli`**
 
 Use Edit. Replace the existing `listMetaMeditations` function (lines 170–182):
 ```typescript
@@ -422,7 +422,7 @@ export function listStimuli(projectRoot: string): string {
 }
 ```
 
-- [ ] **Step 4: Replace `readMetaMeditation` with `readStimulus`**
+- [x] **Step 4: Replace `readMetaMeditation` with `readStimulus`**
 
 Use Edit. Replace lines 247–255:
 ```typescript
@@ -449,7 +449,7 @@ export function readStimulus(projectRoot: string, filename: string): string {
 }
 ```
 
-- [ ] **Step 5: Drop `argv[3]` parsing**
+- [x] **Step 5: Drop `argv[3]` parsing**
 
 Use Edit. Replace:
 ```typescript
@@ -461,7 +461,7 @@ with:
   const projectRoot = process.argv[2];
 ```
 
-- [ ] **Step 6: Rename the two MCP tool registrations**
+- [x] **Step 6: Rename the two MCP tool registrations**
 
 Use Edit. Replace:
 ```typescript
@@ -512,12 +512,12 @@ with:
     );
 ```
 
-- [ ] **Step 7: Run the new tests, verify they pass**
+- [x] **Step 7: Run the new tests, verify they pass**
 
 Run: `npx vitest run src/cli/tests/illumination-server.test.ts -t "listStimuli|readStimulus"`
 Expected: all 9 PASS.
 
-- [ ] **Step 8: Run the full illumination-server test file**
+- [x] **Step 8: Run the full illumination-server test file**
 
 Run: `npx vitest run src/cli/tests/illumination-server.test.ts`
 Expected: all PASS.
@@ -533,7 +533,7 @@ Expected: all PASS.
 
 (All line numbers below describe pre-edit state. They will shift as edits land within the chunk; rely on `old_string` content matching.)
 
-- [ ] **Step 1a: Drop `getMetaMeditationsDir` from `assets.test.ts` import**
+- [x] **Step 1a: Drop `getMetaMeditationsDir` from `assets.test.ts` import**
 
 Use Edit. Replace:
 ```typescript
@@ -544,7 +544,7 @@ with:
 import { getBundledPipelinesDir, getIlluminationServerPath } from "../lib/assets";
 ```
 
-- [ ] **Step 1b: Delete the entire `getMetaMeditationsDir returns a path...` test block**
+- [x] **Step 1b: Delete the entire `getMetaMeditationsDir returns a path...` test block**
 
 Use Edit on `src/cli/tests/assets.test.ts`. Replace:
 ```typescript
@@ -560,12 +560,12 @@ Use Edit on `src/cli/tests/assets.test.ts`. Replace:
 ```
 with the empty string (delete entirely, including the trailing blank line after the closing `});`).
 
-- [ ] **Step 1c: Verify `assets.test.ts` still compiles and passes**
+- [x] **Step 1c: Verify `assets.test.ts` still compiles and passes**
 
 Run: `npx vitest run src/cli/tests/assets.test.ts`
 Expected: PASS (the deletion is a green-by-vacuum step — no test references the symbol). Move on; the plumbing-deletion happens in Step 5.
 
-- [ ] **Step 2: Update `agent-handler.test.ts` test description and assertion**
+- [x] **Step 2: Update `agent-handler.test.ts` test description and assertion**
 
 Use Edit on `src/attractor/tests/agent-handler.test.ts`. Replace:
 ```typescript
@@ -585,12 +585,12 @@ with:
     expect(call.variables).not.toHaveProperty("META_MEDITATIONS_DIR");
 ```
 
-- [ ] **Step 3: Run the updated test — confirm RED**
+- [x] **Step 3: Run the updated test — confirm RED**
 
 Run: `npx vitest run src/attractor/tests/agent-handler.test.ts -t "auto-injects standard MCP infra variables"`
 Expected: FAIL — `agent-prep.ts` still injects `META_MEDITATIONS_DIR`, so `not.toHaveProperty` fails. This is the intended red phase; do not flip code yet.
 
-- [ ] **Step 4: Update `graph-validator-inputs.test.ts`**
+- [x] **Step 4: Update `graph-validator-inputs.test.ts`**
 
 Use Edit. Replace:
 ```typescript
@@ -615,7 +615,7 @@ inputs: [PROJECT_ROOT, ILLUMINATION_SERVER_PATH]
 
 Note: this test stays green throughout — the validator currently does not fire on any of the three vars (all are system-injected). Removing one from the list does not change the assertion outcome. The edit is for parity with the new system contract, not as a TDD-red signal. Acceptable here because the contract assertion is in `agent-handler.test.ts` (Step 3 above).
 
-- [ ] **Step 5: Delete `getMetaMeditationsDir()` from `assets.ts`**
+- [x] **Step 5: Delete `getMetaMeditationsDir()` from `assets.ts`**
 
 Use Edit. Delete lines 40–47 (the entire function plus its preceding blank line):
 ```typescript
@@ -630,7 +630,7 @@ export function getMetaMeditationsDir(): string {
 }
 ```
 
-- [ ] **Step 6: Drop the import + system-injected-var entry in `agent-prep.ts`**
+- [x] **Step 6: Drop the import + system-injected-var entry in `agent-prep.ts`**
 
 Use Edit. Replace line 6:
 ```typescript
@@ -672,44 +672,44 @@ function buildSystemInjectedVars(projectRoot: string): Record<(typeof SYSTEM_INJ
 }
 ```
 
-- [ ] **Step 7: Verify TypeScript compiles**
+- [x] **Step 7: Verify TypeScript compiles**
 
 Run: `npx tsc --noEmit`
 Expected: no errors.
 
-- [ ] **Step 8: Re-run the previously-RED test from Step 3 — confirm GREEN**
+- [x] **Step 8: Re-run the previously-RED test from Step 3 — confirm GREEN**
 
 Run: `npx vitest run src/attractor/tests/agent-handler.test.ts -t "auto-injects standard MCP infra variables"`
 Expected: PASS. `META_MEDITATIONS_DIR` is no longer injected; `not.toHaveProperty` holds. This closes the red-green cycle for the system-injected-var deletion.
 
-- [ ] **Step 9: Verify the four touched test files pass**
+- [x] **Step 9: Verify the four touched test files pass**
 
 Run: `npx vitest run src/cli/tests/assets.test.ts src/attractor/tests/agent-handler.test.ts src/attractor/tests/graph-validator-inputs.test.ts src/cli/tests/illumination-server.test.ts`
 Expected: all PASS.
 
 ### Task 2.8: Full repo verification
 
-- [ ] **Step 1: Verify no lingering `meta_meditation` references in live source**
+- [x] **Step 1: Verify no lingering `meta_meditation` references in live source**
 
 Run: `grep -rn "meta_meditation\|MetaMeditation\|META_MEDITATIONS" src/ --include="*.ts" --include="*.md" || echo "clean"`
 Expected: `clean`. Any hit means a missed surface — investigate before proceeding.
 
-- [ ] **Step 2: Run full test suite**
+- [x] **Step 2: Run full test suite**
 
 Run: `npx vitest run`
 Expected: all PASS.
 
-- [ ] **Step 3: Build**
+- [x] **Step 3: Build**
 
 Run: `npm run build`
 Expected: success.
 
-- [ ] **Step 4: Smoke-test the meditate pipeline against this repo**
+- [x] **Step 4: Smoke-test the meditate pipeline against this repo**
 
 Run: `npx tsx src/cli/index.ts pipeline validate src/cli/pipelines/meditate/pipeline.dot`
 Expected: validation passes (no `bare_input_not_in_caller_inputs_or_system` for `META_MEDITATIONS_DIR`).
 
-- [ ] **Step 5: Commit the atomic refactor**
+- [x] **Step 5: Commit the atomic refactor**
 
 ```bash
 git add \

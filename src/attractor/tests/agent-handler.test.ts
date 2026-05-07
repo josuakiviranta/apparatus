@@ -179,7 +179,7 @@ describe("AgentHandler", () => {
     );
   });
 
-  it("auto-injects standard MCP infra variables (illumination server, project root, meta-meditations dir)", async () => {
+  it("auto-injects standard MCP infra variables (illumination server, project root)", async () => {
     mockResolve.mockReturnValue({ ...baseConfig });
     mockAgentRun.mockResolvedValue({ exitCode: 0, sessionId: null, stdout: null });
 
@@ -193,7 +193,7 @@ describe("AgentHandler", () => {
     const call = mockAgentRun.mock.calls[0][0];
     expect(call.variables.ILLUMINATION_SERVER_PATH).toMatch(/illumination-server\.(ts|js)$/);
     expect(call.variables.PROJECT_ROOT).toBe("/tmp/specific-project");
-    expect(call.variables.META_MEDITATIONS_DIR).toMatch(/meditations\/stimuli$/);
+    expect(call.variables).not.toHaveProperty("META_MEDITATIONS_DIR");
   });
 
   it("falls back PROJECT_ROOT to cwd when projectDir is not set", async () => {

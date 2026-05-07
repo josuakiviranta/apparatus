@@ -37,15 +37,6 @@ export function resolveBundledPipeline(name: string): string {
   return path;
 }
 
-export function getMetaMeditationsDir(): string {
-  // prod: dist/cli/ → up two → package root
-  // dev:  src/cli/lib/ → up three → package root
-  const packageRoot = isProduction()
-    ? join(__dirname, "../..")
-    : join(__dirname, "../../..");
-  return join(packageRoot, ".apparat", "meditations", "stimuli");
-}
-
 export function getIlluminationServerPath(): string {
   if (isProduction()) {
     return join(__dirname, "mcp", "illumination-server.js");

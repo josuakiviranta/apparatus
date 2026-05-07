@@ -281,13 +281,13 @@ body`,
     expect(diags.find(d => d.rule === "bare_input_not_in_caller_inputs_or_system")).toBeUndefined();
   });
 
-  it("does not fire for system-injected vars (PROJECT_ROOT, ILLUMINATION_SERVER_PATH, META_MEDITATIONS_DIR)", () => {
+  it("does not fire for system-injected vars (PROJECT_ROOT, ILLUMINATION_SERVER_PATH)", () => {
     const dir = join(tmpdir(), `rule-binis-sysvar-${Date.now()}`);
     setup(dir, {
       "consumer.md": `---
 name: consumer
 description: x
-inputs: [PROJECT_ROOT, ILLUMINATION_SERVER_PATH, META_MEDITATIONS_DIR]
+inputs: [PROJECT_ROOT, ILLUMINATION_SERVER_PATH]
 outputs: { foo: string }
 ---
 body`,

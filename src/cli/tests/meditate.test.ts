@@ -158,8 +158,8 @@ describe("meditate template agent tool whitelist", () => {
       "mcp__illumination__glob_files",
       "mcp__illumination__project_tree",
       "mcp__illumination__write_illumination",
-      "mcp__illumination__list_meta_meditations",
-      "mcp__illumination__read_meta_meditation",
+      "mcp__illumination__list_stimuli",
+      "mcp__illumination__read_stimulus",
     ];
     for (const tool of expected) {
       expect(tools).toContain(tool);
@@ -187,6 +187,17 @@ describe("meditate template agent tool whitelist", () => {
     }
   });
 
+  it("mcp.args is exactly two entries: illumination server path + project root", () => {
+    const agentMd = readFileSync(templatePath, "utf-8");
+    const argsMatch = agentMd.match(/^\s+args:\n((?:\s+-\s+.+\n)+)/m);
+    expect(argsMatch).not.toBeNull();
+    const args = argsMatch![1]
+      .split("\n")
+      .map((l) => l.replace(/^\s+-\s+"?/, "").replace(/"?$/, "").trim())
+      .filter(Boolean);
+    expect(args).toEqual(["{{ILLUMINATION_SERVER_PATH}}", "{{PROJECT_ROOT}}"]);
+  });
+
   it("body does not reference any removed lifecycle tool name", () => {
     const agentMd = readFileSync(templatePath, "utf-8");
     const frontmatterMatch = agentMd.match(/^---\n[\s\S]+?\n---\n/);
@@ -203,6 +214,18 @@ describe("meditate template agent tool whitelist", () => {
     for (const name of removedNames) {
       expect(body).not.toContain(name);
     }
+  });
+
+  it("body does not reference legacy meta-meditation tool names", () => {
+    const agentMd = readFileSync(templatePath, "utf-8");
+    const frontmatterMatch = agentMd.match(/^---\n[\s\S]+?\n---\n/);
+    expect(frontmatterMatch).not.toBeNull();
+    const body = agentMd.slice(frontmatterMatch![0].length);
+
+    expect(body).not.toContain("list_meta_meditations");
+    expect(body).not.toContain("read_meta_meditation");
+    expect(body).not.toContain("meta-meditation");
+    expect(body).not.toContain("meta_meditation");
   });
 });
 

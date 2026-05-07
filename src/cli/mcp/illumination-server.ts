@@ -3,7 +3,7 @@ import { execSync } from "node:child_process";
 import { join, resolve, isAbsolute, relative } from "path";
 import ignore from "ignore";
 import fg from "fast-glob";
-import { illuminationsDir } from "../lib/apparat-paths.js";
+import { illuminationsDir, stimuliDir } from "../lib/apparat-paths.js";
 
 // ─── Exported pure helpers (for testing) ──────────────────────────────────────
 
@@ -160,24 +160,24 @@ export async function globFiles(projectRoot: string, pattern: string): Promise<s
   return matches.join("\n");
 }
 
-const NO_META_MEDITATIONS_MESSAGE =
-  "No meta-meditations found. You can still proceed — reflect on the project code " +
-  "directly and write your illumination using write_illumination.\n\n" +
-  "To add meta-meditations: create .md files in the .apparat/meditations/stimuli/ folder of your " +
-  "apparat-cli installation (e.g. ~/.npm-global/lib/node_modules/apparat-cli/.apparat/meditations/stimuli/). " +
-  "Each file is a lens the agent will use to reflect on your project.";
+const NO_STIMULI_MESSAGE =
+  "No stimuli found. You can still proceed — reflect on the project code directly " +
+  "and write your illumination using write_illumination.\n\n" +
+  "To add stimuli: create .md files in this project's .apparat/meditations/stimuli/ " +
+  "folder. Each file is a lens the agent will use to reflect on your project.";
 
-export function listMetaMeditations(meditationsDir: string): string {
+export function listStimuli(projectRoot: string): string {
+  const dir = stimuliDir(projectRoot);
   try {
-    const files = readdirSync(meditationsDir)
+    const files = readdirSync(dir)
       .filter((f) => f.endsWith(".md"))
       .sort();
-    if (files.length === 0) return NO_META_MEDITATIONS_MESSAGE;
+    if (files.length === 0) return NO_STIMULI_MESSAGE;
     return files
-      .map((name) => `${name} — ${parseIlluminationDescription(join(meditationsDir, name))}`)
+      .map((name) => `${name} — ${parseIlluminationDescription(join(dir, name))}`)
       .join("\n");
   } catch {
-    return NO_META_MEDITATIONS_MESSAGE;
+    return NO_STIMULI_MESSAGE;
   }
 }
 
@@ -244,11 +244,11 @@ export function listPlans(projectRoot: string): string {
   }
 }
 
-export function readMetaMeditation(meditationsDir: string, filename: string): string {
+export function readStimulus(projectRoot: string, filename: string): string {
   const err = validateFilename(filename);
   if (err) return `Error: ${err}`;
   try {
-    return readFileSync(join(meditationsDir, filename), "utf8");
+    return readFileSync(join(stimuliDir(projectRoot), filename), "utf8");
   } catch {
     return `Error: file not found: ${filename}`;
   }
@@ -305,7 +305,6 @@ const isTestEnv =
 
 if (!isTestEnv) {
   const projectRoot = process.argv[2];
-  const meditationsDir = process.argv[3] ?? "";
 
   if (!projectRoot) {
     console.error("Error: project root must be passed as first argument");
@@ -408,23 +407,23 @@ if (!isTestEnv) {
     );
 
     server.tool(
-      "list_meta_meditations",
-      "List available meta-meditation lens files from the apparat-cli installation. " +
+      "list_stimuli",
+      "List available stimulus lens files from this project's .apparat/meditations/stimuli/ folder. " +
         "Call this first to see which lenses are available before reading any.",
       {},
       async () => {
-        const result = listMetaMeditations(meditationsDir);
+        const result = listStimuli(projectRoot);
         return { content: [{ type: "text" as const, text: result }] };
       },
     );
 
     server.tool(
-      "read_meta_meditation",
-      "Read a specific meta-meditation lens file by filename. " +
-        "Use list_meta_meditations first to get available filenames.",
+      "read_stimulus",
+      "Read a specific stimulus lens file by filename. " +
+        "Use list_stimuli first to get available filenames.",
       { filename: z.string() },
       async ({ filename }: { filename: string }) => {
-        const result = readMetaMeditation(meditationsDir, filename);
+        const result = readStimulus(projectRoot, filename);
         return { content: [{ type: "text" as const, text: result }] };
       },
     );

@@ -3,7 +3,7 @@ import { join } from "path";
 import type { Node, PipelineContext, CheckpointState } from "../types.js";
 import type { HandlerExecutionContext } from "./registry.js";
 import { Agent, type AgentConfig } from "../../cli/lib/agent.js";
-import { getIlluminationServerPath, getMetaMeditationsDir } from "../../cli/lib/assets.js";
+import { getIlluminationServerPath } from "../../cli/lib/assets.js";
 import { buildPreamble } from "../transforms/preamble.js";
 import { renderInputsBlock } from "../transforms/inputs-renderer.js";
 import { extractDefaults } from "../transforms/variable-expansion.js";
@@ -16,14 +16,12 @@ import { extractDefaults } from "../transforms/variable-expansion.js";
 export const SYSTEM_INJECTED_VARS = [
   "ILLUMINATION_SERVER_PATH",
   "PROJECT_ROOT",
-  "META_MEDITATIONS_DIR",
 ] as const;
 
 function buildSystemInjectedVars(projectRoot: string): Record<(typeof SYSTEM_INJECTED_VARS)[number], string> {
   return {
     ILLUMINATION_SERVER_PATH: getIlluminationServerPath(),
     PROJECT_ROOT: projectRoot,
-    META_MEDITATIONS_DIR: getMetaMeditationsDir(),
   };
 }
 

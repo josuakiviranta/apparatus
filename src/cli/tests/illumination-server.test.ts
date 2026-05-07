@@ -11,7 +11,7 @@ vi.mock("node:child_process", () => ({
   execSync: mockExecSync,
 }));
 
-import { validateFilename, validateSlug, composeIlluminationFilename, writeIllumination, assertWithinRoot, readFile, validateGlobPattern, globFiles, projectTree, listMetaMeditations, readMetaMeditation, listIlluminations, listPlans, consume, consumePlan } from "../mcp/illumination-server";
+import { validateFilename, validateSlug, composeIlluminationFilename, writeIllumination, assertWithinRoot, readFile, validateGlobPattern, globFiles, projectTree, listStimuli, readStimulus, listIlluminations, listPlans, consume, consumePlan } from "../mcp/illumination-server";
 
 let tmpDir: string;
 
@@ -395,59 +395,77 @@ describe("projectTree", () => {
   });
 });
 
-describe("listMetaMeditations", () => {
-  it("returns sorted filename — description pairs when dir has .md files", () => {
-    writeFileSync(join(tmpDir, "b-lens.md"), "---\ndescription: B lens summary\n---\ncontent b");
-    writeFileSync(join(tmpDir, "a-lens.md"), "---\ndescription: A lens summary\n---\ncontent a");
-    const result = listMetaMeditations(tmpDir);
-    expect(result).toBe("a-lens.md — A lens summary\nb-lens.md — B lens summary");
+describe("listStimuli", () => {
+  function seed(projectRoot: string, files: Record<string, string>) {
+    const dir = join(projectRoot, ".apparat", "meditations", "stimuli");
+    mkdirSync(dir, { recursive: true });
+    for (const [name, content] of Object.entries(files)) {
+      writeFileSync(join(dir, name), content);
+    }
+  }
+
+  it("returns sorted filename — description pairs when stimuli dir has .md files", () => {
+    seed(tmpDir, {
+      "b-lens.md": "---\ndescription: B lens summary\n---\ncontent b",
+      "a-lens.md": "---\ndescription: A lens summary\n---\ncontent a",
+    });
+    expect(listStimuli(tmpDir)).toBe("a-lens.md — A lens summary\nb-lens.md — B lens summary");
   });
 
   it("falls back to (no description) when frontmatter is missing", () => {
-    writeFileSync(join(tmpDir, "raw-lens.md"), "no frontmatter here");
-    const result = listMetaMeditations(tmpDir);
-    expect(result).toBe("raw-lens.md — (no description)");
+    seed(tmpDir, { "raw-lens.md": "no frontmatter here" });
+    expect(listStimuli(tmpDir)).toBe("raw-lens.md — (no description)");
   });
 
   it("only lists .md files, ignoring other file types", () => {
-    writeFileSync(join(tmpDir, "a-lens.md"), "---\ndescription: A\n---\n");
-    writeFileSync(join(tmpDir, "config.json"), "");
-    const result = listMetaMeditations(tmpDir);
+    seed(tmpDir, {
+      "a-lens.md": "---\ndescription: A\n---\n",
+      "config.json": "",
+    });
+    const result = listStimuli(tmpDir);
     expect(result).toContain("a-lens.md");
     expect(result).not.toContain("config.json");
   });
 
-  it("returns explanatory message with instructions when dir is empty", () => {
-    const result = listMetaMeditations(tmpDir);
-    expect(result).toContain("No meta-meditations found");
-    expect(result).toContain("meditations/");
+  it("returns explanatory message pointing at the project's stimuli folder when dir is empty", () => {
+    mkdirSync(join(tmpDir, ".apparat", "meditations", "stimuli"), { recursive: true });
+    const result = listStimuli(tmpDir);
+    expect(result).toContain("No stimuli found");
+    expect(result).toContain(".apparat/meditations/stimuli/");
+    expect(result).not.toContain("npm-global");
   });
 
-  it("returns explanatory message with instructions when dir does not exist", () => {
-    const result = listMetaMeditations(join(tmpDir, "nonexistent"));
-    expect(result).toContain("No meta-meditations found");
-    expect(result).toContain("meditations/");
+  it("returns explanatory message when stimuli dir does not exist", () => {
+    const result = listStimuli(tmpDir);
+    expect(result).toContain("No stimuli found");
+    expect(result).toContain(".apparat/meditations/stimuli/");
   });
 });
 
-describe("readMetaMeditation", () => {
+describe("readStimulus", () => {
+  function seed(projectRoot: string, filename: string, content: string) {
+    const dir = join(projectRoot, ".apparat", "meditations", "stimuli");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, filename), content);
+  }
+
   it("returns file content for a valid existing filename", () => {
-    writeFileSync(join(tmpDir, "my-lens.md"), "# My Lens\ncontent here");
-    expect(readMetaMeditation(tmpDir, "my-lens.md")).toBe("# My Lens\ncontent here");
+    seed(tmpDir, "my-lens.md", "# My Lens\ncontent here");
+    expect(readStimulus(tmpDir, "my-lens.md")).toBe("# My Lens\ncontent here");
   });
 
   it("returns error for path traversal attempt (../secrets.md)", () => {
-    const result = readMetaMeditation(tmpDir, "../secrets.md");
+    const result = readStimulus(tmpDir, "../secrets.md");
     expect(result).toMatch(/^Error:/);
   });
 
   it("returns error for filename without .md extension", () => {
-    const result = readMetaMeditation(tmpDir, "lens.txt");
+    const result = readStimulus(tmpDir, "lens.txt");
     expect(result).toMatch(/^Error:/);
   });
 
   it("returns error when file does not exist", () => {
-    const result = readMetaMeditation(tmpDir, "nonexistent.md");
+    const result = readStimulus(tmpDir, "nonexistent.md");
     expect(result).toMatch(/^Error:/);
     expect(result).toContain("nonexistent.md");
   });
