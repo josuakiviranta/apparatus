@@ -10,6 +10,8 @@ inputs:
   - plan_writer.plan_path
 outputs:
   done: boolean
+  pre_sha: string
+  reason: {enum: [no_diff_produced, ""]}
 ---
 
 0. **Skill invocation (mandatory, first action).** Before any reading, planning, or coding, invoke the `superpowers:subagent-driven-development` skill via the Skill tool. Invoke `superpowers:test-driven-development` before each chunk's implementation phase. These skills are the operating contract — not aspirational guidance. Skipping them is a procedure violation.
@@ -29,6 +31,13 @@ Then dispatch parallel Sonnet subagents (up to 100) to read concurrently:
 
 Each subagent returns a brief summary of its slice. For code-level facts during work, Grep/Glob the discovered source roots on demand.
 0b. **Read the active plan.** The pipeline binds the path of the just-written plan as `$plan_writer_plan_path`. That file — and only that file — is your work list. Read it in full with `Read $plan_writer_plan_path`. Do **not** open `IMPLEMENTATION_PLAN.md` at the project root; that file (when present) is legacy state from older flows and will mislead this loop into reporting `done:true` against unrelated checkboxes.
+Step 0c. **Capture pre-implement HEAD sha (diff-guard reference).** Before any reads, dispatches, or edits, record the working-tree state:
+
+    ```bash
+    pre_sha=$(cd $project && git rev-parse HEAD)
+    ```
+
+    Carry this value in your working memory through to the final JSON emit. Every iteration's final JSON MUST include `pre_sha` whether you emit `done=true` or `done=false`.
 0d. For reference, the application source code is in `src/*`.
 
 1. Your task is to implement the plan at `$plan_writer_plan_path` using parallel subagents instructed with red/green TDD. Pick the next unchecked (`- [ ]`) chunk in that plan and address it. Before making changes, search the codebase (don't assume not implemented) using Sonnet subagents. You may use up to 500 parallel Sonnet subagents for searches/reads and only 1 Sonnet subagent for build/tests. Use Opus subagents when complex reasoning is needed (debugging, architectural decisions). **Your role is orchestration, not authorship.** Every code edit must come from a dispatched subagent. Solo edits by the main agent (Edit/Write directly without dispatching) are forbidden.
@@ -36,6 +45,27 @@ Each subagent returns a brief summary of its slice. For code-level facts during 
 3. When you discover issues, immediately update `$plan_writer_plan_path` with your findings using a subagent. When resolved, update and remove the item.
 4. When the tests pass, update `$plan_writer_plan_path` (mark the chunk `[x]`), then `git add -A` then `git commit` with a message describing the changes. After the commit, `git push`.
 
+5. **Diff guard before declaring done (mandatory final pre-emit step).** Before emitting your iteration's final JSON, run in `$project`:
+
+    ```bash
+    cd $project
+    diff_stat=$(git diff --stat $pre_sha HEAD)
+    porcelain=$(git status --porcelain)
+    ```
+
+    If BOTH `diff_stat` AND `porcelain` are empty AND this iteration's narrative claimed non-trivial implementation work (you attempted a chunk, you intended to touch a file), emit:
+
+    ```json
+    { "done": false, "reason": "no_diff_produced", "pre_sha": "<sha>" }
+    ```
+
+    Refuse to mask a no-op as success — the deep loop will re-invoke you with a fresh context to actually do the work. Otherwise emit:
+
+    ```json
+    { "done": <self-attested>, "reason": "", "pre_sha": "<sha>" }
+    ```
+
+    The handler at `src/attractor/handlers/looping-agent-handler.ts:151` still trusts the `done` field as-is — this guard lives in the agent prompt, not the handler, so policy tweaks (e.g. allow no-op for doc-only plans) stay readable here.
 
 9. IMPORTANT: Always use subagent-driven development with red/green TDD. The main agent orchestrates; subagents write code. If you find yourself about to call Edit or Write directly on a source file, STOP and dispatch a subagent instead. Reread step 0 if unsure.
 99. If `$plan_writer_plan_path` contains multiple chunks, implement one chunk per iteration. The deep-loop runner will re-invoke you with a fresh context until the plan reports all `[x]`.
