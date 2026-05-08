@@ -19,8 +19,8 @@ describe(".apparat/pipelines/illumination-to-implementation/tmux-tester.md — p
     expect(md).toMatch(/inputs:[\s\S]*?-\s*implement\.pre_sha/);
   });
 
-  it("outputs include plan_files_touched as an integer", () => {
-    expect(md).toMatch(/outputs:[\s\S]*?plan_files_touched:\s*integer/);
+  it("outputs include plan_files_touched as a number", () => {
+    expect(md).toMatch(/outputs:[\s\S]*?plan_files_touched:\s*number/);
   });
 
   it("body has a Phase 0a — Plan-coverage candidate extraction step that reads plan_writer.plan_path", () => {

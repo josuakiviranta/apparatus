@@ -16,7 +16,7 @@ outputs:
   test_result: {enum: [pass, fail]}
   test_summary: string
   test_render: string
-  plan_files_touched: integer
+  plan_files_touched: number
 inputs:
   - project
   - run_id

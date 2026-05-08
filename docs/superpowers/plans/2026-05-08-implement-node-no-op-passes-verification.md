@@ -21,6 +21,8 @@ This plan therefore creates **new** content-shape test files alongside the exist
 
 A `runPipelineForTest` helper does not exist in this repo (`Grep runPipelineForTest src/` → 0 hits). The new smoke uses the **shape-test** pattern that the rest of `src/cli/tests/pipeline-smoke-*-folder.test.ts` files use (read the `.md` and assert content), not a runtime engine driver. A future engine-driven smoke is left as Open Question §OQ1.
 
+> **Retro note (added during Chunk 3):** Chunk 2 originally specified `plan_files_touched: integer` but the validator at `src/attractor/core/schemas.ts` only supports `string`/`number`/`boolean` shorthands — `integer` is not a recognized shorthand and produces `[outputs_schema_invalid]`. Switched to `number` retroactively during Chunk 3 to keep `pipeline validate` exit 0 for Chunk 5.
+
 ---
 
 ## Chunk 1: `implement.md` — agent-driven diff guard
@@ -175,7 +177,7 @@ git commit -m "feat(implement): add agent-driven diff guard with pre_sha and no_
 
 ## Chunk 2: `tmux-tester.md` — plan-coverage signal (`plan_files_touched`)
 
-Extends `inputs:` with `plan_writer.plan_path` and `implement.pre_sha`, adds `plan_files_touched: integer` to `outputs:`, and inserts Phase 0a (plan-coverage candidate extraction) + Phase 1c (diff cross-reference) into the body.
+Extends `inputs:` with `plan_writer.plan_path` and `implement.pre_sha`, adds `plan_files_touched: number` to `outputs:`, and inserts Phase 0a (plan-coverage candidate extraction) + Phase 1c (diff cross-reference) into the body.
 
 **Files:**
 - Test (new): `src/cli/tests/pipeline-illum-to-impl-tmux-tester-folder.test.ts`
@@ -209,8 +211,8 @@ describe(".apparat/pipelines/illumination-to-implementation/tmux-tester.md — p
     expect(md).toMatch(/inputs:[\s\S]*?-\s*implement\.pre_sha/);
   });
 
-  it("outputs include plan_files_touched as an integer", () => {
-    expect(md).toMatch(/outputs:[\s\S]*?plan_files_touched:\s*integer/);
+  it("outputs include plan_files_touched as a number", () => {
+    expect(md).toMatch(/outputs:[\s\S]*?plan_files_touched:\s*number/);
   });
 
   it("body has a Phase 0a — Plan-coverage candidate extraction step that reads plan_writer.plan_path", () => {
@@ -261,7 +263,7 @@ outputs:
   test_result: {enum: [pass, fail]}
   test_summary: string
   test_render: string
-  plan_files_touched: integer
+  plan_files_touched: number
 inputs:
   - project
   - run_id
@@ -609,7 +611,7 @@ describe("pipeline-smoke: illumination-to-implementation no-op refusal interlock
   it("tmux-tester.md emits plan_files_touched; tmux_confirm_gate.md consumes it", () => {
     const tester = readFileSync(TMUX_TESTER_MD, "utf-8");
     const gate = readFileSync(GATE_MD, "utf-8");
-    expect(tester).toMatch(/outputs:[\s\S]*?plan_files_touched:\s*integer/);
+    expect(tester).toMatch(/outputs:[\s\S]*?plan_files_touched:\s*number/);
     expect(gate).toMatch(/inputs:[\s\S]*?-\s*tmux_tester\.plan_files_touched/);
     expect(gate).toMatch(/\$tmux_tester\.plan_files_touched/);
   });
