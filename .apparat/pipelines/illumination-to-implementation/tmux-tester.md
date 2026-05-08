@@ -16,9 +16,12 @@ outputs:
   test_result: {enum: [pass, fail]}
   test_summary: string
   test_render: string
+  plan_files_touched: integer
 inputs:
   - project
   - run_id
+  - plan_writer.plan_path
+  - implement.pre_sha
 ---
 
 # Mission
@@ -178,6 +181,16 @@ Idempotent by design: on a fresh run the window is created; on `--resume` after 
 
 If `$SESSION` is empty (i.e. the pipeline is not running inside a tmux session), emit `test_result="fail"` with `test_render`'s "Remaining issues" section listing "tmux-tester node requires the pipeline to be running inside a tmux session; $SESSION was empty" and end. Do not attempt to start a detached tmux process — that sandbox is a user-environment concern.
 
+## Phase 0a — Plan-coverage candidate extraction
+
+Before any cycle starts, read `$plan_writer.plan_path` and extract every back-tick-quoted file reference matching the pattern:
+
+```
+\`[^\`]+\.(ts|md|dot|js|json)\`
+```
+
+Store the matches as the **candidate set** — a list of relative paths the plan claims to touch. Hold this set in working memory; you will diff against it in Phase 1c. If `$plan_writer.plan_path` is empty or unreadable, set the candidate set to `[]` and continue (Phase 1c will emit `plan_files_touched=0`, which the gate disambiguates).
+
 ## Phase 1 — Automated verification
 
 1. Send into the window:
@@ -189,6 +202,23 @@ If `$SESSION` is empty (i.e. the pipeline is not running inside a tmux session),
 4. Record pass/fail and the raw counts ("X passed, Y failed, Z total").
 
 If Phase 1 fails, you MAY skip Phases 2–3 for this cycle and go straight to the **Fix step** — a broken build or red suite means smoke runs are unreliable.
+
+## Phase 1c — Diff cross-reference
+
+After Phase 1 settles (build + test cycle finished), run in `$project`:
+
+```bash
+git diff --name-only $implement.pre_sha HEAD
+```
+
+Count how many paths in the candidate set (Phase 0a) appear verbatim in the diff. Emit the count as `plan_files_touched` in the final JSON. Append a one-line "### Plan coverage" entry to `test_render`:
+
+```markdown
+### Plan coverage
+plan_files_touched: <count>  (out of <candidate-set-size> candidate paths in plan_writer.plan_path)
+```
+
+`test_result` is **orthogonal** to plan coverage — a plan touching zero files but producing green build + green tests still reports `test_result=pass` AND `plan_files_touched=0`. The downstream `tmux_confirm_gate` weights the three signals together; the tester does not fail the build for low coverage.
 
 ## Phase 2 — Scenario pipelines
 
