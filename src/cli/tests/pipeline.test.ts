@@ -39,9 +39,13 @@ vi.mock("../components/PipelineApp.js", () => ({
     waitUntilExit: vi.fn(async () => {}),
   })),
 }));
-vi.mock("../lib/assets.js", () => ({
-  resolveBundledPipeline: vi.fn((name: string) => `/fake/pipelines/${name}/pipeline.dot`),
-}));
+vi.mock("../lib/assets.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../lib/assets.js")>();
+  return {
+    ...actual,
+    resolveBundledPipeline: vi.fn((name: string) => `/fake/pipelines/${name}/pipeline.dot`),
+  };
+});
 vi.mock("../lib/stream-formatter.js", () => ({
   streamEvents: vi.fn(async function* () {}),
   parseStreamJsonEvents: vi.fn(async function* () {}),
@@ -333,18 +337,37 @@ describe("pipelineListCommand", () => {
   });
   afterEach(() => { rmSync(dir, { recursive: true }); });
 
-  it("prints message when pipelines/ does not exist", async () => {
+  // The mock for ../lib/assets.js at the top of this file (widened in
+  // Step 1a) keeps resolveBundledPipeline stubbed but PASSES THROUGH the
+  // real getBundledPipelinesDir, so the bundled tier rendered by
+  // pipelineListCommand reads from the real src/cli/pipelines/ folder
+  // during dev (implement, janitor, meditate). The "tags fork pairs"
+  // case below relies on that.
+
+  it("never prints the broken 'apparat pipeline create' hint, even on a fresh project", async () => {
     await pipelineListCommand({ project: dir });
-    expect(out.info).toHaveBeenCalledWith(expect.stringContaining("apparat pipeline create"));
+    const calls = (out.info as ReturnType<typeof vi.fn>).mock.calls.map(c => String(c[0]));
+    expect(calls.join("\n")).not.toContain("apparat pipeline create");
   });
 
-  it("prints message when pipelines/ is empty", async () => {
-    mkdirSync(join(dir, ".apparat", "pipelines"), { recursive: true });
+  it("prints two grouped headers — Local pipelines and Bundled pipelines", async () => {
     await pipelineListCommand({ project: dir });
-    expect(out.info).toHaveBeenCalledWith(expect.stringContaining("apparat pipeline create"));
+    expect(out.info).toHaveBeenCalledWith(expect.stringContaining("Local pipelines:"));
+    expect(out.info).toHaveBeenCalledWith(expect.stringContaining("Bundled pipelines:"));
   });
 
-  it("lists .dot files with their goal attribute", async () => {
+  it("renders '(none)' under Local pipelines when project has no .apparat/pipelines folder", async () => {
+    await pipelineListCommand({ project: dir });
+    const calls = (out.info as ReturnType<typeof vi.fn>).mock.calls.map(c => String(c[0]));
+    const localIdx = calls.findIndex(s => s.includes("Local pipelines:"));
+    const bundledIdx = calls.findIndex(s => s.includes("Bundled pipelines:"));
+    expect(localIdx).toBeGreaterThanOrEqual(0);
+    expect(bundledIdx).toBeGreaterThan(localIdx);
+    const localBlock = calls.slice(localIdx + 1, bundledIdx).join("\n");
+    expect(localBlock).toContain("(none)");
+  });
+
+  it("lists local pipelines under Local pipelines: with their goal attribute", async () => {
     mkdirSync(join(dir, ".apparat", "pipelines"), { recursive: true });
     writeFileSync(join(dir, ".apparat", "pipelines", "review.dot"),
       `digraph g {\n  goal="Run review"\n  start [shape=Mdiamond]\n  done [shape=Msquare]\n  start -> done\n}`);
@@ -355,6 +378,23 @@ describe("pipelineListCommand", () => {
     expect(out.info).toHaveBeenCalledWith(expect.stringContaining("Run review"));
     expect(out.info).toHaveBeenCalledWith(expect.stringContaining("deploy"));
     expect(out.info).toHaveBeenCalledWith(expect.stringContaining("no goal defined"));
+  });
+
+  it("tags fork pairs on BOTH rows when a local pipeline shadows a bundled one", async () => {
+    // Use a real bundled folder (default in dev). 'janitor' is bundled at
+    // src/cli/pipelines/janitor/pipeline.dot, so a local janitor folder
+    // here will be tagged "(forked → local)" and the bundled row
+    // "(shadowed by local)".
+    const localJanitor = join(dir, ".apparat", "pipelines", "janitor");
+    mkdirSync(localJanitor, { recursive: true });
+    writeFileSync(
+      join(localJanitor, "pipeline.dot"),
+      `digraph janitor {\n  goal="local fork"\n  start [shape=Mdiamond]\n  done [shape=Msquare]\n  start -> done\n}`,
+    );
+    await pipelineListCommand({ project: dir });
+    const calls = (out.info as ReturnType<typeof vi.fn>).mock.calls.map(c => String(c[0]));
+    expect(calls.some(s => s.includes("janitor (forked → local)"))).toBe(true);
+    expect(calls.some(s => s.includes("janitor (shadowed by local)"))).toBe(true);
   });
 });
 

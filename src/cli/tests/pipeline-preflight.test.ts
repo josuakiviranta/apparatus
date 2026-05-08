@@ -102,10 +102,27 @@ describe("pipeline list shows requires:", () => {
     expect(combined).toContain("with-inputs");
     expect(combined).toContain("requires: foo, bar");
     expect(combined).toContain("no-inputs");
-    // Legacy pipeline must NOT have a requires: line
-    const noInputsIdx = combined.indexOf("no-inputs");
-    const withInputsIdx = combined.indexOf("with-inputs");
-    const noInputsBlock = combined.slice(noInputsIdx, withInputsIdx);
-    expect(noInputsBlock).not.toContain("requires:");
+    // Legacy pipeline must NOT have a `requires:` line on its own row.
+    // Parse line-by-line so the assertion survives bundled rows being added
+    // to the listing (Local pipelines: / Bundled pipelines: groups).
+    const lines = combined.split(/\r?\n/);
+    let foundNoInputs = false;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      // Match the row that names "no-inputs" — the renderer prints it as the
+      // padded name column followed by the goal, so a startsWith on the
+      // trimmed leading whitespace is enough.
+      if (/^\s+no-inputs\b/.test(line)) {
+        foundNoInputs = true;
+        // The renderer would emit "requires:" on the very next line for that
+        // pipeline if inputs= were declared. Confirm the next non-empty,
+        // still-indented line either belongs to a different row or to a
+        // group header.
+        const next = lines[i + 1] ?? "";
+        expect(next.includes("requires:")).toBe(false);
+        break;
+      }
+    }
+    expect(foundNoInputs).toBe(true);
   });
 });

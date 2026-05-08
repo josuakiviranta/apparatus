@@ -89,7 +89,7 @@ Check a pipeline for structural errors and `portability_heuristic` warnings (har
 ```bash
 apparat pipeline list <project-folder>
 ```
-List all `.dot` pipeline files found in the project.
+List runnable pipelines for the project — both bundled (e.g. `implement`, `janitor`, `meditate`) and project-local under `<project>/.apparat/pipelines/`. Forked bundled pipelines are tagged on both rows.
 
 ```bash
 apparat pipeline trace <runId> [--node-receive <nodeId>] [--full]
@@ -172,9 +172,11 @@ exits the loop with `agent.success=false`.
 
 ### No-op refusal (added 2026-05-08)
 
-In addition to `done: boolean`, agents that opt into the deep loop MAY emit `pre_sha: string` (captured via `git rev-parse HEAD` before any work) and `reason: {enum: [no_diff_produced, ""]}`. When an agent runs `git diff --stat $pre_sha HEAD` + `git status --porcelain` at exit and finds both empty AND the iteration claimed non-trivial work, the agent MUST emit `{ "done": false, "reason": "no_diff_produced", "pre_sha": "<sha>" }` so the looping handler re-invokes it with a fresh context. Without this guard, a planning-only run can mask as a real ship — green build + green tests on an unchanged tree trivially pass any downstream `tmux_tester` node.
+The deep loop adds a `reason: {enum: [no_diff_produced, ""]}` output and a diff guard before declaring `done: true`. The HEAD SHA reference (`pre_sha`) is captured by an upstream `capture_pre_sha` tool node — `git rev-parse HEAD` runs once before the agent loop fires and the value is consumed via `inputs: capture_pre_sha.pre_sha`. Pulling the capture out of the agent prose removes a contract-drift surface (one iteration emitting bare `{"done": true}` previously broke every downstream consumer of `pre_sha`).
 
-The diff guard is **agent-driven**, not handler-side. The looping handler at `src/attractor/handlers/looping-agent-handler.ts:151` continues to trust the `done` field as-is. Forcing `done=false` from the handler would break the deep-loop public contract for every other agent that uses the looping handler. Keeping the policy in the agent prompt also keeps it readable and tweakable per pipeline (e.g. allow no-op for doc-only plans by editing the `.md`, not TypeScript).
+Inside each iteration, the agent runs `git diff --stat $capture_pre_sha_pre_sha HEAD` + `git status --porcelain` at exit. If both are empty AND the iteration claimed non-trivial work, the agent MUST emit `{ "done": false, "reason": "no_diff_produced" }` so the looping handler re-invokes it with a fresh context. Without this guard, a planning-only run can mask as a real ship — green build + green tests on an unchanged tree trivially pass any downstream `tmux_tester` node.
+
+The diff guard is **agent-driven**, not handler-side. The looping handler at `src/attractor/handlers/looping-agent-handler.ts:151` continues to trust the `done` field as-is. Forcing `done=false` from the handler would break the deep-loop public contract for every other agent that uses the looping handler. Keeping the policy in the agent prompt also keeps it readable and tweakable per pipeline (e.g. allow no-op for doc-only plans by editing the `.md`, not TypeScript). The pre-SHA capture stays out of the prose precisely because it's a deterministic side-effect, not a policy.
 
 ## Stopping the loop
 

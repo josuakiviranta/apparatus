@@ -41,7 +41,7 @@ Background scheduling (heartbeat):
   apparat heartbeat stop meditate:my-app                  Remove task and kill any running session
 
 Pipeline engine (DOT-graph workflows):
-  apparat pipeline list --project my-app             List workflows in a project
+  apparat pipeline list --project my-app             List runnable pipelines (bundled + local)
   apparat pipeline validate workflow.dot             Check a pipeline file for errors
   apparat pipeline validate review --project my-app  Validate by workflow name
   apparat pipeline show workflow.dot                 Render a pipeline as SVG next to the source
