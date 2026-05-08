@@ -14,31 +14,35 @@ const IMPLEMENT_MD = join(
 describe(".apparat/pipelines/illumination-to-implementation/implement.md — diff guard", () => {
   const md = readFileSync(IMPLEMENT_MD, "utf-8");
 
-  it("declares pre_sha as a string output in frontmatter", () => {
-    expect(md).toMatch(/outputs:[\s\S]*?pre_sha:\s*string/);
+  it("consumes capture_pre_sha.pre_sha as a declared input (not self-emitted)", () => {
+    expect(md).toMatch(/inputs:[\s\S]*?-\s*capture_pre_sha\.pre_sha/);
+  });
+
+  it("does NOT declare pre_sha as an output (owned by upstream capture_pre_sha tool node)", () => {
+    expect(md).not.toMatch(/outputs:[\s\S]*?pre_sha:\s*string/);
   });
 
   it("declares reason as an enum output covering no_diff_produced and empty", () => {
     expect(md).toMatch(/outputs:[\s\S]*?reason:\s*\{enum:\s*\[no_diff_produced,\s*""\]\}/);
   });
 
-  it("body captures pre_sha via `git rev-parse HEAD` BEFORE any work (Step 0c)", () => {
+  it("Step 0c references the upstream-captured $capture_pre_sha_pre_sha and forbids re-running git rev-parse", () => {
     expect(md).toMatch(/Step 0c/);
-    expect(md).toMatch(/pre_sha=\$\(cd \$project && git rev-parse HEAD\)/);
+    expect(md).toMatch(/\$capture_pre_sha_pre_sha/);
+    expect(md).not.toMatch(/pre_sha=\$\(cd \$project && git rev-parse HEAD\)/);
   });
 
-  it("body runs a diff guard with `git diff --stat $pre_sha HEAD` and `git status --porcelain` before declaring done", () => {
-    expect(md).toMatch(/git diff --stat \$pre_sha HEAD/);
+  it("Step 5 diff guard runs git diff --stat $capture_pre_sha_pre_sha HEAD + git status --porcelain", () => {
+    expect(md).toMatch(/git diff --stat \$capture_pre_sha_pre_sha HEAD/);
     expect(md).toMatch(/git status --porcelain/);
   });
 
-  it("body documents emitting done=false reason=no_diff_produced when both diff and porcelain are empty", () => {
+  it("body documents the no-op refusal emit shape — done=false, reason=no_diff_produced, no pre_sha", () => {
     expect(md).toContain("no_diff_produced");
-    expect(md).toMatch(/"done":\s*false/);
+    expect(md).toMatch(/"done":\s*false,\s*"reason":\s*"no_diff_produced"\s*\}/);
   });
 
-  it("body documents emitting done=<self-attested> reason=\"\" pre_sha=<sha> on the happy path", () => {
-    expect(md).toMatch(/"reason":\s*""/);
-    expect(md).toMatch(/"pre_sha":\s*"<sha>"/);
+  it("body documents the happy-path emit shape — done=<self-attested>, reason=\"\", no pre_sha echo", () => {
+    expect(md).toMatch(/"done":\s*<self-attested>,\s*"reason":\s*""\s*\}/);
   });
 });

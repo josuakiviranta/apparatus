@@ -14,9 +14,13 @@ const TMUX_TESTER_MD = join(
 describe(".apparat/pipelines/illumination-to-implementation/tmux-tester.md — plan-coverage signal", () => {
   const md = readFileSync(TMUX_TESTER_MD, "utf-8");
 
-  it("inputs include plan_writer.plan_path and implement.pre_sha", () => {
+  it("inputs include plan_writer.plan_path and capture_pre_sha.pre_sha", () => {
     expect(md).toMatch(/inputs:[\s\S]*?-\s*plan_writer\.plan_path/);
-    expect(md).toMatch(/inputs:[\s\S]*?-\s*implement\.pre_sha/);
+    expect(md).toMatch(/inputs:[\s\S]*?-\s*capture_pre_sha\.pre_sha/);
+  });
+
+  it("inputs no longer reference implement.pre_sha (moved to upstream capture_pre_sha tool node)", () => {
+    expect(md).not.toMatch(/inputs:[\s\S]*?-\s*implement\.pre_sha/);
   });
 
   it("outputs include plan_files_touched as a number", () => {
@@ -29,9 +33,9 @@ describe(".apparat/pipelines/illumination-to-implementation/tmux-tester.md — p
     expect(md).toMatch(/\\\.\(ts\|md\|dot\|js\|json\)/);
   });
 
-  it("body has a Phase 1c — Diff cross-reference step using implement.pre_sha", () => {
+  it("body has a Phase 1c — Diff cross-reference step using capture_pre_sha.pre_sha", () => {
     expect(md).toMatch(/Phase 1c/);
-    expect(md).toMatch(/git diff --name-only \$implement\.pre_sha HEAD/);
+    expect(md).toMatch(/git diff --name-only \$capture_pre_sha\.pre_sha HEAD/);
   });
 
   it("body emits plan_files_touched in the JSON and a Plan coverage line in test_render", () => {

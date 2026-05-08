@@ -8,9 +8,9 @@ mcp: []
 loop: true
 inputs:
   - plan_writer.plan_path
+  - capture_pre_sha.pre_sha
 outputs:
   done: boolean
-  pre_sha: string
   reason: {enum: [no_diff_produced, ""]}
 ---
 
@@ -31,13 +31,7 @@ Then dispatch parallel Sonnet subagents (up to 100) to read concurrently:
 
 Each subagent returns a brief summary of its slice. For code-level facts during work, Grep/Glob the discovered source roots on demand.
 0b. **Read the active plan.** The pipeline binds the path of the just-written plan as `$plan_writer_plan_path`. That file — and only that file — is your work list. Read it in full with `Read $plan_writer_plan_path`. Do **not** open `IMPLEMENTATION_PLAN.md` at the project root; that file (when present) is legacy state from older flows and will mislead this loop into reporting `done:true` against unrelated checkboxes.
-Step 0c. **Capture pre-implement HEAD sha (diff-guard reference).** Before any reads, dispatches, or edits, record the working-tree state:
-
-    ```bash
-    pre_sha=$(cd $project && git rev-parse HEAD)
-    ```
-
-    Carry this value in your working memory through to the final JSON emit. Every iteration's final JSON MUST include `pre_sha` whether you emit `done=true` or `done=false`.
+Step 0c. **Diff-guard reference (already captured).** A prior `capture_pre_sha` tool node recorded HEAD before this node fired. The value is injected as `$capture_pre_sha_pre_sha` (rendered tag in the inputs block above). Do NOT run `git rev-parse HEAD` yourself — every implement iteration shares the same baseline so each iteration's diff-guard compares against the original HEAD, not the prior iteration's commit. You do not need to emit it back; downstream nodes consume `capture_pre_sha.pre_sha` directly.
 0d. For reference, the application source code is in `src/*`.
 
 1. Your task is to implement the plan at `$plan_writer_plan_path` using parallel subagents instructed with red/green TDD. Pick the next unchecked (`- [ ]`) chunk in that plan and address it. Before making changes, search the codebase (don't assume not implemented) using Sonnet subagents. You may use up to 500 parallel Sonnet subagents for searches/reads and only 1 Sonnet subagent for build/tests. Use Opus subagents when complex reasoning is needed (debugging, architectural decisions). **Your role is orchestration, not authorship.** Every code edit must come from a dispatched subagent. Solo edits by the main agent (Edit/Write directly without dispatching) are forbidden.
@@ -49,23 +43,23 @@ Step 0c. **Capture pre-implement HEAD sha (diff-guard reference).** Before any r
 
     ```bash
     cd $project
-    diff_stat=$(git diff --stat $pre_sha HEAD)
+    diff_stat=$(git diff --stat $capture_pre_sha_pre_sha HEAD)
     porcelain=$(git status --porcelain)
     ```
 
     If BOTH `diff_stat` AND `porcelain` are empty AND this iteration's narrative claimed non-trivial implementation work (you attempted a chunk, you intended to touch a file), emit:
 
     ```json
-    { "done": false, "reason": "no_diff_produced", "pre_sha": "<sha>" }
+    { "done": false, "reason": "no_diff_produced" }
     ```
 
     Refuse to mask a no-op as success — the deep loop will re-invoke you with a fresh context to actually do the work. Otherwise emit:
 
     ```json
-    { "done": <self-attested>, "reason": "", "pre_sha": "<sha>" }
+    { "done": <self-attested>, "reason": "" }
     ```
 
-    The handler at `src/attractor/handlers/looping-agent-handler.ts:151` still trusts the `done` field as-is — this guard lives in the agent prompt, not the handler, so policy tweaks (e.g. allow no-op for doc-only plans) stay readable here.
+    The handler at `src/attractor/handlers/looping-agent-handler.ts:151` still trusts the `done` field as-is — this guard lives in the agent prompt, not the handler, so policy tweaks (e.g. allow no-op for doc-only plans) stay readable here. The pre_sha itself is owned by the upstream `capture_pre_sha` tool node and consumed directly by downstream nodes (e.g. tmux-tester); do not re-emit it.
 
 9. IMPORTANT: Always use subagent-driven development with red/green TDD. The main agent orchestrates; subagents write code. If you find yourself about to call Edit or Write directly on a source file, STOP and dispatch a subagent instead. Reread step 0 if unsure.
 99. If `$plan_writer_plan_path` contains multiple chunks, implement one chunk per iteration. The deep-loop runner will re-invoke you with a fresh context until the plan reports all `[x]`.

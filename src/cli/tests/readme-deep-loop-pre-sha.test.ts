@@ -8,8 +8,9 @@ const README = join(REPO_ROOT, "README.md");
 describe("README.md — deep-loop section documents pre_sha and no-op refusal", () => {
   const md = readFileSync(README, "utf-8");
 
-  it("mentions pre_sha as a deep-loop output", () => {
+  it("mentions pre_sha as captured by an upstream capture_pre_sha tool node", () => {
     expect(md).toMatch(/pre_sha/);
+    expect(md).toMatch(/capture_pre_sha/);
   });
 
   it("mentions no_diff_produced as the no-op refusal reason", () => {

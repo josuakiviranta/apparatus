@@ -21,7 +21,7 @@ inputs:
   - project
   - run_id
   - plan_writer.plan_path
-  - implement.pre_sha
+  - capture_pre_sha.pre_sha
 ---
 
 # Mission
@@ -208,7 +208,7 @@ If Phase 1 fails, you MAY skip Phases 2–3 for this cycle and go straight to th
 After Phase 1 settles (build + test cycle finished), run in `$project`:
 
 ```bash
-git diff --name-only $implement.pre_sha HEAD
+git diff --name-only $capture_pre_sha.pre_sha HEAD
 ```
 
 Count how many paths in the candidate set (Phase 0a) appear verbatim in the diff. Emit the count as `plan_files_touched` in the final JSON. Append a one-line "### Plan coverage" entry to `test_render`:

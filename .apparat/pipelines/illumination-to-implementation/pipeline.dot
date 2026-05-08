@@ -30,6 +30,12 @@ digraph illumination_to_implementation {
 
   // ── Phase 2: Implementation ───────────────────────────────────────────────
 
+  capture_pre_sha [type="tool",
+                   cwd="$project",
+                   script_file="capture-pre-sha.sh",
+                   produces_from_stdout="true",
+                   produces="pre_sha"]
+
   implement [agent="implement", max_retries=1]
 
   review_gate [shape=hexagon]
@@ -73,8 +79,10 @@ digraph illumination_to_implementation {
   // Decline branch terminator
   consume_declined -> done
 
-  // Plan writing — plan_writer hands its plan_path directly to implement.
-  design_writer -> plan_writer -> implement
+  // Plan writing — plan_writer hands its plan_path to capture_pre_sha,
+  // which records HEAD before any implementation work and dominates implement
+  // + tmux_tester so both consume capture_pre_sha.pre_sha deterministically.
+  design_writer -> plan_writer -> capture_pre_sha -> implement
 
   // ── Routing: Phase 2 ─────────────────────────────────────────────────────
 
