@@ -220,20 +220,65 @@ plan_files_touched: <count>  (out of <candidate-set-size> candidate paths in pla
 
 `test_result` is **orthogonal** to plan coverage — a plan touching zero files but producing green build + green tests still reports `test_result=pass` AND `plan_files_touched=0`. The downstream `tmux_confirm_gate` weights the three signals together; the tester does not fail the build for low coverage.
 
-## Phase 2 — Scenario pipelines
+## Phase 2 — Live scenario discovery + execution
 
-After Phase 1 (build + test) is GREEN, drive every scenario pipeline through `apparat pipeline run` in the tmux window — unconditionally, no diff filtering, no skipping, cost is acceptable.
-
-**A green vitest suite is NOT a substitute.** `pipeline-smoke-*-folder.test.ts` wraps the scenarios for unit-style assertions, but the live `apparat pipeline run` path (CLI parsing, TUI render, daemon plumbing, exit handling) is only exercised when you actually drive it. Run them.
+After Phase 1 (build + test) is GREEN, discover every bundled scenario at runtime and drive each through `apparat pipeline run` in the tmux window. The structural `pipeline-smoke-*-folder.test.ts` suite was deleted (2026-05-08): live execution is now the only signal that catches scenarios broken by anything outside `validateGraph` — agent-attribute drift, runtime crashes, TUI glitches, broken interactive prompts.
 
 1. If Phase 1 is RED, do NOT enter this phase. Stay in the Fix loop until tests pass, then re-run Phase 1, then enter here.
-2. List every scenario in your shell (not the tmux window): `ls $project/.apparat/scenarios/*/pipeline.dot`.
-3. For each scenario:
-   a. **Validate first** in your shell: `apparat pipeline validate $project/.apparat/scenarios/<name>/pipeline.dot`. If validate fails, that IS the issue — capture its output, treat as a Phase 2 failure for the Fix step, do NOT attempt to run it.
-   b. If validate passes, read the `.dot` header to extract required `--var` keys, then send into the window:
-      `apparat pipeline run .apparat/scenarios/<name>/pipeline.dot --var <required-vars>`
-4. After each run: `wait_stable 180000`, `capture`, read `current.txt`. Apply your agent-level observation criteria (crashes, exits ≠ 0, hangs, TUI glitches, copy regressions).
-5. Run all scenarios every cycle. Do not skip. If a scenario is genuinely incompatible with this environment, run it anyway and let it fail — the failure is the data.
+
+2. **Discover.** In your shell (not the tmux window), run:
+
+   ```bash
+   ls -d $project/.apparat/scenarios/*/
+   ```
+
+   Hold the resulting folder list as the discovery set.
+
+3. **Self-skip rule.** For each folder, skip if:
+   - the folder basename is exactly `tmux-tester`, OR
+   - the folder contains a file named `tmux-tester.md`.
+
+   Either condition means the folder would (or might) reinvoke this very agent and cause recursion. Defensive — today's tree (post 2026-05-08 reconcile) has no folder that triggers either condition.
+
+4. **For each non-skipped folder:**
+
+   a. **Validate first** in your shell:
+      ```bash
+      apparat pipeline validate $project/.apparat/scenarios/<name>/pipeline.dot
+      ```
+      If validate fails, that IS the issue — capture its output, append a FAIL row to `### Scenarios run` in `test_render` (see step 5), feed the failure to the Fix step, and continue to the next folder. Do NOT attempt to run a scenario that fails validation.
+
+   b. If validate passes, read the `.dot` header to extract required `--var` keys, then `send_input` into the window:
+      ```
+      apparat pipeline run .apparat/scenarios/<name>/pipeline.dot --var <required-vars>
+      ```
+
+   c. Drive the scenario to completion:
+      - `wait_stable 180000` between drives. After each `wait_stable`, `capture` and read `current.txt`.
+      - Apply the observation criteria below (crashes, exits ≠ 0, hangs, TUI glitches, copy regressions).
+      - **Agent-as-human for interactive prompts.** When the pane shows a prompt waiting on a human (gate choice, chat continuation, meditate-steer topic, approval gate), use `send_input "<plausible answer>"` to feed a deterministic, plausible response. No skiplist; no interactive-vs-non-interactive split. Plausible defaults:
+        - Gate / approval-gate: pick the **first non-Decline** option presented (e.g. `Approve`, `Continue`, `Yes`).
+        - Chat / steer / continuation prompts: send a one-line affirmative continuation (e.g. `looks good, continue`).
+        - Meditate-steer topic: send a one-line topic (e.g. `verify the current direction`).
+        - Edge case (a prompt asks the agent to choose between two named directions or otherwise does not fit the templates above): pick the **first affirmative option** presented and log the choice in `### Scenarios run` for the human to audit at `tmux_confirm_gate`.
+      - Detect run completion by either a clean shell prompt return (`$ ` reappears in `current.txt`) or an exit-code line; if neither appears within the `wait_stable` budget, treat as a hang and record FAIL with symptom "hang past wait_stable 180000ms".
+
+   d. If a scenario crashes the tmux window itself (not just the run inside it — i.e. the pane goes blank, tmux loses the window, or the harness can no longer `capture-pane`), short-circuit Phase 2: stop the discovery loop, record the affected scenario as the cause, and let `test_result` flip to `"fail"` with the issue surfaced in `### Remaining issues`.
+
+5. **Aggregation contract.** After every scenario completes (success or fail), append one row to the in-progress `test_render` `### Scenarios run` section:
+
+   ```
+   - <scenario-name>: PASS  (run took Ns)
+   - <scenario-name>: FAIL  (symptom — first error line from current.txt)
+   ```
+
+   Roll up into the existing four outputs without contract change:
+   - `test_result` flips to `"fail"` the moment any scenario surfaces a crash, exit ≠ 0, hang past the `wait_stable 180000` budget, surface a `TypeError` / `ReferenceError` / unhandled rejection, or shows a TUI glitch.
+   - `test_summary` includes a one-line scenario-coverage roll-up: `"N scenarios discovered, M passed, K failed, S skipped"` (S = skipped by self-skip rule).
+   - `test_render` carries the per-scenario rows under `### Scenarios run`.
+   - `plan_files_touched` is unaffected — Phase 1c continues to count diffs against `$plan_writer.plan_path` independently.
+
+6. **Run all non-skipped scenarios every cycle. Do not short-circuit on early failures (except per 4d).** Failed scenarios feed the Fix step like any other Phase 2 issue.
 
 For any command you drive in the window, apply these observation criteria:
 - crashes / stack traces
@@ -288,6 +333,13 @@ Emit JSON matching the schema:
   1. <Cycle 1 headline — what was observed, what broke, what was fixed>
   2. <Cycle 2 headline — ...>
   ...
+
+  ### Scenarios run
+  - <scenario-name>: PASS  (run took Ns)
+  - <scenario-name>: FAIL  (symptom — first error line from current.txt)
+  - <scenario-name>: SKIP  (self-skip rule — folder name or tmux-tester.md present)
+  ...
+  (or "No scenarios discovered." if `.apparat/scenarios/` was empty.)
 
   ### Fixes applied (N commits)
   - `<short-hash>` <commit subject>
