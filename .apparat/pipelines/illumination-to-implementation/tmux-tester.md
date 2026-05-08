@@ -240,7 +240,17 @@ After Phase 1 (build + test) is GREEN, discover every bundled scenario at runtim
 
    Either condition means the folder would (or might) reinvoke this very agent and cause recursion. Defensive — today's tree (post 2026-05-08 reconcile) has no folder that triggers either condition.
 
-4. **For each non-skipped folder:**
+3a. **Relevance selection.** For each non-self-skipped folder, decide INCLUDE or SKIP based on whether the implementer's diff plausibly affects what the scenario exercises:
+
+   - Use the diff already computed for Phase 1c: `git diff --name-only $capture_pre_sha.pre_sha HEAD`.
+   - For each candidate folder, read `<folder>/pipeline.dot` and any sibling `.md` / `script_file` referenced via `agent="…"` or `script_file="…"`.
+   - Reason about overlap: does the diff touch source the scenario depends on — agents it invokes, commands it drives, parser/validator/handler code in its execution path?
+   - **Cross-cutting fallback.** If the diff touches engine internals (`src/attractor/`, `src/cli/lib/dot/`, the validator, handler dispatch, the deep-loop runner, the streaming formatter) → INCLUDE all. Engine changes hit every scenario; do not try to be clever.
+   - **Bias toward INCLUDE.** When uncertain, INCLUDE. The cost of a missed regression at `tmux_confirm_gate` exceeds the cost of one extra scenario run.
+   - **Floor.** If your reasoning produces zero INCLUDEs, INCLUDE one scenario as sanity (pick the smallest / cheapest to run).
+   - Record the call and a one-line reason for every folder — this feeds the `### Scenarios run` log so `tmux_confirm_gate` (and the human) can audit the selection.
+
+4. **For each INCLUDED folder:**
 
    a. **Validate first** in your shell:
       ```bash
@@ -265,20 +275,22 @@ After Phase 1 (build + test) is GREEN, discover every bundled scenario at runtim
 
    d. If a scenario crashes the tmux window itself (not just the run inside it — i.e. the pane goes blank, tmux loses the window, or the harness can no longer `capture-pane`), short-circuit Phase 2: stop the discovery loop, record the affected scenario as the cause, and let `test_result` flip to `"fail"` with the issue surfaced in `### Remaining issues`.
 
-5. **Aggregation contract.** After every scenario completes (success or fail), append one row to the in-progress `test_render` `### Scenarios run` section:
+5. **Aggregation contract.** After every scenario completes (success or fail), append one row to the in-progress `test_render` `### Scenarios run` section. Skipped scenarios get a row at selection time:
 
    ```
    - <scenario-name>: PASS  (run took Ns)
    - <scenario-name>: FAIL  (symptom — first error line from current.txt)
+   - <scenario-name>: SKIP  (self-skip — folder name or tmux-tester.md present)
+   - <scenario-name>: SKIP  (diff-irrelevance — <one-line reason>)
    ```
 
    Roll up into the existing four outputs without contract change:
    - `test_result` flips to `"fail"` the moment any scenario surfaces a crash, exit ≠ 0, hang past the `wait_stable 180000` budget, surface a `TypeError` / `ReferenceError` / unhandled rejection, or shows a TUI glitch.
-   - `test_summary` includes a one-line scenario-coverage roll-up: `"N scenarios discovered, M passed, K failed, S skipped"` (S = skipped by self-skip rule).
+   - `test_summary` includes a one-line scenario-coverage roll-up: `"N scenarios discovered, I included, M passed, K failed, S skipped"` (S includes both self-skip and diff-irrelevance skips).
    - `test_render` carries the per-scenario rows under `### Scenarios run`.
    - `plan_files_touched` is unaffected — Phase 1c continues to count diffs against `$plan_writer.plan_path` independently.
 
-6. **Run all non-skipped scenarios every cycle. Do not short-circuit on early failures (except per 4d).** Failed scenarios feed the Fix step like any other Phase 2 issue.
+6. **Run every INCLUDED scenario each cycle. Do not short-circuit on early failures (except per 4d).** Failed scenarios feed the Fix step like any other Phase 2 issue. After a Fix-step commit, re-run Phase 1c → 3a — a fix may shift the diff and pull previously-irrelevant scenarios into INCLUDE.
 
 For any command you drive in the window, apply these observation criteria:
 - crashes / stack traces
@@ -337,7 +349,8 @@ Emit JSON matching the schema:
   ### Scenarios run
   - <scenario-name>: PASS  (run took Ns)
   - <scenario-name>: FAIL  (symptom — first error line from current.txt)
-  - <scenario-name>: SKIP  (self-skip rule — folder name or tmux-tester.md present)
+  - <scenario-name>: SKIP  (self-skip — folder name or tmux-tester.md present)
+  - <scenario-name>: SKIP  (diff-irrelevance — <one-line reason>)
   ...
   (or "No scenarios discovered." if `.apparat/scenarios/` was empty.)
 
