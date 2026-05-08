@@ -340,7 +340,7 @@ Extends gate `inputs:` with `implement.done`, `implement.reason`, `tmux_tester.t
 
 ### Steps
 
-- [ ] **Step 3.1: Write the failing content-shape test**
+- [x] **Step 3.1: Write the failing content-shape test**
 
 Create `src/cli/tests/pipeline-illum-to-impl-tmux-confirm-gate-folder.test.ts`:
 
@@ -389,12 +389,12 @@ describe(".apparat/pipelines/illumination-to-implementation/tmux_confirm_gate.md
 });
 ```
 
-- [ ] **Step 3.2: Run the test to verify it fails**
+- [x] **Step 3.2: Run the test to verify it fails**
 
 Run: `npx vitest run src/cli/tests/pipeline-illum-to-impl-tmux-confirm-gate-folder.test.ts`
 Expected: 4 failing assertions (Signals block, three new inputs, three signal interpolations).
 
-- [ ] **Step 3.3: Replace the entire `tmux_confirm_gate.md` content**
+- [x] **Step 3.3: Replace the entire `tmux_confirm_gate.md` content**
 
 Overwrite `.apparat/pipelines/illumination-to-implementation/tmux_confirm_gate.md` with:
 
@@ -424,17 +424,17 @@ $tmux_tester.test_render
 Commit the fixes or give tmux-tester another pass?
 ```
 
-- [ ] **Step 3.4: Run the test to verify it passes**
+- [x] **Step 3.4: Run the test to verify it passes**
 
 Run: `npx vitest run src/cli/tests/pipeline-illum-to-impl-tmux-confirm-gate-folder.test.ts`
 Expected: 4 passing assertions.
 
-- [ ] **Step 3.5: Validate the pipeline still parses**
+- [x] **Step 3.5: Validate the pipeline still parses**
 
 Run: `npx tsx src/cli/index.ts pipeline validate .apparat/pipelines/illumination-to-implementation/pipeline.dot`
 Expected: exits 0, no error-severity diagnostics. (The gate `inputs:` field is optional per `src/attractor/core/schemas.ts:61`, so additive entries are accepted.)
 
-- [ ] **Step 3.6: Commit**
+- [x] **Step 3.6: Commit**
 
 ```bash
 git add src/cli/tests/pipeline-illum-to-impl-tmux-confirm-gate-folder.test.ts \
