@@ -170,6 +170,12 @@ The validator rejects `loop: true` without `done: boolean` with error
 `loop_missing_done_field`. A non-zero exit during any deep-loop iteration
 exits the loop with `agent.success=false`.
 
+### No-op refusal (added 2026-05-08)
+
+In addition to `done: boolean`, agents that opt into the deep loop MAY emit `pre_sha: string` (captured via `git rev-parse HEAD` before any work) and `reason: {enum: [no_diff_produced, ""]}`. When an agent runs `git diff --stat $pre_sha HEAD` + `git status --porcelain` at exit and finds both empty AND the iteration claimed non-trivial work, the agent MUST emit `{ "done": false, "reason": "no_diff_produced", "pre_sha": "<sha>" }` so the looping handler re-invokes it with a fresh context. Without this guard, a planning-only run can mask as a real ship — green build + green tests on an unchanged tree trivially pass any downstream `tmux_tester` node.
+
+The diff guard is **agent-driven**, not handler-side. The looping handler at `src/attractor/handlers/looping-agent-handler.ts:151` continues to trust the `done` field as-is. Forcing `done=false` from the handler would break the deep-loop public contract for every other agent that uses the looping handler. Keeping the policy in the agent prompt also keeps it readable and tweakable per pipeline (e.g. allow no-op for doc-only plans by editing the `.md`, not TypeScript).
+
 ## Stopping the loop
 
 Press `Ctrl+C`. apparat cleanly terminates its own claude subprocess without affecting any other running claude sessions.
