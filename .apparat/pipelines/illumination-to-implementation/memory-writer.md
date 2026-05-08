@@ -104,6 +104,21 @@ Memory files are reference documents for future sessions. Keep them dense, scann
    - test_summary: <verbatim from $tmux_tester.test_summary>
    ```
 
+4a. **Warnings cross-check (no-op detection on the success path).** Define the no-op substring set:
+
+    ```
+    no_op_substrings = [
+      "no in-scope diff",
+      "nothing to verify",
+      "implement node committed only",
+      "no_diff_produced",
+    ]
+    ```
+
+    Scan `$tmux_tester.test_summary` case-insensitively for each substring. If any substring matches, prepend a `## Warnings` section to the memory body, before `## What was implemented`, with one bullet per matched substring quoting the surrounding sentence from `test_summary`. Memory-reflector reads `## Warnings` first; this is the channel for "this run looks like a no-op even though it landed."
+
+    The Warnings section is **separate** from the optional `## Learnings from the run` section. Learnings is for retry-loop pattern mining; Warnings is for no-op-on-success collusion that the rest of the pipeline already resolved structurally. The Step 7 pre-check still suppresses `consume`/`consume_plan` on `tmux_tester.test_result=fail` — Step 4a runs on the **success path** too, exactly the case the original failure mode missed.
+
 5. **Commit any pending work.** Run in `$project`:
 
    ```bash

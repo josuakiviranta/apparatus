@@ -463,7 +463,7 @@ Inserts Step 4a between Step 4 (compose memory) and Step 5 (commit). Step 4a sca
 
 ### Steps
 
-- [ ] **Step 4.1: Write the failing content-shape test**
+- [x] **Step 4.1: Write the failing content-shape test**
 
 Create `src/cli/tests/pipeline-illum-to-impl-memory-writer-folder.test.ts`:
 
@@ -518,12 +518,12 @@ describe(".apparat/pipelines/illumination-to-implementation/memory-writer.md —
 });
 ```
 
-- [ ] **Step 4.2: Run the test to verify it fails**
+- [x] **Step 4.2: Run the test to verify it fails**
 
 Run: `npx vitest run src/cli/tests/pipeline-illum-to-impl-memory-writer-folder.test.ts`
 Expected: 4 failing assertions (Step 4a not present yet); the Step 7 pre-check assertion should pass already.
 
-- [ ] **Step 4.3: Insert Step 4a in `memory-writer.md`**
+- [x] **Step 4.3: Insert Step 4a in `memory-writer.md`**
 
 In `.apparat/pipelines/illumination-to-implementation/memory-writer.md`, locate the end of Step 4 (currently lines 64–105 ends with the `Final verification` markdown subsection's closing `\`\`\``). Insert directly between the closing backtick fence of Step 4 (line 105) and the start of `5. **Commit any pending work.**` (line 107):
 
@@ -544,12 +544,12 @@ In `.apparat/pipelines/illumination-to-implementation/memory-writer.md`, locate 
     The Warnings section is **separate** from the optional `## Learnings from the run` section. Learnings is for retry-loop pattern mining; Warnings is for no-op-on-success collusion that the rest of the pipeline already resolved structurally. The Step 7 pre-check still suppresses `consume`/`consume_plan` on `tmux_tester.test_result=fail` — Step 4a runs on the **success path** too, exactly the case the original failure mode missed.
 ```
 
-- [ ] **Step 4.4: Run the test to verify it passes**
+- [x] **Step 4.4: Run the test to verify it passes**
 
 Run: `npx vitest run src/cli/tests/pipeline-illum-to-impl-memory-writer-folder.test.ts`
 Expected: 5 passing assertions.
 
-- [ ] **Step 4.5: Commit**
+- [x] **Step 4.5: Commit**
 
 ```bash
 git add src/cli/tests/pipeline-illum-to-impl-memory-writer-folder.test.ts \
