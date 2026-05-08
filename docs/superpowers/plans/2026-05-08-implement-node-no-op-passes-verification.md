@@ -687,13 +687,13 @@ Inline edit to `README.md` lines 65–117 (the deep-loop section). Documents the
 
 ### Steps
 
-- [ ] **Step 6.1: Locate the deep-loop section**
+- [x] **Step 6.1: Locate the deep-loop section**
 
 Run: `grep -n "deep" /Users/josu/Documents/projects/apparatus/README.md` to find the section heading. The design doc cites lines 65–117. Confirm the section exists and capture the exact heading text in this step's output before editing.
 
 If the README does NOT have a deep-loop section at the cited lines (the README may have been edited since the design was written), expand this step: locate the section that documents `outputs: { done: boolean }` as the loop-break contract by `grep -n "done: boolean" README.md`. Edit that section instead. Surface the discrepancy in the commit body.
 
-- [ ] **Step 6.2: Write the failing content-shape test**
+- [x] **Step 6.2: Write the failing content-shape test**
 
 Create `src/cli/tests/readme-deep-loop-pre-sha.test.ts`:
 
@@ -722,12 +722,12 @@ describe("README.md — deep-loop section documents pre_sha and no-op refusal", 
 });
 ```
 
-- [ ] **Step 6.3: Run the test to verify it fails**
+- [x] **Step 6.3: Run the test to verify it fails**
 
 Run: `npx vitest run src/cli/tests/readme-deep-loop-pre-sha.test.ts`
 Expected: 3 failing assertions.
 
-- [ ] **Step 6.4: Edit `README.md` deep-loop section**
+- [x] **Step 6.4: Edit `README.md` deep-loop section**
 
 In the deep-loop section (located in Step 6.1), append a paragraph after the existing `outputs: { done: boolean }` documentation:
 
@@ -739,17 +739,17 @@ In addition to `done: boolean`, agents that opt into the deep loop MAY emit `pre
 The diff guard is **agent-driven**, not handler-side. The looping handler at `src/attractor/handlers/looping-agent-handler.ts:151` continues to trust the `done` field as-is. Forcing `done=false` from the handler would break the deep-loop public contract for every other agent that uses the looping handler. Keeping the policy in the agent prompt also keeps it readable and tweakable per pipeline (e.g. allow no-op for doc-only plans by editing the `.md`, not TypeScript).
 ```
 
-- [ ] **Step 6.5: Run the test to verify it passes**
+- [x] **Step 6.5: Run the test to verify it passes**
 
 Run: `npx vitest run src/cli/tests/readme-deep-loop-pre-sha.test.ts`
 Expected: 3 passing assertions.
 
-- [ ] **Step 6.6: Run the full suite + tsc one more time**
+- [x] **Step 6.6: Run the full suite + tsc one more time**
 
 Run: `npx vitest run && npx tsc --noEmit`
 Expected: full suite green, zero TypeScript errors.
 
-- [ ] **Step 6.7: Commit**
+- [x] **Step 6.7: Commit**
 
 ```bash
 git add src/cli/tests/readme-deep-loop-pre-sha.test.ts README.md
@@ -778,14 +778,14 @@ git commit -m "docs(readme): document pre_sha output and agent-driven no-op refu
 
 ## Final Verification Checklist (run after Chunk 6 commits)
 
-- [ ] `npx tsc --noEmit` — clean.
-- [ ] `npx vitest run` — passes, including all six new test files.
-- [ ] `npx tsx src/cli/index.ts pipeline validate .apparat/pipelines/illumination-to-implementation/pipeline.dot` — exits 0, no error-severity diagnostics.
-- [ ] Repo-wide grep invariants:
-  - [ ] `.apparat/pipelines/illumination-to-implementation/implement.md` contains `pre_sha`, `no_diff_produced`, `Step 0c`.
-  - [ ] `.apparat/pipelines/illumination-to-implementation/tmux-tester.md` contains `plan_files_touched`, `implement.pre_sha`, `Phase 0a`, `Phase 1c`.
-  - [ ] `.apparat/pipelines/illumination-to-implementation/tmux_confirm_gate.md` contains `$implement.done`, `$tmux_tester.plan_files_touched`, `### Signals`.
-  - [ ] `.apparat/pipelines/illumination-to-implementation/memory-writer.md` contains `## Warnings`, `no_op_substrings`, `4a.`.
-  - [ ] `src/cli/tests/pipeline-smoke-implement-noop-folder.test.ts` exists and passes.
-- [ ] Loop-break check at `src/attractor/handlers/looping-agent-handler.ts:151` is byte-identical to pre-change (no handler edit in this plan).
-- [ ] `commit_push`, `review_gate`, `memory_reflector`, `verifier`, `explainer`, `chat_session`, `chat_summarizer`, `design_writer`, `plan_writer`, `pipeline.dot` — all unchanged.
+- [x] `npx tsc --noEmit` — clean.
+- [x] `npx vitest run` — passes, including all six new test files.
+- [x] `npx tsx src/cli/index.ts pipeline validate .apparat/pipelines/illumination-to-implementation/pipeline.dot` — exits 0, no error-severity diagnostics.
+- [x] Repo-wide grep invariants:
+  - [x] `.apparat/pipelines/illumination-to-implementation/implement.md` contains `pre_sha`, `no_diff_produced`, `Step 0c`.
+  - [x] `.apparat/pipelines/illumination-to-implementation/tmux-tester.md` contains `plan_files_touched`, `implement.pre_sha`, `Phase 0a`, `Phase 1c`.
+  - [x] `.apparat/pipelines/illumination-to-implementation/tmux_confirm_gate.md` contains `$implement.done`, `$tmux_tester.plan_files_touched`, `### Signals`.
+  - [x] `.apparat/pipelines/illumination-to-implementation/memory-writer.md` contains `## Warnings`, `no_op_substrings`, `4a.`.
+  - [x] `src/cli/tests/pipeline-smoke-implement-noop-folder.test.ts` exists and passes.
+- [x] Loop-break check at `src/attractor/handlers/looping-agent-handler.ts:151` is byte-identical to pre-change (no handler edit in this plan).
+- [x] `commit_push`, `review_gate`, `memory_reflector`, `verifier`, `explainer`, `chat_session`, `chat_summarizer`, `design_writer`, `plan_writer`, `pipeline.dot` — all unchanged.
