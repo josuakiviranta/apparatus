@@ -577,7 +577,7 @@ Adds a content-shape smoke that verifies all four pipeline-spec edits **interloc
 
 ### Steps
 
-- [ ] **Step 5.1: Write the failing integration smoke**
+- [x] **Step 5.1: Write the failing integration smoke**
 
 Create `src/cli/tests/pipeline-smoke-implement-noop-folder.test.ts`:
 
@@ -644,24 +644,24 @@ describe("pipeline-smoke: illumination-to-implementation no-op refusal interlock
 });
 ```
 
-- [ ] **Step 5.2: Run the smoke to verify it passes**
+- [x] **Step 5.2: Run the smoke to verify it passes**
 
 Run: `npx vitest run src/cli/tests/pipeline-smoke-implement-noop-folder.test.ts`
 Expected: 5 passing assertions. (The smoke runs LAST in the chunk sequence — chunks 1–4 ship the content this smoke asserts. If chunks 1–4 are all green, this smoke is also green.)
 
 If any assertion fails, do NOT modify the smoke — fix the upstream chunk that ships the missing content. The smoke is the interlock check.
 
-- [ ] **Step 5.3: Validate the pipeline parses end-to-end**
+- [x] **Step 5.3: Validate the pipeline parses end-to-end**
 
 Run: `npx tsx src/cli/index.ts pipeline validate .apparat/pipelines/illumination-to-implementation/pipeline.dot`
 Expected: exit 0, zero error-severity diagnostics.
 
-- [ ] **Step 5.4: Run the full vitest suite to catch regressions**
+- [x] **Step 5.4: Run the full vitest suite to catch regressions**
 
 Run: `npx vitest run`
 Expected: all tests green. Pay special attention to any pre-existing scenario tests that touch the four edited files.
 
-- [ ] **Step 5.5: Commit**
+- [x] **Step 5.5: Commit**
 
 ```bash
 git add src/cli/tests/pipeline-smoke-implement-noop-folder.test.ts
