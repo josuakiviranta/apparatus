@@ -9,6 +9,7 @@ import { pipelineListCommand } from "./commands/pipeline/list.js";
 import { pipelineTraceCommand } from "./commands/pipeline/trace.js";
 import { pipelineShowCommand } from "./commands/pipeline/show.js";
 import { pipelineExplainCommand } from "./commands/pipeline/explain.js";
+import { statusCommand } from "./commands/status.js";
 import { collectKV } from "./lib/collect-kv.js";
 
 export function createProgram(): Command {
@@ -75,7 +76,10 @@ Pipeline engine (DOT-graph workflows):
     diamond    Conditional — branches without human input (condition= on edges)
 
 Meditation (restricted insight sessions):
-  apparat meditate my-app                   Run a one-shot meditation session`
+  apparat meditate my-app                   Run a one-shot meditation session
+
+Cross-project status:
+  apparat status                            Cross-project status: projects, heartbeats, recent runs`
   );
 
   program
@@ -224,6 +228,13 @@ placeholder values — no LLM invoked, no run dir created.
     .action(async (pipelineArg: string, nodeId: string | undefined, opts: { project?: string }) => {
       const code = await pipelineExplainCommand(pipelineArg, nodeId, opts);
       process.exit(code);
+    });
+
+  program
+    .command("status")
+    .description("Cross-project status: registered projects, heartbeats, and recent runs")
+    .action(async () => {
+      await statusCommand();
     });
 
   registerHeartbeatCommand(program);
