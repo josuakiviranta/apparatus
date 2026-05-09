@@ -86,3 +86,14 @@ The `.ralph/memory/` slot is removed. Session-closure files written by the `memo
 ---
 
 **Update 2026-05-05:** Naming superseded by [ADR-0010](0010-rename-to-apparatus.md). The folder name `.ralph/` becomes `.apparat/`; the two-clause partition principle stands.
+
+### Application: `~/.apparat/` as the operator-global tier
+
+The same partition principle (Clause A: apparat-defined state, Clause B: no
+pre-existing convention) applies one level up at the operator layer. `~/.apparat/`
+holds orchestration state shared across all projects on the machine: scheduled
+heartbeat tasks, PID files, orchestration breadcrumb logs, and a `projects.json`
+index of paths the operator has run apparat against. Project-local
+`.apparat/` continues to own the per-project state per the original ruling;
+the operator-global tier is strictly orchestration state, not agent
+definitions (ADR-0001 still holds — agent definitions remain project-local).
