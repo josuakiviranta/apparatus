@@ -60,8 +60,12 @@ describe("pipeline run — failureReason surfacing", () => {
     expect(failingEnd).toBeDefined();
     expect(String(failingEnd!.failureReason)).toContain("boom-stderr");
 
-    expect(writtenStderr).toMatch(/✗ pipeline failed at node runner: .*boom-stderr/);
-    expect(writtenStderr).toContain("trace: ");
-    expect(writtenStderr).toContain(tracePath);
+    expect(writtenStderr).toMatch(/✗ failed at runner: .*boom-stderr/);
+    expect(writtenStderr).toContain(`trace: ${tracePath}`);
+    expect(writtenStderr).toMatch(/inspect: apparat pipeline trace .* --node-receive \S+ --full/);
+    expect(writtenStderr).toMatch(/\n\nresume: apparat pipeline run .*--resume \S+/);
+    // Tool node — no agent clause, no raw-output line.
+    expect(writtenStderr).not.toContain("(agent:");
+    expect(writtenStderr).not.toContain("raw output:");
   });
 });
