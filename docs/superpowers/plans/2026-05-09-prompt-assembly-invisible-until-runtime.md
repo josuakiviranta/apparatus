@@ -360,7 +360,7 @@ The commit body is the design's §3.3 motivation in one line; no behaviour chang
 
 ### Task 2.1 — Failing tests for both modes
 
-- [ ] **Step 2.1.1: Create `src/cli/tests/pipeline-explain.test.ts`**
+- [x] **Step 2.1.1: Create `src/cli/tests/pipeline-explain.test.ts`**
 
 Mirror the structure of `src/cli/tests/pipeline-show.test.ts` (mock `output.js`, capture `console.log` via override). Use the existing `tmpdir()` + `mkdtempSync` pattern from `pipeline-trace-command-validation.test.ts:16-19` for fixtures.
 
@@ -643,7 +643,7 @@ describe("pipelineExplainCommand — node-zoom mode", () => {
 });
 ```
 
-- [ ] **Step 2.1.2: Run the new test file and confirm all cases fail**
+- [x] **Step 2.1.2: Run the new test file and confirm all cases fail**
 
 ```
 npx vitest run src/cli/tests/pipeline-explain.test.ts
@@ -656,7 +656,7 @@ Expected: every test fails (or TS compile error) because `pipelineExplainCommand
 **Files:**
 - Create: `src/cli/commands/pipeline/explain.ts`
 
-- [ ] **Step 2.2.1: Write `src/cli/commands/pipeline/explain.ts`**
+- [x] **Step 2.2.1: Write `src/cli/commands/pipeline/explain.ts`**
 
 Skeleton (the implementer fills the renderer bodies based on §3.2.1 / §3.2.2 of the design doc):
 
@@ -960,7 +960,7 @@ Notes for the implementer:
 - The renderer is plain `console.log` — no chalk, no boxen, no ANSI escapes — so the FORCE_COLOR=0 test passes trivially.
 - `process.stdout.write(built.prompt)` writes one chunk; the test captures via the `console.log` override. Switch the renderer to `console.log(built.prompt)` if the test framework's stdout capture proves easier — both forms are byte-identical to the design's success-only-prompt rule (§3.2.2 step 8).
 
-- [ ] **Step 2.2.2: Run the explain test file**
+- [x] **Step 2.2.2: Run the explain test file**
 
 ```
 npx vitest run src/cli/tests/pipeline-explain.test.ts
@@ -970,7 +970,7 @@ Expected: all 9 tests pass. Iterate on the renderer until the assertions match t
 
 ### Task 2.3 — Re-export and CLI registration
 
-- [ ] **Step 2.3.1: Add the re-export to `src/cli/commands/pipeline.ts`**
+- [x] **Step 2.3.1: Add the re-export to `src/cli/commands/pipeline.ts`**
 
 Append after the existing `pipelineShowCommand` re-export at line 12:
 
@@ -979,7 +979,7 @@ export { pipelineExplainCommand } from "./pipeline/explain.js";
 export type { PipelineExplainOptions } from "./pipeline/explain.js";
 ```
 
-- [ ] **Step 2.3.2: Register the subcommand in `src/cli/program.ts`**
+- [x] **Step 2.3.2: Register the subcommand in `src/cli/program.ts`**
 
 Add the import at the top of the file (next to the existing pipeline subcommand imports at lines 6-10):
 
@@ -1011,7 +1011,7 @@ placeholder values — no LLM invoked, no run dir created.
 
 **Note (deferred to Chunk 3):** the `apparat pipeline …` overview block that lives in `program.ts:21-77` (mirrored by `README.md` lines 43-51) is updated in Chunk 3, Task 3.5. Do **not** double-edit it here.
 
-- [ ] **Step 2.3.3: Confirm `tsc` is clean**
+- [x] **Step 2.3.3: Confirm `tsc` is clean**
 
 ```
 npx tsc --noEmit
@@ -1021,7 +1021,7 @@ Expected: clean. The new import in `program.ts` resolves to the new file; the ac
 
 ### Task 2.4 — Smoke against the real `illumination-to-implementation` pipeline
 
-- [ ] **Step 2.4.1: Build and run the bare topology view**
+- [x] **Step 2.4.1: Build and run the bare topology view**
 
 ```
 npm run build
@@ -1030,7 +1030,7 @@ node dist/cli/index.js pipeline explain illumination-to-implementation --project
 
 Expected exit 0; stdout contains a `Pipeline: illumination-to-implementation` header, a `Nodes:` block with at least the `start`, `verifier`, `explainer`, `approval_gate`, and `implement` rows, a non-empty `Loops:` section (the `implement` retry edge), and a `Reachability:` line. Pipe through `cat -v` to confirm zero ANSI escapes.
 
-- [ ] **Step 2.4.2: Run the node-zoom view against `verifier`**
+- [x] **Step 2.4.2: Run the node-zoom view against `verifier`**
 
 ```
 node dist/cli/index.js pipeline explain illumination-to-implementation verifier --project .
@@ -1038,7 +1038,7 @@ node dist/cli/index.js pipeline explain illumination-to-implementation verifier 
 
 Expected: stdout is the rendered prompt skeleton; contains `## Inputs`; contains a tag like `<illumination_path><placeholder:illumination_path></illumination_path>` (or the qualified form, depending on the verifier agent's declared inputs); contains the verifier agent body verbatim. Exit 0. No new directory under `.apparat/runs/`.
 
-- [ ] **Step 2.4.3: Run the missing-node negative case**
+- [x] **Step 2.4.3: Run the missing-node negative case**
 
 ```
 node dist/cli/index.js pipeline explain illumination-to-implementation does_not_exist --project .
@@ -1046,7 +1046,7 @@ node dist/cli/index.js pipeline explain illumination-to-implementation does_not_
 
 Expected exit 1; stderr contains `does_not_exist` and an `available:` listing.
 
-- [ ] **Step 2.4.4: Run the non-agent negative case**
+- [x] **Step 2.4.4: Run the non-agent negative case**
 
 ```
 node dist/cli/index.js pipeline explain illumination-to-implementation approval_gate --project .
@@ -1056,7 +1056,7 @@ Expected exit 1; stderr contains `kind=gate` and `agent nodes`.
 
 ### Task 2.5 — Commit
 
-- [ ] **Step 2.5.1: Stage + commit**
+- [x] **Step 2.5.1: Stage + commit**
 
 ```
 git add src/cli/commands/pipeline/explain.ts src/cli/commands/pipeline.ts src/cli/program.ts src/cli/tests/pipeline-explain.test.ts
@@ -1090,7 +1090,7 @@ git commit -m "feat(pipeline): add 'explain <pipeline> [nodeId]' for topology + 
 
 ### Task 3.1 — Failing test for the trace prompt-line
 
-- [ ] **Step 3.1.1: Add new `it(...)` blocks to `src/cli/tests/pipeline-trace-command-validation.test.ts`**
+- [x] **Step 3.1.1: Add new `it(...)` blocks to `src/cli/tests/pipeline-trace-command-validation.test.ts`**
 
 Reuse the existing top-of-file imports (`mkdtempSync, writeFileSync, mkdirSync` from `node:fs`, `tmpdir`, `join`, `pipelineTraceCommand`, `runDir`) and the file-level `logs[]` array — no new imports are required. Append the two `it(...)` blocks below inside the existing `describe(...)` block (after the existing case at lines 15-36):
 
@@ -1143,7 +1143,7 @@ Reuse the existing top-of-file imports (`mkdtempSync, writeFileSync, mkdirSync` 
   });
 ```
 
-- [ ] **Step 3.1.2: Run the trace test file and confirm the two new cases fail**
+- [x] **Step 3.1.2: Run the trace test file and confirm the two new cases fail**
 
 ```
 npx vitest run src/cli/tests/pipeline-trace-command-validation.test.ts
@@ -1153,7 +1153,7 @@ Expected: 2 fails (the new cases — `prompt:` line is not yet emitted), 1 pass 
 
 ### Task 3.2 — Implement the three-line `trace.ts` addition
 
-- [ ] **Step 3.2.1: Edit `src/cli/commands/pipeline/trace.ts` between lines 51 and 52**
+- [x] **Step 3.2.1: Edit `src/cli/commands/pipeline/trace.ts` between lines 51 and 52**
 
 Replace:
 
@@ -1175,7 +1175,7 @@ with:
 
 Zero new imports — `existsSync` is already at line 1, `runDir` at line 3, `join` at line 2, `project` is in scope from line 10.
 
-- [ ] **Step 3.2.2: Re-run the trace test file**
+- [x] **Step 3.2.2: Re-run the trace test file**
 
 ```
 npx vitest run src/cli/tests/pipeline-trace-command-validation.test.ts
@@ -1188,7 +1188,7 @@ Expected: 3 passes (the new two + the existing one).
 **Files:**
 - Modify: `src/cli/skills/apparatus/pipelines.md` §3 (insert one new sub-section between the §3 frontmatter table and the §3 example digraph)
 
-- [ ] **Step 3.3.1: Insert a new sub-section in `pipelines.md`**
+- [x] **Step 3.3.1: Insert a new sub-section in `pipelines.md`**
 
 Anchor: the **§3** "Example digraph" heading. There is also a `### Example digraph` heading later in §4 — disambiguate by inserting between two specific anchors:
 
@@ -1221,7 +1221,7 @@ The four-backtick wrapper above is for *this plan document only*, so the inner t
 
 ### Task 3.4 — Add the `pipeline explain` row to `SKILL.md`
 
-- [ ] **Step 3.4.1: Edit `src/cli/skills/apparatus/SKILL.md` command table (line 12-22)**
+- [x] **Step 3.4.1: Edit `src/cli/skills/apparatus/SKILL.md` command table (line 12-22)**
 
 Add this row immediately after the existing `pipeline trace …` row (line 20):
 
@@ -1233,7 +1233,7 @@ ADR-0011 ships SKILL.md as a hand-edited shim today — there is no `scripts/` r
 
 ### Task 3.5 — Add the `pipeline explain` entry to `README.md` and the `program.ts` overview mirror
 
-- [ ] **Step 3.5.1: Edit `README.md` — insert a new bash block between `pipeline validate` (lines 84-87) and `pipeline list` (lines 89-92)**
+- [x] **Step 3.5.1: Edit `README.md` — insert a new bash block between `pipeline validate` (lines 84-87) and `pipeline list` (lines 89-92)**
 
 Insert exactly the literal markdown below immediately after the `apparat pipeline validate` paragraph and immediately before the `apparat pipeline list` bash block. **Do not wrap in an outer code fence** — the snippet is live markdown containing one bash code block plus one prose paragraph:
 
@@ -1246,7 +1246,7 @@ Plain-text walkthrough of a pipeline's topology (per-node `consumes:` / `produce
 
 The four-backtick wrapper above is plan-document-only. The actual content to paste into `README.md` is everything between the two four-backtick lines, including the inner triple-backtick `bash` fence.
 
-- [ ] **Step 3.5.2: Edit `src/cli/program.ts` `addHelpText` overview block at lines 21-77**
+- [x] **Step 3.5.2: Edit `src/cli/program.ts` `addHelpText` overview block at lines 21-77**
 
 `README.md` has no `Pipeline engine (DOT-graph workflows):` overview block — only per-command bash sections (the one added in Step 3.5.1). The overview lives only in `program.ts` and surfaces via `apparat --help`.
 
@@ -1266,7 +1266,7 @@ Verify with `grep -n "pipeline explain workflow.dot" src/cli/program.ts` — sho
 
 ### Task 3.6 — Final full test + tsc + commit
 
-- [ ] **Step 3.6.1: Full test run**
+- [x] **Step 3.6.1: Full test run**
 
 ```
 npx vitest run
@@ -1275,7 +1275,7 @@ npx tsc --noEmit
 
 Expected: both clean. Any regression at this point is in the docs (unlikely to break tests) or in the trace edit (which is covered by the new cases) — re-read the diff for the offending file and align.
 
-- [ ] **Step 3.6.2: Stage + commit**
+- [x] **Step 3.6.2: Stage + commit**
 
 ```
 git add src/cli/commands/pipeline/trace.ts \
