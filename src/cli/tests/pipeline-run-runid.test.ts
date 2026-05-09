@@ -6,7 +6,7 @@ import { rmSync } from "fs";
 import { pipelineRunCommand } from "../commands/pipeline/run.js";
 import { readProjects } from "../lib/projects-registry.js";
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => { vi.restoreAllMocks(); });
 
 describe("pipelineRunCommand records the project in ~/.apparat/projects.json", () => {
   it("appends the absolute project path with lastSeen", async () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync, chmodSync, mkdirSync } from "fs";
+import { mkdtempSync, rmSync, writeFileSync, chmodSync, mkdirSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { readProjects, recordProject, projectsFilePath } from "../lib/projects-registry.js";
