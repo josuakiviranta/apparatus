@@ -8,6 +8,7 @@ import { pipelineValidateCommand } from "./commands/pipeline/validate.js";
 import { pipelineListCommand } from "./commands/pipeline/list.js";
 import { pipelineTraceCommand } from "./commands/pipeline/trace.js";
 import { pipelineShowCommand } from "./commands/pipeline/show.js";
+import { pipelineExplainCommand } from "./commands/pipeline/explain.js";
 import { collectKV } from "./lib/collect-kv.js";
 
 export function createProgram(): Command {
@@ -199,6 +200,24 @@ file:line:col diagnostics and writes nothing.
     .option("--project <folder>", "Project folder (for name shorthand resolution, defaults to cwd)")
     .action(async (dotFile: string, opts: { project?: string }) => {
       const code = await pipelineShowCommand(dotFile, opts);
+      process.exit(code);
+    });
+
+  pipeline
+    .command("explain <pipeline> [nodeId]")
+    .description("Plain-text walkthrough of a pipeline's topology, or render a node's prompt skeleton")
+    .addHelpText("after", `
+Examples:
+  apparat pipeline explain <pipeline>           # topology walkthrough
+  apparat pipeline explain <pipeline> <nodeId>  # render the agent's prompt skeleton
+
+Bare invocation prints node-by-node consumes/produces/branches, plus Loops and
+Reachability sections. With a node id, prints the rendered prompt skeleton with
+placeholder values — no LLM invoked, no run dir created.
+`)
+    .option("--project <folder>", "Project folder (defaults to cwd)")
+    .action(async (pipelineArg: string, nodeId: string | undefined, opts: { project?: string }) => {
+      const code = await pipelineExplainCommand(pipelineArg, nodeId, opts);
       process.exit(code);
     });
 
