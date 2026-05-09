@@ -1855,7 +1855,7 @@ The cross-link breadcrumb is *already authored by the daemon in Chunk 2*. The `h
 
 ### Task 6.1: Lock breadcrumb pass-through with a test
 
-- [ ] **Step 1: Read the daemon-client contract first**
+- [x] **Step 1: Read the daemon-client contract first**
 
 Read `src/lib/daemon-client.ts` and locate the exports `request` and `stream`. Confirm:
 - `request(action, payload)` — returns a `Promise<...>` with the response payload (single value)
@@ -1863,12 +1863,12 @@ Read `src/lib/daemon-client.ts` and locate the exports `request` and `stream`. C
 
 The mock shape in Step 3 below MUST match the actual return contract — otherwise the test passes against a fiction. If `request("stream_logs", { follow: false })` returns a structured object (e.g. `{ type: "logs", lines: LogLine[] }`) rather than a string, adapt the mock and the assertion accordingly.
 
-- [ ] **Step 2: Read the existing heartbeat-logs test surface**
+- [x] **Step 2: Read the existing heartbeat-logs test surface**
 
 Run: `grep -nR "stream_logs\|heartbeat.*logs" src/cli/tests/`
 Purpose: identify the right test file to extend. If `heartbeat-headless.test.ts` or `heartbeat.test.ts` already exercises the `logs` action, append there. Otherwise create `heartbeat-logs-crosslink.test.ts`.
 
-- [ ] **Step 3: Create the test (path-string in `vi.mock` MUST match the import in `heartbeat.ts`)**
+- [x] **Step 3: Create the test (path-string in `vi.mock` MUST match the import in `heartbeat.ts`)**
 
 The consumer implementation at `src/cli/commands/heartbeat.ts` (logs action) uses `stream("stream_logs", ...)` for `--follow` and `request("stream_logs", ...)` otherwise. The follow path is the right one to test because it exercises per-line callbacks (closer to the production user flow).
 
@@ -1912,12 +1912,12 @@ describe("apparat heartbeat logs --follow prints daemon-authored cross-link verb
 
 This test asserts the consumer prints the daemon-authored line verbatim — no transformation, no filter. That is the contract: the cross-link is *data*, not formatting.
 
-- [ ] **Step 4: Run**
+- [x] **Step 4: Run**
 
 Run: `npx vitest run -t "cross-link verbatim"`
 Expected: PASS — the consumer is already pass-through.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/cli/tests/heartbeat-headless.test.ts  # or src/cli/tests/heartbeat-logs-crosslink.test.ts
@@ -1926,12 +1926,12 @@ git commit -m "test(heartbeat-logs): lock cross-link pass-through contract"
 
 ### Task 6.2: CONTEXT.md operator-global subsection
 
-- [ ] **Step 1: Read CONTEXT.md to find the right insertion point**
+- [x] **Step 1: Read CONTEXT.md to find the right insertion point**
 
 Run: `grep -n "^##\|^###" CONTEXT.md`
 Purpose: locate a suitable sibling subsection (e.g. an existing "Project-local apparat tree" section). If no such section exists, append the new subsection at the bottom under a new top-level `## Operator-global tier` heading.
 
-- [ ] **Step 2: Add the subsection**
+- [x] **Step 2: Add the subsection**
 
 Insert (or append) the following block. Adjust the heading depth to match neighbouring sections:
 
@@ -1957,7 +1957,7 @@ level up:
 per ADR-0001.
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add CONTEXT.md
@@ -1966,12 +1966,12 @@ git commit -m "docs(context): document ~/.apparat/ operator-global tier"
 
 ### Task 6.3: README.md command-table updates
 
-- [ ] **Step 1: Locate the README command table**
+- [x] **Step 1: Locate the README command table**
 
 Run: `grep -n "apparat status\|apparat watch\|heartbeat watch\|## Commands\|^### " README.md`
 Purpose: find the section listing apparat commands.
 
-- [ ] **Step 2: Add rows for `apparat status` and `apparat watch`; mark `heartbeat watch` deprecated**
+- [x] **Step 2: Add rows for `apparat status` and `apparat watch`; mark `heartbeat watch` deprecated**
 
 In the command table (or list) area, add:
 
@@ -1984,7 +1984,7 @@ And edit the existing `apparat heartbeat watch` row (if present) to read:
 
 If README does not have a command table, surface to the user — adding a new table is out of scope for this docs ripple.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add README.md
@@ -1993,12 +1993,12 @@ git commit -m "docs(readme): add apparat status / watch; mark heartbeat watch de
 
 ### Task 6.4: ADR-0008 paragraph
 
-- [ ] **Step 1: Read `docs/adr/0008-partial-revert-of-ralph-folder.md` to find the right insertion point**
+- [x] **Step 1: Read `docs/adr/0008-partial-revert-of-ralph-folder.md` to find the right insertion point**
 
 Run: `cat docs/adr/0008-partial-revert-of-ralph-folder.md`
 Purpose: read the partition principle in context. The new paragraph applies it to `~/.apparat/`.
 
-- [ ] **Step 2: Append a paragraph at the end of the ADR**
+- [x] **Step 2: Append a paragraph at the end of the ADR**
 
 ```markdown
 ### Application: `~/.apparat/` as the operator-global tier
@@ -2013,7 +2013,7 @@ the operator-global tier is strictly orchestration state, not agent
 definitions (ADR-0001 still holds — agent definitions remain project-local).
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add docs/adr/0008-partial-revert-of-ralph-folder.md
@@ -2022,17 +2022,17 @@ git commit -m "docs(adr-0008): append operator-global tier paragraph"
 
 ### Task 6.5: Final verification pass
 
-- [ ] **Step 1: Full test suite**
+- [x] **Step 1: Full test suite**
 
 Run: `npx vitest run`
 Expected: PASS.
 
-- [ ] **Step 2: Type-check**
+- [x] **Step 2: Type-check**
 
 Run: `npx tsc --noEmit`
 Expected: PASS.
 
-- [ ] **Step 3: Repo-wide grep invariants from design §8**
+- [x] **Step 3: Repo-wide grep invariants from design §8**
 
 Run each, confirm expected counts:
 
@@ -2043,7 +2043,7 @@ Run each, confirm expected counts:
 - `grep -n 'command("status"' src/cli/program.ts` — one match
 - `grep -n 'command("watch"' src/cli/program.ts` — one match (top-level watch)
 
-- [ ] **Step 4: Final manual smoke**
+- [x] **Step 4: Final manual smoke**
 
 End-to-end exercise per design §10.3:
 
