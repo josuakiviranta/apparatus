@@ -4,7 +4,7 @@ import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-import { randomUUID } from "crypto";
+import { newRunId } from "../cli/lib/apparat-paths.js";
 import { createRun, appendLogLine, closeRun, getPidFilePath } from "./state";
 import type { Task } from "./state";
 
@@ -51,7 +51,7 @@ export function killSession(task: Task): boolean {
 }
 
 export async function runTask(task: Task): Promise<{ runId: string; exitCode: number }> {
-  const runId = randomUUID();
+  const runId = newRunId();
   const startedAt = Date.now();
   createRun(task.id, runId, startedAt);
   appendLogLine(task.id, runId, { ts: startedAt, stream: "system", content: "Session started" });
