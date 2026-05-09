@@ -1,5 +1,4 @@
 import { join, dirname } from "path";
-import { randomUUID } from "crypto";
 import { JsonlPipelineTracer } from "../../../attractor/tracer/jsonl-pipeline-tracer.js";
 import type { PipelineTracer } from "../../../attractor/tracer/pipeline-tracer.js";
 import { validateOrRaise } from "../../../attractor/core/graph-validator.js";
@@ -18,7 +17,7 @@ import {
 } from "../../lib/preflight-format.js";
 import { InkInterviewer } from "../../../attractor/interviewer/ink.js";
 import { AutoApproveInterviewer } from "../../../attractor/interviewer/auto-approve.js";
-import { runsDir } from "../../lib/apparat-paths.js";
+import { newRunId, runsDir } from "../../lib/apparat-paths.js";
 import { PassThrough } from "stream";
 import { parseStreamJsonEvents, streamEvents } from "../../lib/stream-formatter.js";
 import * as output from "../../lib/output.js";
@@ -124,7 +123,7 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
     process.exit(1);
   }
 
-  const runId = randomUUID().slice(0, 8);
+  const runId = newRunId();
   const runsRoot = runsDir(opts.project ?? process.cwd());
   if (!opts.resume) {
     const keep = Number(process.env.APPARAT_RUNS_KEEP ?? "50");
