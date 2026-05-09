@@ -1,3 +1,7 @@
+import { readFileSync } from "fs";
+import type { Graph, Node } from "../../attractor/types.js";
+import { resolveAgentFileForNode } from "./agent-paths.js";
+
 export interface FailureHandoff {
   /** id of the node whose Outcome.status was non-success. */
   nodeId: string;
@@ -47,4 +51,102 @@ export function renderFailureFooter(h: FailureHandoff): string {
   lines.push(`resume: ${h.resumeCommand}`);
 
   return lines.join("\n") + "\n";
+}
+
+export interface LoadFailureHandoffArgs {
+  tracePath: string;
+  failedNodeId: string;
+  /** Whatever the engine surfaced as the per-node failureReason. */
+  failureReason: string;
+  /** User-facing path passed to `pipeline run` — used to build the resume command. */
+  dotFile: string;
+  /** Directory of the .dot file — used by the agent-path resolver. */
+  dotDir: string;
+  runId: string;
+  graph: Graph;
+}
+
+/**
+ * Read the JSONL trace we just authored and assemble a `FailureHandoff`.
+ *
+ * - Picks the most recent `node-start` for `failedNodeId` (a node may run many
+ *   times in retry loops) to get `nodeReceiveId`.
+ * - Picks the highest-attempt `validation-failure` event for that receive id
+ *   to get `rawOutputPath` (refinement: latest attempt only — earlier attempts
+ *   are reachable via the `inspect:` line's `pipeline trace --node-receive --full`).
+ * - Resolves the agent file path via `resolveAgentFileForNode`.
+ *
+ * Never throws — degrades gracefully on unreadable trace, missing receive id,
+ * or absent validation-failure events. The footer always prints something.
+ */
+export function loadFailureHandoff(args: LoadFailureHandoffArgs): FailureHandoff {
+  const reason = normaliseReason(args.failureReason);
+  const node = args.graph.nodes instanceof Map
+    ? args.graph.nodes.get(args.failedNodeId)
+    : (args.graph.nodes as unknown as Node[]).find(n => n.id === args.failedNodeId);
+  const agentRelPath = node ? resolveAgentFileForNode(node, args.dotDir) : null;
+  const resumeCommand = `apparat pipeline run ${args.dotFile} --resume ${args.runId}`;
+
+  let lines: Record<string, unknown>[] = [];
+  try {
+    const raw = readFileSync(args.tracePath, "utf-8").trim();
+    if (raw.length > 0) {
+      lines = raw.split("\n").map(l => {
+        try { return JSON.parse(l) as Record<string, unknown>; }
+        catch { return {}; }
+      });
+    }
+  } catch {
+    // Unreadable trace — degraded handoff.
+    return {
+      nodeId: args.failedNodeId,
+      nodeReceiveId: null,
+      agentRelPath,
+      reason,
+      tracePath: args.tracePath,
+      runId: args.runId,
+      rawOutputPath: null,
+      resumeCommand,
+    };
+  }
+
+  const nodeStarts = lines.filter(l =>
+    l.kind === "node-start" && l.nodeId === args.failedNodeId
+  );
+  const nodeReceiveId = nodeStarts.length > 0
+    ? String(nodeStarts[nodeStarts.length - 1].nodeReceiveId)
+    : null;
+
+  let rawOutputPath: string | null = null;
+  if (nodeReceiveId) {
+    const failures = lines.filter(l =>
+      l.kind === "validation-failure" && l.nodeReceiveId === nodeReceiveId
+    );
+    if (failures.length > 0) {
+      const sorted = [...failures].sort((a, b) =>
+        Number(b.attempt ?? 0) - Number(a.attempt ?? 0)
+      );
+      const top = sorted[0];
+      if (typeof top.rawOutputPath === "string") {
+        rawOutputPath = top.rawOutputPath;
+      }
+    }
+  }
+
+  return {
+    nodeId: args.failedNodeId,
+    nodeReceiveId,
+    agentRelPath,
+    reason,
+    tracePath: args.tracePath,
+    runId: args.runId,
+    rawOutputPath,
+    resumeCommand,
+  };
+}
+
+function normaliseReason(raw: string): string {
+  const trimmed = (raw ?? "").trim();
+  if (trimmed.length === 0) return "pipeline failed";
+  return trimmed.split("\n")[0].slice(0, 500);
 }
