@@ -74,6 +74,14 @@ export async function runTask(task: Task): Promise<{ runId: string; exitCode: nu
     augmentedArgs = injectRunArgs(task.args, runId, logsRoot);
   }
 
+  if (logsRoot) {
+    appendLogLine(task.id, runId, {
+      ts: startedAt,
+      stream: "system",
+      content: `Engine trace: ${join(logsRoot, "pipeline.jsonl")}`,
+    });
+  }
+
   // In test mode, the test command replaces the entire invocation (no task args appended).
   const fullArgs = cliPath.shell ? [] : [...cliPath.args, task.command, ...augmentedArgs];
 
@@ -111,6 +119,13 @@ export async function runTask(task: Task): Promise<{ runId: string; exitCode: nu
       try { unlinkSync(pidPath); } catch {}
       const exitCode = code ?? 1;
       const endedAt = Date.now();
+      if (logsRoot && projectRoot) {
+        appendLogLine(task.id, runId, {
+          ts: endedAt,
+          stream: "system",
+          content: `→ apparat pipeline trace ${runId} --project ${projectRoot}`,
+        });
+      }
       appendLogLine(task.id, runId, {
         ts: endedAt,
         stream: "system",
