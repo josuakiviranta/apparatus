@@ -87,6 +87,11 @@ apparat pipeline validate <pipeline.dot>
 Check a pipeline for structural errors and `portability_heuristic` warnings (hardcoded paths that would break when the pipeline runs in a different environment).
 
 ```bash
+apparat pipeline explain <pipeline> [nodeId]
+```
+Plain-text walkthrough of a pipeline's topology (per-node `consumes:` / `produces:` / `branches:` / `next:`, plus `Loops:` and `Reachability:`). With a node id, renders that agent's prompt skeleton with `<placeholder:…>` values — useful for iterating on agent `.md` files without spawning an LLM.
+
+```bash
 apparat pipeline list <project-folder>
 ```
 List runnable pipelines for the project — both bundled (e.g. `implement`, `janitor`, `meditate`) and project-local under `<project>/.apparat/pipelines/`. Forked bundled pipelines are tagged on both rows.

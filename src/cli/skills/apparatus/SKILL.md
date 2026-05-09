@@ -18,6 +18,7 @@ apparat is an agentic-loop runner that executes graphs of agents (pipelines, def
 | `apparat pipeline validate <name>` | Structural + portability check. **Run before every `pipeline run`.** |
 | `apparat pipeline list <project>` | List all `.dot` pipelines discoverable in the project. |
 | `apparat pipeline trace <runId> [--node-receive <nodeId>] [--full]` | Inspect a past run's context + trace logs. |
+| `apparat pipeline explain <name> [nodeId]` | Plain-text topology walkthrough; with `nodeId`, render the agent's prompt skeleton (placeholders, no LLM). |
 | `apparat heartbeat pipeline <name> --project <dir> --every <minutes>` | Schedule a recurring pipeline run. |
 
 When invoking from outside the project directory, pass `--project <folder>`.

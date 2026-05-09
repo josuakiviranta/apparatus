@@ -34,4 +34,51 @@ describe("pipeline trace --node-receive surfaces validation attempts", () => {
     expect(out).toMatch(/\[1\] ✗ failed — preferred_label: Required/);
     expect(out).toMatch(/raw: verifier\/raw-attempt-1\.txt/);
   });
+
+  it("prints `prompt: <runDir>/<nodeId>/prompt.md` after `received:` when the file exists", async () => {
+    const projectRoot = mkdtempSync(join(tmpdir(), "trace-prompt-"));
+    const traceDir = runDir(projectRoot, "r2");
+    mkdirSync(traceDir, { recursive: true });
+    const tracePath = join(traceDir, "pipeline.jsonl");
+
+    // Drop a real prompt.md under <runDir>/<nodeId>/ so existsSync passes.
+    const nodeDir = join(traceDir, "verifier");
+    mkdirSync(nodeDir, { recursive: true });
+    const promptPath = join(nodeDir, "prompt.md");
+    writeFileSync(promptPath, "PROMPT BODY");
+
+    const lines = [
+      { kind: "pipeline-start", runId: "r2", pipelineName: "p", nodes: ["start","verifier"], timestamp: "" },
+      { kind: "node-start", nodeReceiveId: "verifier-1", nodeId: "verifier", nodeKind: "agent", timestamp: "T0", contextSnapshot: { foo: "bar" } },
+      { kind: "node-end", nodeReceiveId: "verifier-1", nodeId: "verifier", success: true, contextUpdates: {} },
+      { kind: "pipeline-end", runId: "r2", outcome: "success", timestamp: "" },
+    ];
+    writeFileSync(tracePath, lines.map(l => JSON.stringify(l)).join("\n"));
+
+    await pipelineTraceCommand("r2", { project: projectRoot, nodeReceive: "verifier-1" });
+
+    const out = logs.join("\n");
+    expect(out).toMatch(/received: T0/);
+    expect(out).toMatch(new RegExp(`prompt:\\s+${promptPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+  });
+
+  it("omits the `prompt:` line when prompt.md is missing (lazy prune)", async () => {
+    const projectRoot = mkdtempSync(join(tmpdir(), "trace-prompt-"));
+    const traceDir = runDir(projectRoot, "r3");
+    mkdirSync(traceDir, { recursive: true });
+    const tracePath = join(traceDir, "pipeline.jsonl");
+    const lines = [
+      { kind: "pipeline-start", runId: "r3", pipelineName: "p", nodes: ["start","verifier"], timestamp: "" },
+      { kind: "node-start", nodeReceiveId: "verifier-1", nodeId: "verifier", nodeKind: "agent", timestamp: "T0", contextSnapshot: {} },
+      { kind: "node-end", nodeReceiveId: "verifier-1", nodeId: "verifier", success: true, contextUpdates: {} },
+      { kind: "pipeline-end", runId: "r3", outcome: "success", timestamp: "" },
+    ];
+    writeFileSync(tracePath, lines.map(l => JSON.stringify(l)).join("\n"));
+
+    await pipelineTraceCommand("r3", { project: projectRoot, nodeReceive: "verifier-1" });
+
+    const out = logs.join("\n");
+    expect(out).toMatch(/received: T0/);
+    expect(out).not.toMatch(/prompt:\s/);
+  });
 });

@@ -49,6 +49,10 @@ export async function pipelineTraceCommand(
     console.log(`\nnode:     ${event.nodeId}`);
     console.log(`kind:     ${event.nodeKind}`);
     console.log(`received: ${event.timestamp}`);
+    const promptPath = join(runDir(project, runId), String(event.nodeId), "prompt.md");
+    if (existsSync(promptPath)) {
+      console.log(`prompt:   ${promptPath}`);
+    }
     console.log(`\ncontext snapshot (${keys.length} key${keys.length === 1 ? "" : "s"}):`);
     if (keys.length === 0) {
       console.log("  (empty — first node)");

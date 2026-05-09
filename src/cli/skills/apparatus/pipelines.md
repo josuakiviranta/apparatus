@@ -66,6 +66,24 @@ Whenever the work needs LLM reasoning — drafting, judging, summarising, transf
 | `mcp` | list | no | MCP server allowlist |
 | `permissionMode` | string | no | Pass-through to Claude CLI |
 
+### Auto-injected `## Inputs` block
+
+When an agent runs, the engine prepends a `## Inputs` section to the prompt
+that wraps each declared input in an XML-style tag. The tag name uses
+`<sourceNode>_<localKey>` for qualified inputs (the dot is replaced by an
+underscore) and `<bareKey>` for caller-graph inputs and system-injected vars.
+
+Example: an agent declaring `inputs: [verifier.summary, illumination_path]`
+receives:
+
+```
+<verifier_summary>...the value...</verifier_summary>
+<illumination_path>...the value...</illumination_path>
+```
+
+Use `apparat pipeline explain <pipeline> <nodeId>` to render the exact
+skeleton with placeholder values without running the LLM.
+
 ### Example digraph
 
 ```dot

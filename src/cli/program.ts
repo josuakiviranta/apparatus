@@ -46,6 +46,7 @@ Pipeline engine (DOT-graph workflows):
   apparat pipeline validate workflow.dot             Check a pipeline file for errors
   apparat pipeline validate review --project my-app  Validate by workflow name
   apparat pipeline show workflow.dot                 Render a pipeline as SVG next to the source
+  apparat pipeline explain workflow.dot              Plain-text topology walkthrough or node prompt skeleton
   apparat pipeline run workflow.dot                  Execute a pipeline
   apparat pipeline run review --project my-app       Run by workflow name
   apparat pipeline run workflow.dot --resume         Continue a pipeline after Ctrl-C or node failure
