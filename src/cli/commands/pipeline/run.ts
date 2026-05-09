@@ -18,6 +18,7 @@ import {
 import { InkInterviewer } from "../../../attractor/interviewer/ink.js";
 import { AutoApproveInterviewer } from "../../../attractor/interviewer/auto-approve.js";
 import { newRunId, runsDir } from "../../lib/apparat-paths.js";
+import { recordProject } from "../../lib/projects-registry.js";
 import { PassThrough } from "stream";
 import { parseStreamJsonEvents, streamEvents } from "../../lib/stream-formatter.js";
 import * as output from "../../lib/output.js";
@@ -55,6 +56,7 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
   let graph = loaded.graph;
   const dotDir = dirname(loaded.absPath);
   const project = loaded.projectRoot;
+  if (project) recordProject(project);
 
   try { validateOrRaise(graph); }
   catch (err) {
