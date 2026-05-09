@@ -683,7 +683,7 @@ This chunk adds a best-effort `~/.apparat/projects.json` written every time `app
 
 ### Task 3.1: Failing test for `projects-registry.ts`
 
-- [ ] **Step 1: Create `src/cli/tests/projects-registry.test.ts`**
+- [x] **Step 1: Create `src/cli/tests/projects-registry.test.ts`**
 
 ```ts
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
@@ -770,14 +770,14 @@ describe("recordProject", () => {
 });
 ```
 
-- [ ] **Step 2: Run to confirm failure**
+- [x] **Step 2: Run to confirm failure**
 
 Run: `npx vitest run src/cli/tests/projects-registry.test.ts`
 Expected: FAIL — module-not-found on `../lib/projects-registry.js`.
 
 ### Task 3.2: Implement `projects-registry.ts`
 
-- [ ] **Step 1: Create `src/cli/lib/projects-registry.ts`**
+- [x] **Step 1: Create `src/cli/lib/projects-registry.ts`**
 
 ```ts
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
@@ -824,12 +824,12 @@ export function recordProject(absPath: string): void {
 }
 ```
 
-- [ ] **Step 2: Run the new tests**
+- [x] **Step 2: Run the new tests**
 
 Run: `npx vitest run src/cli/tests/projects-registry.test.ts`
 Expected: PASS (all 7 `it` cases).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/cli/lib/projects-registry.ts src/cli/tests/projects-registry.test.ts
@@ -838,7 +838,7 @@ git commit -m "feat(registry): add projects.json operator-state index"
 
 ### Task 3.3: Wire `recordProject` into `pipelineRunCommand`
 
-- [ ] **Step 1: Edit `src/cli/commands/pipeline/run.ts`**
+- [x] **Step 1: Edit `src/cli/commands/pipeline/run.ts`**
 
 Add the import near the existing `import { runsDir } …` line:
 
@@ -854,7 +854,7 @@ if (project) recordProject(project);
 
 The guard against `null`/`undefined` avoids polluting `projects.json` for runs that never resolved a project (interactive headless runs are already rejected upstream at `:120-125`, but defence-in-depth is cheap).
 
-- [ ] **Step 2: Failing test — `pipelineRunCommand` records the project**
+- [x] **Step 2: Failing test — `pipelineRunCommand` records the project**
 
 Append to `src/cli/tests/pipeline-run-runid.test.ts` (or create `src/cli/tests/pipeline-run-records-project.test.ts`):
 
@@ -890,17 +890,17 @@ describe("pipelineRunCommand records the project in ~/.apparat/projects.json", (
 });
 ```
 
-- [ ] **Step 3: Run the test**
+- [x] **Step 3: Run the test**
 
 Run: `npx vitest run src/cli/tests/pipeline-run-runid.test.ts -t "records the project"`
 Expected: PASS — `recordProject` was wired in Step 1.
 
-- [ ] **Step 4: Run the full suite**
+- [x] **Step 4: Run the full suite**
 
 Run: `npx vitest run`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/cli/commands/pipeline/run.ts src/cli/tests/pipeline-run-runid.test.ts
