@@ -4,7 +4,8 @@ import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-import { newRunId } from "../cli/lib/apparat-paths.js";
+import { newRunId, runsDir } from "../cli/lib/apparat-paths.js";
+import { resolveProjectFromArgs, injectRunArgs } from "./runner-args.js";
 import { createRun, appendLogLine, closeRun, getPidFilePath } from "./state";
 import type { Task } from "./state";
 
@@ -57,8 +58,24 @@ export async function runTask(task: Task): Promise<{ runId: string; exitCode: nu
   appendLogLine(task.id, runId, { ts: startedAt, stream: "system", content: "Session started" });
 
   const cliPath = getRalphCliPath();
+
+  // For `pipeline run` tasks with --project, route the engine trace into the
+  // project-local tree so we collapse onto the existing JsonlPipelineTracer
+  // seam rather than maintaining a parallel home-global stream.
+  const projectRoot =
+    task.command === "pipeline" && task.args[0] === "run"
+      ? resolveProjectFromArgs(task.args)
+      : null;
+
+  let augmentedArgs = task.args;
+  let logsRoot: string | null = null;
+  if (projectRoot) {
+    logsRoot = join(runsDir(projectRoot), runId);
+    augmentedArgs = injectRunArgs(task.args, runId, logsRoot);
+  }
+
   // In test mode, the test command replaces the entire invocation (no task args appended).
-  const fullArgs = cliPath.shell ? [] : [...cliPath.args, task.command, ...task.args];
+  const fullArgs = cliPath.shell ? [] : [...cliPath.args, task.command, ...augmentedArgs];
 
   // Strip Claude Code session markers so spawned `claude` processes aren't
   // blocked by the "nested session" guard.
