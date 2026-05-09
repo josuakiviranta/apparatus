@@ -931,7 +931,7 @@ The `readLastRunOutcome` helper is **shared infrastructure** with the `2026-05-0
 
 ### Task 4.1: Sanity-check whether `pipeline-status.ts` already exists
 
-- [ ] **Step 1: Check the file**
+- [x] **Step 1: Check the file**
 
 Run: `ls src/cli/lib/pipeline-status.ts 2>/dev/null && echo EXISTS || echo MISSING`
 
@@ -941,7 +941,7 @@ If `MISSING`: continue with Task 4.2.
 
 ### Task 4.2: Failing test + implementation for `readLastRunOutcome` (only if missing)
 
-- [ ] **Step 0: Lock the on-disk event shape**
+- [x] **Step 0: Lock the on-disk event shape**
 
 Read `src/attractor/tracer/jsonl-pipeline-tracer.ts` and find `onPipelineEnd`. Confirm the appended record shape. Verified at plan-write time:
 
@@ -956,7 +956,7 @@ this.append({
 
 Field names: `kind` (NOT `event`), `outcome` (NOT `status`), `timestamp` (ISO string, NOT `ts` epoch ms). Both the fixtures and the implementation below use these names — do NOT regress to the field names from the original review feedback.
 
-- [ ] **Step 1: Create `src/cli/tests/pipeline-status.test.ts`**
+- [x] **Step 1: Create `src/cli/tests/pipeline-status.test.ts`**
 
 ```ts
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
@@ -1032,12 +1032,12 @@ describe("readLastRunOutcome", () => {
 });
 ```
 
-- [ ] **Step 2: Run to confirm failure**
+- [x] **Step 2: Run to confirm failure**
 
 Run: `npx vitest run src/cli/tests/pipeline-status.test.ts`
 Expected: FAIL — module-not-found.
 
-- [ ] **Step 3: Implement `src/cli/lib/pipeline-status.ts`**
+- [x] **Step 3: Implement `src/cli/lib/pipeline-status.ts`**
 
 ```ts
 import { existsSync, readdirSync, readFileSync, statSync } from "fs";
@@ -1112,12 +1112,12 @@ export function readLastRunOutcome(runsRoot: string): LastRunOutcome | null {
 
 Field names locked in Step 0 above against `src/attractor/tracer/jsonl-pipeline-tracer.ts:51-58`: `kind`, `outcome`, `timestamp` (ISO). The tracer is the on-disk source of truth.
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `npx vitest run src/cli/tests/pipeline-status.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/cli/lib/pipeline-status.ts src/cli/tests/pipeline-status.test.ts
@@ -1126,7 +1126,7 @@ git commit -m "feat(pipeline-status): add readLastRunOutcome helper"
 
 ### Task 4.3: Failing test for `apparat status`
 
-- [ ] **Step 1: Create `src/cli/tests/status.test.ts`**
+- [x] **Step 1: Create `src/cli/tests/status.test.ts`**
 
 ```ts
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -1223,14 +1223,14 @@ describe("apparat status", () => {
 });
 ```
 
-- [ ] **Step 2: Run to confirm failure**
+- [x] **Step 2: Run to confirm failure**
 
 Run: `npx vitest run src/cli/tests/status.test.ts`
 Expected: FAIL — `../commands/status.js` does not exist.
 
 ### Task 4.4: Implement `apparat status`
 
-- [ ] **Step 1: Create `src/cli/commands/status.ts`**
+- [x] **Step 1: Create `src/cli/commands/status.ts`**
 
 ```ts
 import { request } from "../../lib/daemon-client.js";
@@ -1293,16 +1293,16 @@ export async function statusCommand(): Promise<void> {
 }
 ```
 
-- [ ] **Step 2: Verify the output sink before running tests**
+- [x] **Step 2: Verify the output sink before running tests**
 
 Required preflight: read `src/cli/lib/output.ts` and confirm what `output.info` writes to (stdout via `process.stdout.write`, `console.log`, or a custom sink). The Chunk 4 Task 4.3 status test spies on `process.stdout.write`. If `output.info` does NOT eventually write to `process.stdout`, change the spy target in the test to match the actual sink (e.g. `vi.spyOn(console, "log")`). The contract is: `apparat status` produces operator-readable text that the test can capture; the spy target is implementation-coupled.
 
-- [ ] **Step 3: Run the status tests**
+- [x] **Step 3: Run the status tests**
 
 Run: `npx vitest run src/cli/tests/status.test.ts`
 Expected: PASS (all 5 `it` cases).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/cli/commands/status.ts src/cli/tests/status.test.ts
@@ -1311,7 +1311,7 @@ git commit -m "feat(status): add apparat status command"
 
 ### Task 4.5: Register `apparat status` in `src/cli/program.ts`
 
-- [ ] **Step 1: Edit `src/cli/program.ts`**
+- [x] **Step 1: Edit `src/cli/program.ts`**
 
 Add the import at the top, alongside other command imports:
 
@@ -1330,7 +1330,7 @@ program
   });
 ```
 
-- [ ] **Step 2: Wire the help text**
+- [x] **Step 2: Wire the help text**
 
 In the existing `program.addHelpText("after", …)` template literal (anchor on the literal — line numbers will have drifted as Chunks 4 and 5 add imports), append a new section after the `Meditation (restricted insight sessions):` block:
 
@@ -1339,17 +1339,17 @@ Cross-project status:
   apparat status                            Cross-project status: projects, heartbeats, recent runs
 ```
 
-- [ ] **Step 3: Compile-check**
+- [x] **Step 3: Compile-check**
 
 Run: `npx tsc --noEmit`
 Expected: PASS.
 
-- [ ] **Step 4: Smoke the registration**
+- [x] **Step 4: Smoke the registration**
 
 Run: `npx tsx src/cli/index.ts status`
 Expected: command runs (prints "No projects registered yet" when home is fresh, or lists projects). No "unknown command" error.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/cli/program.ts
