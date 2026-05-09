@@ -1,5 +1,6 @@
 // src/cli/lib/apparat-paths.ts
 import { join } from "node:path";
+import { randomUUID } from "node:crypto";
 
 export function apparatDir(projectRoot: string): string {
   return join(projectRoot, ".apparat");
@@ -31,4 +32,13 @@ export function runsDir(projectRoot: string): string {
 
 export function runDir(projectRoot: string, runId: string): string {
   return join(runsDir(projectRoot), runId);
+}
+
+/**
+ * Canonical 8-char runId shape used by both interactive runs
+ * (src/cli/commands/pipeline/run.ts) and the daemon (src/daemon/runner.ts).
+ * One source of truth for the truncation rule.
+ */
+export function newRunId(): string {
+  return randomUUID().slice(0, 8);
 }

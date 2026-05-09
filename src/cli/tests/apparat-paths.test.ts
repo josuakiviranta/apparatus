@@ -9,6 +9,7 @@ import {
   pipelinesDir,
   runsDir,
   runDir,
+  newRunId,
 } from "../lib/apparat-paths";
 
 describe("apparat-paths", () => {
@@ -47,5 +48,18 @@ describe("apparat-paths", () => {
   it("runDir composes from runsDir", () => {
     const runId = "abc";
     expect(runDir(project, runId).startsWith(runsDir(project))).toBe(true);
+  });
+});
+
+describe("newRunId", () => {
+  it("returns an 8-char hex slice of randomUUID", () => {
+    const id = newRunId();
+    expect(id).toMatch(/^[0-9a-f]{8}$/);
+  });
+
+  it("returns a different id on each call (collision-resistant for solo dev tooling)", () => {
+    const a = newRunId();
+    const b = newRunId();
+    expect(a).not.toBe(b);
   });
 });
