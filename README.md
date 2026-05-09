@@ -103,6 +103,16 @@ apparat pipeline trace <runId> [--node-receive <nodeId>] [--full]
 ```
 Inspect the context and trace logs for a completed pipeline run. `--node-receive` filters to a specific node execution; `--full` shows the raw JSONL trace.
 
+```bash
+apparat status
+```
+Cross-project status dashboard. Lists registered projects, scheduled heartbeats, and the most recent run outcome per project. Reads `~/.apparat/projects.json`.
+
+```bash
+apparat watch
+```
+Live cross-project Ink dashboard composing heartbeat tasks and recent runs. Press `q` to quit. (Note: `apparat heartbeat watch` is a deprecated alias.)
+
 ### Pipeline script files
 
 Tool nodes can externalise their logic into a sibling script file next to `pipeline.dot` rather than embedding shell in the `.dot` file. Reference the script from a node with `script_file="<name>.<ext>"` (resolved relative to the pipeline folder), plus optional `script_args="..."` and `produces_from_stdout="<context-key>"`. See [`.apparat/pipelines/illumination-to-implementation/consume.mjs`](.apparat/pipelines/illumination-to-implementation/consume.mjs) for a working example, and the [design doc](docs/superpowers/specs/2026-04-17-pipeline-script-files-design.md) for the full attribute surface and rationale.
