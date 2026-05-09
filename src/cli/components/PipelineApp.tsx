@@ -7,6 +7,7 @@ import { LiveFooter, type LiveBlockWithInput } from "./LiveFooter.js";
 import { parseSlashCommand } from "../lib/slash-commands.js";
 import { claudeTracePath } from "../lib/claudeTracePath.js";
 import type { StreamEvent } from "../lib/stream-formatter.js";
+import type { FailureHandoff } from "../lib/failure-handoff.js";
 import { StreamLine } from "./ui.js";
 
 export interface PipelineAppCallbacks {
@@ -33,7 +34,8 @@ type StaticItem =
   | { kind: "trace-line";       id: string; tracePath: string }
   | { kind: "body-line";        id: string; line: BodyLine }
   | { kind: "stream-event";     id: string; event: StreamEvent }
-  | { kind: "block-close";      id: string; block: Block };
+  | { kind: "block-close";      id: string; block: Block }
+  | { kind: "failure-handoff";  id: string; handoff: FailureHandoff };
 
 function BlockCloseView({ block }: { block: Block }) {
   const glyph = block.outcome.status === "success" ? "✓" : "✗";
@@ -151,6 +153,11 @@ export function PipelineApp({ pipelineName, pid, goal, nodes, runId, tracePath, 
             ...prev,
             { kind: "stream-event", id: `${liveBlockIdRef.current}-body-${i}`, event: event.event },
           ]);
+        } else if (event.kind === "failure-handoff") {
+          setStaticItems(prev => [
+            ...prev,
+            { kind: "failure-handoff", id: `failure-handoff-${event.handoff.nodeId}`, handoff: event.handoff },
+          ]);
         }
         dispatch(event);
       },
@@ -256,6 +263,25 @@ export function PipelineApp({ pipelineName, pid, goal, nodes, runId, tracePath, 
             return (
               <Box key={item.id} flexDirection="column" marginBottom={1}>
                 <BlockCloseView block={item.block} />
+              </Box>
+            );
+          }
+          if (item.kind === "failure-handoff") {
+            const h = item.handoff;
+            return (
+              <Box key={item.id} flexDirection="column" marginBottom={1}>
+                <Text>
+                  {"✗ failed at "}{h.nodeId}
+                  {h.agentRelPath ? ` (agent: ${h.agentRelPath})` : ""}
+                  {": "}{h.reason}
+                </Text>
+                <Text>{`trace: ${h.tracePath}`}</Text>
+                {h.rawOutputPath && <Text>{`raw output: ${h.rawOutputPath}`}</Text>}
+                {h.nodeReceiveId && (
+                  <Text>{`inspect: apparat pipeline trace ${h.runId} --node-receive ${h.nodeReceiveId} --full`}</Text>
+                )}
+                <Text> </Text>
+                <Text>{`resume: ${h.resumeCommand}`}</Text>
               </Box>
             );
           }

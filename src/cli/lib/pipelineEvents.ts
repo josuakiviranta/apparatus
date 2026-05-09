@@ -1,6 +1,7 @@
 import type { ChildHandle } from "./agent.js";
 import type { BlockKind } from "./classifyNode.js";
 import type { StreamEvent } from "./stream-formatter.js";
+import type { FailureHandoff } from "./failure-handoff.js";
 
 export type BodyLine =
   | { kind: "text"; role: "you" | "claude" | "system"; text: string }
@@ -27,7 +28,8 @@ export type NodeEvent =
   | { kind: "interactive-ready"; child: ChildHandle; onDone: () => void }
   | { kind: "gate-ready"; options: string[]; onChoose: (choice: string) => void }
   | { kind: "stream-line"; event: StreamEvent }
-  | { kind: "end"; outcome: Outcome; stats?: Partial<Stats> };
+  | { kind: "end"; outcome: Outcome; stats?: Partial<Stats> }
+  | { kind: "failure-handoff"; handoff: FailureHandoff };
 
 export type Block = {
   id: string;             // stable key for <Static>, e.g. `${nodeId}-${frozenIndex}`

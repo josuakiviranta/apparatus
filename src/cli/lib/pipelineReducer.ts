@@ -98,6 +98,9 @@ export function pipelineReducer(state: PipelineState, event: NodeEvent): Pipelin
       };
       return { frozen: [...state.frozen, frozen], live: null };
     }
+
+    case "failure-handoff":
+      return state;
   }
 }
 

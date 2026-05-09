@@ -89,6 +89,48 @@ describe("PipelineApp integration: chat → summarize full flow", () => {
     done();
   });
 
+  it("renders the failure-handoff block as a static item after a fail", async () => {
+    let captured: PipelineAppCallbacks | null = null;
+    const { lastFrame } = render(
+      <PipelineApp
+        pipelineName="failtest"
+        pid={1}
+        goal={undefined}
+        nodes={["runner"]}
+        runId="abc12345"
+        tracePath="/runs/r/pipeline.jsonl"
+        onReady={(cbs) => { captured = cbs; }}
+      />,
+    );
+    expect(captured).not.toBeNull();
+    const { emit, done } = captured!;
+
+    emit({ kind: "start", nodeId: "runner", label: "tool · runner", blockKind: "tool" });
+    emit({ kind: "end", outcome: { status: "fail", reason: "boom" } });
+    emit({
+      kind: "failure-handoff",
+      handoff: {
+        nodeId: "runner",
+        nodeReceiveId: "rid-1",
+        agentRelPath: null,
+        reason: "boom",
+        tracePath: "/runs/r/pipeline.jsonl",
+        runId: "abc12345",
+        rawOutputPath: null,
+        resumeCommand: "apparat pipeline run /work/p.dot --resume abc12345",
+      },
+    });
+    await flush();
+
+    const out = lastFrame() ?? "";
+    expect(out).toContain("✗ failed at runner: boom");
+    expect(out).toContain("trace: /runs/r/pipeline.jsonl");
+    expect(out).toContain("inspect: apparat pipeline trace abc12345 --node-receive rid-1 --full");
+    expect(out).toContain("resume: apparat pipeline run /work/p.dot --resume abc12345");
+    expect(out).not.toContain("raw output:");
+    done();
+  });
+
   it("abort path: emitting end with status=abort freezes live block and does not crash", () => {
     let captured: PipelineAppCallbacks | null = null;
     render(
