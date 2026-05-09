@@ -132,11 +132,15 @@ re-execute the node that failed.
 `)
     .option("--project <folder>", "Project folder ($project variable and cwd for work nodes)")
     .option("--resume [runId]", "Resume from a checkpoint. Bare flag auto-selects the only run; pass <runId> to pick one explicitly")
+    .option("--run-id <id>", "Override the runId allocated for this run (used by the daemon to align home-global and project-local logs)")
+    .option("--logs-root <path>", "Override the logs directory; defaults to <project>/.apparat/runs/<runId>")
     .option("--var <key=value>", "pass caller variable (repeatable)", collectKV, {} as Record<string, string>)
-    .action(async (dotFile: string, opts: { project?: string; resume?: boolean | string }) => {
+    .action(async (dotFile: string, opts: { project?: string; resume?: boolean | string; runId?: string; logsRoot?: string }) => {
       await pipelineRunCommand(dotFile, {
         project: opts.project,
         resume: opts.resume,
+        runId: opts.runId,
+        logsRoot: opts.logsRoot,
         variables: (opts as Record<string, unknown>)["var"] as Record<string, string> | undefined,
       });
     });

@@ -32,6 +32,7 @@ export interface PipelineRunOptions {
   project?: string;
   resume?: boolean | string;
   logsRoot?: string;
+  runId?: string;
   /** Extra key=value pairs injected as $variable context for variableExpansionTransform */
   variables?: Record<string, string>;
 }
