@@ -1,0 +1,18 @@
+digraph pipeline_failure_footer {
+  goal="Locks the pipeline-run failure footer's recipe shape"
+
+  start [shape=Mdiamond]
+
+  // Tool node that fails — drives the bird's-eye + trace + inspect + resume
+  // block of the failure footer.
+  runner [
+    type="tool",
+    cwd="$project",
+    shape=parallelogram,
+    tool_command="echo boom-stderr 1>&2; exit 1"
+  ]
+
+  done [shape=Msquare]
+
+  start -> runner -> done
+}
