@@ -1,5 +1,5 @@
 import { readFileSync } from "fs";
-import type { Graph, Node } from "../../attractor/types.js";
+import type { Graph } from "../../attractor/types.js";
 import { resolveAgentFileForNode } from "./agent-paths.js";
 
 export interface FailureHandoff {
@@ -81,9 +81,7 @@ export interface LoadFailureHandoffArgs {
  */
 export function loadFailureHandoff(args: LoadFailureHandoffArgs): FailureHandoff {
   const reason = normaliseReason(args.failureReason);
-  const node = args.graph.nodes instanceof Map
-    ? args.graph.nodes.get(args.failedNodeId)
-    : (args.graph.nodes as unknown as Node[]).find(n => n.id === args.failedNodeId);
+  const node = args.graph.nodes.get(args.failedNodeId);
   const agentRelPath = node ? resolveAgentFileForNode(node, args.dotDir) : null;
   const resumeCommand = `apparat pipeline run ${args.dotFile} --resume ${args.runId}`;
 
@@ -113,8 +111,9 @@ export function loadFailureHandoff(args: LoadFailureHandoffArgs): FailureHandoff
   const nodeStarts = lines.filter(l =>
     l.kind === "node-start" && l.nodeId === args.failedNodeId
   );
-  const nodeReceiveId = nodeStarts.length > 0
-    ? String(nodeStarts[nodeStarts.length - 1].nodeReceiveId)
+  const last = nodeStarts[nodeStarts.length - 1];
+  const nodeReceiveId = nodeStarts.length > 0 && typeof last?.nodeReceiveId === "string"
+    ? last.nodeReceiveId
     : null;
 
   let rawOutputPath: string | null = null;
