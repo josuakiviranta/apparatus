@@ -34,13 +34,32 @@ export interface PreparedAgent {
   nodeDir: string;
 }
 
-export function assembleAgentPrompt(
+/**
+ * Pure prompt-skeleton produced by `buildAgentPrompt`. Carries every piece
+ * the runtime wrapper needs to instantiate an Agent and write `prompt.md`,
+ * but performs no filesystem I/O itself beyond the caller-injected `load`.
+ */
+export interface BuiltPrompt {
+  prompt: string;
+  inputsBlock: string;
+  jsonSchema: string | undefined;
+  agentVariables: Record<string, unknown>;
+  config: AgentConfig;
+  /** Path the runtime would `mkdir`+write into. NOT created here. */
+  nodeDir: string;
+}
+
+/**
+ * Pure (modulo the caller-injected `load` reading the agent .md). Used by both
+ * the runtime wrapper (`assembleAgentPrompt`) and design-time tools
+ * (`apparat pipeline explain <pipeline> <nodeId>`).
+ */
+export function buildAgentPrompt(
   node: Node,
   ctx: PipelineContext,
   meta: HandlerExecutionContext,
   load: (name: string, pipelineDir: string) => AgentConfig,
-  create: (config: AgentConfig) => Agent,
-): PreparedAgent | { fail: string } {
+): BuiltPrompt | { fail: string } {
   const agentName = node.agent ?? "implement";
   if (!agentName) {
     return { fail: "Node has no agent attribute" };
@@ -73,7 +92,6 @@ export function assembleAgentPrompt(
   const jsonSchema: string | undefined = config.jsonSchema;
 
   const nodeDir = join(logsRoot, node.id);
-  mkdirSync(nodeDir, { recursive: true });
   const agentInstructions = (config.prompt ?? "").trim();
 
   const declaredInputs = (config.inputs as string[] | undefined) ?? [];
@@ -94,9 +112,40 @@ export function assembleAgentPrompt(
     ? `IMPORTANT: Your FINAL response MUST be valid JSON matching this schema. No markdown, no preamble, output ONLY the JSON object.\nSchema: ${jsonSchema}\n\n${assembledPrompt}\n\nREMINDER: Output MUST be valid JSON matching the schema above. No markdown, no explanation.`
     : assembledPrompt;
   const prompt = preamble + jsonWrappedPrompt;
-  writeFileSync(join(nodeDir, "prompt.md"), prompt);
 
-  const agent = create({ ...config, prompt, ...(jsonSchema ? { jsonSchema } : {}) });
+  return { prompt, inputsBlock, jsonSchema, agentVariables, config, nodeDir };
+}
 
-  return { agent, config, jsonSchema, agentVariables, prompt, nodeDir };
+/**
+ * Runtime wrapper. Preserves today's exported signature exactly so the two
+ * existing call sites (`looping-agent-handler.ts:27`, `interactive-agent-handler.ts:26`)
+ * and the existing tests compile unchanged.
+ */
+export function assembleAgentPrompt(
+  node: Node,
+  ctx: PipelineContext,
+  meta: HandlerExecutionContext,
+  load: (name: string, pipelineDir: string) => AgentConfig,
+  create: (config: AgentConfig) => Agent,
+): PreparedAgent | { fail: string } {
+  const built = buildAgentPrompt(node, ctx, meta, load);
+  if ("fail" in built) return built;
+
+  mkdirSync(built.nodeDir, { recursive: true });
+  writeFileSync(join(built.nodeDir, "prompt.md"), built.prompt);
+
+  const agent = create({
+    ...built.config,
+    prompt: built.prompt,
+    ...(built.jsonSchema ? { jsonSchema: built.jsonSchema } : {}),
+  });
+
+  return {
+    agent,
+    config: built.config,
+    jsonSchema: built.jsonSchema,
+    agentVariables: built.agentVariables,
+    prompt: built.prompt,
+    nodeDir: built.nodeDir,
+  };
 }
