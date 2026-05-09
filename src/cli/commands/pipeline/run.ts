@@ -372,19 +372,26 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
     process.off("SIGINT", onSignal);
     process.off("SIGTERM", onSignal);
     await new Promise((resolve) => setImmediate(resolve));
+
+    let handoff: ReturnType<typeof loadFailureHandoff> | null = null;
+    if (pipelineFailed && lastFailedNodeId) {
+      handoff = loadFailureHandoff({
+        tracePath,
+        failedNodeId: lastFailedNodeId,
+        failureReason: lastFailureReason ?? "pipeline failed",
+        dotFile,
+        dotDir,
+        runId,
+        graph,
+      });
+      emit({ kind: "failure-handoff", handoff });
+    }
+
     done();
     await waitUntilExit();
+
     if (pipelineFailed) {
-      if (lastFailedNodeId) {
-        const handoff = loadFailureHandoff({
-          tracePath,
-          failedNodeId: lastFailedNodeId,
-          failureReason: lastFailureReason ?? "pipeline failed",
-          dotFile,
-          dotDir,
-          runId,
-          graph,
-        });
+      if (handoff) {
         process.stderr.write(renderFailureFooter(handoff));
       }
       process.exit(1);
