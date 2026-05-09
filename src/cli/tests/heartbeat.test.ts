@@ -13,7 +13,7 @@ vi.mock("../../lib/daemon-client", () => ({
   stream: vi.fn(),
 }));
 
-import { request } from "../../lib/daemon-client";
+import { request, stream } from "../../lib/daemon-client";
 
 // Real fixture directory that exists on disk — used by tests that exercise
 // the happy path of commands that validate the folder exists.
@@ -291,6 +291,29 @@ describe("apparat heartbeat pipeline preflight: missing --project when $project 
       command: "pipeline",
       args: ["run", dot, "--project", FIXTURE_DIR],
     }));
+    logSpy.mockRestore();
+  });
+});
+
+describe("apparat heartbeat logs --follow prints daemon-authored cross-link verbatim", () => {
+  it("forwards LogLine content through console.log so the daemon's cross-link survives end-to-end", async () => {
+    const messages = [
+      { type: "log_line", stream: "system", content: "Engine trace: /work/.apparat/runs/abcd1234/pipeline.jsonl" },
+      { type: "log_line", stream: "stdout", content: "[engine] node: start" },
+      { type: "log_line", stream: "system", content: "→ apparat pipeline trace abcd1234 --project /work" },
+      { type: "log_line", stream: "system", content: "Session ended (exit 0)" },
+    ];
+    vi.mocked(stream).mockImplementation(async (_action, _payload, onData) => {
+      for (const msg of messages) onData(msg);
+    });
+
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    await makeProgram().parseAsync([
+      "node", "apparat", "heartbeat", "logs", "pipeline:work", "--follow",
+    ]);
+
+    const combined = logSpy.mock.calls.flat().join("\n");
+    expect(combined).toContain("→ apparat pipeline trace abcd1234 --project /work");
     logSpy.mockRestore();
   });
 });
