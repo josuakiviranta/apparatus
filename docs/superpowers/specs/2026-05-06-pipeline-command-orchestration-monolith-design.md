@@ -176,6 +176,26 @@ Failure modes raise `PipelineLoadError`: `kind: "not-found"` (file missing), `ki
 
 The split adds ~80 LOC across imports, type re-declarations, and barrel boilerplate — acceptable for the locality and seam clarity gains. `run.ts` at ~340 LOC is the largest file post-split and itself a candidate for a future split (the SIGINT handler + interactive callback closure is ~120 LOC), but that is out of scope for this design.
 
+### 3.6 Failure-footer contract
+
+`src/cli/commands/pipeline/run.ts:374-382` now emits a recipe-shape failure footer instead of the legacy 2-line `✗ pipeline failed at node X: …\n  trace: …`. Concretely:
+
+- `loadFailureHandoff(…)` (in `src/cli/lib/failure-handoff.ts`) reads the JSONL we just authored to assemble a `FailureHandoff { nodeId, nodeReceiveId, agentRelPath, reason, tracePath, runId, rawOutputPath, resumeCommand }`.
+- `renderFailureFooter(handoff)` (same file, pure formatter) prints the bird's-eye line + investigation block (`trace:` / optional `raw output:` / optional `inspect:`) + blank line + retry block (`resume:`).
+- `resolveAgentFileForNode(node, dotDir)` (in `src/cli/lib/agent-paths.ts`) is the single resolver of "does this node have a `.md` sibling, and where is it?" — used by `loadFailureHandoff` for the `agent:` clause. Tool/start/exit/conditional/store nodes return `null`.
+- `PipelineApp.tsx`'s `<Static>` items list mirrors the same recipe via a new `failure-handoff` event/static-item — appended once per run (after the engine returns and before `done()` flushes the frame). Both render sites consume the same `FailureHandoff` value.
+- Tracer wrapper at `src/cli/commands/pipeline/run.ts:147-155` was patched to forward `onValidationFailure` so `validation-failure` events actually reach `pipeline.jsonl` (previously the engine's optional-chain call at `src/attractor/core/engine.ts:251` was a no-op).
+
+Tests:
+
+- `src/cli/tests/agent-paths.test.ts` — `resolveAgentFileForNode` for agent / wait.human / tool / start / exit / conditional / store / missing-file cases.
+- `src/cli/tests/failure-handoff.test.ts` — `renderFailureFooter` snapshots (full / tool-node / early-crash / no-raw / blank-line / trailing-newline) and `loadFailureHandoff` JSONL fixtures (latest receive id / highest-attempt rawOutputPath / no node-start / unreadable trace / truncated reason / empty reason / agent path resolved).
+- `src/cli/tests/jsonl-validation-failure-forwarded.test.ts` — contract test for the tracer-wrapper forwarding fix.
+- `src/cli/tests/pipeline-failure-reason.test.ts:63-65` — updated assertions for the new footer shape.
+- `src/cli/tests/pipeline-failure-footer-scenario.test.ts` — drives `.apparat/scenarios/pipeline-failure-footer/pipeline.dot` through `pipelineRunCommand` end-to-end.
+
+No `program.ts` registration change. No new CLI flag, no exit-code change, no JSONL-schema change. The originating illumination's step 3 (a new `apparat pipeline why <runId>` command) was dropped per chat-summarizer round 1, bullet 2 — footer-as-recipe achieves the same end with zero new command, zero new render format, zero on-disk artifacts.
+
 ## 4. Components & file edits
 
 ### 4.1 `src/cli/commands/pipeline-invocation.ts` (new)

@@ -81,6 +81,8 @@ apparat pipeline run pipelines/my-pipeline.dot \
 
 Pass `--resume [runId]` to continue a pipeline after Ctrl-C, a node failure, or a crash. The engine checkpoints after every node advance to `<project>/.apparat/runs/<runId>/checkpoint.json` — the trace `pipeline.jsonl` lives in the same directory. Bare `--resume` auto-selects when exactly one prior run exists for the project; pass an explicit `<runId>` to disambiguate. Older runs are pruned lazily (last 50 per project, override with `APPARAT_RUNS_KEEP`). For `--resume` to be useful, tool-node scripts must be idempotent — a script that hard-requires "state before I act" will fail on retry; detect the desired outcome is already present and exit 0 as a no-op instead.
 
+When a pipeline run fails, the stderr footer prints a copy-pasteable recipe instead of just a trace path: a bird's-eye line naming the failed node and its agent file, then `trace:` / `raw output:` (latest validation-retry attempt) / `inspect:` (the exact `pipeline trace --node-receive --full` command for that invocation), a blank line, and finally `resume:` (the exact `pipeline run … --resume <runId>` command for after you fix it). Tool-node failures omit the `agent:` clause and the `raw output:` line; pre-handler crashes omit the `inspect:` and `raw output:` lines. The recipe is mirrored inside the in-frame Ink fail block so the same hand-off is visible whether the run dies inside the TUI or after it unmounts.
+
 ```bash
 apparat pipeline validate <pipeline.dot>
 ```
