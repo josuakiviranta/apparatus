@@ -223,6 +223,26 @@ Agents needing workspace orientation discover the project layout at runtime
 (Glob source/docs roots) and read `CONTEXT.md` + `docs/adr/` + `README.md` +
 a live `src/` inventory. No preloaded curated overview.
 
+### Operator-global tier — `~/.apparat/`
+
+apparat persists state at two tiers, mirroring ADR-0008's partition principle one
+level up:
+
+- **Project-local** — `<project>/.apparat/`: pipelines, agents, run traces, run
+  checkpoints. Owned by the project's repo. One folder per project.
+- **Operator-global** — `~/.apparat/`: orchestration state across all projects on
+  this machine. Contents:
+  - `tasks.json` — daemon-scheduled heartbeat tasks
+  - `pids/` — running session PID files
+  - `logs/<taskId>/<runId>.log` — daemon-authored orchestration breadcrumbs
+    (start, end, exit code, cross-link to the project-local engine trace)
+  - `projects.json` — index of project paths the operator has invoked apparat
+    against, with `lastSeen` timestamps. Read by `apparat status`. Best-effort
+    write per `--project`-resolving CLI invocation.
+
+`~/.apparat/` is operator-state only. Agent definitions remain project-local
+per ADR-0001.
+
 ---
 
 ADR-0007 (`.apparat/` as project-local home) is partly superseded by
