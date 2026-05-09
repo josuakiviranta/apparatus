@@ -152,6 +152,7 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
     },
     onNodeEnd(meta) { jsonlTracer.onNodeEnd(meta); },
     onPipelineEnd(meta) { jsonlTracer.onPipelineEnd(meta); },
+    onValidationFailure(meta) { jsonlTracer.onValidationFailure?.(meta); },
   };
 
   // Mount the new single-<Static> PipelineApp.
