@@ -22,6 +22,7 @@ import { runsDir } from "../../lib/apparat-paths.js";
 import { PassThrough } from "stream";
 import { parseStreamJsonEvents, streamEvents } from "../../lib/stream-formatter.js";
 import * as output from "../../lib/output.js";
+import { loadFailureHandoff, renderFailureFooter } from "../../lib/failure-handoff.js";
 import { renderPipelineApp } from "../../components/PipelineApp.js";
 import { classifyNode } from "../../lib/classifyNode.js";
 import { parseClaudeEvent } from "../../lib/parseClaudeEvent.js";
@@ -375,9 +376,16 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
     await waitUntilExit();
     if (pipelineFailed) {
       if (lastFailedNodeId) {
-        const firstLine = (lastFailureReason ?? "pipeline failed").split("\n")[0].slice(0, 500);
-        process.stderr.write(`✗ pipeline failed at node ${lastFailedNodeId}: ${firstLine}\n`);
-        process.stderr.write(`  trace: ${tracePath}\n`);
+        const handoff = loadFailureHandoff({
+          tracePath,
+          failedNodeId: lastFailedNodeId,
+          failureReason: lastFailureReason ?? "pipeline failed",
+          dotFile,
+          dotDir,
+          runId,
+          graph,
+        });
+        process.stderr.write(renderFailureFooter(handoff));
       }
       process.exit(1);
     }
