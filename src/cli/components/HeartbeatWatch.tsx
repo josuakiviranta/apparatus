@@ -1,6 +1,6 @@
 // src/cli/components/HeartbeatWatch.tsx
 import React, { useState, useEffect, useRef } from "react";
-import { render, Box, Text, useInput, useApp } from "ink";
+import { Box, Text, useInput, useApp } from "ink";
 import { stream } from "../../lib/daemon-client";
 import type { Task } from "../../daemon/state";
 
