@@ -11,7 +11,7 @@ interface LogEntry {
   content: string;
 }
 
-function WatchApp(): React.ReactElement {
+export function HeartbeatPane(): React.ReactElement {
   const { exit } = useApp();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [selectedIdx, setSelectedIdx] = useState(0);
@@ -86,7 +86,9 @@ function WatchApp(): React.ReactElement {
   );
 }
 
+import { renderWatchApp } from "./WatchApp.js";
+
 export async function renderWatch(): Promise<void> {
-  const { waitUntilExit } = render(<WatchApp />);
-  await waitUntilExit();
+  process.stderr.write("[apparat] `heartbeat watch` is deprecated; use `apparat watch` instead.\n");
+  await renderWatchApp();
 }
