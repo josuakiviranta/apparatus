@@ -1383,7 +1383,7 @@ The existing `apparat heartbeat watch` is preserved as a deprecation alias with 
 
 The design's load-bearing constraint (refinement #4) is that `apparat watch` MUST compose `HeartbeatPane` AND `PipelineApp` as React children inside one Ink root — NOT a wrapper that shells out to two separate processes. This task verifies whether the existing `PipelineApp` can be composed as-is, or whether a small refactor is required first.
 
-- [ ] **Step 1: Read `src/cli/components/PipelineApp.tsx` lines 1-60**
+- [x] **Step 1: Read `src/cli/components/PipelineApp.tsx` lines 1-60**
 
 Locate the `PipelineApp` Props interface and the export. Verified at plan-write time: `PipelineApp` is exported as a React component (`export function PipelineApp(...)`) at line 50, but its Props are:
 
@@ -1401,7 +1401,7 @@ interface Props {
 
 `PipelineApp` is event-driven: it expects `onReady` to receive an `emit(NodeEvent)` callback that the parent uses to push live events. It does NOT consume a static JSONL trace and replay it.
 
-- [ ] **Step 2: Decide the composition path**
+- [x] **Step 2: Decide the composition path**
 
 **Option A — replay JSONL into `emit()` (preferred):** the implementing session writes a small `replayTraceIntoApp(tracePath, emit)` helper that reads `<runDir>/pipeline.jsonl`, maps each event to the corresponding `NodeEvent` (`{kind: "start", ...}`, `{kind: "stream-line", ...}`, `{kind: "end", ...}`, etc.), and calls `emit(...)` per event. `WatchApp` mounts `<PipelineApp ... onReady={(cbs) => replayTraceIntoApp(tracePath, cbs.emit)} />`. The trace replays once on mount; the user sees the latest completed run rendered exactly the way it looked live.
 
@@ -1411,7 +1411,7 @@ interface Props {
 
 If neither option is achievable in this chunk's scope, **STOP and surface to the user** — do NOT fall back to a shell-out wrapper. The design's load-bearing constraint is non-negotiable.
 
-- [ ] **Step 3: If Option A is chosen, sketch the helper signature**
+- [x] **Step 3: If Option A is chosen, sketch the helper signature**
 
 ```ts
 // src/cli/lib/replayTraceIntoApp.ts (NEW)
@@ -1435,7 +1435,7 @@ The mapping body is intentionally a stub at plan time — the implementer reads 
 
 ### Task 5.1: Extract `HeartbeatPane` from `HeartbeatWatch.tsx`
 
-- [ ] **Step 1: Edit `src/cli/components/HeartbeatWatch.tsx`**
+- [x] **Step 1: Edit `src/cli/components/HeartbeatWatch.tsx`**
 
 Rename the function `WatchApp` → `HeartbeatPane` and add `export` to the declaration. Preserve the body verbatim.
 
@@ -1458,14 +1458,14 @@ export async function renderWatch(): Promise<void> {
 
 Static import is safe: `WatchApp.tsx` imports `HeartbeatPane` from this file, but does not import `renderWatch`. No cycle.
 
-- [ ] **Step 2: Compile-check**
+- [x] **Step 2: Compile-check**
 
 Run: `npx tsc --noEmit`
 Expected: FAIL with "Cannot find module './WatchApp.js'" — that's expected; we create it next.
 
 ### Task 5.2: Create `src/cli/components/WatchApp.tsx` — composed Ink root
 
-- [ ] **Step 1: Create `src/cli/lib/replayTraceIntoApp.ts` (Option A from Task 5.0)**
+- [x] **Step 1: Create `src/cli/lib/replayTraceIntoApp.ts` (Option A from Task 5.0)**
 
 Write the helper. The implementer must read `src/cli/lib/pipelineEvents.ts` for the `NodeEvent` union and `src/attractor/tracer/jsonl-pipeline-tracer.ts` for the on-disk event shapes (`pipeline-start`, `node-start`, `node-end`, `pipeline-end`, `validation-failure`). Then write the explicit mapping. Skeleton:
 
@@ -1489,7 +1489,7 @@ export function replayTraceIntoApp(tracePath: string, emit: (ev: NodeEvent) => v
 }
 ```
 
-- [ ] **Step 2: Create a unit test for the helper**
+- [x] **Step 2: Create a unit test for the helper**
 
 `src/cli/tests/replayTraceIntoApp.test.ts`:
 
@@ -1544,7 +1544,7 @@ describe("replayTraceIntoApp", () => {
 Run: `npx vitest run src/cli/tests/replayTraceIntoApp.test.ts`
 Expected: FAIL initially (mapping is stubbed), then PASS once the mapping is implemented.
 
-- [ ] **Step 3: Create `src/cli/components/WatchApp.tsx`**
+- [x] **Step 3: Create `src/cli/components/WatchApp.tsx`**
 
 ```tsx
 // src/cli/components/WatchApp.tsx
@@ -1625,14 +1625,14 @@ This is the *real* composition: `<PipelineApp>` is mounted as a child of `<Watch
 
 **Do NOT fall back to a shell-out wrapper.** Surface to the user instead — the design's load-bearing constraint is non-negotiable.
 
-- [ ] **Step 4: Compile-check**
+- [x] **Step 4: Compile-check**
 
 Run: `npx tsc --noEmit`
 Expected: PASS.
 
 ### Task 5.3: Create `src/cli/commands/watch.ts`
 
-- [ ] **Step 1: Create the file**
+- [x] **Step 1: Create the file**
 
 ```ts
 // src/cli/commands/watch.ts
@@ -1643,7 +1643,7 @@ export async function watchCommand(): Promise<void> {
 }
 ```
 
-- [ ] **Step 2: Register in `src/cli/program.ts`**
+- [x] **Step 2: Register in `src/cli/program.ts`**
 
 Add the import:
 
@@ -1674,12 +1674,12 @@ And add a new entry in the new `Cross-project status:` block (introduced in Chun
   apparat watch                             Live cross-project dashboard
 ```
 
-- [ ] **Step 3: Smoke the registration**
+- [x] **Step 3: Smoke the registration**
 
 Run: `npx tsx src/cli/index.ts --help`
 Expected: help text lists `apparat watch` as a top-level command.
 
-- [ ] **Step 4: Commit (so far — Tasks 5.1–5.3)**
+- [x] **Step 4: Commit (so far — Tasks 5.1–5.3)**
 
 ```bash
 git add src/cli/components/HeartbeatWatch.tsx src/cli/components/WatchApp.tsx src/cli/commands/watch.ts src/cli/program.ts
@@ -1688,7 +1688,7 @@ git commit -m "feat(watch): apparat watch — composed Ink dashboard; deprecatio
 
 ### Task 5.4: Failing test for the deprecation notice
 
-- [ ] **Step 1: Create `src/cli/tests/watch.test.ts`**
+- [x] **Step 1: Create `src/cli/tests/watch.test.ts`**
 
 ```ts
 import { describe, it, expect, vi } from "vitest";
@@ -1716,12 +1716,12 @@ describe("`heartbeat watch` deprecation alias", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test**
+- [x] **Step 2: Run the test**
 
 Run: `npx vitest run src/cli/tests/watch.test.ts`
 Expected: PASS — the deprecation forwarding was wired in Task 5.1.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/cli/tests/watch.test.ts
@@ -1732,12 +1732,12 @@ git commit -m "test(watch): lock heartbeat-watch deprecation forwarding"
 
 This automated assertion guards the load-bearing refinement from regressing into a shell-out facade.
 
-- [ ] **Step 1: Confirm `ink-testing-library` is available**
+- [x] **Step 1: Confirm `ink-testing-library` is available**
 
 Run: `npm ls ink-testing-library 2>/dev/null || npm view ink-testing-library version`
 If missing: `npm install --save-dev ink-testing-library` and commit `package.json` + lockfile changes in a separate prep commit before continuing.
 
-- [ ] **Step 2: Create `src/cli/tests/watch-composition.test.tsx`**
+- [x] **Step 2: Create `src/cli/tests/watch-composition.test.tsx`**
 
 ```tsx
 import { describe, it, expect, vi } from "vitest";
@@ -1801,14 +1801,14 @@ import { WatchApp } from "../components/WatchApp.js";
 const tree = render(<WatchApp />);
 ```
 
-- [ ] **Step 3: Run the composition test**
+- [x] **Step 3: Run the composition test**
 
 Run: `npx vitest run src/cli/tests/watch-composition.test.tsx`
 Expected: PASS — the rendered output contains both `[HeartbeatPane stub]` AND `[PipelineApp stub: …]`.
 
 If the test fails because `PipelineApp` is NOT rendered (e.g. `WatchApp`'s conditional fell through), revisit Task 5.2 and the composition feasibility analysis from Task 5.0. **Do NOT delete this test to make Chunk 5 ship.** It exists specifically to guard the design constraint.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/cli/components/WatchApp.tsx src/cli/tests/watch-composition.test.tsx
@@ -1817,7 +1817,7 @@ git commit -m "test(watch): lock WatchApp composition — HeartbeatPane + Pipeli
 
 ### Task 5.5: Smoke the live TUIs end-to-end
 
-- [ ] **Step 1: Manual smoke — `apparat watch`**
+- [x] **Step 1: Manual smoke — `apparat watch`** (deferred — requires interactive terminal)
 
 Run in a real terminal:
 1. `apparat heartbeat pipeline meditate --project /tmp/test-app --every 1` — schedules a task
@@ -1825,7 +1825,7 @@ Run in a real terminal:
 3. Press `q` → exits cleanly, no orphaned processes (`ps aux | grep apparat`)
 4. Press `Tab` (with multiple registered projects) → selection moves; lower pane updates
 
-- [ ] **Step 2: Manual smoke — `apparat heartbeat watch` deprecation**
+- [x] **Step 2: Manual smoke — `apparat heartbeat watch` deprecation** (deferred — requires interactive terminal)
 
 1. Run `apparat heartbeat watch`
 2. Confirm stderr line: `[apparat] heartbeat watch is deprecated; use apparat watch instead.`
