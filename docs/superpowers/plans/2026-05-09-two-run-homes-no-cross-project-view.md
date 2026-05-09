@@ -201,7 +201,7 @@ The daemon today spawns `apparat pipeline run` blind: child allocates its own 8-
 
 ### Task 2.1: Failing test for `resolveProjectFromArgs`
 
-- [ ] **Step 1: Create `src/daemon/tests/runner-args.test.ts`**
+- [x] **Step 1: Create `src/daemon/tests/runner-args.test.ts`**
 
 ```ts
 import { describe, it, expect } from "vitest";
@@ -267,14 +267,14 @@ describe("injectRunArgs", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test to confirm it fails**
+- [x] **Step 2: Run the test to confirm it fails**
 
 Run: `npx vitest run src/daemon/tests/runner-args.test.ts`
 Expected: FAIL with module-not-found error on `../runner-args.js`.
 
 ### Task 2.2: Implement `runner-args.ts`
 
-- [ ] **Step 1: Create `src/daemon/runner-args.ts`**
+- [x] **Step 1: Create `src/daemon/runner-args.ts`**
 
 ```ts
 /**
@@ -302,12 +302,12 @@ export function injectRunArgs(args: string[], runId: string, logsRoot: string): 
 }
 ```
 
-- [ ] **Step 2: Run the test to confirm all cases pass**
+- [x] **Step 2: Run the test to confirm all cases pass**
 
 Run: `npx vitest run src/daemon/tests/runner-args.test.ts`
 Expected: PASS (all 7 `it` cases).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/daemon/runner-args.ts src/daemon/tests/runner-args.test.ts
@@ -316,7 +316,7 @@ git commit -m "feat(daemon): add resolveProjectFromArgs/injectRunArgs helpers"
 
 ### Task 2.3: Add `--run-id <id>` and `--logs-root <path>` flags to `apparat pipeline run`
 
-- [ ] **Step 1: Edit `src/cli/program.ts` — extend the `pipeline run` registration**
+- [x] **Step 1: Edit `src/cli/program.ts` — extend the `pipeline run` registration**
 
 Find the `.option("--var <key=value>", "pass caller variable (repeatable)", collectKV, {} as Record<string, string>)` line in the `pipeline.command("run …")` block (around `:135`). Insert two new option lines immediately above it:
 
@@ -341,12 +341,12 @@ Then update the `.action` callback to thread the new options through:
 
 Note: `--logs-root` is *already* honoured by `pipelineRunCommand` via `PipelineRunOptions.logsRoot` at `src/cli/commands/pipeline/run.ts:35`; this step only registers the CLI flag so users (and the daemon) can pass it. `--run-id` is new on both sides — the run command receives it in Task 2.4.
 
-- [ ] **Step 2: Verify the flag registration compiles**
+- [x] **Step 2: Verify the flag registration compiles**
 
 Run: `npx tsc --noEmit`
 Expected: PASS.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/cli/program.ts
@@ -355,7 +355,7 @@ git commit -m "feat(pipeline/run): add --run-id and --logs-root CLI flags"
 
 ### Task 2.4: Failing test — `pipelineRunCommand` honours `opts.runId`
 
-- [ ] **Step 1: Create `src/cli/tests/pipeline-run-runid.test.ts`** (new file — keeps blast radius clean and easier to grep)
+- [x] **Step 1: Create `src/cli/tests/pipeline-run-runid.test.ts`** (new file — keeps blast radius clean and easier to grep)
 
 ```ts
 import { describe, it, expect, vi, afterEach } from "vitest";
@@ -386,14 +386,14 @@ describe("pipelineRunCommand --run-id override", () => {
 });
 ```
 
-- [ ] **Step 3: Run the test to confirm it fails**
+- [x] **Step 3: Run the test to confirm it fails**
 
 Run: `npx vitest run src/cli/tests/pipeline-run-runid.test.ts` (or the file you appended to)
 Expected: FAIL — `existsSync(...)` is `false` because today the run command allocates a fresh runId regardless of `opts.runId`.
 
 ### Task 2.5: Implement `runId` plumbing inside `pipelineRunCommand`
 
-- [ ] **Step 1: Edit `src/cli/commands/pipeline/run.ts`**
+- [x] **Step 1: Edit `src/cli/commands/pipeline/run.ts`**
 
 Extend `PipelineRunOptions` (at `:32-38`) to include the two new options:
 
@@ -422,12 +422,12 @@ const runId = opts.runId ?? newRunId();
 
 The engine already accepts `opts.runId` at `src/attractor/core/engine.ts:150`. The downstream `runPipeline({ logsRoot, runId, ... })` call at `:212-214` is unchanged — it already threads `runId` through.
 
-- [ ] **Step 2: Run the new test to confirm it passes**
+- [x] **Step 2: Run the new test to confirm it passes**
 
 Run: `npx vitest run src/cli/tests/pipeline-run-runid.test.ts`
 Expected: PASS — the trace file now lands at `<project>/.apparat/runs/deadbeef/pipeline.jsonl`.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/cli/commands/pipeline/run.ts src/cli/tests/pipeline-run-runid.test.ts
@@ -436,7 +436,7 @@ git commit -m "feat(pipeline/run): honour opts.runId override"
 
 ### Task 2.6: Failing test — daemon spawns child with `--run-id` and `--logs-root` for `pipeline run` tasks
 
-- [ ] **Step 1: Append to `src/daemon/tests/runner.test.ts`**
+- [x] **Step 1: Append to `src/daemon/tests/runner.test.ts`**
 
 ```ts
 import { spawn } from "child_process";
@@ -505,7 +505,7 @@ describe("runTask — pipeline run argv augmentation", () => {
 
 Note: the existing test file already imports `mkdirSync` and `join`. If not, add to the existing import block at the top.
 
-- [ ] **Step 2: Run the test to confirm both `it` cases fail**
+- [x] **Step 2: Run the test to confirm both `it` cases fail**
 
 Run: `npx vitest run src/daemon/tests/runner.test.ts -t "argv augmentation"`
 Expected: FAIL — first case fails on `expect(argv).toContain("--run-id …")` because today the daemon does not augment argv.
@@ -514,7 +514,7 @@ Expected: FAIL — first case fails on `expect(argv).toContain("--run-id …")` 
 
 Anchor edits on identifiers, not line numbers — line numbers will drift mid-chunk.
 
-- [ ] **Step 1: Edit `src/daemon/runner.ts` — imports**
+- [x] **Step 1: Edit `src/daemon/runner.ts` — imports**
 
 Add (after existing imports):
 
@@ -523,7 +523,7 @@ import { runsDir } from "../cli/lib/apparat-paths.js";
 import { resolveProjectFromArgs, injectRunArgs } from "./runner-args.js";
 ```
 
-- [ ] **Step 2: Replace the `cliPath` + `fullArgs` block**
+- [x] **Step 2: Replace the `cliPath` + `fullArgs` block**
 
 Anchor: find the line `const cliPath = getRalphCliPath();` inside `runTask`. Replace from that line through the next blank line (the existing `const fullArgs = cliPath.shell ? [] : [...cliPath.args, task.command, ...task.args];`) with:
 
@@ -549,18 +549,18 @@ if (projectRoot) {
 const fullArgs = cliPath.shell ? [] : [...cliPath.args, task.command, ...augmentedArgs];
 ```
 
-- [ ] **Step 3: Run the augmentation test**
+- [x] **Step 3: Run the augmentation test**
 
 Run: `npx vitest run src/daemon/tests/runner.test.ts -t "argv augmentation"`
 Expected: PASS — both `it` cases pass.
 
-- [ ] **Step 4: Run the full daemon-runner suite to catch mock-spawn flakes**
+- [x] **Step 4: Run the full daemon-runner suite to catch mock-spawn flakes**
 
 Run: `npx vitest run src/daemon/tests/runner.test.ts`
 
 Expected: PASS for all cases. **Caution:** Task 2.6 added `vi.mock("child_process", ...)` at file-top. vitest hoist-mock + ESM means the mock applies to ALL preceding tests in the file. Verify the existing tests (returns runId+exitCode, writes header, captures non-zero exit, env var stripping, pid file lifecycle) still pass — they rely on real `spawn`. If the mock now intercepts them, scope the mock with `vi.doMock` inside the `describe("argv augmentation")` block and call `vi.doUnmock("child_process")` after, OR move the new tests into a separate file `src/daemon/tests/runner-augmentation.test.ts` so existing tests run unaffected.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/daemon/runner.ts
@@ -569,7 +569,7 @@ git commit -m "feat(daemon): inject --run-id/--logs-root for pipeline-run tasks"
 
 ### Task 2.7b: Add the breadcrumb log lines
 
-- [ ] **Step 1: Add the start-of-run breadcrumb**
+- [x] **Step 1: Add the start-of-run breadcrumb**
 
 Anchor: find the existing line `appendLogLine(task.id, runId, { ts: startedAt, stream: "system", content: "Session started" });` inside `runTask`. Immediately after it, add:
 
@@ -583,7 +583,7 @@ if (logsRoot) {
 }
 ```
 
-- [ ] **Step 2: Add the close-of-run breadcrumb**
+- [x] **Step 2: Add the close-of-run breadcrumb**
 
 Anchor: inside the `child.on("close", (code) => { … })` handler, find the existing `appendLogLine(task.id, runId, { …, content: ` ``Session ended (exit ${exitCode})`` ` })` line. Immediately BEFORE that line, add:
 
@@ -597,17 +597,17 @@ if (logsRoot && projectRoot) {
 }
 ```
 
-- [ ] **Step 3: Run the full daemon-runner suite**
+- [x] **Step 3: Run the full daemon-runner suite**
 
 Run: `npx vitest run src/daemon/tests/runner.test.ts`
 Expected: PASS.
 
-- [ ] **Step 4: Run the full suite**
+- [x] **Step 4: Run the full suite**
 
 Run: `npx vitest run`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/daemon/runner.ts
@@ -616,7 +616,7 @@ git commit -m "feat(daemon): emit Engine-trace + cross-link breadcrumbs for pipe
 
 ### Task 2.8: Failing test — breadcrumb lines land in the home-global log
 
-- [ ] **Step 1: Append a third `it` to the same `describe` block in `src/daemon/tests/runner.test.ts`**
+- [x] **Step 1: Append a third `it` to the same `describe` block in `src/daemon/tests/runner.test.ts`**
 
 ```ts
 it("writes Engine trace breadcrumb on start and cross-link on close (pipeline-run task)", async () => {
@@ -649,12 +649,12 @@ it("writes Engine trace breadcrumb on start and cross-link on close (pipeline-ru
 });
 ```
 
-- [ ] **Step 2: Run the test**
+- [x] **Step 2: Run the test**
 
 Run: `npx vitest run src/daemon/tests/runner.test.ts -t "breadcrumb"`
 Expected: PASS (already implemented in Task 2.7; this test just asserts the contract is locked).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/daemon/tests/runner.test.ts
@@ -667,6 +667,8 @@ git commit -m "test(daemon): lock breadcrumb contract for pipeline-run tasks"
 - Manual exercises: `apparat heartbeat pipeline meditate --project /tmp/test-app --every 1`, wait one cycle; confirm `~/.apparat/logs/<taskId>/<runId>.log` contains an `Engine trace:` line and a `→ apparat pipeline trace <runId> --project /tmp/test-app` line, AND `/tmp/test-app/.apparat/runs/<sameRunId>/pipeline.jsonl` exists with the engine trace
 - Lint: `npx tsc --noEmit`; `npx vitest run src/daemon/tests/runner-args.test.ts`; `npx vitest run src/daemon/tests/runner.test.ts`; `npx vitest run src/cli/tests/pipeline-run-runid.test.ts`
 - Surfaces touched: daemon (runner, runner-args), cli-commands (pipeline/run), cli-program (flags)
+
+**Status:** Chunk 2 complete. Commits 2476777..df6c41b. All 20 tests pass (runner-args 8, runner-augmentation 3, runner 8, pipeline-run-runid 1). tsc clean, full vitest 1382/1382 pass.
 
 ---
 
