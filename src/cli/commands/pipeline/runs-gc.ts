@@ -1,4 +1,5 @@
 import { existsSync, readdirSync, rmSync, lstatSync } from "fs";
+import { listAllRuns } from "../../lib/runs-index.js";
 import { join } from "path";
 
 /**
@@ -64,4 +65,55 @@ export function gcOldRuns(runsRoot: string, keep: number): void {
   for (const e of entries.slice(keep)) {
     rmSync(e.path, { recursive: true, force: true });
   }
+}
+
+export interface GcRetention {
+  /** Keep the newest K runs per known pipelineName. Default 10. */
+  perPipelineKeep: number;
+  /** Keep the newest K crash-at-start dirs (no pipeline.jsonl or no pipeline-start). Default 5. */
+  crashAtStartKeep: number;
+}
+
+const CRASH_BUCKET_KEY = "__crash_at_start__";
+
+/**
+ * Garbage-collect a project's runs directory by bucketing entries on
+ * pipelineName (read from each run's pipeline.jsonl) and keeping the newest
+ * `perPipelineKeep` per known pipeline plus the newest `crashAtStartKeep`
+ * for crash-at-start dirs (no JSONL or no pipeline-start line).
+ *
+ * Replaces the previous flat-by-mtime `gcOldRuns(runsRoot, keep)`. The crash
+ * bucket exists so a noisy crash loop cannot evict last week's only useful
+ * named-pipeline run.
+ */
+export function gcOldRunsPerPipeline(runsRoot: string, retention: GcRetention): void {
+  if (!existsSync(runsRoot)) return;
+  const summaries = listAllRuns(runsRoot);
+
+  const buckets = new Map<string, typeof summaries>();
+  for (const s of summaries) {
+    const key = s.pipelineName ?? CRASH_BUCKET_KEY;
+    const arr = buckets.get(key) ?? [];
+    arr.push(s);
+    buckets.set(key, arr);
+  }
+
+  for (const [key, arr] of buckets) {
+    let ordered = arr;
+    if (key === CRASH_BUCKET_KEY) {
+      ordered = [...arr].sort((a, b) => {
+        const ma = safeMtime(join(runsRoot, a.runId));
+        const mb = safeMtime(join(runsRoot, b.runId));
+        return mb - ma;
+      });
+    }
+    const keep = key === CRASH_BUCKET_KEY ? retention.crashAtStartKeep : retention.perPipelineKeep;
+    for (const e of ordered.slice(keep)) {
+      rmSync(join(runsRoot, e.runId), { recursive: true, force: true });
+    }
+  }
+}
+
+function safeMtime(path: string): number {
+  try { return lstatSync(path).mtimeMs; } catch { return 0; }
 }
