@@ -68,11 +68,20 @@ const VALID_DOT = `digraph g {
 
 describe("pipelineValidateCommand", () => {
   let dir: string;
+  let fakeHome: string;
+  let origHome: string | undefined;
   beforeEach(() => {
     vi.clearAllMocks();
+    fakeHome = mkdtempSync(join(tmpdir(), "apparat-validate-home-"));
+    origHome = process.env.HOME;
+    process.env.HOME = fakeHome;
     dir = mkdtempSync(join(tmpdir(), "apparat-pipeline-test-"));
   });
-  afterEach(() => { rmSync(dir, { recursive: true }); });
+  afterEach(() => {
+    process.env.HOME = origHome;
+    rmSync(fakeHome, { recursive: true, force: true });
+    rmSync(dir, { recursive: true });
+  });
 
   it("returns 0 for a valid dot file", async () => {
     const dotFile = join(dir, "test.dot");
@@ -123,11 +132,20 @@ describe("pipelineValidateCommand", () => {
 
 describe("pipelineRunCommand", () => {
   let dir: string;
+  let fakeHome: string;
+  let origHome: string | undefined;
   beforeEach(() => {
     vi.clearAllMocks();
+    fakeHome = mkdtempSync(join(tmpdir(), "apparat-run-home-"));
+    origHome = process.env.HOME;
+    process.env.HOME = fakeHome;
     dir = mkdtempSync(join(tmpdir(), "apparat-pipeline-test-"));
   });
-  afterEach(() => { rmSync(dir, { recursive: true }); });
+  afterEach(() => {
+    process.env.HOME = origHome;
+    rmSync(fakeHome, { recursive: true, force: true });
+    rmSync(dir, { recursive: true });
+  });
 
   it("calls runPipeline with parsed graph and done on success", async () => {
     const dotFile = join(dir, "test.dot");
@@ -223,11 +241,18 @@ describe("pipelineRunCommand", () => {
 
 describe("pipelineRunCommand — --resume resolution", () => {
   let dir: string;
+  let fakeHome: string;
+  let origHome: string | undefined;
   beforeEach(() => {
     vi.clearAllMocks();
+    fakeHome = mkdtempSync(join(tmpdir(), "apparat-resume-home-"));
+    origHome = process.env.HOME;
+    process.env.HOME = fakeHome;
     dir = mkdtempSync(join(tmpdir(), "apparat-pipeline-resume-"));
   });
   afterEach(() => {
+    process.env.HOME = origHome;
+    rmSync(fakeHome, { recursive: true, force: true });
     rmSync(dir, { recursive: true });
   });
 
@@ -289,11 +314,20 @@ describe("pipelineRunCommand — --resume resolution", () => {
 
 describe("pipelineRunCommand — onInteractiveRequest", () => {
   let dir: string;
+  let fakeHome: string;
+  let origHome: string | undefined;
   beforeEach(() => {
     vi.clearAllMocks();
+    fakeHome = mkdtempSync(join(tmpdir(), "apparat-oninteractive-home-"));
+    origHome = process.env.HOME;
+    process.env.HOME = fakeHome;
     dir = mkdtempSync(join(tmpdir(), "apparat-pipeline-test-"));
   });
-  afterEach(() => { rmSync(dir, { recursive: true }); });
+  afterEach(() => {
+    process.env.HOME = origHome;
+    rmSync(fakeHome, { recursive: true, force: true });
+    rmSync(dir, { recursive: true });
+  });
 
   it("populates session.history with assistant turns so $node.output is available downstream", async () => {
     const dotFile = join(dir, "test.dot");
@@ -334,11 +368,20 @@ describe("pipelineRunCommand — onInteractiveRequest", () => {
 
 describe("pipelineListCommand", () => {
   let dir: string;
+  let fakeHome: string;
+  let origHome: string | undefined;
   beforeEach(() => {
     vi.clearAllMocks();
+    fakeHome = mkdtempSync(join(tmpdir(), "apparat-list-home-"));
+    origHome = process.env.HOME;
+    process.env.HOME = fakeHome;
     dir = mkdtempSync(join(tmpdir(), "apparat-pipeline-test-"));
   });
-  afterEach(() => { rmSync(dir, { recursive: true }); });
+  afterEach(() => {
+    process.env.HOME = origHome;
+    rmSync(fakeHome, { recursive: true, force: true });
+    rmSync(dir, { recursive: true });
+  });
 
   // The mock for ../lib/assets.js at the top of this file (widened in
   // Step 1a) keeps resolveBundledPipeline stubbed but PASSES THROUGH the
@@ -404,13 +447,22 @@ describe("pipelineListCommand", () => {
 describe("pipelineValidateCommand — edge-label diff", () => {
   let dir: string;
   let dotPath: string;
+  let fakeHome: string;
+  let origHome: string | undefined;
   beforeEach(() => {
     vi.clearAllMocks();
+    fakeHome = mkdtempSync(join(tmpdir(), "apparat-diff-home-"));
+    origHome = process.env.HOME;
+    process.env.HOME = fakeHome;
     dir = mkdtempSync(join(tmpdir(), "apparat-pipeline-diff-"));
     dotPath = join(dir, "test.dot");
     writeFileSync(dotPath, VALID_DOT);
   });
-  afterEach(() => { rmSync(dir, { recursive: true }); });
+  afterEach(() => {
+    process.env.HOME = origHome;
+    rmSync(fakeHome, { recursive: true, force: true });
+    rmSync(dir, { recursive: true });
+  });
 
   function makeNode(id: string, extra: Partial<Node> = {}): Node {
     return { id, shape: "box", agent: "noop", prompt: "noop", ...extra } as Node;

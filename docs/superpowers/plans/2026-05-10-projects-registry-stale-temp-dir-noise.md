@@ -323,14 +323,14 @@ Six blocks, six identical extensions. The shape is the same in each: alongside t
 
 ### Task 3.1: Extend imports
 
-- [ ] **Step 1: Snapshot the registry baseline**
+- [x] **Step 1: Snapshot the registry baseline**
 
 ```bash
 cp ~/.apparat/projects.json /tmp/before-chunk-3.json 2>/dev/null || echo "[]" > /tmp/before-chunk-3.json
 grep -c "apparat-pipeline-test-\|apparat-pipeline-resume-\|apparat-pipeline-diff-" /tmp/before-chunk-3.json || true
 ```
 
-- [ ] **Step 2: Reproduce the leak**
+- [x] **Step 2: Reproduce the leak**
 
 Run: `npx vitest run src/cli/tests/pipeline.test.ts`
 
@@ -342,7 +342,7 @@ grep -c "apparat-pipeline-test-\|apparat-pipeline-resume-" ~/.apparat/projects.j
 
 Expected: count is **strictly greater** than baseline. The three leaking blocks combined call `pipelineRunCommand(_, { project: dir })` 14 times across all `it` blocks; each invocation appends one entry on first sight (idempotent on repeat), so a single test-file run typically grows the registry by ~3 unique entries (one per fresh `mkdtempSync` `dir` that survives within an `it`). Any non-zero growth confirms the leak.
 
-- [ ] **Step 3: Add `rmSync` to the `fs` import (already present) — verify only**
+- [x] **Step 3: Add `rmSync` to the `fs` import (already present) — verify only**
 
 The existing import at `:2` already has `mkdtempSync, rmSync, writeFileSync, mkdirSync` — no edit needed. Confirm by running:
 
@@ -364,7 +364,7 @@ If `rmSync` is missing, add it to the named-imports list before proceeding.
 
 Six blocks, identical pattern. Each step below names the block and gives the exact replacement.
 
-- [ ] **Step 1: Block 1 — `pipelineValidateCommand` (`:69-122`)**
+- [x] **Step 1: Block 1 — `pipelineValidateCommand` (`:69-122`)**
 
 Replace `:69-75` (the `describe` opening through the `afterEach`) with:
 
@@ -387,7 +387,7 @@ describe("pipelineValidateCommand", () => {
   });
 ```
 
-- [ ] **Step 2: Block 2 — `pipelineRunCommand` (`:124-222`)**
+- [x] **Step 2: Block 2 — `pipelineRunCommand` (`:124-222`)**
 
 Replace `:124-130` with:
 
@@ -410,7 +410,7 @@ describe("pipelineRunCommand", () => {
   });
 ```
 
-- [ ] **Step 3: Block 3 — `pipelineRunCommand — --resume resolution` (`:224-288`)**
+- [x] **Step 3: Block 3 — `pipelineRunCommand — --resume resolution` (`:224-288`)**
 
 Replace `:224-232` with:
 
@@ -433,7 +433,7 @@ describe("pipelineRunCommand — --resume resolution", () => {
   });
 ```
 
-- [ ] **Step 4: Block 4 — `pipelineRunCommand — onInteractiveRequest` (`:290-333`)**
+- [x] **Step 4: Block 4 — `pipelineRunCommand — onInteractiveRequest` (`:290-333`)**
 
 Replace `:290-296` with:
 
@@ -456,7 +456,7 @@ describe("pipelineRunCommand — onInteractiveRequest", () => {
   });
 ```
 
-- [ ] **Step 5: Block 5 — `pipelineListCommand` (`:335-402`)**
+- [x] **Step 5: Block 5 — `pipelineListCommand` (`:335-402`)**
 
 Replace `:335-341` with:
 
@@ -479,7 +479,7 @@ describe("pipelineListCommand", () => {
   });
 ```
 
-- [ ] **Step 6: Block 6 — `pipelineValidateCommand — edge-label diff` (`:404-548`)**
+- [x] **Step 6: Block 6 — `pipelineValidateCommand — edge-label diff` (`:404-548`)**
 
 This block declares `dotPath` alongside `dir`. Replace `:404-413` with:
 
@@ -507,19 +507,19 @@ describe("pipelineValidateCommand — edge-label diff", () => {
 
 ### Task 3.3: Verify and commit
 
-- [ ] **Step 1: Static check**
+- [x] **Step 1: Static check**
 
 Run: `npx tsc --noEmit`
 
 Expected: zero errors. If TypeScript complains about `tmpdir is not defined`, re-check that the existing `import { tmpdir } from "os";` at `:4` survived the edits intact.
 
-- [ ] **Step 2: Run the targeted vitest file and confirm green**
+- [x] **Step 2: Run the targeted vitest file and confirm green**
 
 Run: `npx vitest run src/cli/tests/pipeline.test.ts`
 
 Expected: `Test Files  1 passed (1)` and `Tests  N passed (N)` where N matches the pre-edit count (the file currently has 26 `it` blocks across six `describe`s — 5 + 7 + 3 + 1 + 5 + 5; if you have not edited bodies, N must be 26). Re-record the count from the test output for the verification step.
 
-- [ ] **Step 3: Verify the leak is closed**
+- [x] **Step 3: Verify the leak is closed**
 
 ```bash
 cp ~/.apparat/projects.json /tmp/before-rerun-chunk-3.json
@@ -529,7 +529,7 @@ diff /tmp/before-rerun-chunk-3.json ~/.apparat/projects.json
 
 Expected: **empty diff.** No new `apparat-pipeline-*` entries.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/cli/tests/pipeline.test.ts
