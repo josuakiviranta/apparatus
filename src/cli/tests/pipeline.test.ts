@@ -176,8 +176,11 @@ describe("pipelineRunCommand", () => {
     const call = (engine.runPipeline as ReturnType<typeof vi.fn>).mock.calls[0];
     const opts = call[1];
     // logsRoot shape: <project>/.apparat/runs/<8hex runId>
+    // After slug-prefixing, runId is `<pipeline-slug>-<uuid8>`. The dot test fixture
+    // is parsed as `digraph my_pipeline { … }` (the legacy underscored slug); the
+    // slugify rule lower-cases and collapses non-alphanumerics, yielding `my-pipeline`.
     expect(opts.logsRoot).toMatch(
-      new RegExp(`\\.apparat[\\\\/]runs[\\\\/][0-9a-f]{8}$`),
+      new RegExp(`\\.apparat[\\\\/]runs[\\\\/][a-z0-9-]+-[0-9a-f]{8}$`),
     );
     expect(opts.logsRoot).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
   });

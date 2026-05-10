@@ -126,7 +126,7 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
     process.exit(1);
   }
 
-  const runId = opts.runId ?? newRunId();
+  const runId = opts.runId ?? newRunId(loaded.graph.name);
   const runsRoot = runsDir(opts.project ?? process.cwd());
   if (!opts.resume) {
     const keep = Number(process.env.APPARAT_RUNS_KEEP ?? "50");
