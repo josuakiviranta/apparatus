@@ -23,7 +23,6 @@ export async function pipelineListCommand(opts: PipelineListOptions = {}): Promi
     if (!matched) {
       process.stderr.write(`pipeline not found: ${opts.name} (apparat pipeline list to see roster)\n`);
       process.exit(1);
-      return;
     }
     await renderLayer2(entries, matched, runsDir(project), opts.name);
     return;

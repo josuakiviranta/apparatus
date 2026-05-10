@@ -171,18 +171,21 @@ When a plain name is given (no path separators or .dot extension), resolves to
     });
 
   pipeline
-    .command("list")
-    .description("List pipeline workflows in a project")
+    .command("list [name]")
+    .description("List pipelines (no arg) or recent runs of one pipeline")
     .addHelpText("after", `
 Examples:
-  apparat pipeline list --project my-app
-  apparat pipeline list
+  apparat pipeline list                       # all pipelines (Layer 1)
+  apparat pipeline list meditate              # recent runs of 'meditate' (Layer 2)
+  apparat pipeline list meditate --project my-app
 
-Scans <project>/pipelines/*.dot and prints each workflow's name and goal.
+Scans <project>/.apparat/pipelines/<name>/ and the bundled fallback. With a
+positional <name>, also prints the most recent runs from
+<project>/.apparat/runs/, capped by APPARAT_RUNS_KEEP (default 10 per pipeline).
 `)
     .option("--project <folder>", "Project folder (defaults to cwd)")
-    .action(async (opts: { project?: string }) => {
-      await pipelineListCommand(opts);
+    .action(async (name: string | undefined, opts: { project?: string }) => {
+      await pipelineListCommand({ ...opts, name });
     });
 
   pipeline
