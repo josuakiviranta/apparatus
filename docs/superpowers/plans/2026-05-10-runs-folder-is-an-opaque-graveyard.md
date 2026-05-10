@@ -628,7 +628,7 @@ git commit -m "feat(pipeline-run): slug-prefixed runId via newRunId(graph.name)"
 
 `pipeline trace` already works with both shapes because `runDir(project, runId)` is `path.join` (verified at `src/cli/commands/pipeline/trace.ts:11`). This test pins that contract so a future refactor can't silently break bare-id back-compat.
 
-- [ ] **Step 1: Write the regression-pin test**
+- [x] **Step 1: Write the regression-pin test**
 
 Create `src/cli/tests/pipeline-trace-runid-compat.test.ts`:
 
@@ -679,17 +679,17 @@ describe("pipeline trace accepts both runId shapes", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test**
+- [x] **Step 2: Run the test**
 
 Run: `npx vitest run src/cli/tests/pipeline-trace-runid-compat.test.ts`
 Expected: PASS, 2 tests. (The implementation is unchanged; this test pins existing behaviour.)
 
-- [ ] **Step 3: Verify global build is still green**
+- [x] **Step 3: Verify global build is still green**
 
 Run: `npx tsc --noEmit`
 Expected: clean.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/cli/tests/pipeline-trace-runid-compat.test.ts
