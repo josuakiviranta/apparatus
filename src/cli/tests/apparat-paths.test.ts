@@ -52,9 +52,13 @@ describe("apparat-paths", () => {
 });
 
 describe("newRunId", () => {
-  it("returns an 8-char hex slice of randomUUID", () => {
+  it("returns an 8-char hex slice when no pipelineName provided (back-compat)", () => {
     const id = newRunId();
     expect(id).toMatch(/^[0-9a-f]{8}$/);
+  });
+
+  it("returns <slug>-<uuid8> when pipelineName provided", () => {
+    expect(newRunId("meditate")).toMatch(/^meditate-[0-9a-f]{8}$/);
   });
 
   it("returns a different id on each call (collision-resistant for solo dev tooling)", () => {
