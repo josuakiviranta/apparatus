@@ -479,7 +479,7 @@ git commit -m "feat(apparat-paths): newRunId(pipelineName?) returns slug-prefixe
 **Files:**
 - Modify: `src/cli/tests/apparat-paths.test.ts`
 
-- [ ] **Step 1: Replace the `describe("newRunId", …)` block (`:54-65`)**
+- [x] **Step 1: Replace the `describe("newRunId", …)` block (`:54-65`)**
 
 Edit `src/cli/tests/apparat-paths.test.ts`. Replace lines 54-65 with:
 
@@ -502,12 +502,12 @@ describe("newRunId", () => {
 });
 ```
 
-- [ ] **Step 2: Run the file to verify it passes**
+- [x] **Step 2: Run the file to verify it passes**
 
 Run: `npx vitest run src/cli/tests/apparat-paths.test.ts`
 Expected: PASS, all 11 tests (8 existing path-helper tests + 3 newRunId).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/cli/tests/apparat-paths.test.ts
