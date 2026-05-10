@@ -59,6 +59,7 @@ import {
 import type { Graph, Node, Edge } from "../../attractor/types.js";
 import * as engine from "../../attractor/core/engine.js";
 import * as out from "../lib/output.js";
+import { withFakeApparatHome, type FakeApparatHome } from "./_apparatHome";
 
 const VALID_DOT = `digraph g {
   start [shape=Mdiamond]
@@ -68,19 +69,14 @@ const VALID_DOT = `digraph g {
 
 describe("pipelineValidateCommand", () => {
   let dir: string;
-  let fakeHome: string;
-  let origHome: string | undefined;
+  let scratch: FakeApparatHome;
   beforeEach(() => {
     vi.clearAllMocks();
-    fakeHome = mkdtempSync(join(tmpdir(), "apparat-validate-home-"));
-    origHome = process.env.HOME;
-    process.env.HOME = fakeHome;
+    scratch = withFakeApparatHome("apparat-validate-home");
     dir = mkdtempSync(join(tmpdir(), "apparat-pipeline-test-"));
   });
   afterEach(() => {
-    if (origHome === undefined) delete process.env.HOME;
-    else process.env.HOME = origHome;
-    rmSync(fakeHome, { recursive: true, force: true });
+    scratch.cleanup();
     rmSync(dir, { recursive: true });
   });
 
@@ -133,19 +129,14 @@ describe("pipelineValidateCommand", () => {
 
 describe("pipelineRunCommand", () => {
   let dir: string;
-  let fakeHome: string;
-  let origHome: string | undefined;
+  let scratch: FakeApparatHome;
   beforeEach(() => {
     vi.clearAllMocks();
-    fakeHome = mkdtempSync(join(tmpdir(), "apparat-run-home-"));
-    origHome = process.env.HOME;
-    process.env.HOME = fakeHome;
+    scratch = withFakeApparatHome("apparat-run-home");
     dir = mkdtempSync(join(tmpdir(), "apparat-pipeline-test-"));
   });
   afterEach(() => {
-    if (origHome === undefined) delete process.env.HOME;
-    else process.env.HOME = origHome;
-    rmSync(fakeHome, { recursive: true, force: true });
+    scratch.cleanup();
     rmSync(dir, { recursive: true });
   });
 
@@ -243,19 +234,14 @@ describe("pipelineRunCommand", () => {
 
 describe("pipelineRunCommand — --resume resolution", () => {
   let dir: string;
-  let fakeHome: string;
-  let origHome: string | undefined;
+  let scratch: FakeApparatHome;
   beforeEach(() => {
     vi.clearAllMocks();
-    fakeHome = mkdtempSync(join(tmpdir(), "apparat-resume-home-"));
-    origHome = process.env.HOME;
-    process.env.HOME = fakeHome;
+    scratch = withFakeApparatHome("apparat-resume-home");
     dir = mkdtempSync(join(tmpdir(), "apparat-pipeline-resume-"));
   });
   afterEach(() => {
-    if (origHome === undefined) delete process.env.HOME;
-    else process.env.HOME = origHome;
-    rmSync(fakeHome, { recursive: true, force: true });
+    scratch.cleanup();
     rmSync(dir, { recursive: true });
   });
 
@@ -317,19 +303,14 @@ describe("pipelineRunCommand — --resume resolution", () => {
 
 describe("pipelineRunCommand — onInteractiveRequest", () => {
   let dir: string;
-  let fakeHome: string;
-  let origHome: string | undefined;
+  let scratch: FakeApparatHome;
   beforeEach(() => {
     vi.clearAllMocks();
-    fakeHome = mkdtempSync(join(tmpdir(), "apparat-oninteractive-home-"));
-    origHome = process.env.HOME;
-    process.env.HOME = fakeHome;
+    scratch = withFakeApparatHome("apparat-oninteractive-home");
     dir = mkdtempSync(join(tmpdir(), "apparat-pipeline-test-"));
   });
   afterEach(() => {
-    if (origHome === undefined) delete process.env.HOME;
-    else process.env.HOME = origHome;
-    rmSync(fakeHome, { recursive: true, force: true });
+    scratch.cleanup();
     rmSync(dir, { recursive: true });
   });
 
@@ -372,19 +353,14 @@ describe("pipelineRunCommand — onInteractiveRequest", () => {
 
 describe("pipelineListCommand", () => {
   let dir: string;
-  let fakeHome: string;
-  let origHome: string | undefined;
+  let scratch: FakeApparatHome;
   beforeEach(() => {
     vi.clearAllMocks();
-    fakeHome = mkdtempSync(join(tmpdir(), "apparat-list-home-"));
-    origHome = process.env.HOME;
-    process.env.HOME = fakeHome;
+    scratch = withFakeApparatHome("apparat-list-home");
     dir = mkdtempSync(join(tmpdir(), "apparat-pipeline-test-"));
   });
   afterEach(() => {
-    if (origHome === undefined) delete process.env.HOME;
-    else process.env.HOME = origHome;
-    rmSync(fakeHome, { recursive: true, force: true });
+    scratch.cleanup();
     rmSync(dir, { recursive: true });
   });
 
@@ -452,21 +428,16 @@ describe("pipelineListCommand", () => {
 describe("pipelineValidateCommand — edge-label diff", () => {
   let dir: string;
   let dotPath: string;
-  let fakeHome: string;
-  let origHome: string | undefined;
+  let scratch: FakeApparatHome;
   beforeEach(() => {
     vi.clearAllMocks();
-    fakeHome = mkdtempSync(join(tmpdir(), "apparat-diff-home-"));
-    origHome = process.env.HOME;
-    process.env.HOME = fakeHome;
+    scratch = withFakeApparatHome("apparat-diff-home");
     dir = mkdtempSync(join(tmpdir(), "apparat-pipeline-diff-"));
     dotPath = join(dir, "test.dot");
     writeFileSync(dotPath, VALID_DOT);
   });
   afterEach(() => {
-    if (origHome === undefined) delete process.env.HOME;
-    else process.env.HOME = origHome;
-    rmSync(fakeHome, { recursive: true, force: true });
+    scratch.cleanup();
     rmSync(dir, { recursive: true });
   });
 
