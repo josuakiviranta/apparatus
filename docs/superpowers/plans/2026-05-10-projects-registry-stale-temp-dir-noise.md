@@ -163,14 +163,14 @@ The second `describe("pipeline list shows requires:", …)` block at `:77-128` o
 
 ### Task 2.1: Add describe-scoped HOME isolation to both blocks
 
-- [ ] **Step 1: Snapshot the registry baseline**
+- [x] **Step 1: Snapshot the registry baseline**
 
 ```bash
 cp ~/.apparat/projects.json /tmp/before-chunk-2.json 2>/dev/null || echo "[]" > /tmp/before-chunk-2.json
 grep -c "apparat-preflight-" /tmp/before-chunk-2.json || true
 ```
 
-- [ ] **Step 2: Reproduce the leak**
+- [x] **Step 2: Reproduce the leak**
 
 Build the CLI bundle (the test invokes `dist/cli/index.js` via `spawnSync`):
 
@@ -191,7 +191,7 @@ Expected: tests pass; the count is **strictly greater** than baseline (typically
 
 If the count is unchanged, the spawned child may have failed before reaching `recordProject`. Re-read `r.stdout`/`r.stderr` from the failing run; `recordProject` is invoked at `src/cli/commands/pipeline/run.ts:59` regardless of preflight outcome but only when `project` is bound — confirm whether the child's CLI parser auto-bound `--project=cwd`. Either way, applying the fix below is correct; the empirical check in Step 6 is the contract.
 
-- [ ] **Step 3: Apply isolation to the `pipeline run pre-flight check` block**
+- [x] **Step 3: Apply isolation to the `pipeline run pre-flight check` block**
 
 Edit `src/cli/tests/pipeline-preflight.test.ts`. Replace the imports block at `:1-5`:
 
@@ -227,7 +227,7 @@ describe("pipeline run pre-flight check", () => {
 
 The three `it` bodies (`:24-40`, `:42-58`, `:60-74`) are unchanged. The `spawnSync` calls inside them inherit the patched `HOME` automatically because no `env:` option is supplied — verified by inspecting the call shape at `:33`: `spawnSync("node", [CLI, "pipeline", "run", dot], { encoding: "utf-8" })`.
 
-- [ ] **Step 4: Apply isolation to the `pipeline list shows requires:` block (defensive)**
+- [x] **Step 4: Apply isolation to the `pipeline list shows requires:` block (defensive)**
 
 Replace the `describe("pipeline list shows requires:", () => {` opening (currently `:77`) with:
 
@@ -253,19 +253,19 @@ describe("pipeline list shows requires:", () => {
 
 The single `it` body at `:78-127` is unchanged.
 
-- [ ] **Step 5: Static check**
+- [x] **Step 5: Static check**
 
 Run: `npx tsc --noEmit`
 
 Expected: zero errors.
 
-- [ ] **Step 6: Run the targeted vitest file and confirm green**
+- [x] **Step 6: Run the targeted vitest file and confirm green**
 
 Run: `npx vitest run src/cli/tests/pipeline-preflight.test.ts`
 
 Expected: `Test Files  1 passed (1)` and `Tests  4 passed (4)`.
 
-- [ ] **Step 7: Verify the leak is closed**
+- [x] **Step 7: Verify the leak is closed**
 
 ```bash
 cp ~/.apparat/projects.json /tmp/before-rerun-chunk-2.json
@@ -275,7 +275,7 @@ diff /tmp/before-rerun-chunk-2.json ~/.apparat/projects.json
 
 Expected: **empty diff.** No new `apparat-preflight-*` entries in the registry.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/cli/tests/pipeline-preflight.test.ts
