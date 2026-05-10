@@ -17,8 +17,13 @@ describe("pipeline run — failureReason surfacing", () => {
   let work: string;
   let stderrSpy: ReturnType<typeof vi.spyOn>;
   let writtenStderr = "";
+  let fakeHome: string;
+  let origHome: string | undefined;
 
   beforeEach(() => {
+    fakeHome = mkdtempSync(join(tmpdir(), "apparat-failreason-home-"));
+    origHome = process.env.HOME;
+    process.env.HOME = fakeHome;
     work = mkdtempSync(join(tmpdir(), "apparat-failreason-"));
     writeFileSync(join(work, "fail.dot"), DOT);
     writtenStderr = "";
@@ -29,6 +34,9 @@ describe("pipeline run — failureReason surfacing", () => {
   });
 
   afterEach(() => {
+    if (origHome === undefined) delete process.env.HOME;
+    else process.env.HOME = origHome;
+    rmSync(fakeHome, { recursive: true, force: true });
     stderrSpy.mockRestore();
     rmSync(work, { recursive: true, force: true });
   });
