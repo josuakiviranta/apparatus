@@ -5,16 +5,18 @@ import { tmpdir } from "os";
 import { readProjects, recordProject, projectsFilePath } from "../lib/projects-registry.js";
 
 let testHome: string;
+let fakeApparatHome: string;
 
 beforeEach(() => {
   testHome = mkdtempSync(join(tmpdir(), "apparat-registry-"));
-  process.env.HOME = testHome;
-  mkdirSync(join(testHome, ".apparat"), { recursive: true });
+  fakeApparatHome = join(testHome, ".apparat");
+  process.env.APPARAT_HOME = fakeApparatHome;
+  mkdirSync(fakeApparatHome, { recursive: true });
 });
 
 afterEach(() => {
   rmSync(testHome, { recursive: true, force: true });
-  delete process.env.HOME;
+  delete process.env.APPARAT_HOME;
 });
 
 describe("readProjects", () => {

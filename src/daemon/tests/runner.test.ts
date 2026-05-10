@@ -3,8 +3,8 @@ import { mkdirSync, rmSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 
-const testHome = join(tmpdir(), `apparat-runner-test-${process.pid}`);
-process.env.HOME = testHome;
+const testHome = join(tmpdir(), `apparat-runner-test-${process.pid}`, ".apparat");
+process.env.APPARAT_HOME = testHome;
 
 import { runTask, isSessionRunning, killSession } from "../runner";
 import { ensureDirs, readRunLogs, getPidFilePath } from "../state";

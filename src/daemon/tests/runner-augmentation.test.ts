@@ -8,8 +8,8 @@ vi.mock("child_process", () => ({
   spawn: vi.fn(),
 }));
 
-const testHome = join(tmpdir(), `apparat-runner-aug-test-${process.pid}`);
-process.env.HOME = testHome;
+const testHome = join(tmpdir(), `apparat-runner-aug-test-${process.pid}`, ".apparat");
+process.env.APPARAT_HOME = testHome;
 
 import { runTask } from "../runner.js";
 import { ensureDirs, readRunLogs } from "../state.js";

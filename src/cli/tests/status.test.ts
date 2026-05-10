@@ -12,11 +12,13 @@ import { recordProject } from "../lib/projects-registry.js";
 import { statusCommand } from "../commands/status.js";
 
 let testHome: string;
+let fakeApparatHome: string;
 let captured: string[];
 
 beforeEach(() => {
   testHome = mkdtempSync(join(tmpdir(), "apparat-status-"));
-  process.env.HOME = testHome;
+  fakeApparatHome = join(testHome, ".apparat");
+  process.env.APPARAT_HOME = fakeApparatHome;
   captured = [];
   vi.spyOn(process.stdout, "write").mockImplementation((chunk: any) => {
     captured.push(String(chunk));
@@ -26,7 +28,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.restoreAllMocks();
   rmSync(testHome, { recursive: true, force: true });
-  delete process.env.HOME;
+  delete process.env.APPARAT_HOME;
 });
 
 function output(): string {
