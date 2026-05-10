@@ -849,7 +849,7 @@ Expected: clean.
 
 ### Task 4.1: Pool benchmark
 
-- [ ] **Step 1: Time `npm test` 3× under the current `pool: "forks"`**
+- [x] **Step 1: Time `npm test` 3× under the current `pool: "forks"`**
 
 Confirm `vitest.config.ts:5` reads `pool: "forks"`.
 
@@ -862,7 +862,7 @@ time npm test
 
 Record the 3 wall-clock times (e.g., `1m 18s`, `1m 21s`, `1m 16s`). Take the median.
 
-- [ ] **Step 2: Edit `vitest.config.ts:5` to `pool: "threads"`**
+- [x] **Step 2: Edit `vitest.config.ts:5` to `pool: "threads"`**
 
 ```ts
 import { defineConfig } from "vitest/config";
@@ -877,11 +877,13 @@ export default defineConfig({
 });
 ```
 
-- [ ] **Step 3: Time `npm test` 3× under `pool: "threads"`**
+- [x] **Step 3: Time `npm test` 3× under `pool: "threads"`**
 
 Same 3-run procedure. Record times. Take median.
 
-- [ ] **Step 4: Compare medians and decide**
+- [x] **Step 4: Compare medians and decide**
+
+Result: forks median 26.42s (runs: 25.09, 26.55, 26.42), threads median 19.93s (runs: 18.86, 19.93, 19.98). Threads is ~24.5% faster — well above 5% threshold. All 1453 tests pass under threads. Keeping `threads`.
 
 If `threads` median is faster than `forks` median by a meaningful margin (≥5%), keep `threads`. If not, revert to `forks` (`git checkout -- vitest.config.ts`).
 
@@ -891,7 +893,7 @@ npx vitest run
 ```
 Expected: PASS. **Critical:** if any test fails under `threads` that passed under `forks`, the `APPARAT_HOME` migration is incomplete — some describe is still cross-contaminating env state. Find it (likely a forgotten `process.env.HOME` reference, or a test that mutates `APPARAT_HOME` without restoring), fix it, re-benchmark.
 
-- [ ] **Step 5: Commit (conditionally)**
+- [x] **Step 5: Commit (conditionally)**
 
 If `threads` won:
 ```bash
