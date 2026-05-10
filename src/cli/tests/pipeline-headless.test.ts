@@ -3,6 +3,10 @@ import { mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 
+// HOME isolation pattern: see src/cli/tests/projects-registry.test.ts:9-18.
+// pipelineRunCommand records into ~/.apparat/projects.json on every invocation;
+// without a swapped HOME those tmp project dirs leak into the user registry.
+
 vi.mock("../../attractor/core/engine.js", () => ({
   runPipeline: vi.fn(async () => ({ status: "success", completedNodes: ["start", "done"], context: {} })),
 }));
@@ -66,8 +70,13 @@ describe("pipelineRunCommand headless safety", () => {
   let exitSpy: any;
   const origIsTTY = process.stdin.isTTY;
   let dir: string;
+  let fakeHome: string;
+  let origHome: string | undefined;
 
   beforeEach(() => {
+    fakeHome = mkdtempSync(join(tmpdir(), "apparat-headless-home-"));
+    origHome = process.env.HOME;
+    process.env.HOME = fakeHome;
     exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {
       throw new Error("process.exit called");
     }) as any);
@@ -75,6 +84,9 @@ describe("pipelineRunCommand headless safety", () => {
   });
 
   afterEach(() => {
+    if (origHome === undefined) delete process.env.HOME;
+    else process.env.HOME = origHome;
+    rmSync(fakeHome, { recursive: true, force: true });
     exitSpy.mockRestore();
     Object.defineProperty(process.stdin, "isTTY", { value: origIsTTY, writable: true, configurable: true });
     rmSync(dir, { recursive: true, force: true });
@@ -123,8 +135,13 @@ describe("pipelineRunCommand headless --project guard", () => {
   let stderrSpy: any;
   const origIsTTY = process.stdin.isTTY;
   let dir: string;
+  let fakeHome: string;
+  let origHome: string | undefined;
 
   beforeEach(() => {
+    fakeHome = mkdtempSync(join(tmpdir(), "apparat-headless-home-"));
+    origHome = process.env.HOME;
+    process.env.HOME = fakeHome;
     exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {
       throw new Error("process.exit called");
     }) as any);
@@ -133,6 +150,9 @@ describe("pipelineRunCommand headless --project guard", () => {
   });
 
   afterEach(() => {
+    if (origHome === undefined) delete process.env.HOME;
+    else process.env.HOME = origHome;
+    rmSync(fakeHome, { recursive: true, force: true });
     exitSpy.mockRestore();
     stderrSpy.mockRestore();
     Object.defineProperty(process.stdin, "isTTY", { value: origIsTTY, writable: true, configurable: true });
