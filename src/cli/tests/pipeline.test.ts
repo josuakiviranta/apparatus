@@ -78,7 +78,8 @@ describe("pipelineValidateCommand", () => {
     dir = mkdtempSync(join(tmpdir(), "apparat-pipeline-test-"));
   });
   afterEach(() => {
-    process.env.HOME = origHome;
+    if (origHome === undefined) delete process.env.HOME;
+    else process.env.HOME = origHome;
     rmSync(fakeHome, { recursive: true, force: true });
     rmSync(dir, { recursive: true });
   });
@@ -142,7 +143,8 @@ describe("pipelineRunCommand", () => {
     dir = mkdtempSync(join(tmpdir(), "apparat-pipeline-test-"));
   });
   afterEach(() => {
-    process.env.HOME = origHome;
+    if (origHome === undefined) delete process.env.HOME;
+    else process.env.HOME = origHome;
     rmSync(fakeHome, { recursive: true, force: true });
     rmSync(dir, { recursive: true });
   });
@@ -251,7 +253,8 @@ describe("pipelineRunCommand — --resume resolution", () => {
     dir = mkdtempSync(join(tmpdir(), "apparat-pipeline-resume-"));
   });
   afterEach(() => {
-    process.env.HOME = origHome;
+    if (origHome === undefined) delete process.env.HOME;
+    else process.env.HOME = origHome;
     rmSync(fakeHome, { recursive: true, force: true });
     rmSync(dir, { recursive: true });
   });
@@ -324,7 +327,8 @@ describe("pipelineRunCommand — onInteractiveRequest", () => {
     dir = mkdtempSync(join(tmpdir(), "apparat-pipeline-test-"));
   });
   afterEach(() => {
-    process.env.HOME = origHome;
+    if (origHome === undefined) delete process.env.HOME;
+    else process.env.HOME = origHome;
     rmSync(fakeHome, { recursive: true, force: true });
     rmSync(dir, { recursive: true });
   });
@@ -378,7 +382,8 @@ describe("pipelineListCommand", () => {
     dir = mkdtempSync(join(tmpdir(), "apparat-pipeline-test-"));
   });
   afterEach(() => {
-    process.env.HOME = origHome;
+    if (origHome === undefined) delete process.env.HOME;
+    else process.env.HOME = origHome;
     rmSync(fakeHome, { recursive: true, force: true });
     rmSync(dir, { recursive: true });
   });
@@ -459,7 +464,8 @@ describe("pipelineValidateCommand — edge-label diff", () => {
     writeFileSync(dotPath, VALID_DOT);
   });
   afterEach(() => {
-    process.env.HOME = origHome;
+    if (origHome === undefined) delete process.env.HOME;
+    else process.env.HOME = origHome;
     rmSync(fakeHome, { recursive: true, force: true });
     rmSync(dir, { recursive: true });
   });

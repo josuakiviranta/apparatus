@@ -31,7 +31,8 @@ describe("pipeline run pre-flight check", () => {
   });
 
   afterEach(() => {
-    process.env.HOME = origHome;
+    if (origHome === undefined) delete process.env.HOME;
+    else process.env.HOME = origHome;
     rmSync(fakeHome, { recursive: true, force: true });
   });
 
@@ -99,7 +100,8 @@ describe("pipeline list shows requires:", () => {
   });
 
   afterEach(() => {
-    process.env.HOME = origHome;
+    if (origHome === undefined) delete process.env.HOME;
+    else process.env.HOME = origHome;
     rmSync(fakeHome, { recursive: true, force: true });
   });
 

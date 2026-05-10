@@ -15,7 +15,8 @@ describe("pipelineRunCommand — $project preflight", () => {
   });
 
   afterEach(() => {
-    process.env.HOME = origHome;
+    if (origHome === undefined) delete process.env.HOME;
+    else process.env.HOME = origHome;
     rmSync(fakeHome, { recursive: true, force: true });
   });
 
