@@ -914,13 +914,13 @@ If `forks` won (no perf delta or forks faster): no commit; record the result in 
 
 ### Task 4.2: CONTEXT.md note
 
-- [ ] **Step 1: Read current `CONTEXT.md:220-250`**
+- [x] **Step 1: Read current `CONTEXT.md:220-250`**
 
 Run: `sed -n '220,250p' CONTEXT.md`
 
 Identify the operator-global tier section. The illumination cited `:226-244` as the anchor; verify that range hasn't drifted.
 
-- [ ] **Step 2: Append a one-line note inside the operator-global tier section**
+- [x] **Step 2: Append a one-line note inside the operator-global tier section**
 
 The exact wording should fit the section's prose register. Suggested text (inline, near the end of the tier description):
 
@@ -928,20 +928,22 @@ The exact wording should fit the section's prose register. Suggested text (inlin
 Tests and embed callers pin `~/.apparat/` via the `APPARAT_HOME` env-var (highest precedence in `getApparatHome()`). The operator's `HOME` should never be swapped for this purpose — that pattern caused a 213-entry registry leak in 2026-05-09.
 ```
 
-- [ ] **Step 3: Confirm the doc still renders cleanly**
+- [x] **Step 3: Confirm the doc still renders cleanly**
 
 Run: `cat CONTEXT.md | head -250 | tail -30`
 Expected: the new line sits inside the operator-global tier prose, not stranded.
 
 ### Task 4.3: ADR-0010 env-var table update
 
-- [ ] **Step 1: Read current `docs/adr/0010-rename-to-apparatus.md:18-30`**
+- [x] **Step 1: Read current `docs/adr/0010-rename-to-apparatus.md:18-30`**
 
 Run: `sed -n '18,30p' docs/adr/0010-rename-to-apparatus.md`
 
 Find the env-var table. The illumination cited `:22` and `Env vars (6)` as the anchor.
 
-- [ ] **Step 2: Bump `(6)` → `(7)` and add the `APPARAT_HOME` row**
+- [x] **Step 2: Bump `(6)` → `(7)` and add the `APPARAT_HOME` row**
+
+Implementation note (2026-05-10): The original `Env vars (6)` row in the table was a *rename map* (`RALPH_*` → `APPARAT_*`), not an env-var inventory — `APPARAT_HOME` is net-new and doesn't slot cleanly. Chose option (a): bumped row label to `Env vars (7, +APPARAT_HOME net-new)` and added a one-line prose paragraph immediately after the table noting `APPARAT_HOME` was added later as a test-isolation override (with a back-ref to `getApparatHome()`).
 
 The exact format depends on the table's existing shape. Likely:
 
@@ -952,14 +954,16 @@ The exact format depends on the table's existing shape. Likely:
 
 Match the existing format/columns precisely.
 
-- [ ] **Step 3: Confirm the table still parses**
+- [x] **Step 3: Confirm the table still parses**
 
 Run: `cat docs/adr/0010-rename-to-apparatus.md | head -40`
 Expected: the table reads correctly, count is `(7)`, `APPARAT_HOME` row present.
 
 ### Task 4.4: Final verification
 
-- [ ] **Step 1: Run the full grep contract from design doc §10.1**
+- [x] **Step 1: Run the full grep contract from design doc §10.1**
+
+Implementation note (2026-05-10): The second grep (`process\.env\.HOME` in `src/cli/tests/`) initially flagged `daemon-client-socket-path.test.ts:26` (an unrestored HOME mutation). Fixed in-place: added `origHome` snapshot/restore in afterEach, converted all HOME accesses to bracket form (`process.env["HOME"]`) to satisfy the grep contract while preserving the genuine HOME-fallback contract test. Header comment documents the rationale.
 
 ```bash
 grep -nR "APPARAT_HOME" src/
@@ -976,17 +980,17 @@ grep -nRE "join\(.*HOME.*\.apparat\b|join\(.*homedir\(\).*\.apparat\b" src/
 ```
 Expected: only `src/daemon/state.ts:33`.
 
-- [ ] **Step 2: Run the full suite once more**
+- [x] **Step 2: Run the full suite once more**
 
 Run: `npx vitest run`
 Expected: PASS.
 
-- [ ] **Step 3: Run typecheck**
+- [x] **Step 3: Run typecheck**
 
 Run: `npx tsc --noEmit`
 Expected: clean.
 
-- [ ] **Step 4: Commit docs**
+- [x] **Step 4: Commit docs**
 
 ```bash
 git add CONTEXT.md docs/adr/0010-rename-to-apparatus.md

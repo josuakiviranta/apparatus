@@ -19,12 +19,14 @@ Adopt the following rename map:
 | Brand / repo / GitHub | `ralph-cli` | `apparatus` |
 | Binary | `ralph` | `apparat` |
 | Project-local folder | `<project>/.ralph/` | `<project>/.apparat/` |
-| Env vars (6) | `RALPH_*` | `APPARAT_*` |
+| Env vars (7, +`APPARAT_HOME` net-new) | `RALPH_*` | `APPARAT_*` |
 | Build constant | `__RALPH_PROD__` | `__APPARAT_PROD__` |
 | Path-helper module | `src/cli/lib/ralph-paths.ts` | `src/cli/lib/apparat-paths.ts` |
 | Path-helper function | `ralphDir()` | `apparatDir()` |
 | Domain idiom | "ralph-shaped project" | "apparat-shaped project" |
 | npm package name | `ralph-cli` | `apparat-cli` (provisional; finalized post-merge) |
+
+`APPARAT_HOME` was added later (2026-05-10) as a test-isolation override — not a rename. It overrides `~/.apparat` for tests, fixtures, and embed callers; it has highest precedence in `getApparatHome()` (`src/daemon/state.ts`), falling back to `HOME` then `homedir()`.
 
 Migration is big-bang: a single PR rewrites every reference. No compatibility layer, no transition release, no auto-migration code. Each project on the developer's machine that uses the tool runs `git mv .ralph .apparat && git commit` once, manually, after upgrading.
 

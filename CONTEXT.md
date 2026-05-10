@@ -241,7 +241,10 @@ level up:
     write per `--project`-resolving CLI invocation.
 
 `~/.apparat/` is operator-state only. Agent definitions remain project-local
-per ADR-0001.
+per ADR-0001. Tests and embed callers pin `~/.apparat/` via the `APPARAT_HOME`
+env-var (highest precedence in `getApparatHome()`); the operator's `HOME`
+should never be swapped for this purpose — that pattern caused a 213-entry
+registry leak in 2026-05-09.
 
 ---
 
