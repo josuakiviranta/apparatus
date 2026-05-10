@@ -1,5 +1,4 @@
 import { join, dirname } from "path";
-import { mkdirSync, writeFileSync } from "fs";
 import { JsonlPipelineTracer } from "../../../attractor/tracer/jsonl-pipeline-tracer.js";
 import type { PipelineTracer } from "../../../attractor/tracer/pipeline-tracer.js";
 import { validateOrRaise } from "../../../attractor/core/graph-validator.js";
@@ -140,32 +139,27 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
   } else {
     logsRoot = join(runsRoot, runId);
   }
-  if (!opts.resume) {
-    // Claim the new run directory with a stub pipeline-start line so GC buckets
-    // the new run under the correct pipeline name, preventing it from counting
-    // against the crash-at-start quota.
-    if (!opts.logsRoot) {
-      const stubPath = join(logsRoot, "pipeline.jsonl");
-      mkdirSync(logsRoot, { recursive: true });
-      writeFileSync(stubPath, JSON.stringify({
-        kind: "pipeline-start",
-        runId,
-        pipelineName: graph.name,
-        goal: graph.goal ?? "",
-        nodes: [],
-        timestamp: new Date().toISOString(),
-      }) + "\n");
-    }
-    const perPipelineKeep = positiveIntEnv("APPARAT_RUNS_KEEP", 10);
-    const crashAtStartKeep = positiveIntEnv("APPARAT_CRASH_AT_START_KEEP", 5);
-    gcOldRunsPerPipeline(runsRoot, { perPipelineKeep, crashAtStartKeep });
-  }
   const tracePath = join(logsRoot, "pipeline.jsonl");
   const jsonlTracer = new JsonlPipelineTracer(tracePath);
   let latestContext: Record<string, unknown> = {};
 
+  // Per-pipeline GC fires once, after the engine writes the real pipeline-start
+  // line into pipeline.jsonl — so the new run lands in its proper bucket and
+  // doesn't count against the crash-at-start quota. Skipped for resume runs.
+  let gcRan = false;
+  const runGc = (): void => {
+    if (gcRan || opts.resume) return;
+    gcRan = true;
+    const perPipelineKeep = positiveIntEnv("APPARAT_RUNS_KEEP", 10);
+    const crashAtStartKeep = positiveIntEnv("APPARAT_CRASH_AT_START_KEEP", 5);
+    gcOldRunsPerPipeline(runsRoot, { perPipelineKeep, crashAtStartKeep });
+  };
+
   const tracer: PipelineTracer = {
-    onPipelineStart(meta) { jsonlTracer.onPipelineStart(meta); },
+    onPipelineStart(meta) {
+      jsonlTracer.onPipelineStart(meta);
+      runGc();
+    },
     onNodeStart(meta) {
       latestContext = meta.ctx.values;
       jsonlTracer.onNodeStart(meta);
