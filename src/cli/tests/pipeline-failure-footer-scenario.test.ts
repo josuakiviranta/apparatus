@@ -14,8 +14,13 @@ describe("scenario: pipeline-failure-footer", () => {
   let work: string;
   let stderrSpy: ReturnType<typeof vi.spyOn>;
   let writtenStderr = "";
+  let fakeHome: string;
+  let origHome: string | undefined;
 
   beforeEach(() => {
+    fakeHome = mkdtempSync(join(tmpdir(), "apparat-failfooter-home-"));
+    origHome = process.env.HOME;
+    process.env.HOME = fakeHome;
     work = mkdtempSync(join(tmpdir(), "apparat-failure-footer-scenario-"));
     copyFileSync(SCENARIO, join(work, "pipeline.dot"));
     writtenStderr = "";
@@ -26,6 +31,9 @@ describe("scenario: pipeline-failure-footer", () => {
   });
 
   afterEach(() => {
+    if (origHome === undefined) delete process.env.HOME;
+    else process.env.HOME = origHome;
+    rmSync(fakeHome, { recursive: true, force: true });
     stderrSpy.mockRestore();
     rmSync(work, { recursive: true, force: true });
   });
