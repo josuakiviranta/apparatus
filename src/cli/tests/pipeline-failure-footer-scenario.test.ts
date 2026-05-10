@@ -5,6 +5,7 @@ import { join, dirname, resolve } from "path";
 import { fileURLToPath } from "url";
 import { pipelineRunCommand } from "../commands/pipeline.js";
 import { runsDir } from "../lib/apparat-paths.js";
+import { withFakeApparatHome, type FakeApparatHome } from "./_apparatHome";
 
 // Anchor scenario path on this test file's location — survives any cwd shift.
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -14,13 +15,10 @@ describe("scenario: pipeline-failure-footer", () => {
   let work: string;
   let stderrSpy: ReturnType<typeof vi.spyOn>;
   let writtenStderr = "";
-  let fakeHome: string;
-  let origHome: string | undefined;
+  let scratch: FakeApparatHome;
 
   beforeEach(() => {
-    fakeHome = mkdtempSync(join(tmpdir(), "apparat-failfooter-home-"));
-    origHome = process.env.HOME;
-    process.env.HOME = fakeHome;
+    scratch = withFakeApparatHome("apparat-failfooter-home");
     work = mkdtempSync(join(tmpdir(), "apparat-failure-footer-scenario-"));
     copyFileSync(SCENARIO, join(work, "pipeline.dot"));
     writtenStderr = "";
@@ -31,9 +29,7 @@ describe("scenario: pipeline-failure-footer", () => {
   });
 
   afterEach(() => {
-    if (origHome === undefined) delete process.env.HOME;
-    else process.env.HOME = origHome;
-    rmSync(fakeHome, { recursive: true, force: true });
+    scratch.cleanup();
     stderrSpy.mockRestore();
     rmSync(work, { recursive: true, force: true });
   });
