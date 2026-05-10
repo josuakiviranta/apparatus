@@ -1,4 +1,5 @@
 import { join, dirname } from "path";
+import { mkdirSync, writeFileSync } from "fs";
 import { JsonlPipelineTracer } from "../../../attractor/tracer/jsonl-pipeline-tracer.js";
 import type { PipelineTracer } from "../../../attractor/tracer/pipeline-tracer.js";
 import { validateOrRaise } from "../../../attractor/core/graph-validator.js";
@@ -27,7 +28,7 @@ import { renderPipelineApp } from "../../components/PipelineApp.js";
 import { classifyNode } from "../../lib/classifyNode.js";
 import { parseClaudeEvent } from "../../lib/parseClaudeEvent.js";
 import { loadPipeline, PipelineLoadError, type LoadedPipeline } from "../pipeline-invocation.js";
-import { gcOldRuns, resolveResumeLogsRoot } from "./runs-gc.js";
+import { gcOldRunsPerPipeline, resolveResumeLogsRoot } from "./runs-gc.js";
 
 export interface PipelineRunOptions {
   project?: string;
@@ -128,10 +129,6 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
 
   const runId = opts.runId ?? newRunId(loaded.graph.name);
   const runsRoot = runsDir(opts.project ?? process.cwd());
-  if (!opts.resume) {
-    const keep = Number(process.env.APPARAT_RUNS_KEEP ?? "50");
-    gcOldRuns(runsRoot, Number.isFinite(keep) && keep > 0 ? keep : 50);
-  }
   let logsRoot: string;
   if (opts.logsRoot) {
     logsRoot = opts.logsRoot;
@@ -142,6 +139,26 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
     logsRoot = resolved ?? join(runsRoot, runId);
   } else {
     logsRoot = join(runsRoot, runId);
+  }
+  if (!opts.resume) {
+    // Claim the new run directory with a stub pipeline-start line so GC buckets
+    // the new run under the correct pipeline name, preventing it from counting
+    // against the crash-at-start quota.
+    if (!opts.logsRoot) {
+      const stubPath = join(logsRoot, "pipeline.jsonl");
+      mkdirSync(logsRoot, { recursive: true });
+      writeFileSync(stubPath, JSON.stringify({
+        kind: "pipeline-start",
+        runId,
+        pipelineName: graph.name,
+        goal: graph.goal ?? "",
+        nodes: [],
+        timestamp: new Date().toISOString(),
+      }) + "\n");
+    }
+    const perPipelineKeep = positiveIntEnv("APPARAT_RUNS_KEEP", 10);
+    const crashAtStartKeep = positiveIntEnv("APPARAT_CRASH_AT_START_KEEP", 5);
+    gcOldRunsPerPipeline(runsRoot, { perPipelineKeep, crashAtStartKeep });
   }
   const tracePath = join(logsRoot, "pipeline.jsonl");
   const jsonlTracer = new JsonlPipelineTracer(tracePath);
@@ -399,4 +416,11 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
       process.exit(1);
     }
   }
+}
+
+function positiveIntEnv(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (raw === undefined) return fallback;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
 }

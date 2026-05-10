@@ -16,4 +16,4 @@ export type { PipelineExplainOptions } from "./pipeline/explain.js";
 export { pipelineListCommand } from "./pipeline/list.js";
 export type { PipelineListOptions } from "./pipeline/list.js";
 export { pipelineTraceCommand } from "./pipeline/trace.js";
-export { gcOldRuns, gcOldRunsPerPipeline, resolveResumeLogsRoot } from "./pipeline/runs-gc.js";
+export { gcOldRunsPerPipeline, resolveResumeLogsRoot } from "./pipeline/runs-gc.js";

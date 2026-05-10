@@ -3,6 +3,7 @@ import { mkdtempSync, mkdirSync, rmSync, existsSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { gcOldRunsPerPipeline } from "../commands/pipeline.js";
+import { runsDir } from "../lib/apparat-paths.js";
 
 function writeRun(
   root: string,
@@ -122,9 +123,11 @@ describe("gcOldRunsPerPipeline", () => {
       'digraph meditate { goal="t"; start [shape=Mdiamond]; done [shape=Msquare]; start -> done; }\n',
     );
 
+    // Old runs must live in the actual runs directory that pipelineRunCommand uses.
+    const projectRunsRoot = runsDir(project);
     for (let i = 0; i < 3; i++) {
       const ts = `2026-05-08T18:00:0${i}.000Z`;
-      writeRun(root, `meditate-old-${i}`, meditateRun(`meditate-old-${i}`, ts));
+      writeRun(projectRunsRoot, `meditate-old-${i}`, meditateRun(`meditate-old-${i}`, ts));
     }
     const orig = process.env.APPARAT_RUNS_KEEP;
     process.env.APPARAT_RUNS_KEEP = "1";
@@ -138,8 +141,10 @@ describe("gcOldRunsPerPipeline", () => {
       if (orig === undefined) delete process.env.APPARAT_RUNS_KEEP;
       else process.env.APPARAT_RUNS_KEEP = orig;
     }
+    // After GC with perPipelineKeep=1: the new run (stub-claimed before GC) is the
+    // newest meditate entry; all 3 older meditate-old-* dirs are evicted.
     const survivors = ["meditate-old-0","meditate-old-1","meditate-old-2"]
-      .filter(n => existsSync(join(root, n)));
+      .filter(n => existsSync(join(projectRunsRoot, n)));
     expect(survivors.length).toBe(0);
   });
 });

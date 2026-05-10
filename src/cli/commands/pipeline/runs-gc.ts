@@ -45,28 +45,6 @@ export function resolveResumeLogsRoot(
   return null;
 }
 
-/**
- * Garbage-collect a project's runs directory: keep the `keep` newest entries
- * by mtime, recursively remove the rest. Silently ignores non-existent roots
- * and non-directory children. Pure I/O — exported for tests.
- */
-export function gcOldRuns(runsRoot: string, keep: number): void {
-  if (!existsSync(runsRoot)) return;
-  const entries: { path: string; mtime: number }[] = [];
-  for (const name of readdirSync(runsRoot)) {
-    const path = join(runsRoot, name);
-    try {
-      const st = lstatSync(path);
-      if (!st.isDirectory()) continue;
-      entries.push({ path, mtime: st.mtimeMs });
-    } catch { continue; }
-  }
-  entries.sort((a, b) => b.mtime - a.mtime);
-  for (const e of entries.slice(keep)) {
-    rmSync(e.path, { recursive: true, force: true });
-  }
-}
-
 export interface GcRetention {
   /** Keep the newest K runs per known pipelineName. Default 10. */
   perPipelineKeep: number;
