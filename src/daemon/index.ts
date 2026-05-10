@@ -1,15 +1,16 @@
 // src/daemon/index.ts
 import { existsSync, mkdirSync, writeFileSync, unlinkSync, readFileSync } from "fs";
 import { join, basename } from "path";
-import { homedir } from "os";
 import net from "net";
-import { ensureDirs, readTasks, upsertTask, deleteTask, getTask, listRuns, readRunLogs } from "./state";
+import { ensureDirs, readTasks, upsertTask, deleteTask, getTask, listRuns, readRunLogs, getApparatHome } from "./state";
 import { Scheduler } from "./scheduler";
 import { runTask, isSessionRunning, killSession } from "./runner";
 import { createSocketServer } from "./socket";
 import type { Task } from "./state";
 
-const apparatHome = join(process.env.HOME || homedir(), ".apparat");
+// Captured at daemon-process startup; APPARAT_HOME mutations after this point
+// have no effect (intentional — the daemon is always re-spawned per env).
+const apparatHome = getApparatHome();
 const pidPath = join(apparatHome, "daemon.pid");
 const sockPath = join(apparatHome, "daemon.sock");
 

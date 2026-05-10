@@ -6,9 +6,12 @@ import { fileURLToPath } from "url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 import { existsSync } from "fs";
 import { spawn } from "child_process";
-import { homedir } from "os";
+import { getApparatHome } from "../daemon/state.js";
 
-const SOCK_PATH = join(process.env.HOME || homedir(), ".apparat", "daemon.sock");
+export function getDaemonSocketPath(): string {
+  return join(getApparatHome(), "daemon.sock");
+}
+
 const DAEMON_START_TIMEOUT_MS = 3000;
 const DAEMON_POLL_INTERVAL_MS = 100;
 
@@ -34,14 +37,14 @@ function getDaemonBin(): { command: string; args: string[] } {
 async function waitForSocket(timeoutMs: number): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (existsSync(SOCK_PATH)) return;
+    if (existsSync(getDaemonSocketPath())) return;
     await new Promise((r) => setTimeout(r, DAEMON_POLL_INTERVAL_MS));
   }
   throw new Error("Daemon failed to start — check permissions on ~/.apparat/");
 }
 
 async function ensureDaemon(): Promise<void> {
-  if (existsSync(SOCK_PATH)) return;
+  if (existsSync(getDaemonSocketPath())) return;
   console.error("Starting apparat daemon...");
   const { command, args } = getDaemonBin();
   const child = spawn(command, args, { detached: true, stdio: "ignore" });
@@ -51,7 +54,7 @@ async function ensureDaemon(): Promise<void> {
 
 function openSocket(): Promise<net.Socket> {
   return new Promise((resolve, reject) => {
-    const socket = net.createConnection(SOCK_PATH);
+    const socket = net.createConnection(getDaemonSocketPath());
     socket.once("connect", () => resolve(socket));
     socket.once("error", reject);
   });

@@ -195,3 +195,18 @@ describe("getApparatHome precedence", () => {
     expect(getApparatHome()).toBe("");
   });
 });
+
+describe("daemon and CLI agree on the socket path under APPARAT_HOME", () => {
+  let origApparatHome: string | undefined;
+  afterEach(() => {
+    if (origApparatHome === undefined) delete process.env.APPARAT_HOME;
+    else process.env.APPARAT_HOME = origApparatHome;
+  });
+
+  it("the daemon-client socket path resolves under APPARAT_HOME, not HOME", async () => {
+    origApparatHome = process.env.APPARAT_HOME;
+    process.env.APPARAT_HOME = "/tmp/socket-bridge-scratch";
+    const { getDaemonSocketPath } = await import("../../lib/daemon-client.js");
+    expect(getDaemonSocketPath()).toBe(join("/tmp/socket-bridge-scratch", "daemon.sock"));
+  });
+});
