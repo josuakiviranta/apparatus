@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, writeFileSync, existsSync, readdirSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -27,13 +27,29 @@ describe("pipelineRunCommand records the project in ~/.apparat/projects.json", (
     const entries = readProjects();
     expect(entries.find((e) => e.path === project)).toBeTruthy();
 
-    process.env.HOME = origHome;
+    if (origHome === undefined) delete process.env.HOME;
+    else process.env.HOME = origHome;
     rmSync(fakeHome, { recursive: true, force: true });
     rmSync(project, { recursive: true, force: true });
   });
 });
 
 describe("pipelineRunCommand --run-id override", () => {
+  let fakeHome: string;
+  let origHome: string | undefined;
+
+  beforeEach(() => {
+    fakeHome = mkdtempSync(join(tmpdir(), "apparat-runid-home-"));
+    origHome = process.env.HOME;
+    process.env.HOME = fakeHome;
+  });
+
+  afterEach(() => {
+    if (origHome === undefined) delete process.env.HOME;
+    else process.env.HOME = origHome;
+    rmSync(fakeHome, { recursive: true, force: true });
+  });
+
   it("uses opts.runId instead of allocating a fresh one", async () => {
     const project = mkdtempSync(join(tmpdir(), "apparat-runid-"));
     const dotFile = join(project, "smoke.dot");
@@ -52,6 +68,21 @@ describe("pipelineRunCommand --run-id override", () => {
 });
 
 describe("pipelineRunCommand allocates a slug-prefixed runId by default", () => {
+  let fakeHome: string;
+  let origHome: string | undefined;
+
+  beforeEach(() => {
+    fakeHome = mkdtempSync(join(tmpdir(), "apparat-slugrunid-home-"));
+    origHome = process.env.HOME;
+    process.env.HOME = fakeHome;
+  });
+
+  afterEach(() => {
+    if (origHome === undefined) delete process.env.HOME;
+    else process.env.HOME = origHome;
+    rmSync(fakeHome, { recursive: true, force: true });
+  });
+
   it("creates <project>/.apparat/runs/<pipeline-slug>-<8hex>/pipeline.jsonl", async () => {
     const project = mkdtempSync(join(tmpdir(), "apparat-slug-runid-"));
     const dotFile = join(project, "smoke.dot");
