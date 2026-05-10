@@ -969,7 +969,7 @@ git commit -m "feat(runs-gc): add gcOldRunsPerPipeline with per-pipeline + crash
 - Modify: `src/cli/commands/pipeline/run.ts` (call site)
 - Rewrite: `src/cli/tests/pipeline-runs-gc.test.ts`
 
-- [ ] **Step 1: Rewrite the legacy test against the new helper**
+- [x] **Step 1: Rewrite the legacy test against the new helper**
 
 Replace the entire contents of `src/cli/tests/pipeline-runs-gc.test.ts` with:
 
@@ -991,7 +991,7 @@ describe("gcOldRuns is removed in favour of gcOldRunsPerPipeline", () => {
 
 (The per-bucket retention behaviour is fully covered by `runs-gc-per-pipeline.test.ts` from Task 3.1; rewriting this file as a barrel-presence check keeps the rename auditable in `git log` without duplicating coverage.)
 
-- [ ] **Step 2: Update the barrel export**
+- [x] **Step 2: Update the barrel export**
 
 Edit `src/cli/commands/pipeline.ts:19`. Replace:
 
@@ -1005,11 +1005,11 @@ with:
 export { gcOldRunsPerPipeline, resolveResumeLogsRoot } from "./pipeline/runs-gc.js";
 ```
 
-- [ ] **Step 3: Delete `gcOldRuns` from `runs-gc.ts`**
+- [x] **Step 3: Delete `gcOldRuns` from `runs-gc.ts`**
 
 Edit `src/cli/commands/pipeline/runs-gc.ts`. Remove the `export function gcOldRuns(runsRoot, keep)` block (the original `:47-67`, including its leading docblock). The file should now export only `resolveResumeLogsRoot`, `gcOldRunsPerPipeline`, and `GcRetention`. Steps 2 (barrel update), 3 (delete), and 4 (caller switch) all live in the same commit at Step 8 so the build stays green between commits.
 
-- [ ] **Step 4: Switch the caller in `run.ts`**
+- [x] **Step 4: Switch the caller in `run.ts`**
 
 Edit `src/cli/commands/pipeline/run.ts`. At line 30, replace:
 
@@ -1053,17 +1053,17 @@ function positiveIntEnv(name: string, fallback: number): number {
 }
 ```
 
-- [ ] **Step 5: Run the full test sweep**
+- [x] **Step 5: Run the full test sweep**
 
 Run: `npx vitest run src/cli/tests/runs-gc-per-pipeline.test.ts src/cli/tests/pipeline-runs-gc.test.ts src/cli/tests/pipeline.test.ts src/cli/tests/pipeline-run-runid.test.ts src/cli/tests/runs-index.test.ts`
 Expected: PASS for all five files.
 
-- [ ] **Step 6: Confirm no orphan callers**
+- [x] **Step 6: Confirm no orphan callers**
 
 Run: `npx tsc --noEmit`
 Expected: clean. (`gcOldRuns` is removed; if any caller you missed still references it, tsc reports the import error.)
 
-- [ ] **Step 7: Confirm grep invariants from §10.1 of the design**
+- [x] **Step 7: Confirm grep invariants from §10.1 of the design**
 
 Manually:
 
@@ -1082,7 +1082,7 @@ git grep -nE 'randomUUID\(\)\.slice\(0, 8\)' -- src
 ```
 Expected: exactly one match — inside `newRunId` in `apparat-paths.ts`.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/cli/commands/pipeline/runs-gc.ts src/cli/commands/pipeline.ts src/cli/commands/pipeline/run.ts src/cli/tests/pipeline-runs-gc.test.ts
