@@ -5,14 +5,22 @@ import { tmpdir } from "os";
 import { rmSync } from "fs";
 import { pipelineRunCommand } from "../commands/pipeline/run.js";
 import { readProjects } from "../lib/projects-registry.js";
+import { withFakeApparatHome, type FakeApparatHome } from "./_apparatHome";
 
 afterEach(() => { vi.restoreAllMocks(); });
 
 describe("pipelineRunCommand records the project in ~/.apparat/projects.json", () => {
+  let scratch: FakeApparatHome;
+
+  beforeEach(() => {
+    scratch = withFakeApparatHome("apparat-rec-home");
+  });
+
+  afterEach(() => {
+    scratch.cleanup();
+  });
+
   it("appends the absolute project path with lastSeen", async () => {
-    const fakeHome = mkdtempSync(join(tmpdir(), "apparat-rec-home-"));
-    const origHome = process.env.HOME;
-    process.env.HOME = fakeHome;
     const project = mkdtempSync(join(tmpdir(), "apparat-rec-proj-"));
     const dotFile = join(project, "smoke.dot");
     writeFileSync(
@@ -27,27 +35,19 @@ describe("pipelineRunCommand records the project in ~/.apparat/projects.json", (
     const entries = readProjects();
     expect(entries.find((e) => e.path === project)).toBeTruthy();
 
-    if (origHome === undefined) delete process.env.HOME;
-    else process.env.HOME = origHome;
-    rmSync(fakeHome, { recursive: true, force: true });
     rmSync(project, { recursive: true, force: true });
   });
 });
 
 describe("pipelineRunCommand --run-id override", () => {
-  let fakeHome: string;
-  let origHome: string | undefined;
+  let scratch: FakeApparatHome;
 
   beforeEach(() => {
-    fakeHome = mkdtempSync(join(tmpdir(), "apparat-runid-home-"));
-    origHome = process.env.HOME;
-    process.env.HOME = fakeHome;
+    scratch = withFakeApparatHome("apparat-runid-home");
   });
 
   afterEach(() => {
-    if (origHome === undefined) delete process.env.HOME;
-    else process.env.HOME = origHome;
-    rmSync(fakeHome, { recursive: true, force: true });
+    scratch.cleanup();
   });
 
   it("uses opts.runId instead of allocating a fresh one", async () => {
@@ -68,19 +68,14 @@ describe("pipelineRunCommand --run-id override", () => {
 });
 
 describe("pipelineRunCommand allocates a slug-prefixed runId by default", () => {
-  let fakeHome: string;
-  let origHome: string | undefined;
+  let scratch: FakeApparatHome;
 
   beforeEach(() => {
-    fakeHome = mkdtempSync(join(tmpdir(), "apparat-slugrunid-home-"));
-    origHome = process.env.HOME;
-    process.env.HOME = fakeHome;
+    scratch = withFakeApparatHome("apparat-slugrunid-home");
   });
 
   afterEach(() => {
-    if (origHome === undefined) delete process.env.HOME;
-    else process.env.HOME = origHome;
-    rmSync(fakeHome, { recursive: true, force: true });
+    scratch.cleanup();
   });
 
   it("creates <project>/.apparat/runs/<pipeline-slug>-<8hex>/pipeline.jsonl", async () => {
