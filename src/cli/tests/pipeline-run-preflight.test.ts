@@ -1,10 +1,24 @@
-import { describe, it, expect, vi } from "vitest";
-import { writeFileSync, mkdtempSync } from "fs";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { writeFileSync, mkdtempSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { pipelineRunCommand } from "../commands/pipeline.js";
 
 describe("pipelineRunCommand — $project preflight", () => {
+  let fakeHome: string;
+  let origHome: string | undefined;
+
+  beforeEach(() => {
+    fakeHome = mkdtempSync(join(tmpdir(), "apparat-preflight-home-"));
+    origHome = process.env.HOME;
+    process.env.HOME = fakeHome;
+  });
+
+  afterEach(() => {
+    process.env.HOME = origHome;
+    rmSync(fakeHome, { recursive: true, force: true });
+  });
+
   it("exits with error when pipeline references $project but --project not passed", async () => {
     const dir = mkdtempSync(join(tmpdir(), "apparat-preflight-"));
     const dot = join(dir, "p.dot");
