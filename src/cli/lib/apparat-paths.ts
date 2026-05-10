@@ -34,11 +34,28 @@ export function runDir(projectRoot: string, runId: string): string {
   return join(runsDir(projectRoot), runId);
 }
 
+function slugify(name: string): string {
+  return name.toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
+}
+
 /**
- * Canonical 8-char runId shape used by both interactive runs
- * (src/cli/commands/pipeline/run.ts) and the daemon (src/daemon/runner.ts).
- * One source of truth for the truncation rule.
+ * Canonical runId shape used by interactive runs (src/cli/commands/pipeline/run.ts)
+ * and the daemon (src/daemon/runner.ts).
+ *
+ *   newRunId("meditate") → "meditate-<8hex>"   ← slug-prefixed (preferred)
+ *   newRunId()           → "<8hex>"            ← bare back-compat (daemon path)
+ *
+ * Slug rule: lower-case, runs of non-alphanumeric chars collapse to "-",
+ * leading/trailing dashes trimmed, capped at 40 chars. Empty slug (e.g. all
+ * special chars) falls back to the bare uuid8 shape.
  */
-export function newRunId(): string {
-  return randomUUID().slice(0, 8);
+export function newRunId(pipelineName?: string): string {
+  const uuid8 = randomUUID().slice(0, 8);
+  if (!pipelineName) return uuid8;
+  const slug = slugify(pipelineName);
+  if (slug.length === 0) return uuid8;
+  return `${slug}-${uuid8}`;
 }
