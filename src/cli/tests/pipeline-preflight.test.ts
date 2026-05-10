@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { spawnSync } from "child_process";
-import { writeFileSync, mkdtempSync, mkdirSync, rmSync } from "fs";
+import { writeFileSync, mkdtempSync, mkdirSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
+import { withFakeApparatHome, type FakeApparatHome } from "./_apparatHome";
 
 const CLI = join(process.cwd(), "dist/cli/index.js");
 
@@ -21,19 +22,14 @@ function writeTempDot(contents: string): string {
 }
 
 describe("pipeline run pre-flight check", () => {
-  let fakeHome: string;
-  let origHome: string | undefined;
+  let scratch: FakeApparatHome;
 
   beforeEach(() => {
-    fakeHome = mkdtempSync(join(tmpdir(), "apparat-preflight-home-"));
-    origHome = process.env.HOME;
-    process.env.HOME = fakeHome;
+    scratch = withFakeApparatHome("apparat-preflight-home");
   });
 
   afterEach(() => {
-    if (origHome === undefined) delete process.env.HOME;
-    else process.env.HOME = origHome;
-    rmSync(fakeHome, { recursive: true, force: true });
+    scratch.cleanup();
   });
 
   it("exits 1 when a declared input is not supplied", () => {
@@ -90,19 +86,14 @@ describe("pipeline run pre-flight check", () => {
 });
 
 describe("pipeline list shows requires:", () => {
-  let fakeHome: string;
-  let origHome: string | undefined;
+  let scratch: FakeApparatHome;
 
   beforeEach(() => {
-    fakeHome = mkdtempSync(join(tmpdir(), "apparat-list-home-"));
-    origHome = process.env.HOME;
-    process.env.HOME = fakeHome;
+    scratch = withFakeApparatHome("apparat-preflight-list-home");
   });
 
   afterEach(() => {
-    if (origHome === undefined) delete process.env.HOME;
-    else process.env.HOME = origHome;
-    rmSync(fakeHome, { recursive: true, force: true });
+    scratch.cleanup();
   });
 
   it("prints 'requires:' for pipelines with inputs=, omits it for legacy pipelines", () => {
