@@ -714,7 +714,7 @@ Replaces the flat `gcOldRuns(runsRoot, keep)` with `gcOldRunsPerPipeline(runsRoo
 **Files:**
 - Create: `src/cli/tests/runs-gc-per-pipeline.test.ts`
 
-- [ ] **Step 1: Write the failing test file**
+- [x] **Step 1: Write the failing test file**
 
 Create `src/cli/tests/runs-gc-per-pipeline.test.ts`:
 
@@ -881,12 +881,12 @@ describe("gcOldRunsPerPipeline", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run src/cli/tests/runs-gc-per-pipeline.test.ts`
 Expected: FAIL — `gcOldRunsPerPipeline` does not exist (`SyntaxError: The requested module '../commands/pipeline.js' does not provide an export named 'gcOldRunsPerPipeline'`).
 
-- [ ] **Step 3: Add `gcOldRunsPerPipeline` to `runs-gc.ts` (do NOT delete `gcOldRuns` yet)**
+- [x] **Step 3: Add `gcOldRunsPerPipeline` to `runs-gc.ts` (do NOT delete `gcOldRuns` yet)**
 
 Edit `src/cli/commands/pipeline/runs-gc.ts`. Keep the file's existing `resolveResumeLogsRoot` block (`:1-45`) byte-for-byte **and** keep the existing `gcOldRuns` block (`:47-67`) intact for now — Task 3.2 deletes it atomically with the caller + barrel switch so no commit between 3.1 and 3.2 leaves the barrel re-exporting a missing symbol. Append below the existing `gcOldRuns` block:
 
@@ -949,12 +949,12 @@ function safeMtime(path: string): number {
 
 (Adjust the file's existing `import` line at the top to drop unused symbols if needed — the existing imports `existsSync, readdirSync, rmSync, lstatSync` from `"fs"` and `join` from `"path"` are all still consumed; `readdirSync` only by `resolveResumeLogsRoot`.)
 
-- [ ] **Step 4: Verify the new tests pass**
+- [x] **Step 4: Verify the new tests pass**
 
 Run: `npx vitest run src/cli/tests/runs-gc-per-pipeline.test.ts`
 Expected: PASS, 7 tests.
 
-- [ ] **Step 5: Commit (intermediate; barrel + caller wiring next)**
+- [x] **Step 5: Commit (intermediate; barrel + caller wiring next)**
 
 ```bash
 git add src/cli/commands/pipeline/runs-gc.ts src/cli/tests/runs-gc-per-pipeline.test.ts
