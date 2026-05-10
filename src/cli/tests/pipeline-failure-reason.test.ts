@@ -4,6 +4,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { pipelineRunCommand } from "../commands/pipeline.js";
 import { runsDir } from "../lib/apparat-paths.js";
+import { withFakeApparatHome, type FakeApparatHome } from "./_apparatHome";
 
 const DOT = `digraph fail_fixture {
   goal="exercise failure-reason surfacing"
@@ -17,13 +18,10 @@ describe("pipeline run — failureReason surfacing", () => {
   let work: string;
   let stderrSpy: ReturnType<typeof vi.spyOn>;
   let writtenStderr = "";
-  let fakeHome: string;
-  let origHome: string | undefined;
+  let scratch: FakeApparatHome;
 
   beforeEach(() => {
-    fakeHome = mkdtempSync(join(tmpdir(), "apparat-failreason-home-"));
-    origHome = process.env.HOME;
-    process.env.HOME = fakeHome;
+    scratch = withFakeApparatHome("apparat-failreason-home");
     work = mkdtempSync(join(tmpdir(), "apparat-failreason-"));
     writeFileSync(join(work, "fail.dot"), DOT);
     writtenStderr = "";
@@ -34,9 +32,7 @@ describe("pipeline run — failureReason surfacing", () => {
   });
 
   afterEach(() => {
-    if (origHome === undefined) delete process.env.HOME;
-    else process.env.HOME = origHome;
-    rmSync(fakeHome, { recursive: true, force: true });
+    scratch.cleanup();
     stderrSpy.mockRestore();
     rmSync(work, { recursive: true, force: true });
   });
