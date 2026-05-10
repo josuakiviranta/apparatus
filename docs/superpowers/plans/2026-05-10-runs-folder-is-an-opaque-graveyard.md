@@ -1417,7 +1417,7 @@ git commit -m "feat(pipeline-list): Layer-2 recent-runs table for `pipeline list
 **Files:**
 - Modify: `src/cli/program.ts`
 
-- [ ] **Step 1: Update the `pipeline list` registration**
+- [x] **Step 1: Update the `pipeline list` registration**
 
 Edit `src/cli/program.ts`. Replace the block at `:173-186` with:
 
@@ -1441,7 +1441,7 @@ positional <name>, also prints the most recent runs from
     });
 ```
 
-- [ ] **Step 2: Verify commander still parses cleanly**
+- [x] **Step 2: Verify commander still parses cleanly**
 
 Run: `npx tsc --noEmit`
 Expected: clean.
@@ -1449,7 +1449,7 @@ Expected: clean.
 Run: `npx vitest run`
 Expected: PASS — the full suite.
 
-- [ ] **Step 3: Manual exercise (do this once before commit)**
+- [x] **Step 3: Manual exercise (do this once before commit)**
 
 ```bash
 node dist/cli/index.js pipeline list --help
@@ -1458,7 +1458,7 @@ Expected output contains both `apparat pipeline list                       # all
 
 (Skip this step if the dist/ build is stale; the intent is to confirm the help text rendered as written. The tsc + vitest sweeps already prove the code path.)
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/cli/program.ts
