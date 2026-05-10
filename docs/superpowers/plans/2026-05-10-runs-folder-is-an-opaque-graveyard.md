@@ -521,7 +521,7 @@ git commit -m "test(apparat-paths): cover slug + bare runId shapes"
 - Modify: `src/cli/tests/pipeline.test.ts`
 - Modify: `src/cli/tests/pipeline-run-runid.test.ts`
 
-- [ ] **Step 1: Update the `pipeline.test.ts` regex first (TDD)**
+- [x] **Step 1: Update the `pipeline.test.ts` regex first (TDD)**
 
 Edit `src/cli/tests/pipeline.test.ts:179-181`. Replace:
 
@@ -544,12 +544,12 @@ with:
 
 (The neighbouring `expect(opts.logsRoot).not.toMatch(/\d{4}-\d{2}-\d{2}T/);` line stays.)
 
-- [ ] **Step 2: Run the test to confirm it fails as expected (still bare-id)**
+- [x] **Step 2: Run the test to confirm it fails as expected (still bare-id)**
 
 Run: `npx vitest run src/cli/tests/pipeline.test.ts -t "places logsRoot under <project>/.apparat/runs/<runId> when none provided"`
 Expected: FAIL — current `newRunId()` is still called without an arg from `run.ts`, so logsRoot is bare-8-char and does not match `[a-z0-9-]+-[0-9a-f]{8}$`.
 
-- [ ] **Step 3: Wire `loaded.graph.name` into `newRunId` in `run.ts`**
+- [x] **Step 3: Wire `loaded.graph.name` into `newRunId` in `run.ts`**
 
 Edit `src/cli/commands/pipeline/run.ts:129`. Replace:
 
@@ -565,17 +565,17 @@ with:
 
 (`loaded.graph` is bound at `:56` and stays in scope. Verified by reading the file.)
 
-- [ ] **Step 4: Run the failing test to verify green**
+- [x] **Step 4: Run the failing test to verify green**
 
 Run: `npx vitest run src/cli/tests/pipeline.test.ts -t "places logsRoot under <project>/.apparat/runs/<runId> when none provided"`
 Expected: PASS.
 
-- [ ] **Step 5: Verify the rest of `pipeline.test.ts` still passes**
+- [x] **Step 5: Verify the rest of `pipeline.test.ts` still passes**
 
 Run: `npx vitest run src/cli/tests/pipeline.test.ts`
 Expected: PASS for the full file. If any other regex anywhere in the file locks on `[0-9a-f]{8}$`, update it analogously and note the change in the commit message.
 
-- [ ] **Step 6: Update `pipeline-run-runid.test.ts` to add a slug-shape assertion**
+- [x] **Step 6: Update `pipeline-run-runid.test.ts` to add a slug-shape assertion**
 
 Edit `src/cli/tests/pipeline-run-runid.test.ts`. Add `readdirSync` to the existing `import` from `"fs"` at the top of the file (currently `import { mkdtempSync, writeFileSync, existsSync } from "fs";` — make it `import { mkdtempSync, writeFileSync, existsSync, readdirSync } from "fs";`). Then append a new test inside the file (after line 52, before the file ends):
 
@@ -604,17 +604,17 @@ describe("pipelineRunCommand allocates a slug-prefixed runId by default", () => 
 
 (The existing `--run-id deadbeef` override test still passes because the override path still wins via `opts.runId ??`.)
 
-- [ ] **Step 7: Run the file to confirm both blocks pass**
+- [x] **Step 7: Run the file to confirm both blocks pass**
 
 Run: `npx vitest run src/cli/tests/pipeline-run-runid.test.ts`
 Expected: PASS — both the project-registry test, the `--run-id` override test, and the new slug-shape test.
 
-- [ ] **Step 8: Confirm `pipeline-trace-command-validation.test.ts` is unaffected**
+- [x] **Step 8: Confirm `pipeline-trace-command-validation.test.ts` is unaffected**
 
 Run: `npx vitest run src/cli/tests/pipeline-trace-command-validation.test.ts`
 Expected: PASS unchanged. The file uses literal runIds (`r1`, `r2`, `r3`) and never asserts a regex; no edit required. Verified at plan-write time by reading the file.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add src/cli/commands/pipeline/run.ts src/cli/tests/pipeline.test.ts src/cli/tests/pipeline-run-runid.test.ts
