@@ -94,14 +94,14 @@ apparat pipeline explain <pipeline> [nodeId]
 Plain-text walkthrough of a pipeline's topology (per-node `consumes:` / `produces:` / `branches:` / `next:`, plus `Loops:` and `Reachability:`). With a node id, renders that agent's prompt skeleton with `<placeholder:…>` values — useful for iterating on agent `.md` files without spawning an LLM.
 
 ```bash
-apparat pipeline list <project-folder>
+apparat pipeline list [<name>] --project <folder>
 ```
-List runnable pipelines for the project — both bundled (e.g. `implement`, `janitor`, `meditate`) and project-local under `<project>/.apparat/pipelines/`. Forked bundled pipelines are tagged on both rows.
+Without `<name>`: list runnable pipelines for the project — both bundled (e.g. `implement`, `janitor`, `meditate`) and project-local under `<project>/.apparat/pipelines/`. Forked bundled pipelines are tagged on both rows. With `<name>`: zoom into one pipeline and print its recent runs from `<project>/.apparat/runs/` newest-first (capped by `APPARAT_RUNS_KEEP`, default 10 per pipeline). Each row prints `→ apparat pipeline trace <runId>` for copy-paste drill-in.
 
 ```bash
 apparat pipeline trace <runId> [--node-receive <nodeId>] [--full]
 ```
-Inspect the context and trace logs for a completed pipeline run. `--node-receive` filters to a specific node execution; `--full` shows the raw JSONL trace.
+Inspect the context and trace logs for a completed pipeline run. `<runId>` accepts both the slug-prefixed shape (`meditate-2f8a91c3`, the new default) and the bare 8-char shape (`2f8a91c3`, used by older runs and daemon-spawned tasks). `--node-receive` filters to a specific node execution; `--full` shows the raw JSONL trace.
 
 ```bash
 apparat status
