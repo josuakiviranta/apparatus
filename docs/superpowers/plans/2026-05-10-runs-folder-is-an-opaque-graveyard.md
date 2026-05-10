@@ -1107,7 +1107,7 @@ Widens `pipelineListCommand` to take an optional `name`; preserves Layer-1 rende
 **Files:**
 - Create: `src/cli/tests/pipeline-list-layer2.test.ts`
 
-- [ ] **Step 1: Write the Layer-1 regression test FIRST (it must pass before any list.ts edit)**
+- [x] **Step 1: Write the Layer-1 regression test FIRST (it must pass before any list.ts edit)**
 
 Create `src/cli/tests/pipeline-list-layer2.test.ts`:
 
@@ -1153,12 +1153,12 @@ describe("pipeline list — Layer 1 (no positional)", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test to confirm Layer-1 baseline is captured (current code already prints this)**
+- [x] **Step 2: Run the test to confirm Layer-1 baseline is captured (current code already prints this)**
 
 Run: `npx vitest run src/cli/tests/pipeline-list-layer2.test.ts`
 Expected: PASS for the Layer-1 case (the existing `pipelineListCommand` already does this; the regression-pin protects it from drift).
 
-- [ ] **Step 3: Commit the regression-pin alone**
+- [x] **Step 3: Commit the regression-pin alone**
 
 ```bash
 git add src/cli/tests/pipeline-list-layer2.test.ts
@@ -1170,7 +1170,7 @@ git commit -m "test(pipeline-list): regression-pin Layer-1 output before adding 
 **Files:**
 - Modify: `src/cli/tests/pipeline-list-layer2.test.ts`
 
-- [ ] **Step 1: Append failing Layer-2 tests**
+- [x] **Step 1: Append failing Layer-2 tests**
 
 Edit `src/cli/tests/pipeline-list-layer2.test.ts`. Append after the Layer-1 describe block (still inside the same file):
 
@@ -1267,12 +1267,12 @@ describe("pipeline list <name> — Layer 2 (positional)", () => {
 });
 ```
 
-- [ ] **Step 2: Run the file to confirm Layer-2 cases fail**
+- [x] **Step 2: Run the file to confirm Layer-2 cases fail**
 
 Run: `npx vitest run src/cli/tests/pipeline-list-layer2.test.ts`
 Expected: Layer-1 case PASS, four Layer-2 cases FAIL — `pipelineListCommand` does not yet accept `name`.
 
-- [ ] **Step 3: Implement Layer 2 in `list.ts`**
+- [x] **Step 3: Implement Layer 2 in `list.ts`**
 
 Edit `src/cli/commands/pipeline/list.ts`. Replace the entire file body with:
 
@@ -1395,17 +1395,17 @@ async function renderEntry(e: PipelineEntry): Promise<void> {
 
 > **Note on the ghost-section block:** per design §9.1 we honour Layer-1's "always print both headers" lock — the unmatched side always renders the `ghostLine`. The unrelated section's roster size is intentionally irrelevant to the rendering. If a future cycle picks option 3 from §9.1 (omit the empty section) only the `else` arm needs to change.
 
-- [ ] **Step 4: Run the Layer-2 file**
+- [x] **Step 4: Run the Layer-2 file**
 
 Run: `npx vitest run src/cli/tests/pipeline-list-layer2.test.ts`
 Expected: PASS, all five tests.
 
-- [ ] **Step 5: Confirm no other test-file regression**
+- [x] **Step 5: Confirm no other test-file regression**
 
 Run: `npx vitest run`
 Expected: PASS — the entire suite. (If any pre-existing snapshot of `pipeline list` output asserts the old shape, this is the moment to update it; verify with `npx vitest run` and adjust.)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/cli/commands/pipeline/list.ts src/cli/tests/pipeline-list-layer2.test.ts
