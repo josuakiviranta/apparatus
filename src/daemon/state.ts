@@ -29,8 +29,8 @@ export interface LogLine {
 }
 
 export function getApparatHome(): string {
-  const home = process.env.HOME || homedir();
-  return join(home, ".apparat");
+  return process.env.APPARAT_HOME
+    ?? join(process.env.HOME ?? homedir(), ".apparat");
 }
 
 export function ensureDirs(): void {
