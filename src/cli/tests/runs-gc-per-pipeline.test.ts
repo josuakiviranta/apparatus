@@ -36,8 +36,20 @@ function janitorRun(runId: string, ts: string): Array<Record<string, unknown>> {
 
 describe("gcOldRunsPerPipeline", () => {
   let root: string;
-  beforeEach(() => { root = mkdtempSync(join(tmpdir(), "apparat-gc-pp-")); });
-  afterEach(() => { rmSync(root, { recursive: true, force: true }); });
+  let fakeHome: string;
+  let origHome: string | undefined;
+  beforeEach(() => {
+    fakeHome = mkdtempSync(join(tmpdir(), "apparat-gc-home-"));
+    origHome = process.env.HOME;
+    process.env.HOME = fakeHome;
+    root = mkdtempSync(join(tmpdir(), "apparat-gc-pp-"));
+  });
+  afterEach(() => {
+    if (origHome === undefined) delete process.env.HOME;
+    else process.env.HOME = origHome;
+    rmSync(fakeHome, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
+  });
 
   it("is a no-op when fewer than perPipelineKeep runs exist", () => {
     writeRun(root, "meditate-1", meditateRun("meditate-1", "2026-05-09T18:00:00.000Z"));
