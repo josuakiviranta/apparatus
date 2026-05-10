@@ -14,7 +14,7 @@ Read this once before any pipeline-authoring work. Then follow the workflow in �
 4. **Write sibling files** — one `.md` per agent or gate node referenced by the graph; one `.mjs`/`.sh`/etc. per `script_file=` reference.
 5. **Validate** — run `apparat pipeline validate <name>` and fix every reported error. Re-run until clean. Validation is mandatory; the runtime trusts the validator.
 6. **Run** — `apparat pipeline run <name> --project <target>`. Pass `--var k=v` for each declared `inputs="k"` the pipeline expects from the caller.
-7. **Inspect on failure** — `apparat pipeline trace <runId>` to read the per-node context + trace logs from `<project>/.apparat/runs/<runId>/`.
+7. **Inspect on failure** — `apparat pipeline trace <runId>` to read the per-node context + trace logs from `<project>/.apparat/runs/<runId>/`. For a chronological table of recent runs of one pipeline, use `apparat pipeline list <name>`.
 
 Step 5 is non-optional. Skipping validation wastes runtime cycles and produces confusing errors mid-run.
 
@@ -486,7 +486,7 @@ apparat pipeline run <name> --project <target> --resume <runId>
 
 Bare `--resume` auto-picks when exactly one prior run exists for the project. State lives at `<project>/.apparat/runs/<runId>/checkpoint.json`. The trace JSONL is in the same directory.
 
-Older runs are pruned to the last 50 per project (override with env `APPARAT_RUNS_KEEP=N`).
+Older runs are pruned to the last 10 per pipeline (override with env `APPARAT_RUNS_KEEP=N`). Runs that crashed before writing a `pipeline-start` event are bucketed separately and pruned to the last 5 (override with env `APPARAT_CRASH_AT_START_KEEP=N`) so a noisy crash loop cannot evict useful named-pipeline history.
 
 For `--resume` to work, tool-node scripts must be idempotent — detect "the desired outcome is already present" and exit 0 as a no-op rather than failing.
 
@@ -499,6 +499,8 @@ apparat pipeline trace <runId> --full
 ```
 
 `--node-receive <id>` filters to a specific node execution. `--full` dumps the raw `pipeline.jsonl`.
+
+Run IDs are composed as `<pipeline-slug>-<8hex>` (e.g. `meditate-2f8a91c3`) so `<project>/.apparat/runs/` is self-describing on disk. Both `pipeline trace` and `pipeline run --resume` accept the slug-prefixed shape and the legacy bare 8-char shape, so older run dirs remain readable and resumable. To list a pipeline's recent runs without remembering a runId, run `apparat pipeline list <name>` — each row prints a copy-pasteable `→ apparat pipeline trace <runId>` line.
 
 ---
 
