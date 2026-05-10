@@ -4,6 +4,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { gcOldRunsPerPipeline } from "../commands/pipeline.js";
 import { runsDir } from "../lib/apparat-paths.js";
+import { withFakeApparatHome, type FakeApparatHome } from "./_apparatHome";
 
 function writeRun(
   root: string,
@@ -36,18 +37,13 @@ function janitorRun(runId: string, ts: string): Array<Record<string, unknown>> {
 
 describe("gcOldRunsPerPipeline", () => {
   let root: string;
-  let fakeHome: string;
-  let origHome: string | undefined;
+  let scratch: FakeApparatHome;
   beforeEach(() => {
-    fakeHome = mkdtempSync(join(tmpdir(), "apparat-gc-home-"));
-    origHome = process.env.HOME;
-    process.env.HOME = fakeHome;
+    scratch = withFakeApparatHome("apparat-gc-home");
     root = mkdtempSync(join(tmpdir(), "apparat-gc-pp-"));
   });
   afterEach(() => {
-    if (origHome === undefined) delete process.env.HOME;
-    else process.env.HOME = origHome;
-    rmSync(fakeHome, { recursive: true, force: true });
+    scratch.cleanup();
     rmSync(root, { recursive: true, force: true });
   });
 
