@@ -24,8 +24,12 @@ import {
 } from "../state";
 import type { Task, RunHeader, LogLine } from "../state";
 
-beforeEach(() => mkdirSync(testApparatHome, { recursive: true }));
-afterEach(() => rmSync(testApparatHome, { recursive: true, force: true }));
+beforeEach(() => {
+  mkdirSync(testApparatHome, { recursive: true });
+});
+afterEach(() => {
+  rmSync(testApparatHome, { recursive: true, force: true });
+});
 
 function makeTask(overrides: Partial<Task> = {}): Task {
   return {
