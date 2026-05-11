@@ -465,7 +465,7 @@ git commit -m "feat(parallel-impl): topological DAG scheduler over chunked plans
 **Files:**
 - Create: `.apparat/pipelines/parallel-implement-test/plan-scheduler.md`
 
-- [ ] **Step 1: Create the agent file**
+- [x] **Step 1: Create the agent file**
 
 ```markdown
 ---
@@ -564,7 +564,7 @@ Parse the chunked implementation plan at `$plan_path`, compute a topological DAG
 Final TEXT response must be the JSON object above. Warnings (if any) precede it as plain text. Never inside a thinking block.
 ```
 
-- [ ] **Step 2: Commit (frontmatter validates lazily at pipeline run)**
+- [x] **Step 2: Commit (frontmatter validates lazily at pipeline run)**
 
 The frontmatter is loaded and validated by `loadAgent` (`src/cli/lib/agent-loader.ts`) when the pipeline first invokes the node at run time. No separate validator subcommand exists today for an agent file in isolation. The `pipeline validate` run in Task 1.5 Step 2 will exercise the YAML parse path because the DOT references `agent="plan-scheduler"`.
 
