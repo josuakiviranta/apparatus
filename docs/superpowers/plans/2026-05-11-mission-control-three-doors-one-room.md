@@ -1793,7 +1793,7 @@ git commit -m "feat(mission-control-render): add 4 zoom-level formatters (render
 
 The challenge: `renderAll`/`renderProject`/`renderPipeline` are pure string emitters via `output.info`. `renderRun` must mount Ink — different surface. Extract the Ink mount into a tiny helper so `mission-control-render.ts` remains importable from non-Ink contexts (e.g. headless tests).
 
-- [ ] **Step 1: Write a failing test for `renderRun`'s static path**
+- [x] **Step 1: Write a failing test for `renderRun`'s static path**
 
 Append to `src/cli/tests/mission-control.test.ts`:
 
@@ -1824,12 +1824,12 @@ describe("renderRun — finished trace", () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails or hangs**
+- [x] **Step 2: Run to verify it fails or hangs**
 
 Run: `npx vitest run src/cli/tests/mission-control.test.ts -t "renderRun"`
 Expected: FAIL or hang (the placeholder prints `tracePath` only; no Ink mount). The implementing session can confirm whichever it sees.
 
-- [ ] **Step 3: Add `src/cli/lib/render-trace-view.ts`**
+- [x] **Step 3: Add `src/cli/lib/render-trace-view.ts`**
 
 ```ts
 // src/cli/lib/render-trace-view.ts
@@ -1871,7 +1871,7 @@ export async function renderTraceView(args: {
 }
 ```
 
-- [ ] **Step 4: Replace `renderRun` body in `mission-control-render.ts`**
+- [x] **Step 4: Replace `renderRun` body in `mission-control-render.ts`**
 
 ```ts
 import { renderTraceView } from "./render-trace-view.js";
@@ -1886,12 +1886,12 @@ export async function renderRun(s: MissionStateRun): Promise<void> {
 }
 ```
 
-- [ ] **Step 5: Run the new test + full suite + tsc**
+- [x] **Step 5: Run the new test + full suite + tsc**
 
 Run: `FORCE_COLOR=0 npx vitest run src/cli/tests/mission-control.test.ts && npx tsc --noEmit`
 Expected: PASS + clean.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/cli/lib/render-trace-view.ts src/cli/lib/mission-control-render.ts src/cli/tests/mission-control.test.ts

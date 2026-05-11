@@ -4,6 +4,7 @@ import type {
   MissionStateAll, MissionStateProject, MissionStatePipeline, MissionStateRun,
 } from "./mission-control.js";
 import type { RunSummary } from "./runs-index.js";
+import { renderTraceView } from "./render-trace-view.js";
 
 function glyph(o: RunSummary["outcome"]): string {
   return o === "success" ? "✓" : o === "failure" ? "✗" : o === "in-progress" ? "…" : "·";
@@ -86,9 +87,10 @@ export async function renderPipeline(s: MissionStatePipeline): Promise<void> {
 }
 
 export async function renderRun(s: MissionStateRun): Promise<void> {
-  // Ink-rendered leaf — wired in Chunk 4 (Task 4.1). For now, print the
-  // resolved trace path so consumers of the state module can fall back to a
-  // string display if invoked before the chunk-4 wire-up.
-  await output.info(`${s.project.path} / ${s.run.pipelineName ?? "(unknown)"} / ${s.run.runId}`);
-  await output.info(s.tracePath);
+  await output.info(`${s.project.path} / ${s.run.pipelineName ?? "(unknown)"} / ${s.run.runId}\n`);
+  await renderTraceView({
+    tracePath: s.tracePath,
+    runId: s.run.runId,
+    isLive: s.isLive,
+  });
 }

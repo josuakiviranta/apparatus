@@ -244,3 +244,28 @@ describe("mission-control-render — zoom-hint byte shape", () => {
     infoSpy.mockRestore();
   });
 });
+
+import { mkdtempSync as mkt2, mkdirSync as mkd2, writeFileSync as wf2, rmSync as rm2 } from "fs";
+import { join as j2 } from "path";
+import { tmpdir as t2 } from "os";
+
+describe("renderRun — finished trace", () => {
+  it("mounts PipelineTraceView and resolves after replay completes", async () => {
+    const projDir = mkt2(j2(t2(), "mc-render-run-"));
+    const runDir = j2(projDir, ".apparat", "runs", "r-z");
+    mkd2(runDir, { recursive: true });
+    wf2(j2(runDir, "pipeline.jsonl"),
+      JSON.stringify({ kind: "pipeline-start", pipelineName: "demo", timestamp: "2026-05-11T10:00:00Z" }) + "\n" +
+      JSON.stringify({ kind: "node-start", nodeId: "a", contextSnapshot: {} }) + "\n" +
+      JSON.stringify({ kind: "node-end",   success: true }) + "\n" +
+      JSON.stringify({ kind: "pipeline-end", outcome: "success", timestamp: "2026-05-11T10:00:01Z" }) + "\n"
+    );
+    registerProject(projDir);
+    const s = await getMissionControlState({
+      level: "run", projectPath: projDir, pipelineName: "demo", runId: "r-z",
+    });
+    if (s.level !== "run") throw new Error("type guard");
+    await renderRun(s);
+    rm2(projDir, { recursive: true });
+  });
+});
