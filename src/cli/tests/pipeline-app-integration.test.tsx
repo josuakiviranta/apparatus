@@ -18,6 +18,8 @@ describe("PipelineRunView integration: chat → summarize full flow", () => {
         pid={12345}
         goal={undefined}
         nodes={["chat", "summarize"]}
+        runId="test-run"
+        tracePath="/tmp/test-run/pipeline.jsonl"
         onReady={(cbs) => { captured = cbs; }}
       />,
     );
@@ -139,6 +141,8 @@ describe("PipelineRunView integration: chat → summarize full flow", () => {
         pid={1}
         goal={undefined}
         nodes={["chat"]}
+        runId="test-run"
+        tracePath="/tmp/test-run/pipeline.jsonl"
         onReady={(cbs) => { captured = cbs; }}
       />,
     );
