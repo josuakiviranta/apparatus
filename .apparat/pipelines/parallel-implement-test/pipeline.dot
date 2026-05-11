@@ -4,12 +4,25 @@ digraph parallel_implement_test {
   inputs="project, plan_path"
 
   start [shape=Mdiamond]
-  plan_scheduler [agent="plan-scheduler",
-                  default_parallel_worthwhile="",
-                  default_batch_count="",
-                  default_chunk_count=""]
+
+  plan_scheduler [agent="plan-scheduler"]
+
+  capture_pre_sha [type="tool",
+                   cwd="$project",
+                   script_file="capture-pre-sha.sh",
+                   produces_from_stdout="true",
+                   produces="pre_sha"]
+
+  batch_orchestrator [agent="batch_orchestrator"]
+
   done [shape=Msquare]
 
   start -> plan_scheduler
-  plan_scheduler -> done
+  plan_scheduler -> done           [condition="plan_scheduler.parallel_worthwhile=false"]
+  plan_scheduler -> capture_pre_sha [condition="plan_scheduler.parallel_worthwhile=true"]
+
+  capture_pre_sha -> batch_orchestrator
+
+  batch_orchestrator -> batch_orchestrator [condition="batch_orchestrator.done=false"]
+  batch_orchestrator -> done               [condition="batch_orchestrator.done=true"]
 }
