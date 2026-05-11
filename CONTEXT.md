@@ -202,6 +202,15 @@ That role disappeared with the lifecycle simplification.
 
 - `apparat heartbeat meditate` — **Removed 2026-05-06.** The bespoke heartbeat subcommand existed only because the bundled meditate pipeline could not run unattended. The pipeline now self-acquires `vision` via a `read_vision` tool node. Use `apparat heartbeat pipeline meditate --project <folder> --every <n>` instead.
 
+### Parallel-implementation pipeline
+
+`.apparat/pipelines/parallel-implement-test/` is a standalone test pipeline that drives DAG-scheduled parallel chunk implementation. It exercises a mechanism intended to replace the linear `implement` node in `illumination-to-implementation` once validated. Four pieces of vocabulary apply to it:
+
+- **plan_scheduler** — single-pass agent. Parses a chunked plan, computes a topological DAG over chunks by file-overlap, emits `<plan_path>.dag.json`. Read-only on source code; writes only `dag.json` and an append to `.gitignore`.
+- **batch_orchestrator** — deep-loop agent. Drives one batch of parallel chunk implementation per iteration. Sole writer of `dag.json` and sole owner of `git merge` into the main worktree. Dispatches per-chunk subagents into freshly-created git worktrees; gates batch acceptance on a single project-wide test run.
+- **merge_resolver** — deep-loop agent. Resolves one conflicted chunk per iteration by re-creating the conflict on disk and dispatching a Sonnet subagent. Caps at 3 resolution attempts per chunk before surfacing to the user.
+- **dag.json** — JSON file at `<plan_path>.dag.json` recording the topological DAG over a chunked plan. Written by `plan_scheduler`; mutated by `batch_orchestrator` and `merge_resolver`. Not committed (the scheduler appends it to `.gitignore` on first write). Schema in `src/cli/lib/dag-schema.ts`.
+
 ### Documentation channels
 
 apparatus has three documentation channels with disjoint roles:
