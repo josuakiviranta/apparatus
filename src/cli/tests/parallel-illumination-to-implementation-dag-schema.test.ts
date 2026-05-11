@@ -1,4 +1,4 @@
-// src/cli/tests/parallel-implement-test-dag-schema.test.ts
+// src/cli/tests/parallel-illumination-to-implementation-dag-schema.test.ts
 import { describe, it, expect } from "vitest";
 import { DagSchema, type Dag } from "../lib/dag-schema.js";
 

@@ -8,11 +8,10 @@ mcp: []
 loop: true
 maxIterations: 10
 inputs:
-  - plan_path
+  - plan_writer.plan_path
   - plan_scheduler.dag_path
 outputs:
   done: boolean
-  resolved_this_iteration: number
 ---
 
 # Mission
@@ -21,10 +20,12 @@ You resolve one conflicted chunk per deep-loop iteration. The `batch_orchestrato
 
 Each iteration runs in a fresh context window. Read `dag.json` at iteration start.
 
+Routing: when you emit `done:true` the pipeline routes BACK to `batch_orchestrator` (not to `tmux_tester`). The orchestrator picks up the next ready batch or detects all-merged. You and the orchestrator ping-pong until every chunk is either `merged` or `failed`.
+
 # Procedure
 
 1. **Read state.** `Read $plan_scheduler_dag_path`. Find the first chunk where `status = "conflicted"` AND `resolver_attempts < 3`.
-   - If none exists → emit terminal `{ "done": true, "resolved_this_iteration": 0 }`. Stop.
+   - If none exists → before emitting, transition any chunk with `status = "conflicted"` AND `resolver_attempts >= 3` to `status = "failed"` (write `dag.json`). This is the **loop-breaker**: without it, the orchestrator would re-emit `conflicts_present=true` on its next iteration and ping-pong with you forever. Once those are flipped, emit `{ "done": true }`. Stop.
 
 2. **Re-attempt the merge.** `cd $project`. `git -C $project merge --no-ff <chunk.branch>`. Expect non-zero exit (the conflict the orchestrator saw). Capture the list of unmerged paths:
 
@@ -32,14 +33,14 @@ Each iteration runs in a fresh context window. Read `dag.json` at iteration star
    git -C $project diff --name-only --diff-filter=U
    ```
 
-   If the merge succeeds cleanly (e.g. main was rewound; conflict no longer applies), treat that as success: commit (`git -C $project commit -m "resolve: <chunk.title>"`), mark chunk `status = "merged"`, mark plan checkbox `[x]`, remove the chunk's worktree, write `dag.json`, emit `{ "done": false, "resolved_this_iteration": 1 }`.
+   If the merge succeeds cleanly (e.g. main was rewound; conflict no longer applies), treat that as success: commit (`git -C $project commit -m "resolve: <chunk.title>"`), mark chunk `status = "merged"`, mark plan checkbox `[x]`, remove the chunk's worktree, write `dag.json`, emit `{ "done": false }`.
 
-3. **Discover the project test command.** Read `$project/package.json`. `scripts.test` → `npm test`, else `scripts["test:smoke"]` → `npm run test:smoke`, else hard fail (mark the chunk's `conflict_files = ["no test command available"]`, increment `resolver_attempts`, `git -C $project merge --abort`, emit `{ "done": false, "resolved_this_iteration": 0 }`).
+3. **Discover the project test command.** Read `$project/package.json`. `scripts.test` → `npm test`, else `scripts["test:smoke"]` → `npm run test:smoke`, else hard fail (mark the chunk's `conflict_files = ["no test command available"]`, increment `resolver_attempts`, `git -C $project merge --abort`, emit `{ "done": false }`).
 
 4. **Dispatch ONE Sonnet subagent for the resolution.** Use the `Task` tool with `subagent_type: "general-purpose"` (Sonnet by default). Pass the subagent:
    - The list of conflicted file paths (from step 2).
    - For each conflicted file: its current content (with `<<<<<<<` / `=======` / `>>>>>>>` markers). Use `Read` to fetch.
-   - The full body of the chunk from `$plan_path` (extract by `## Chunk N: <title>` heading match — read the plan, find the chunk record by `chunk.title`, slice from that heading to the next).
+   - The full body of the chunk from `$plan_writer_plan_path` (extract by `## Chunk N: <title>` heading match — read the plan, find the chunk record by `chunk.title`, slice from that heading to the next).
    - The chunk's `head_sha` (the subagent's worktree HEAD) and the main worktree's current HEAD — both as context.
 
    Subagent prompt skeleton (inline; no separate template file):
@@ -53,19 +54,19 @@ Each iteration runs in a fresh context window. Read `dag.json` at iteration star
 5. **Apply the resolution.** For each file in the subagent's `files` array: `Edit` (or `Write` if the file is being created from scratch) with the resolved content. `git -C $project add <conflict-files>`.
 
 6. **Run the project test suite once.** `cd $project && <test_command>`.
-   - **Green:** `git -C $project commit -m "resolve conflict: <chunk.title>"`. Mark chunk `status = "merged"`, set `merge_sha = <new HEAD>`. Flip plan checkbox `[x]` for the matching `## Chunk N` heading. `git -C $project worktree remove <chunk.worktree_path> --force`. Clear `worktree_path = null`. Write `dag.json`. Emit `{ "done": false, "resolved_this_iteration": 1 }`.
-   - **Red:** `git -C $project merge --abort`. Increment `resolver_attempts` by 1. Leave `status = "conflicted"`. Write `dag.json`. If `resolver_attempts >= 3`, the next iteration will skip this chunk (per step 1's filter); the chunk surfaces to the user via the terminal `done:true` emission. Emit `{ "done": false, "resolved_this_iteration": 0 }`.
+   - **Green:** `git -C $project commit -m "resolve conflict: <chunk.title>"`. Mark chunk `status = "merged"`, set `merge_sha = <new HEAD>`. Flip plan checkbox `[x]` for the matching `## Chunk N` heading. `git -C $project worktree remove <chunk.worktree_path> --force`. Clear `worktree_path = null`. Write `dag.json`. Emit `{ "done": false }`.
+   - **Red:** `git -C $project merge --abort`. Increment `resolver_attempts` by 1. Leave `status = "conflicted"`. Write `dag.json`. If `resolver_attempts >= 3`, the next iteration's step 1 will flip this chunk to `status = "failed"` (the loop-breaker) so the orchestrator stops re-routing here. Emit `{ "done": false }`.
 
 7. **Emit JSON.** Per the conditions in steps 1, 2, 6.
 
 # Hard rules
 
 - You resolve EXACTLY ONE chunk per iteration. Multiple conflicted chunks are addressed across multiple iterations.
-- You are the SOLE writer of `dag.json` during your deep loop (orchestrator already finished).
+- You are the SOLE writer of `dag.json` during your deep loop. The orchestrator does NOT run concurrently — it is paused by the pipeline engine until you emit `done:true` and it resumes.
 - You NEVER edit source code based on your own judgment — the resolution comes from your dispatched Sonnet subagent. Your edits to source files are mechanical applications of the subagent's returned content.
 - You NEVER cap retries by aborting mid-loop — the cap is enforced by step 1's filter (`resolver_attempts < 3`).
 - You NEVER push to remote.
-- If a `merge --abort` fails (working tree state is inconsistent), surface immediately with `{ "done": true, "resolved_this_iteration": 0 }` and the user inspects.
+- If a `merge --abort` fails (working tree state is inconsistent), surface immediately with `{ "done": true }` and the user inspects.
 
 # Output
 
@@ -73,8 +74,7 @@ Final TEXT response of each iteration:
 
 ```json
 {
-  "done": <bool>,
-  "resolved_this_iteration": <int>
+  "done": <bool>
 }
 ```
 

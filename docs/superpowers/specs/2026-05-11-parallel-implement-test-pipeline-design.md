@@ -1,7 +1,9 @@
 # Design: `parallel-implement-test` pipeline — DAG-scheduled parallel implementation via local git worktrees
 
+> **Folder renamed 2026-05-11** to `.apparat/pipelines/parallel-illumination-to-implementation/`. The triage head and verification tail from `illumination-to-implementation` were spliced in around the parallel-impl chain; the v1 test-pipeline framing in this doc is historical. References to `parallel-implement-test` below describe the original folder layout. The pipeline is now the parallel analogue of `illumination-to-implementation`, not a standalone plan-driven test.
+
 **Date:** 2026-05-11
-**Status:** shipped (chunks 1-3 landed; follow-up: swap implement node in illumination-to-implementation)
+**Status:** shipped (chunks 1-3 landed; merged into the renamed pipeline 2026-05-11 with head + tail spliced in)
 **Originating discussion:** in-conversation grilling on parallelising the implement phase of `illumination-to-implementation`. No illumination file — this is forward design, not a defect.
 
 ## 1. Motivation

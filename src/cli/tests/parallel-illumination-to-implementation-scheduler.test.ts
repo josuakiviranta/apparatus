@@ -1,11 +1,11 @@
-// src/cli/tests/parallel-implement-test-scheduler.test.ts
+// src/cli/tests/parallel-illumination-to-implementation-scheduler.test.ts
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { scheduleFromPlan, type SchedulerResult } from "../lib/dag-scheduler.js";
 
 const fixture = (name: string) =>
-  readFileSync(resolve(__dirname, "fixtures/parallel-implement-test", name), "utf-8");
+  readFileSync(resolve(__dirname, "fixtures/parallel-illumination-to-implementation", name), "utf-8");
 
 describe("dag-scheduler", () => {
   it("all-parallel fixture: batch_count=1, every chunk depends_on=[]", () => {

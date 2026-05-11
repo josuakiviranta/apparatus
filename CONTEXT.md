@@ -204,7 +204,7 @@ That role disappeared with the lifecycle simplification.
 
 ### Parallel-implementation pipeline
 
-`.apparat/pipelines/parallel-implement-test/` is a standalone test pipeline that drives DAG-scheduled parallel chunk implementation. It exercises a mechanism intended to replace the linear `implement` node in `illumination-to-implementation` once validated. Four pieces of vocabulary apply to it:
+`.apparat/pipelines/parallel-illumination-to-implementation/` is the parallel-implementation analogue of `illumination-to-implementation`. Same head (verifier + chat refinement loop + approval gate + design_writer + plan_writer) and same tail (tmux_tester + tmux_confirm_gate + memory_writer + memory_reflector); the linear `implement` node in the middle is replaced by a three-node parallel chain. Validates the mechanism end-to-end against real illuminations; once stable, the parallel-impl nodes collapse into `illumination-to-implementation` directly and this folder retires. Four pieces of vocabulary apply to it:
 
 - **plan_scheduler** — single-pass agent. Parses a chunked plan, computes a topological DAG over chunks by file-overlap, emits `<plan_path>.dag.json`. Read-only on source code; writes only `dag.json` and an append to `.gitignore`.
 - **batch_orchestrator** — deep-loop agent. Drives one batch of parallel chunk implementation per iteration. Sole writer of `dag.json` and sole owner of `git merge` into the main worktree. Dispatches per-chunk subagents into freshly-created git worktrees; gates batch acceptance on a single project-wide test run.

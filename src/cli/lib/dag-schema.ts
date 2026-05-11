@@ -7,6 +7,7 @@ export const ChunkStatusSchema = z.enum([
   "green",
   "merged",
   "conflicted",
+  "failed",
   "blocked",
 ]);
 export type ChunkStatus = z.infer<typeof ChunkStatusSchema>;

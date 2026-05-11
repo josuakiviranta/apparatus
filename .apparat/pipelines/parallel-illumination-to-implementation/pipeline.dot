@@ -1,11 +1,38 @@
-digraph parallel_implement_test {
-  goal="Test DAG-scheduled parallel implementation of a pre-written plan via local worktrees"
+// Head + tail copied from .apparat/pipelines/illumination-to-implementation/pipeline.dot
+// (verifier, chat loop, approval gate, design_writer, plan_writer at head; tmux_tester +
+// memory_writer + memory_reflector at tail). Keep in sync until parallel-impl is promoted
+// into illumination-to-implementation directly.
+digraph parallel_illumination_to_implementation {
+  goal="Triage an illumination into an approved plan, then ship it through DAG-scheduled parallel implementation"
   headless_safe=false
-  inputs="project, plan_path"
+  inputs="project, run_id"
 
   start [shape=Mdiamond]
 
-  plan_scheduler [agent="plan-scheduler"]
+  // ── Phase 1: Illumination triage (copied from illumination-to-implementation) ──
+
+  verifier [agent="verifier", default_refinements="", default_illumination_path=""]
+
+  remove_gate [shape=hexagon]
+
+  consume_declined [type="tool",
+                    cwd="$project",
+                    script_file="consume.mjs",
+                    script_args="$verifier.illumination_path declined"]
+
+  explainer [agent="change-explainer", default_refinements=""]
+
+  approval_gate [shape=hexagon, default_refinements=""]
+
+  chat_session [agent="chat-refiner", interactive=true, default_refinements=""]
+
+  chat_summarizer [agent="chat-summarizer", default_refinements=""]
+
+  design_writer [agent="design-writer", default_refinements="No interactive refinements were requested."]
+
+  plan_writer [agent="plan-writer", default_refinements="No interactive refinements were requested."]
+
+  // ── Phase 2: Parallel implementation (existing chain, rewired) ─────────────────
 
   capture_pre_sha [type="tool",
                    cwd="$project",
@@ -13,22 +40,72 @@ digraph parallel_implement_test {
                    produces_from_stdout="true",
                    produces="pre_sha"]
 
+  plan_scheduler [agent="plan-scheduler"]
+
   batch_orchestrator [agent="batch_orchestrator"]
 
   merge_resolver [agent="merge_resolver"]
 
+  // ── Phase 3: Verification + memory (tail copied from illumination-to-implementation) ──
+
+  tmux_tester [agent="tmux-tester"]
+
+  tmux_confirm_gate [shape=hexagon]
+
+  memory_writer [agent="memory-writer", default_test_result="", default_test_summary="", default_illumination_path=""]
+
+  memory_reflector [agent="memory-reflector", default_illumination_path=""]
+
   done [shape=Msquare]
 
-  start -> plan_scheduler
-  plan_scheduler -> done           [condition="plan_scheduler.parallel_worthwhile=false"]
-  plan_scheduler -> capture_pre_sha [condition="plan_scheduler.parallel_worthwhile=true"]
+  // ── Routing: Phase 1 ─────────────────────────────────────────────────────
+  start -> verifier
+  verifier -> remove_gate      [condition="verifier.preferred_label=false"]
+  verifier -> explainer        [condition="verifier.preferred_label=true"]
+  verifier -> done             [condition="verifier.preferred_label=empty"]
 
-  capture_pre_sha -> batch_orchestrator
+  // False path
+  remove_gate -> consume_declined  [label="Archive"]
+  remove_gate -> done              [label="Keep"]
+  remove_gate -> chat_session      [label="Chat"]
 
-  batch_orchestrator -> batch_orchestrator [condition="batch_orchestrator.done=false"]
+  // True path
+  explainer -> approval_gate
+  approval_gate -> consume_declined  [label="Decline"]
+  approval_gate -> design_writer     [label="Approve"]
+  approval_gate -> chat_session      [label="Chat"]
+
+  // Chat loop — scope_changed=true rewinds to verifier; false re-renders explainer only.
+  chat_session -> chat_summarizer
+  chat_summarizer -> verifier  [condition="chat_summarizer.scope_changed=true"]
+  chat_summarizer -> explainer [condition="chat_summarizer.scope_changed=false"]
+
+  // Decline branch terminator
+  consume_declined -> done
+
+  // ── Routing: Phase 2 ─────────────────────────────────────────────────────
+  // plan_writer hands plan_path to capture_pre_sha (HEAD baseline before any impl work),
+  // then plan_scheduler reads the plan to compute the DAG, then batch_orchestrator drives
+  // parallel implementation via local worktrees.
+  design_writer -> plan_writer -> capture_pre_sha -> plan_scheduler -> batch_orchestrator
+
+  // Routing: conflicts route fires first (engine picks first matching condition).
+  // Orchestrator emits done=true ONLY when every chunk is merged. Conflicts route
+  // to resolver, which routes back to orchestrator after each resolution so the
+  // next ready batch can be dispatched.
   batch_orchestrator -> merge_resolver     [condition="batch_orchestrator.conflicts_present=true"]
-  batch_orchestrator -> done               [condition="batch_orchestrator.conflicts_present=false"]
+  batch_orchestrator -> batch_orchestrator [condition="batch_orchestrator.done=false"]
+  batch_orchestrator -> tmux_tester        [condition="batch_orchestrator.done=true"]
 
   merge_resolver -> merge_resolver         [condition="merge_resolver.done=false"]
-  merge_resolver -> done                   [condition="merge_resolver.done=true"]
+  merge_resolver -> batch_orchestrator     [condition="merge_resolver.done=true"]
+
+  // ── Routing: Phase 3 ─────────────────────────────────────────────────────
+  // No review_gate — orchestrator/resolver feed tmux_tester directly per design.
+  tmux_tester -> tmux_confirm_gate
+  tmux_confirm_gate -> memory_writer [label="Commit"]
+  tmux_confirm_gate -> tmux_tester   [label="Retry"]
+
+  memory_writer -> memory_reflector
+  memory_reflector -> done
 }

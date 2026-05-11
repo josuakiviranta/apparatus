@@ -1,5 +1,7 @@
 # Parallel-implement-test Pipeline Implementation Plan
 
+> **Folder renamed 2026-05-11** to `.apparat/pipelines/parallel-illumination-to-implementation/`. The original folder name (`parallel-implement-test`) appears throughout this plan as the historical chunk record. References below describe the original layout; the pipeline now lives at the new path with the verifier-to-plan-writer head and the tmux_tester-to-memory_reflector tail spliced in.
+
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Ship a standalone test pipeline at `.apparat/pipelines/parallel-implement-test/` that parallelises chunk implementation via local git worktrees — scheduler emits a DAG, orchestrator dispatches per-chunk subagents into worktrees and topologically merges, resolver fixes conflicts. Validates the mechanism without modifying `illumination-to-implementation`.

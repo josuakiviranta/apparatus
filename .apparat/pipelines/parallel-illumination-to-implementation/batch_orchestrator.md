@@ -8,7 +8,7 @@ mcp: []
 loop: true
 maxIterations: 20
 inputs:
-  - plan_path
+  - plan_writer.plan_path
   - plan_scheduler.dag_path
   - capture_pre_sha.pre_sha
 outputs:
@@ -31,14 +31,15 @@ Each iteration runs in a fresh context window. Per-iteration state lives in `dag
 
 2. **Compute the ready batch.**
    - Filter chunks where `status = "ready"` AND every chunk in `depends_on` has `status = "merged"`.
-   - If batch is empty AND any chunk has `status = "conflicted"` → emit terminal `{ "done": true, "conflicts_present": true, "reason": "conflicts_to_resolve" }`. Stop.
-   - If batch is empty AND no `conflicted` chunks → emit terminal `{ "done": true, "conflicts_present": false, "reason": "no_chunks_remaining" }`. Stop.
+   - If batch is empty AND any chunk has `status = "conflicted"` → emit `{ "done": false, "conflicts_present": true, "reason": "conflicts_to_resolve" }`. Stop. (Pipeline routes to `merge_resolver`, which routes back here after the conflict clears or the chunk is marked `failed`.)
+   - If batch is empty AND every chunk has `status` in `{"merged", "failed"}` (terminal states) → emit terminal `{ "done": true, "conflicts_present": false, "reason": "no_chunks_remaining" }`. Stop. The pipeline advances to `tmux_tester` against whatever did merge. Any `failed` chunks surface to the user via `dag.json`.
+   - If batch is empty AND chunks remain `ready` or `blocked` with unresolved dependencies on `failed` chunks (transitive dead-end) → emit terminal `{ "done": true, "conflicts_present": false, "reason": "stuck" }`. Stop. Same terminal route; user inspects `dag.json` to find the unreachable chunks.
 
 3. **Choose the worktree base.**
    - First iteration (no chunks have ever been merged): base = `dag.pre_sha`.
    - Subsequent iterations: base = `git -C $project rev-parse HEAD` (current main HEAD). Use Bash to read the SHA; do not trust stale values.
 
-4. **Read the subagent prompt template.** `Read .apparat/pipelines/parallel-implement-test/subagent-prompt-template.md` once. You will interpolate `{{double-brace}}` tokens per-chunk by string replacement before passing to `Task`.
+4. **Read the subagent prompt template.** `Read .apparat/pipelines/parallel-illumination-to-implementation/subagent-prompt-template.md` once. You will interpolate `{{double-brace}}` tokens per-chunk by string replacement before passing to `Task`.
 
 5. **Discover the project test command.** Read `$project/package.json`. If `scripts.test` exists → `test_command = "npm test"`. Else if `scripts["test:smoke"]` exists → `test_command = "npm run test:smoke"`. Else → emit `{ "done": false, "reason": "no_diff_produced", "conflicts_present": false }` and stop the iteration (the user must add a test script for the pipeline to be useful).
 
@@ -59,12 +60,21 @@ Each iteration runs in a fresh context window. Per-iteration state lives in `dag
    - On clean exit: do NOT mark `merged` yet; wait for the post-merge test gate in step 9.
 
 9. **Run the project-wide test suite once.** `cd $project && {{test_command}}` (use Bash). Count successful merge commits created in step 8 — call this `merge_count`.
-   - **Green:** For every chunk just merged this batch: set `status = "merged"`, `merge_sha = <git -C $project rev-parse HEAD~N>` where N is its index from the end of the merge sequence. Edit `$plan_path` to flip each chunk's checkbox `- [ ]` → `- [x]` for the corresponding `## Chunk N` heading. `git -C $project commit --amend --no-edit -a` to fold the plan-checkbox edit into the final merge commit (so one commit per merged chunk remains in history). Write `dag.json` back.
+   - **Green:** For every chunk just merged this batch: set `status = "merged"`, `merge_sha = <git -C $project rev-parse HEAD~N>` where N is its index from the end of the merge sequence. Edit `$plan_writer_plan_path` to flip each chunk's checkbox `- [ ]` → `- [x]` for the corresponding `## Chunk N` heading. `git -C $project commit --amend --no-edit -a` to fold the plan-checkbox edit into the final merge commit (so one commit per merged chunk remains in history). Write `dag.json` back.
    - **Red:** `git -C $project reset --hard HEAD~<merge_count>`. For every chunk just merged this batch: set `status = "conflicted"`, `conflict_files = ["<test-failure-output>"]`. Write `dag.json` back.
 
 10. **Tear down green-chunk worktrees.** For every chunk now `status = "merged"`: `git -C $project worktree remove <chunk.worktree_path> --force`. Clear `worktree_path = null`. Write `dag.json` back. Conflicted chunks KEEP their worktrees (resolver needs them).
 
-11. **Pre-emit termination check.** Re-read `dag.json`. If no chunks remain with `status` in `{"ready", "blocked"}` (every chunk is `merged`, `conflicted`, or done) → emit terminal `done:true` per step 2's rules. Else emit `{ "done": false, "conflicts_present": <any-conflicted-so-far>, "reason": "" }`.
+11. **Pre-emit termination check.** Re-read `dag.json`. Compute:
+    - `terminal` = every chunk has `status` in `{"merged", "failed"}`.
+    - `any_conflicted` = any chunk has `status = "conflicted"`.
+
+    Emit:
+    - `terminal=true` → `{ "done": true, "conflicts_present": false, "reason": "no_chunks_remaining" }`. Pipeline advances to `tmux_tester` against whatever merged.
+    - `any_conflicted=true` → `{ "done": false, "conflicts_present": true, "reason": "conflicts_to_resolve" }`. Pipeline routes to `merge_resolver`; resolver routes back here after each resolution.
+    - Otherwise (ready/blocked chunks remain, no conflicts) → `{ "done": false, "conflicts_present": false, "reason": "" }`. Deep-loop re-invokes this agent for the next batch.
+
+    **NEVER emit `done:true` while any chunk's status is `conflicted` or `ready` or `blocked`.** `done:true` means "every chunk has reached a terminal state (`merged` or `failed`)"; any earlier exit must be `done:false` paired with the right `conflicts_present` / `reason` so the pipeline routes correctly.
 
 # Hard rules
 
@@ -74,7 +84,7 @@ Each iteration runs in a fresh context window. Per-iteration state lives in `dag
 - Plan checkboxes (`- [ ]` ↔ `- [x]`) are YOUR edits, not the subagents'.
 - Worktree teardown is YOUR responsibility. Create-on-dispatch (step 6 — actually the subagent creates its own per the template), destroy-on-merge.
 - Per-iteration state lives on the filesystem. Re-read `dag.json` and `git -C $project rev-parse HEAD` at iteration start; do not assume continuity from a prior iteration's context.
-- If you find yourself about to call Edit on a source file (anything outside `$plan_path`, `dag.json`, or `.gitignore`), STOP — you have crossed your contract.
+- If you find yourself about to call Edit on a source file (anything outside `$plan_writer_plan_path`, `dag.json`, or `.gitignore`), STOP — you have crossed your contract.
 
 # Output
 

@@ -1,5 +1,5 @@
-digraph parallel_implement_test_smoke {
-  goal="Smoke-test parallel-implement-test wiring via a stubbed orchestrator"
+digraph parallel_illumination_to_implementation_smoke {
+  goal="Smoke-test parallel-illumination-to-implementation wiring via a stubbed orchestrator"
   headless_safe=true
   inputs="project, plan_path"
 
@@ -9,13 +9,13 @@ digraph parallel_implement_test_smoke {
 
   capture_pre_sha [type="tool",
                    cwd="$project",
-                   script_file="parallel-implement-test/capture-pre-sha.sh",
+                   script_file="parallel-illumination-to-implementation/capture-pre-sha.sh",
                    produces_from_stdout="true",
                    produces="pre_sha"]
 
   batch_orchestrator_stub [type="tool",
                           cwd="$project",
-                          script_file="parallel-implement-test/batch-orchestrator-stub.sh",
+                          script_file="parallel-illumination-to-implementation/batch-orchestrator-stub.sh",
                           script_args="$plan_scheduler.dag_path $plan_path",
                           produces_from_stdout="true",
                           produces="orchestrator_result"]

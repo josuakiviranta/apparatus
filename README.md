@@ -108,19 +108,20 @@ Every non-leaf output ends with a `zoom in:` line containing the exact next comm
 
 Tool nodes can externalise their logic into a sibling script file next to `pipeline.dot` rather than embedding shell in the `.dot` file. Reference the script from a node with `script_file="<name>.<ext>"` (resolved relative to the pipeline folder), plus optional `script_args="..."` and `produces_from_stdout="<context-key>"`. See [`.apparat/pipelines/illumination-to-implementation/consume.mjs`](.apparat/pipelines/illumination-to-implementation/consume.mjs) for a working example, and the [design doc](docs/superpowers/specs/2026-04-17-pipeline-script-files-design.md) for the full attribute surface and rationale.
 
-### Parallel-implement test pipeline
+### Parallel illumination-to-implementation pipeline
 
-`.apparat/pipelines/parallel-implement-test/` is a standalone pipeline that drives a pre-written implementation plan through DAG-scheduled parallel execution. The scheduler reads the plan, computes a topological DAG over chunks by file-overlap, and emits `<plan_path>.dag.json`. The orchestrator deep-loops one batch per iteration — one Opus subagent per chunk, each in its own `git worktree`, then topological merge into main with a single batch-level test gate. The resolver picks up any conflicted chunks (capped at 3 attempts each) and dispatches a Sonnet subagent for the resolution.
+`.apparat/pipelines/parallel-illumination-to-implementation/` is the parallel-implementation analogue of `illumination-to-implementation`. It takes an illumination through the same triage head (verifier → chat refinement loop → approval gate → design_writer → plan_writer), then ships the plan through DAG-scheduled parallel execution (plan_scheduler → batch_orchestrator → merge_resolver), then through the same verification + memory tail (tmux_tester → tmux_confirm_gate → memory_writer → memory_reflector). The orchestrator deep-loops one batch per iteration — one Opus subagent per chunk, each in its own `git worktree`, then topological merge into main with a single batch-level test gate. The resolver picks up any conflicted chunks (capped at 3 attempts each) and dispatches a Sonnet subagent for the resolution.
 
 Invocation:
 
 ````bash
-apparat pipeline run .apparat/pipelines/parallel-implement-test/pipeline.dot \
-  --project <project-folder> \
-  --var plan_path=<path-to-plan>
+apparat pipeline run .apparat/pipelines/parallel-illumination-to-implementation/pipeline.dot \
+  --project <project-folder>
 ````
 
-The pipeline is a v1 test of the parallel-implementation mechanism; once validated against ≥3 real plans, a follow-up spec will swap the `implement` node in `illumination-to-implementation` for this three-node chain. Requires the project to declare a `scripts.test` key in `package.json`.
+The pipeline is `headless_safe=false` (interactive chat refinement) and requires running inside a tmux session — `tmux_tester` opens a sibling window named `test-$run_id` you can attach to and watch. Requires the project to declare a `scripts.test` key in `package.json`.
+
+The pipeline is a v1 test of the parallel-implementation mechanism; once validated against ≥3 real illuminations, a follow-up spec will collapse the three parallel-impl nodes into `illumination-to-implementation` directly and retire this folder.
 
 ### Pipeline tool nodes and `cwd=`
 

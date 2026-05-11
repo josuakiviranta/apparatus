@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# pipelines/smoke/parallel-implement-test/setup-fixture.sh
+# pipelines/smoke/parallel-illumination-to-implementation/setup-fixture.sh
 # Bootstrap a throwaway project dir for the smoke. Caller passes $1 = target path.
 set -euo pipefail
 script_dir="$(cd "$(dirname "$0")" && pwd)"

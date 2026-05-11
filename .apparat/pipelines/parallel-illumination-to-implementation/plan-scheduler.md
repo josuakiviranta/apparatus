@@ -12,21 +12,18 @@ tools:
   - Glob
 mcp: []
 inputs:
-  - plan_path
+  - plan_writer.plan_path
 outputs:
   dag_path: string
-  parallel_worthwhile: boolean
-  batch_count: number
-  chunk_count: number
 ---
 
 # Mission
 
-Parse the chunked implementation plan at `$plan_path`, compute a topological DAG over chunks by file-overlap, and write the result to `<plan_path>.dag.json`. You are single-pass — no deep loop, no subagent dispatch. Your role is to read a plan and emit a deterministic DAG.
+Parse the chunked implementation plan at `$plan_writer_plan_path`, compute a topological DAG over chunks by file-overlap, and write the result to `<plan_path>.dag.json`. You are single-pass — no deep loop, no subagent dispatch. Your role is to read a plan and emit a deterministic DAG.
 
 # Procedure
 
-1. **Read the plan.** `Read $plan_path` in full. Confirm the file exists; if not, fail with a clear error message naming the path.
+1. **Read the plan.** `Read $plan_writer_plan_path` in full. Confirm the file exists; if not, fail with a clear error message naming the path.
 
 2. **Parse chunks.** Find every `## Chunk N: <title>` heading (regex `^##\s+Chunk\s+(\d+):\s+(.+)$`, multiline). For each chunk, capture the body (everything between this heading and the next chunk heading, or end-of-file for the last).
 
@@ -34,7 +31,7 @@ Parse the chunked implementation plan at `$plan_path`, compute a topological DAG
 
 4. **Compute `depends_on`.** For chunk B at index i: for each chunk A at index j < i, if `A.files_touched ∩ B.files_touched` is non-empty, append A's id to B's `depends_on`. Chunk ids are `c1`, `c2`, … in textual order. If B has empty `files_touched`, set `depends_on = [c1, c2, …, c{i}]` (every previous chunk) and emit a warning in your final text response.
 
-5. **Compute topological batches** via Kahn's algorithm. `batch_count` = number of batches. `parallel_worthwhile = batch_count < chunk_count`.
+5. **Compute topological batches** via Kahn's algorithm. Store the batch breakdown inside `dag.json` for the orchestrator to consume; the scheduler does not surface it as a separate output.
 
 6. **Write `dag.json`.** Path: `<plan_path>.dag.json`. Shape:
 
@@ -74,10 +71,7 @@ Parse the chunked implementation plan at `$plan_path`, compute a topological DAG
 
    ```json
    {
-     "dag_path": "<absolute or repo-relative path to dag.json>",
-     "parallel_worthwhile": <bool>,
-     "batch_count": <int>,
-     "chunk_count": <int>
+     "dag_path": "<absolute or repo-relative path to dag.json>"
    }
    ```
 
@@ -86,7 +80,7 @@ Parse the chunked implementation plan at `$plan_path`, compute a topological DAG
 - Single-pass. No subagent dispatch. No `Task` tool calls (it is not in your allowlist).
 - Read-only on source code. Your only writes are `<plan_path>.dag.json` and the optional `.gitignore` append.
 - No LLM creativity in the DAG construction — the algorithm is mechanical. If you find yourself "interpreting" a chunk's intent to guess dependencies, stop: stick to literal `Files:` stanza overlap.
-- If the plan has zero chunks, emit `{ "dag_path": "<path>", "parallel_worthwhile": false, "batch_count": 0, "chunk_count": 0 }` with an empty `chunks` array in the file.
+- If the plan has zero chunks, emit `{ "dag_path": "<path>" }` with an empty `chunks` array in the file.
 - Warnings (e.g. "chunk c2 has no files_touched") go in your text response *before* the final JSON, not inside the JSON.
 
 # Output

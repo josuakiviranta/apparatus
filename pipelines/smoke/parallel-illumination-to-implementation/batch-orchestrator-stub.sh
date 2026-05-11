@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# pipelines/smoke/parallel-implement-test/batch-orchestrator-stub.sh
+# pipelines/smoke/parallel-illumination-to-implementation/batch-orchestrator-stub.sh
 # Deterministic stand-in for the batch_orchestrator agent during smoke runs.
 # Reads $1 = dag.json path, $2 = plan path.
 # cwd is already set to the project directory by the pipeline (cwd=$project).

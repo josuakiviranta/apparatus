@@ -1,4 +1,4 @@
-<!-- pipelines/smoke/parallel-implement-test/plan.md -->
+<!-- pipelines/smoke/parallel-illumination-to-implementation/plan.md -->
 # Smoke plan — two trivially-disjoint chunks
 
 ## Chunk 1: add foo.txt
