@@ -1903,7 +1903,7 @@ git commit -m "feat(mission-control): renderRun mounts PipelineTraceView, exits 
 **Files:**
 - Modify: `src/cli/commands/status.ts` (full rewrite)
 
-- [ ] **Step 1: Write failing tests for the new `statusCommand`**
+- [x] **Step 1: Write failing tests for the new `statusCommand`**
 
 Create `src/cli/tests/status-command.test.ts`:
 
@@ -1971,12 +1971,12 @@ describe("statusCommand (project arg)", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run src/cli/tests/status-command.test.ts`
 Expected: FAIL — current `statusCommand()` takes no args and doesn't handle positional zoom or error-exit.
 
-- [ ] **Step 3: Replace `src/cli/commands/status.ts` body**
+- [x] **Step 3: Replace `src/cli/commands/status.ts` body**
 
 ```ts
 // src/cli/commands/status.ts
@@ -2020,12 +2020,12 @@ function toZoom(args: StatusArgs): MissionZoom {
 }
 ```
 
-- [ ] **Step 4: Run tests + tsc**
+- [x] **Step 4: Run tests + tsc**
 
 Run: `npx vitest run src/cli/tests/status-command.test.ts && npx tsc --noEmit`
 Expected: PASS + clean.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/cli/commands/status.ts src/cli/tests/status-command.test.ts
