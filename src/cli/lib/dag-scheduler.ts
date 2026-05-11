@@ -92,7 +92,7 @@ function transitiveReduce(deps: string[], chunks: ChunkRecord[]): string[] {
   if (deps.length <= 1) return deps;
   const byId = new Map(chunks.map((c) => [c.id, c]));
 
-  function reachable(from: string, exclude: string): Set<string> {
+  function reachable(from: string): Set<string> {
     const visited = new Set<string>();
     const queue = [from];
     while (queue.length > 0) {
@@ -109,7 +109,7 @@ function transitiveReduce(deps: string[], chunks: ChunkRecord[]): string[] {
 
   return deps.filter((dep) => {
     // Keep dep only if it's NOT reachable from another dep in the set
-    return !deps.some((other) => other !== dep && reachable(other, dep).has(dep));
+    return !deps.some((other) => other !== dep && reachable(other).has(dep));
   });
 }
 
