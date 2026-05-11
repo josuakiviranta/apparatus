@@ -2037,7 +2037,7 @@ git commit -m "refactor(status): delegate to mission-control with positional zoo
 **Files:**
 - Modify: `src/cli/program.ts`
 
-- [ ] **Step 1: Write a failing test for the new help wording**
+- [x] **Step 1: Write a failing test for the new help wording**
 
 Append to `src/cli/tests/pipeline.test.ts` (or create `src/cli/tests/program-help.test.ts` if you prefer isolation):
 
@@ -2060,12 +2060,12 @@ describe("createProgram help text", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run src/cli/tests/pipeline.test.ts -t "createProgram help text"`
 Expected: FAIL — current help mentions `apparat watch` and `pipeline list`.
 
-- [ ] **Step 3: Edit `src/cli/program.ts`**
+- [x] **Step 3: Edit `src/cli/program.ts`**
 
 Concrete edits (apply each):
 
@@ -2106,12 +2106,12 @@ Concrete edits (apply each):
                                                      # live tails if the run is in-progress
      ```
 
-- [ ] **Step 4: Run help test + full suite + tsc**
+- [x] **Step 4: Run help test + full suite + tsc**
 
 Run: `npx vitest run src/cli/tests/pipeline.test.ts && npx tsc --noEmit`
 Expected: help test PASS; full suite has failing cases left for tasks 4.4–4.5 — that's expected this step.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/cli/program.ts src/cli/tests/pipeline.test.ts
