@@ -154,7 +154,7 @@ git commit -m "feat(parallel-impl): zod schema for dag.json"
 - Create: `src/cli/tests/fixtures/parallel-implement-test/plan-all-serial.md`
 - Create: `src/cli/tests/fixtures/parallel-implement-test/plan-mixed.md`
 
-- [ ] **Step 1: Write `plan-all-parallel.md`** — three chunks, each touches a unique file.
+- [x] **Step 1: Write `plan-all-parallel.md`** — three chunks, each touches a unique file.
 
 ```markdown
 # All-parallel fixture
@@ -172,7 +172,7 @@ git commit -m "feat(parallel-impl): zod schema for dag.json"
 - Create: `src/cli/lib/baz.ts`
 ```
 
-- [ ] **Step 2: Write `plan-all-serial.md`** — three chunks, all touching the same file.
+- [x] **Step 2: Write `plan-all-serial.md`** — three chunks, all touching the same file.
 
 ```markdown
 # All-serial fixture
@@ -190,7 +190,7 @@ git commit -m "feat(parallel-impl): zod schema for dag.json"
 - Modify: `src/cli/lib/shared.ts`
 ```
 
-- [ ] **Step 3: Write `plan-mixed.md`** — five chunks per spec §4.7 Fixture C.
+- [x] **Step 3: Write `plan-mixed.md`** — five chunks per spec §4.7 Fixture C.
 
 ```markdown
 # Mixed fixture
@@ -216,7 +216,7 @@ git commit -m "feat(parallel-impl): zod schema for dag.json"
 - Create: `src/cli/lib/z.ts`
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/cli/tests/fixtures/parallel-implement-test/
