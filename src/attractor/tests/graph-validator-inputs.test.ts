@@ -105,6 +105,41 @@ body`,
     const diags = validateGraph(graph, dir);
     expect(diags.find(d => d.rule === "unknown_source_node")).toBeUndefined();
   });
+
+  it("errors when gate inputs reference a non-existent node", () => {
+    const dir = join(tmpdir(), `rule-usn-gate-${Date.now()}`);
+    setup(dir, {
+      "batch_orchestrator.md": `---
+name: batch_orchestrator
+description: x
+inputs: []
+outputs: { done: boolean }
+---
+body`,
+      "tmux_confirm_gate.md": `---
+type: gate
+choices: [Approve, Retry]
+inputs: [implement.done]
+---
+gate body`,
+    });
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      batch_orchestrator [agent="batch_orchestrator"]
+      tmux_confirm_gate [shape=hexagon]
+      done [shape=Msquare]
+      start -> batch_orchestrator -> tmux_confirm_gate -> done
+    }`;
+    writeFileSync(join(dir, "p.dot"), dot);
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    const d = diags.find(
+      x => x.rule === "unknown_source_node" && /Gate "tmux_confirm_gate"/.test(x.message),
+    );
+    expect(d).toBeDefined();
+    expect(d!.severity).toBe("error");
+    expect(d!.message).toMatch(/source node "implement"/);
+  });
 });
 
 describe("validator — source_missing_output_key", () => {
