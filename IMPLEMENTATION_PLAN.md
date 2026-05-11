@@ -1495,11 +1495,11 @@ Cleanup: `rm -rf "$TMP"`.
 - Modify: `README.md`
 - Modify: `CONTEXT.md`
 
-- [ ] **Step 1: Read the existing README "Pipeline script files" surface**
+- [x] **Step 1: Read the existing README "Pipeline script files" surface**
 
 Run: `npx tsx src/cli/index.ts --help | head -40` to confirm command surface. Then Read `README.md` around line 117 (the "Pipeline script files" section).
 
-- [ ] **Step 2: Insert one paragraph in README under "Pipeline script files"**
+- [x] **Step 2: Insert one paragraph in README under "Pipeline script files"**
 
 Locate the section header `### Pipeline script files`. After its closing example reference (around `README.md:118`), insert:
 
@@ -1519,13 +1519,13 @@ apparat pipeline run .apparat/pipelines/parallel-implement-test/pipeline.dot \
 The pipeline is a v1 test of the parallel-implementation mechanism; once validated against ≥3 real plans, a follow-up spec will swap the `implement` node in `illumination-to-implementation` for this three-node chain. Requires the project to declare a `scripts.test` key in `package.json`.
 ```
 
-- [ ] **Step 3: Verify the README insertion**
+- [x] **Step 3: Verify the README insertion**
 
 Run: `npx tsx src/cli/index.ts --help` — no errors (README content does not affect CLI behaviour, but the help output is the surrounding context).
 
 Run: `grep -n "parallel-implement-test" README.md` — expect at least 3 matches (heading, invocation, paragraph body).
 
-- [ ] **Step 4: Add a new `### Parallel-implementation pipeline` section to CONTEXT.md**
+- [x] **Step 4: Add a new `### Parallel-implementation pipeline` section to CONTEXT.md**
 
 CONTEXT.md uses `### Header` sections rather than a flat glossary (e.g. `### Janitor`, `### Illumination lifecycle`). Match that voice. Add a new section near the existing implementation-related sections — place it alphabetically next to `### Janitor` (`P` follows `J`), or wherever fits the doc's existing flow.
 
@@ -1540,7 +1540,7 @@ CONTEXT.md uses `### Header` sections rather than a flat glossary (e.g. `### Jan
 - **dag.json** — JSON file at `<plan_path>.dag.json` recording the topological DAG over a chunked plan. Written by `plan_scheduler`; mutated by `batch_orchestrator` and `merge_resolver`. Not committed (the scheduler appends it to `.gitignore` on first write). Schema in `src/cli/lib/dag-schema.ts`.
 ```
 
-- [ ] **Step 5: Commit README + CONTEXT changes**
+- [x] **Step 5: Commit README + CONTEXT changes**
 
 ```bash
 git add README.md CONTEXT.md
