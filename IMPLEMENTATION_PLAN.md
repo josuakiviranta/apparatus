@@ -799,7 +799,7 @@ git commit -m "feat(parallel-impl): per-chunk subagent prompt template"
 **Files:**
 - Create: `.apparat/pipelines/parallel-implement-test/batch_orchestrator.md`
 
-- [ ] **Step 1: Create the agent file**
+- [x] **Step 1: Create the agent file**
 
 ```markdown
 ---
@@ -895,7 +895,7 @@ Final TEXT response of each iteration is a JSON object:
 Never inside a thinking block. The deep-loop handler at `src/attractor/handlers/looping-agent-handler.ts:151` parses this to decide whether to re-invoke.
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add .apparat/pipelines/parallel-implement-test/batch_orchestrator.md
