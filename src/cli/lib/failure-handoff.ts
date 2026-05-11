@@ -65,6 +65,10 @@ export interface LoadFailureHandoffArgs {
   dotDir: string;
   runId: string;
   graph: Graph;
+  /** Optional: forwards `--project <folder>` into the printed resume command. */
+  project?: string;
+  /** Optional: forwards `--var k=v` pairs (insertion-order) into the printed resume command. */
+  variables?: Record<string, string>;
 }
 
 /**
@@ -84,7 +88,12 @@ export function loadFailureHandoff(args: LoadFailureHandoffArgs): FailureHandoff
   const reason = normaliseReason(args.failureReason);
   const node = args.graph.nodes.get(args.failedNodeId);
   const agentRelPath = node ? resolveAgentFileForNode(node, args.dotDir) : null;
-  const resumeCommand = `apparat pipeline run ${args.dotFile} --resume ${args.runId}`;
+  const resumeCommand = buildResumeCommand({
+    dotFile: args.dotFile,
+    runId: args.runId,
+    project: args.project,
+    variables: args.variables,
+  });
 
   let lines: Record<string, unknown>[] = [];
   try {

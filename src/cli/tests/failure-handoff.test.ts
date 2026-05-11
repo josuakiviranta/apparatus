@@ -248,6 +248,51 @@ describe("loadFailureHandoff", () => {
     });
     expect(handoff.agentRelPath).toMatch(/implement\.md$/);
   });
+
+  it("forwards project and variables into resumeCommand", () => {
+    writeJsonl(tracePath, [
+      { kind: "node-start", nodeReceiveId: "rid", nodeId: "runner", nodeKind: "tool" },
+    ]);
+    const node = { id: "runner", type: "tool" } as Node;
+
+    const handoff = loadFailureHandoff({
+      tracePath,
+      failedNodeId: "runner",
+      failureReason: "boom",
+      dotFile: "/work/my.dot",
+      dotDir,
+      runId: "a1b2c3d4",
+      graph: buildGraph(node),
+      project: ".",
+      variables: { steer: "focus on auth" },
+    });
+
+    expect(handoff.resumeCommand).toBe(
+      "apparat pipeline run /work/my.dot --resume a1b2c3d4 " +
+      "--project '.' --var 'steer=focus on auth'",
+    );
+  });
+
+  it("produces the legacy resumeCommand byte-for-byte when project and variables are absent", () => {
+    writeJsonl(tracePath, [
+      { kind: "node-start", nodeReceiveId: "rid", nodeId: "runner", nodeKind: "tool" },
+    ]);
+    const node = { id: "runner", type: "tool" } as Node;
+
+    const handoff = loadFailureHandoff({
+      tracePath,
+      failedNodeId: "runner",
+      failureReason: "boom",
+      dotFile: "/work/my.dot",
+      dotDir,
+      runId: "a1b2c3d4",
+      graph: buildGraph(node),
+    });
+
+    expect(handoff.resumeCommand).toBe(
+      "apparat pipeline run /work/my.dot --resume a1b2c3d4",
+    );
+  });
 });
 
 import { buildResumeCommand } from "../lib/failure-handoff.js";
