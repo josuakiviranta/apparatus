@@ -721,7 +721,7 @@ git commit -m "feat(parallel-impl): capture-pre-sha tool script (copy of illumin
 **Files:**
 - Create: `.apparat/pipelines/parallel-implement-test/subagent-prompt-template.md`
 
-- [ ] **Step 1: Write the template**
+- [x] **Step 1: Write the template**
 
 ```markdown
 # Per-chunk implementation subagent
@@ -787,7 +787,7 @@ You are a parallel-implementation subagent dispatched by the `batch_orchestrator
 - You MUST emit valid JSON as the final text response; the orchestrator parses it and stores the result in `dag.json`.
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add .apparat/pipelines/parallel-implement-test/subagent-prompt-template.md
