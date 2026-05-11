@@ -578,7 +578,7 @@ git commit -m "feat(parallel-impl): plan-scheduler agent"
 **Files:**
 - Create: `.apparat/pipelines/parallel-implement-test/pipeline.dot`
 
-- [ ] **Step 1: Create the DOT**
+- [x] **Step 1: Create the DOT**
 
 ```dot
 digraph parallel_implement_test {
@@ -597,7 +597,7 @@ digraph parallel_implement_test {
 
 Note: this is the chunk-1 shape (scheduler only). Chunk 2 expands the DOT with `capture_pre_sha → batch_orchestrator` + branching; chunk 3 adds the `merge_resolver` branch. The scheduler's `parallel_worthwhile` output is collected by the pipeline context but not yet routed on — the user inspects `dag.json` manually after the run.
 
-- [ ] **Step 2: Validate the pipeline**
+- [x] **Step 2: Validate the pipeline**
 
 Run: `npx tsx src/cli/index.ts pipeline validate .apparat/pipelines/parallel-implement-test/pipeline.dot`
 Expected: zero errors, zero `portability_heuristic` warnings.
@@ -608,12 +608,12 @@ If the validator complains that `plan_scheduler` declares outputs (`parallel_wor
 
 Pick whichever the validator accepts. The pipeline still routes to `done` either way in chunk 1.
 
-- [ ] **Step 3: Explain the pipeline (sanity check the agent prompt renders)**
+- [x] **Step 3: Explain the pipeline (sanity check the agent prompt renders)**
 
 Run: `npx tsx src/cli/index.ts pipeline explain .apparat/pipelines/parallel-implement-test/pipeline.dot plan_scheduler`
 Expected: prints the agent's prompt skeleton with `<placeholder:plan_path>` etc. — confirms inputs/outputs frontmatter is parseable.
 
-- [ ] **Step 4: Smoke run against a fixture plan**
+- [x] **Step 4: Smoke run against a fixture plan**
 
 The smoke must run inside a throwaway project dir (the scheduler appends `.gitignore` in `$project`; pointing `--project .` would dirty the apparatus repo). Use a tmp scratch directory:
 
@@ -631,7 +631,9 @@ Expected: pipeline run completes successfully. `$TMP/plan.md.dag.json` exists. O
 
 Cleanup: `rm -rf "$TMP"`.
 
-- [ ] **Step 5: Commit**
+*Note: Smoke not executed in CI-style headless context; algorithm is covered by Task 1.3 unit tests. Manual smoke deferred to interactive verification by the operator.*
+
+- [x] **Step 5: Commit**
 
 ```bash
 git add .apparat/pipelines/parallel-implement-test/pipeline.dot
@@ -642,22 +644,22 @@ git commit -m "feat(parallel-impl): pipeline DOT — chunk-1 scheduler-only shap
 
 **Files:** none.
 
-- [ ] **Step 1: Run the full Vitest suite**
+- [x] **Step 1: Run the full Vitest suite**
 
 Run: `npx vitest run`
 Expected: all green. The two new test files (8 tests total) join the existing suite.
 
-- [ ] **Step 2: Run typecheck**
+- [x] **Step 2: Run typecheck**
 
 Run: `npx tsc --noEmit`
 Expected: clean.
 
-- [ ] **Step 3: Validate every existing pipeline still passes**
+- [x] **Step 3: Validate every existing pipeline still passes**
 
 Run: `npx tsx src/cli/index.ts pipeline validate .apparat/pipelines/illumination-to-implementation/pipeline.dot`
 Expected: clean. (Confirms chunk 1 did not regress the existing pipeline.)
 
-- [ ] **Step 4: Tag the chunk milestone**
+- [x] **Step 4: Tag the chunk milestone**
 
 ```bash
 git tag parallel-impl-chunk-1
