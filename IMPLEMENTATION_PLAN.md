@@ -1357,7 +1357,7 @@ git commit -m "feat(parallel-impl): merge_resolver agent"
 **Files:**
 - Modify: `.apparat/pipelines/parallel-implement-test/pipeline.dot`
 
-- [ ] **Step 1: Replace the chunk-2 DOT with chunk-3 final shape**
+- [x] **Step 1: Replace the chunk-2 DOT with chunk-3 final shape**
 
 ```dot
 digraph parallel_implement_test {
@@ -1398,17 +1398,17 @@ digraph parallel_implement_test {
 
 The `batch_orchestrator → merge_resolver` edge fires only when the orchestrator's terminal `done=true` AND `conflicts_present=true` — the deep-loop self-edge on `batch_orchestrator.done=false` keeps iterating; the post-loop branch fires once `done` flips to true (the deep-loop handler's contract). This matches the spec §3.1 routing.
 
-- [ ] **Step 2: Validate the pipeline**
+- [x] **Step 2: Validate the pipeline**
 
 Run: `npx tsx src/cli/index.ts pipeline validate .apparat/pipelines/parallel-implement-test/pipeline.dot`
 Expected: zero errors. The previous chunk-2 `orphan_output` warnings on `plan_scheduler.batch_count` / `chunk_count` may still fire; those are accepted as documentation (see Task 2.4 Step 2). No new warnings should appear from chunk-3 routing.
 
-- [ ] **Step 3: Explain the resolver node**
+- [x] **Step 3: Explain the resolver node**
 
 Run: `npx tsx src/cli/index.ts pipeline explain .apparat/pipelines/parallel-implement-test/pipeline.dot merge_resolver`
 Expected: prints the resolver's prompt skeleton with `<placeholder:plan_path>` and `<placeholder:plan_scheduler.dag_path>`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add .apparat/pipelines/parallel-implement-test/pipeline.dot
