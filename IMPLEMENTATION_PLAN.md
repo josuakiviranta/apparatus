@@ -1551,17 +1551,17 @@ git commit -m "docs(parallel-impl): README + CONTEXT.md entries for parallel-imp
 
 **Files:** none.
 
-- [ ] **Step 1: Run the full Vitest suite**
+- [x] **Step 1: Run the full Vitest suite**
 
 Run: `npx vitest run`
 Expected: all green. Chunk-3 added no new tests (the resolver's correctness is validated by Task 3.3's manual exercise, not unit tests — full unit-test coverage of the resolver is deferred to v2).
 
-- [ ] **Step 2: Typecheck**
+- [x] **Step 2: Typecheck**
 
 Run: `npx tsc --noEmit`
 Expected: clean.
 
-- [ ] **Step 3: Validate all touched pipelines**
+- [x] **Step 3: Validate all touched pipelines**
 
 ```bash
 npx tsx src/cli/index.ts pipeline validate .apparat/pipelines/parallel-implement-test/pipeline.dot
@@ -1570,10 +1570,12 @@ npx tsx src/cli/index.ts pipeline validate .apparat/pipelines/illumination-to-im
 ```
 Expected: all clean (modulo the accepted `orphan_output` warnings). `illumination-to-implementation` validate proves chunk 3 did not regress the existing pipeline.
 
-- [ ] **Step 4: Confirm `apparat pipeline list` surfaces the new pipeline**
+- [x] **Step 4: Confirm `apparat pipeline list` surfaces the new pipeline**
 
 Run: `npx tsx src/cli/index.ts pipeline list --project .`
 Expected: `parallel-implement-test` appears in the project-local pipelines section.
+
+**Step 4 finding:** `apparat pipeline list` is not implemented (CLI surface: `run`, `validate`, `trace`, `show`, `explain`). Verified pipeline presence via directory glob of `.apparat/pipelines/parallel-implement-test/` — all 6 sibling files present. Implementing `pipeline list` is deferred to a follow-up; the pipeline is discoverable by `pipeline validate`/`run` invocation.
 
 - [ ] **Step 5: Bump semver and tag**
 
