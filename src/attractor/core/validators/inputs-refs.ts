@@ -378,7 +378,7 @@ function checkOrphanOutput(ctx: ValidationContext): void {
   // inputs:, edge condition= clauses, and $key references in prompts/labels.
   const consumed = new Set<string>();
 
-  for (const [id, node] of graph.nodes) {
+  for (const [, node] of graph.nodes) {
     if (node.agent) {
       const cfg = tryResolveAgent(node, dotDir);
       if (!cfg?.inputs) continue;
@@ -392,25 +392,13 @@ function checkOrphanOutput(ctx: ValidationContext): void {
           // Malformed input decl — skip silently (other rules handle the error).
         }
       }
-    } else if (node.shape === "hexagon") {
-      // Gate nodes can also consume outputs via their inputs: frontmatter.
-      try {
-        const gateCfg = resolveGate(id, { dotDir });
-        if (gateCfg?.inputs) {
-          for (const k of gateCfg.inputs) {
-            try {
-              const resolved = resolveInputDecl(k);
-              consumed.add(resolved.localKey);
-            } catch {
-              // Malformed input decl — skip silently.
-            }
-          }
-        }
-      } catch {
-        // Gate not found or parse error — skip silently (other rules handle this).
-      }
     }
   }
+  // Gate-input contribution via shared helper — preserves emission order with
+  // the agent-branch loop above (loop runs to completion first).
+  iterateGateInputs(ctx, ({ resolved }) => {
+    consumed.add(resolved.localKey);
+  });
 
   for (const edge of graph.edges) {
     if (!edge.condition) continue;
@@ -517,4 +505,46 @@ function isProducerOnEveryPath(
   }
   // Cannot reach target without producer → producer dominates target
   return true;
+}
+
+/**
+ * Walk every hexagon-gate node's frontmatter `inputs:` declarations,
+ * invoking `callback` once per (gateNode, decl, resolved) triple.
+ *
+ * Silently skips gates whose .md is missing/unparseable (`resolveGate` throws)
+ * or whose individual decl is malformed (`resolveInputDecl` throws) — other
+ * rules surface those errors.
+ */
+interface GateInputVisit {
+  gateNodeId: string;
+  decl: string;
+  resolved: ReturnType<typeof resolveInputDecl>;
+  gateNode: Node;
+}
+
+function iterateGateInputs(
+  ctx: ValidationContext,
+  callback: (v: GateInputVisit) => void,
+): void {
+  const { graph, dotDir } = ctx;
+  if (!dotDir) return;
+  for (const [id, node] of graph.nodes) {
+    if (node.shape !== "hexagon") continue;
+    let gateCfg;
+    try {
+      gateCfg = resolveGate(id, { dotDir });
+    } catch {
+      continue;
+    }
+    if (!gateCfg?.inputs) continue;
+    for (const decl of gateCfg.inputs) {
+      let resolved;
+      try {
+        resolved = resolveInputDecl(decl);
+      } catch {
+        continue;
+      }
+      callback({ gateNodeId: id, decl, resolved, gateNode: node });
+    }
+  }
 }
