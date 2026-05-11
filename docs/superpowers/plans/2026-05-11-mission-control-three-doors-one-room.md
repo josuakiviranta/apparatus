@@ -933,7 +933,7 @@ git commit -m "chore: delete apparat watch verb, WatchApp, heartbeat watch shim 
 
 The mission-control state for the `run` level needs to summarize a single run by id. The existing `summarize(runId, runDir)` helper is module-private; expose it as `summarizeRun(runsRoot, runId)` so callers don't need to know the directory join.
 
-- [ ] **Step 1: Write a failing test**
+- [x] **Step 1: Write a failing test**
 
 Append to `src/cli/tests/runs-index.test.ts` (create if missing) — but first check whether one exists:
 
@@ -989,12 +989,12 @@ describe("summarizeRun", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run src/cli/tests/runs-index.test.ts`
 Expected: FAIL — `summarizeRun is not a function`.
 
-- [ ] **Step 3: Export `summarizeRun` from `runs-index.ts`**
+- [x] **Step 3: Export `summarizeRun` from `runs-index.ts`**
 
 Edit `src/cli/lib/runs-index.ts`. After the existing private `summarize` function (line 74), add:
 
@@ -1006,17 +1006,17 @@ export function summarizeRun(runsRoot: string, runId: string): RunSummary {
 
 Do not rename the private `summarize` — keep the existing call sites in `listAllRuns` working.
 
-- [ ] **Step 4: Run test to verify it passes + full suite**
+- [x] **Step 4: Run test to verify it passes + full suite**
 
 Run: `npx vitest run src/cli/tests/runs-index.test.ts && npx vitest run src/cli/tests`
 Expected: PASS.
 
-- [ ] **Step 5: Type check**
+- [x] **Step 5: Type check**
 
 Run: `npx tsc --noEmit`
 Expected: clean.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/cli/lib/runs-index.ts src/cli/tests/runs-index.test.ts
