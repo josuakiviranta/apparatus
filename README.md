@@ -63,14 +63,16 @@ apparat heartbeat pipeline janitor --project . --every 720 --var lens=tests
 ```
 
 ```bash
-apparat pipeline run <pipeline.dot> [--var <key=value>...] [--resume]
+apparat pipeline run <pipeline> [project] [--var <key=value>...] [--resume]
 ```
-Execute a `.dot` pipeline file. Use `--var` (repeatable) to pass caller variables:
+Execute a pipeline (name or `.dot` path). Pass the project as the second positional. Use `--var` (repeatable) for caller variables:
 
 ```bash
-apparat pipeline run pipelines/my-pipeline.dot \
+apparat pipeline run pipelines/my-pipeline.dot ./my-app \
   --var meditations_dir=meditations
 ```
+
+`--project <folder>` is accepted as a deprecated alias for the second positional; prefer the positional form. Heartbeat-scheduled invocations using the flag form keep working but emit a one-line deprecation warning.
 
 Pass `--resume [runId]` to continue a pipeline after Ctrl-C, a node failure, or a crash. The engine checkpoints after every node advance to `<project>/.apparat/runs/<runId>/checkpoint.json` — the trace `pipeline.jsonl` lives in the same directory. Bare `--resume` auto-selects when exactly one prior run exists for the project; pass an explicit `<runId>` to disambiguate. Older runs are pruned lazily (last 50 per project, override with `APPARAT_RUNS_KEEP`). For `--resume` to be useful, tool-node scripts must be idempotent — a script that hard-requires "state before I act" will fail on retry; detect the desired outcome is already present and exit 0 as a no-op instead.
 
