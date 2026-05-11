@@ -1259,7 +1259,7 @@ The fixture pipeline (`.apparat/pipelines/parallel-implement-test/pipeline.dot`)
 **Files:**
 - Create: `.apparat/pipelines/parallel-implement-test/merge_resolver.md`
 
-- [ ] **Step 1: Create the agent file**
+- [x] **Step 1: Create the agent file**
 
 ```markdown
 ---
@@ -1345,7 +1345,7 @@ Final TEXT response of each iteration:
 Never inside a thinking block.
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add .apparat/pipelines/parallel-implement-test/merge_resolver.md
