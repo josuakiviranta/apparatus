@@ -907,7 +907,7 @@ git commit -m "feat(parallel-impl): batch_orchestrator agent"
 **Files:**
 - Modify: `.apparat/pipelines/parallel-implement-test/pipeline.dot`
 
-- [ ] **Step 1: Replace the chunk-1 DOT with chunk-2 shape**
+- [x] **Step 1: Replace the chunk-1 DOT with chunk-2 shape**
 
 ```dot
 digraph parallel_implement_test {
@@ -942,19 +942,19 @@ digraph parallel_implement_test {
 
 Chunk-2 routes both `conflicts_present=true` and `conflicts_present=false` to `done`. Chunk 3 inserts the `merge_resolver` branch on `conflicts_present=true`.
 
-- [ ] **Step 2: Validate the pipeline**
+- [x] **Step 2: Validate the pipeline**
 
 Run: `npx tsx src/cli/index.ts pipeline validate .apparat/pipelines/parallel-implement-test/pipeline.dot`
 Expected: zero errors, zero `portability_heuristic` warnings.
 
 Acceptable warnings: `orphan_output` on `plan_scheduler.batch_count` and `plan_scheduler.chunk_count` — these outputs are produced for human inspection of `dag.json` and are not consumed by any downstream node. The validator at `src/cli/lib/inputs-refs.ts` may surface these as `orphan_output`. If the warning becomes a blocker for landing, two mitigations: (a) drop the two outputs from the agent frontmatter for chunk 2 and add them back in a follow-up; (b) add an `expected_warnings` field if such a thing exists in the validator config. Default: accept the warning as documentation of v1 scope.
 
-- [ ] **Step 3: Explain the orchestrator node (sanity check)**
+- [x] **Step 3: Explain the orchestrator node (sanity check)**
 
 Run: `npx tsx src/cli/index.ts pipeline explain .apparat/pipelines/parallel-implement-test/pipeline.dot batch_orchestrator`
 Expected: prints the orchestrator's prompt skeleton with `<placeholder:plan_path>`, `<placeholder:plan_scheduler.dag_path>`, `<placeholder:capture_pre_sha.pre_sha>` placeholders.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add .apparat/pipelines/parallel-implement-test/pipeline.dot
