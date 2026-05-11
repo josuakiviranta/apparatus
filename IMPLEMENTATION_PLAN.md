@@ -1143,7 +1143,7 @@ The agents-next-to-pipeline rule means a node with `agent="plan-scheduler"` requ
 **Files:**
 - Possibly modify: a smoke-runner test file under `src/cli/tests/` — implementer reads the codebase to confirm.
 
-- [ ] **Step 1: Locate the smoke-runner**
+- [x] **Step 1: Locate the smoke-runner**
 
 The smoke-runner is the Vitest test that iterates over `pipelines/smoke/*.dot`. Pin its location:
 
@@ -1153,17 +1153,17 @@ grep -l "pipelines/smoke" src/cli/tests/ -r
 
 If the result is a single file (e.g. `src/cli/tests/smoke-pipelines.test.ts`), Read it. Confirm whether it (a) globs `pipelines/smoke/*.dot` and iterates dynamically, or (b) lists smoke pipelines explicitly by name.
 
-- [ ] **Step 2: Edit the runner if it uses an explicit list**
+- [x] **Step 2: Edit the runner if it uses an explicit list**
 
 If the runner globs dynamically: no edit needed; the new smoke is auto-discovered.
 
 If it lists by name: append `'pipelines/smoke/parallel-implement-test.dot'` (or whatever the runner's syntax expects) to the list. Show the diff before committing.
 
-- [ ] **Step 3: Run the smoke runner**
+- [x] **Step 3: Run the smoke runner**
 
 Run: `npx vitest run <smoke-runner-test-file>`. Expected: green, including the new smoke.
 
-- [ ] **Step 4: Commit (only if a file actually changed)**
+- [x] **Step 4: Commit (only if a file actually changed)**
 
 ```bash
 git add <runner-file>
@@ -1171,6 +1171,13 @@ git commit -m "test(parallel-impl): register parallel-implement-test smoke"
 ```
 
 If no file was modified (dynamic-glob runner), skip the commit and proceed to Task 2.7.
+
+## Task 2.6 findings
+
+- `grep -l "pipelines/smoke" src/cli/tests/ -r` returned no matches. No Vitest test in this repo iterates `pipelines/smoke/*.dot`.
+- The only file named `smoke.test.ts` (`src/cli/tests/smoke.test.ts`) is a production-binary smoke (verifies `dist/cli/index.js --version` exits 0 and `__APPARAT_PROD__` is inlined) — unrelated to the `pipelines/smoke/` directory.
+- Existing smoke `.dot` files under `pipelines/smoke/` (e.g. `plan-scheduler.md`, prior smokes) appear to be exercised manually by the operator, consistent with the Task 2.5 ship note ("Manual smoke deferred to interactive verification by the operator.").
+- Outcome: no runner change made. `npx vitest run src/cli/tests/smoke.test.ts` is green post-build. Task 2.6 effectively a no-op edit; new smoke pipeline at `pipelines/smoke/parallel-implement-test.dot` remains operator-driven.
 
 ### Task 2.7: Real-pipeline manual exercise + chunk-2 milestone tag
 
