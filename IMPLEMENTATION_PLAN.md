@@ -229,7 +229,7 @@ git commit -m "test(parallel-impl): fixture plans for scheduler unit tests"
 - Create: `src/cli/lib/dag-scheduler.ts`
 - Create: `src/cli/tests/parallel-implement-test-scheduler.test.ts`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // src/cli/tests/parallel-implement-test-scheduler.test.ts
@@ -318,12 +318,12 @@ Some prose with no Files: section anywhere.
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run src/cli/tests/parallel-implement-test-scheduler.test.ts`
 Expected: FAIL with "Cannot find module '../lib/dag-scheduler.js'"
 
-- [ ] **Step 3: Write the algorithm**
+- [x] **Step 3: Write the algorithm**
 
 ```ts
 // src/cli/lib/dag-scheduler.ts
@@ -441,22 +441,24 @@ function kebab(s: string): string {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run src/cli/tests/parallel-implement-test-scheduler.test.ts`
 Expected: PASS — 5 passing.
 
-- [ ] **Step 5: Run typecheck**
+- [x] **Step 5: Run typecheck**
 
 Run: `npx tsc --noEmit`
 Expected: zero errors.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/cli/lib/dag-scheduler.ts src/cli/tests/parallel-implement-test-scheduler.test.ts
 git commit -m "feat(parallel-impl): topological DAG scheduler over chunked plans"
 ```
+
+> **Notes for future agents:** Plan's verbatim Step 3 algorithm would produce `c3.depends_on=["c1","c2"]` for all-serial; spec §4.7 line 376 mandates `["c2"]`. Implementation added `transitiveReduce()` to drop deps reachable via other deps. Follow-up commit `refactor(parallel-impl): drop dead exclude param in dag-scheduler` removed an unused parameter from the helper.
 
 ### Task 1.4: Author the `plan-scheduler.md` agent
 
