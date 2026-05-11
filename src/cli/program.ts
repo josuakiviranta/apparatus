@@ -5,7 +5,6 @@ import { initCommand } from "./commands/init";
 import { registerHeartbeatCommand } from "./commands/heartbeat";
 import { pipelineRunCommand } from "./commands/pipeline/run.js";
 import { pipelineValidateCommand } from "./commands/pipeline/validate.js";
-import { pipelineListCommand } from "./commands/pipeline/list.js";
 import { pipelineTraceCommand } from "./commands/pipeline/trace.js";
 import { pipelineShowCommand } from "./commands/pipeline/show.js";
 import { pipelineExplainCommand } from "./commands/pipeline/explain.js";
@@ -43,7 +42,6 @@ Background scheduling (heartbeat):
   apparat heartbeat stop meditate:my-app                  Remove task and kill any running session
 
 Pipeline engine (DOT-graph workflows):
-  apparat pipeline list --project my-app             List runnable pipelines (bundled + local)
   apparat pipeline validate workflow.dot             Check a pipeline file for errors
   apparat pipeline validate review --project my-app  Validate by workflow name
   apparat pipeline show workflow.dot                 Render a pipeline as SVG next to the source
@@ -78,8 +76,12 @@ Pipeline engine (DOT-graph workflows):
 Meditation (restricted insight sessions):
   apparat meditate my-app                   Run a one-shot meditation session
 
-Cross-project status:
-  apparat status                            Cross-project status: projects, heartbeats, recent runs`
+Mission control (one verb, zoom by appending tokens):
+  apparat status                                # all projects, running-now block at top
+  apparat status [project]                      # zoom into one project's pipelines + recent runs
+  apparat status [project] [pipeline]           # zoom into one pipeline's runs table
+  apparat status [project] [pipeline] [runId]   # zoom into one run's trace
+                                                # live tails if the run is in-progress`
   );
 
   program
@@ -169,24 +171,6 @@ When a plain name is given (no path separators or .dot extension), resolves to
     });
 
   pipeline
-    .command("list [name]")
-    .description("List pipelines (no arg) or recent runs of one pipeline")
-    .addHelpText("after", `
-Examples:
-  apparat pipeline list                       # all pipelines (Layer 1)
-  apparat pipeline list meditate              # recent runs of 'meditate' (Layer 2)
-  apparat pipeline list meditate --project my-app
-
-Scans <project>/.apparat/pipelines/<name>/ and the bundled fallback. With a
-positional <name>, also prints the most recent runs from
-<project>/.apparat/runs/, capped by APPARAT_RUNS_KEEP (default 10 per pipeline).
-`)
-    .option("--project <folder>", "Project folder (defaults to cwd)")
-    .action(async (name: string | undefined, opts: { project?: string }) => {
-      await pipelineListCommand({ ...opts, name });
-    });
-
-  pipeline
     .command("trace <runId>")
     .description("inspect a pipeline run trace")
     .option("--node-receive <nodeReceiveId>", "show context snapshot for a specific node invocation")
@@ -234,10 +218,17 @@ placeholder values — no LLM invoked, no run dir created.
     });
 
   program
-    .command("status")
-    .description("Cross-project status: registered projects, heartbeats, and recent runs")
-    .action(async () => {
-      await statusCommand();
+    .command("status [project] [pipeline] [runId]")
+    .description("Mission control — in-progress runs at top; zoom by appending the next token shown")
+    .addHelpText("after", `
+Examples:
+  apparat status                                # all projects + running now
+  apparat status /path/to/proj                  # one project: pipelines roster + recent runs
+  apparat status /path/to/proj demo             # one pipeline: runs table
+  apparat status /path/to/proj demo <runId>     # one run: trace (auto-tails if in-progress)
+`)
+    .action(async (project: string | undefined, pipeline: string | undefined, runId: string | undefined) => {
+      await statusCommand({ project, pipeline, runId });
     });
 
   registerHeartbeatCommand(program);

@@ -56,6 +56,7 @@ import {
   pipelineValidateCommand,
   pipelineListCommand,
 } from "../commands/pipeline.js";
+import { createProgram } from "../program.js";
 import type { Graph, Node, Edge } from "../../attractor/types.js";
 import * as engine from "../../attractor/core/engine.js";
 import * as out from "../lib/output.js";
@@ -573,6 +574,31 @@ describe("pipelineValidateCommand — edge-label diff", () => {
     expect(code).toBe(0);
     const warnCalls = (out.warn as ReturnType<typeof vi.fn>).mock.calls.flat();
     expect(warnCalls.find(c => typeof c === "string" && c.includes("routing keys"))).toBeFalsy();
+  });
+});
+
+describe("createProgram help text", () => {
+  // Commander v12 helpInformation() omits addHelpText("after",...) content;
+  // capture full help (including after-text) via outputHelp + writeOut override.
+  function fullHelp(): string {
+    const p = createProgram();
+    let buf = "";
+    (p as unknown as { _outputConfiguration: { writeOut: (s: string) => void } })
+      ._outputConfiguration.writeOut = (s: string) => { buf += s; };
+    p.outputHelp();
+    return buf;
+  }
+
+  it("contains a Mission control subsection naming `apparat status [project]`", () => {
+    const help = fullHelp();
+    expect(help).toContain("Mission control");
+    expect(help).toMatch(/apparat status\s+\[project\]/);
+  });
+
+  it("does not mention `apparat watch` or `apparat pipeline list` anywhere", () => {
+    const help = fullHelp();
+    expect(help).not.toContain("apparat watch");
+    expect(help).not.toContain("pipeline list");
   });
 });
 
