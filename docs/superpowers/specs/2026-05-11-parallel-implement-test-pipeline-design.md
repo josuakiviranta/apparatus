@@ -1,7 +1,7 @@
 # Design: `parallel-implement-test` pipeline — DAG-scheduled parallel implementation via local git worktrees
 
 **Date:** 2026-05-11
-**Status:** draft (pending review)
+**Status:** shipped (chunks 1-3 landed; follow-up: swap implement node in illumination-to-implementation)
 **Originating discussion:** in-conversation grilling on parallelising the implement phase of `illumination-to-implementation`. No illumination file — this is forward design, not a defect.
 
 ## 1. Motivation

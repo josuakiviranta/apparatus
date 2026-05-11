@@ -1419,7 +1419,7 @@ git commit -m "feat(parallel-impl): pipeline DOT — wire merge_resolver branch"
 
 **Files:** none (the exercise is read-only on docs; modifies a scratch project only).
 
-- [ ] **Step 1: Bootstrap a scratch project**
+- [x] **Step 1: Bootstrap a scratch project**
 
 ```bash
 TMP=$(mktemp -d)
@@ -1430,7 +1430,7 @@ echo "initial content" > collision.txt
 git add -A && git commit -q -m "init"
 ```
 
-- [ ] **Step 2: Author a forced-conflict-via-test-red plan**
+- [x] **Step 2: Author a forced-conflict-via-test-red plan**
 
 The plan uses **disjoint files** so the scheduler runs them in parallel. The conflict is forced via a **post-merge test-red gate** instead of a merge-text conflict — the orchestrator's `status="conflicted"` triggers on either, so the resolver path exercises either way. This avoids the unsolvable problem of editing `dag.json` and then having the scheduler overwrite it on pipeline re-run.
 
@@ -1468,7 +1468,7 @@ git -C "$TMP" commit -q -m "test command fails when both chunks land"
 
 (The `test` script exits 0 only when at least one of the two files is absent — i.e. before both chunks merge. Once the orchestrator merges both, the test goes red, the orchestrator's step 9 marks both chunks `conflicted`, and the resolver is invoked.)
 
-- [ ] **Step 3: Run the pipeline once**
+- [x] **Step 3: Run the pipeline once**
 
 ```bash
 cd /Users/josu/Documents/projects/apparatus
@@ -1481,13 +1481,19 @@ This single run exercises the full chain — scheduler emits the DAG (2 chunks, 
 
 Expected resolution: the Sonnet subagent either (a) tweaks `package.json` to accept both files, or (b) deletes one of the files and notes the override in its `notes` field. Either way, the test goes green and both chunks reach `status=merged`. If the subagent can't find a green path in 3 attempts per chunk, the chunks stay `conflicted` and the resolver emits terminal `done=true` — the user inspects `dag.json` and finishes by hand.
 
-- [ ] **Step 4: Observe the resolver path**
+- [x] **Step 4: Observe the resolver path**
 
 Verify after run: `cd "$TMP" && cat plan.md.dag.json | jq '.chunks[].status'`. Either every chunk is `"merged"` (resolver succeeded — exercise success path) or some chunks are `"conflicted"` with `resolver_attempts: 3` (exercise stuck path).
 
 Either outcome counts as a passing exercise — the goal is to prove the routing reaches the resolver, the resolver dispatches its subagent, applies edits, re-runs the test, and either marks `merged` or hits the cap. Both branches of the resolver code path are exercised.
 
 Cleanup: `rm -rf "$TMP"`.
+
+#### Learnings (post-implementation)
+
+**Resolver path exercised — success-branch confirmed.** Plan with two disjoint-file chunks + post-merge test that fails when both files coexist. Run: `npx tsx src/cli/index.ts pipeline run .apparat/pipelines/parallel-implement-test/pipeline.dot --project <scratch> --var plan_path=plan.md`. Outcome: c1 merged clean (resolver_attempts=0), c2 hit post-merge test red → resolver invoked, Sonnet subagent deleted `farewell.txt` to make `test ! -f greeter.txt || test ! -f farewell.txt` pass, resolver committed amend ("resolve conflict: add farewell.txt"), removed worktree, marked c2 status=merged (resolver_attempts=1). Pipeline reached terminal `done=true` cleanly. Path: orchestrator → resolver → done.
+
+The pipeline has `headless_safe=false`, so the exercise must run inside a TTY. Drove it through `docs/harness/tmux-drive.md` (tmux drive harness) with label `parallel-impl-task33`. The exercise took ~9 minutes wall-clock for the 2-chunk plan (plan_scheduler ~30s, batch_orchestrator first iteration ~4min, merge_resolver iterations ~2min each).
 
 ### Task 3.4: README + CONTEXT.md documentation
 
@@ -1577,7 +1583,7 @@ Expected: `parallel-implement-test` appears in the project-local pipelines secti
 
 **Step 4 finding:** `apparat pipeline list` is not implemented (CLI surface: `run`, `validate`, `trace`, `show`, `explain`). Verified pipeline presence via directory glob of `.apparat/pipelines/parallel-implement-test/` — all 6 sibling files present. Implementing `pipeline list` is deferred to a follow-up; the pipeline is discoverable by `pipeline validate`/`run` invocation.
 
-- [ ] **Step 5: Bump semver and tag**
+- [x] **Step 5: Bump semver and tag**
 
 The test pipeline becomes user-facing in this chunk (README documents it). Bump the apparatus CLI patch version per the implement-agent convention. Find the latest tag with `git tag | sort -V | tail -1` and increment the patch component (e.g. `v0.2.46` → `v0.2.47`):
 
@@ -1591,7 +1597,7 @@ git push origin <next-semver-tag>
 git push origin parallel-impl-chunk-3
 ```
 
-- [ ] **Step 6: Mark the source spec as shipped**
+- [x] **Step 6: Mark the source spec as shipped**
 
 Append a small status note to the top of the spec at `docs/superpowers/specs/2026-05-11-parallel-implement-test-pipeline-design.md`:
 
