@@ -1,6 +1,7 @@
 import { readFileSync } from "fs";
 import type { Graph } from "../../attractor/types.js";
 import { resolveAgentFileForNode } from "./agent-paths.js";
+import { shellQuote } from "./shell-quote.js";
 
 export interface FailureHandoff {
   /** id of the node whose Outcome.status was non-success. */
@@ -64,6 +65,10 @@ export interface LoadFailureHandoffArgs {
   dotDir: string;
   runId: string;
   graph: Graph;
+  /** Optional: forwards `--project <folder>` into the printed resume command. */
+  project?: string;
+  /** Optional: forwards `--var k=v` pairs (insertion-order) into the printed resume command. */
+  variables?: Record<string, string>;
 }
 
 /**
@@ -83,7 +88,12 @@ export function loadFailureHandoff(args: LoadFailureHandoffArgs): FailureHandoff
   const reason = normaliseReason(args.failureReason);
   const node = args.graph.nodes.get(args.failedNodeId);
   const agentRelPath = node ? resolveAgentFileForNode(node, args.dotDir) : null;
-  const resumeCommand = `apparat pipeline run ${args.dotFile} --resume ${args.runId}`;
+  const resumeCommand = buildResumeCommand({
+    dotFile: args.dotFile,
+    runId: args.runId,
+    project: args.project,
+    variables: args.variables,
+  });
 
   let lines: Record<string, unknown>[] = [];
   try {
@@ -148,4 +158,40 @@ function normaliseReason(raw: string): string {
   const trimmed = (raw ?? "").trim();
   if (trimmed.length === 0) return "pipeline failed";
   return trimmed.split("\n")[0].slice(0, 500);
+}
+
+export interface BuildResumeCommandArgs {
+  dotFile: string;
+  runId: string;
+  /** Optional: appends `--project <folder>` when set. Quoted in case the
+   *  folder path contains shell metacharacters. */
+  project?: string;
+  /** Optional: appends `--var k=v` per entry, in `Object.entries()` order.
+   *  Values are shell-quoted so spaces, single quotes, $, and backticks
+   *  round-trip through bash/zsh/sh. */
+  variables?: Record<string, string>;
+}
+
+/**
+ * Build the `resume:` recipe line. Pure — no I/O. Output shape:
+ *
+ *   apparat pipeline run <dotFile> --resume <runId>
+ *     [--project '<folder>']
+ *     [--var 'k=v'] ...
+ *
+ * Argument order is stable: `--resume` first (paired with the bare positional),
+ * then `--project`, then `--var` pairs in insertion order. Test fixtures pin
+ * this order.
+ */
+export function buildResumeCommand(args: BuildResumeCommandArgs): string {
+  const parts = [`apparat pipeline run ${args.dotFile} --resume ${args.runId}`];
+  if (args.project !== undefined) {
+    parts.push(`--project ${shellQuote(args.project)}`);
+  }
+  if (args.variables) {
+    for (const [k, v] of Object.entries(args.variables)) {
+      parts.push(`--var ${shellQuote(`${k}=${v}`)}`);
+    }
+  }
+  return parts.join(" ");
 }

@@ -396,6 +396,8 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
         dotDir,
         runId,
         graph,
+        project: opts.project,
+        variables: opts.variables,
       });
       emit({ kind: "failure-handoff", handoff });
     }

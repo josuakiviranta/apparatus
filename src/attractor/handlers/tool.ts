@@ -3,6 +3,7 @@ import { resolve, extname } from "path";
 import type { NodeHandler, HandlerExecutionContext } from "./registry.js";
 import type { Node, Outcome, PipelineContext } from "../types.js";
 import { expandVariables, extractDefaults } from "../transforms/variable-expansion.js";
+import { shellQuote } from "../../cli/lib/shell-quote.js";
 
 /**
  * Map of supported script extensions to their interpreter invocation prefix.
@@ -19,10 +20,6 @@ const SCRIPT_INTERPRETERS: Record<string, string> = {
   ".bash": "bash",
   ".py": "python3",
 };
-
-function shellQuote(s: string): string {
-  return `'${s.replace(/'/g, `'\\''`)}'`;
-}
 
 // Parse the last non-empty line of stdout as JSON. On success, returns the
 // parsed top-level object as a string-keyed record. On failure, emits a warning
