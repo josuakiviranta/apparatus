@@ -695,7 +695,7 @@ The `parallel-impl-chunk-N` tag is a milestone marker, not a semver release. Do 
 **Files:**
 - Create: `.apparat/pipelines/parallel-implement-test/capture-pre-sha.sh`
 
-- [ ] **Step 1: Copy the existing script byte-identical**
+- [x] **Step 1: Copy the existing script byte-identical**
 
 Source: `.apparat/pipelines/illumination-to-implementation/capture-pre-sha.sh`. Target: `.apparat/pipelines/parallel-implement-test/capture-pre-sha.sh`. Use a literal copy (no symlink — spec §3.7 forbids it).
 
@@ -704,12 +704,12 @@ cp .apparat/pipelines/illumination-to-implementation/capture-pre-sha.sh .apparat
 chmod +x .apparat/pipelines/parallel-implement-test/capture-pre-sha.sh
 ```
 
-- [ ] **Step 2: Verify byte-identical**
+- [x] **Step 2: Verify byte-identical**
 
 Run: `diff .apparat/pipelines/illumination-to-implementation/capture-pre-sha.sh .apparat/pipelines/parallel-implement-test/capture-pre-sha.sh`
 Expected: zero output (files match).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add .apparat/pipelines/parallel-implement-test/capture-pre-sha.sh
