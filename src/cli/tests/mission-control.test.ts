@@ -87,3 +87,38 @@ describe("getMissionControlState — level: project", () => {
     expect(s.message).toContain("project not registered");
   });
 });
+
+describe("getMissionControlState — level: pipeline", () => {
+  it("returns runs filtered to the named pipeline", async () => {
+    const projDir = mkdtempSync(join(tmpdir(), "mc-proj-pipe-"));
+    mkdirSync(join(projDir, ".apparat", "pipelines"), { recursive: true });
+    writeFileSync(join(projDir, ".apparat", "pipelines", "demo.dot"),
+      `digraph g { goal="x" start [shape=Mdiamond] done [shape=Msquare] start -> done }`);
+    mkdirSync(join(projDir, ".apparat", "runs", "r-a"), { recursive: true });
+    writeFileSync(join(projDir, ".apparat", "runs", "r-a", "pipeline.jsonl"),
+      JSON.stringify({ kind: "pipeline-start", pipelineName: "demo", timestamp: "2026-05-11T10:00:00Z" }) + "\n" +
+      JSON.stringify({ kind: "pipeline-end",   outcome: "success", timestamp: "2026-05-11T10:00:01Z" }) + "\n"
+    );
+    registerProject(projDir);
+    const s = await getMissionControlState({
+      level: "pipeline", projectPath: projDir, pipelineName: "demo",
+    });
+    if (s.level !== "pipeline") throw new Error("type guard");
+    expect(s.runs.length).toBe(1);
+    expect(s.runs[0].runId).toBe("r-a");
+    expect(s.zoomHint).toContain("r-a");
+    rmSync(projDir, { recursive: true });
+  });
+
+  it("returns level: 'error' when pipeline name not in roster", async () => {
+    const projDir = mkdtempSync(join(tmpdir(), "mc-proj-pipe-"));
+    registerProject(projDir);
+    const s = await getMissionControlState({
+      level: "pipeline", projectPath: projDir, pipelineName: "does-not-exist",
+    });
+    expect(s.level).toBe("error");
+    if (s.level !== "error") throw new Error("type guard");
+    expect(s.message).toContain("pipeline not found");
+    rmSync(projDir, { recursive: true });
+  });
+});

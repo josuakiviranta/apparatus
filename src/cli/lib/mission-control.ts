@@ -89,7 +89,7 @@ export async function getMissionControlState(zoom: MissionZoom): Promise<Mission
   switch (zoom.level) {
     case "all":      return projectAll();
     case "project":  return projectOne(zoom.projectPath);
-    case "pipeline": return Promise.reject(new Error("not implemented in this step"));
+    case "pipeline": return projectPipeline(zoom.projectPath, zoom.pipelineName);
     case "run":      return Promise.reject(new Error("not implemented in this step"));
   }
 }
@@ -149,10 +149,35 @@ async function projectOne(projectPath: string): Promise<MissionState> {
   };
 }
 
-// NOTE: listRunsForPipeline, summarizeRun, existsSync, join are imported
-// for use in Tasks 3.4–3.5 (pipeline/run projections). They are intentionally
+async function projectPipeline(
+  projectPath: string,
+  pipelineName: string,
+): Promise<MissionState> {
+  const projects = readProjects();
+  const project = projects.find(p => p.path === projectPath);
+  if (!project) {
+    return { level: "error", message: `project not registered: ${projectPath} (apparat status to see roster)` };
+  }
+  const pipelines = listAllPipelines(project.path);
+  const pipeline = pipelines.find(e => e.name === pipelineName);
+  if (!pipeline) {
+    return {
+      level: "error",
+      message: `pipeline not found: ${pipelineName} (apparat status ${projectPath} to see roster)`,
+    };
+  }
+  const runs = listRunsForPipeline(runsDir(project.path), pipelineName);
+  const liveRun = runs.find(r => r.outcome === "in-progress") ?? null;
+  const newestRunId = runs[0]?.runId;
+  const zoomHint = newestRunId
+    ? `apparat status ${project.path} ${pipelineName} ${newestRunId}`
+    : `apparat status ${project.path} ${pipelineName}`;
+  return { level: "pipeline", project, pipeline, runs, liveRun, zoomHint };
+}
+
+// NOTE: summarizeRun, existsSync, join are imported
+// for use in Task 3.5 (run projection). They are intentionally
 // referenced here to prevent tree-shaking until those stubs are filled in.
-void listRunsForPipeline;
 void summarizeRun;
 void existsSync;
 void join;

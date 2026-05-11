@@ -1351,13 +1351,13 @@ git commit -m "feat(mission-control): add level:project projection (with error c
 
 > **Implementer note (2026-05-11):** Shipped at commit `cbd74bb`. All 5 mission-control tests pass; `tsc --noEmit` clean. Spec-compliance + code-quality reviewers both approved without changes. The remaining `void listRunsForPipeline; void summarizeRun; void existsSync; void join;` references in `mission-control.ts` are still reserved for Tasks 3.4/3.5.
 
-### Task 3.4: Implement `level: "pipeline"` projection
+### Task 3.4: Implement `level: "pipeline"` projection [x]
 
 **Files:**
 - Modify: `src/cli/lib/mission-control.ts`
 - Modify: `src/cli/tests/mission-control.test.ts`
 
-- [ ] **Step 1: Add failing tests**
+- [x] **Step 1: Add failing tests**
 
 Append to `mission-control.test.ts`:
 
@@ -1398,12 +1398,12 @@ describe("getMissionControlState — level: pipeline", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run src/cli/tests/mission-control.test.ts`
 Expected: FAIL.
 
-- [ ] **Step 3: Add `projectPipeline` helper, wire branch**
+- [x] **Step 3: Add `projectPipeline` helper, wire branch**
 
 In `mission-control.ts`:
 - Switch case: `case "pipeline": return projectPipeline(zoom.projectPath, zoom.pipelineName);`
@@ -1437,12 +1437,12 @@ async function projectPipeline(
 }
 ```
 
-- [ ] **Step 4: Run tests + tsc**
+- [x] **Step 4: Run tests + tsc**
 
 Run: `npx vitest run src/cli/tests/mission-control.test.ts && npx tsc --noEmit`
 Expected: PASS + clean.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/cli/lib/mission-control.ts src/cli/tests/mission-control.test.ts
