@@ -88,7 +88,7 @@ export type MissionState =
 export async function getMissionControlState(zoom: MissionZoom): Promise<MissionState> {
   switch (zoom.level) {
     case "all":      return projectAll();
-    case "project":  return Promise.reject(new Error("not implemented in this step"));
+    case "project":  return projectOne(zoom.projectPath);
     case "pipeline": return Promise.reject(new Error("not implemented in this step"));
     case "run":      return Promise.reject(new Error("not implemented in this step"));
   }
@@ -123,11 +123,36 @@ async function projectAll(): Promise<MissionStateAll> {
   return { level: "all", projects, runningNow, lastRunPerProject, tasks, zoomHint };
 }
 
-// NOTE: listRunsForPipeline, summarizeRun, listAllPipelines, existsSync, join are imported
-// for use in Tasks 3.3–3.5 (project/pipeline/run projections). They are intentionally
+async function projectOne(projectPath: string): Promise<MissionState> {
+  const projects = readProjects();
+  const project = projects.find(p => p.path === projectPath);
+  if (!project) {
+    return { level: "error", message: `project not registered: ${projectPath} (apparat status to see roster)` };
+  }
+  const pipelines = listAllPipelines(project.path);
+  const recentRuns = listAllRuns(runsDir(project.path));
+  const tasksRaw = await listTasksWithTimeout();
+  const tasks: Task[] | "daemon-offline" = tasksRaw === null
+    ? "daemon-offline"
+    : tasksRaw.filter(t => t.args.includes(project.path));
+  const firstPipeline = pipelines[0];
+  const zoomHint = firstPipeline
+    ? `apparat status ${project.path} ${firstPipeline.name}`
+    : `apparat status ${project.path}`;
+  return {
+    level: "project",
+    project,
+    pipelines,
+    recentRuns,
+    tasks,
+    zoomHint,
+  };
+}
+
+// NOTE: listRunsForPipeline, summarizeRun, existsSync, join are imported
+// for use in Tasks 3.4–3.5 (pipeline/run projections). They are intentionally
 // referenced here to prevent tree-shaking until those stubs are filled in.
 void listRunsForPipeline;
 void summarizeRun;
-void listAllPipelines;
 void existsSync;
 void join;

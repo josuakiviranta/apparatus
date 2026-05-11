@@ -63,3 +63,27 @@ describe("getMissionControlState — level: all", () => {
     expect(s.tasks).toBe("daemon-offline");
   });
 });
+
+describe("getMissionControlState — level: project", () => {
+  it("returns project + pipelines roster + recent runs when project is registered", async () => {
+    const projDir = mkdtempSync(join(tmpdir(), "mc-proj-one-"));
+    mkdirSync(join(projDir, ".apparat", "pipelines"), { recursive: true });
+    writeFileSync(join(projDir, ".apparat", "pipelines", "demo.dot"),
+      `digraph g { goal="x" start [shape=Mdiamond] done [shape=Msquare] start -> done }`);
+    registerProject(projDir);
+
+    const s = await getMissionControlState({ level: "project", projectPath: projDir });
+    if (s.level !== "project") throw new Error("type guard");
+    expect(s.project.path).toBe(projDir);
+    expect(s.pipelines.some(p => p.name === "demo")).toBe(true);
+    expect(s.zoomHint).toContain(projDir);
+    rmSync(projDir, { recursive: true });
+  });
+
+  it("returns level: 'error' when projectPath is not registered", async () => {
+    const s = await getMissionControlState({ level: "project", projectPath: "/no/such/path" });
+    expect(s.level).toBe("error");
+    if (s.level !== "error") throw new Error("type guard");
+    expect(s.message).toContain("project not registered");
+  });
+});
