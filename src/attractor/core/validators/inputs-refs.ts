@@ -45,6 +45,7 @@ export function run(ctx: ValidationContext): void {
   if (ctx.dotDir) {
     checkMissingInputProducer(ctx);
     checkInputTypeMismatch(ctx);
+    checkGateUnknownSourceNode(ctx);
     checkOrphanOutput(ctx);
     checkOutputsSchemaShape(ctx);
   }
@@ -505,6 +506,19 @@ function isProducerOnEveryPath(
   }
   // Cannot reach target without producer → producer dominates target
   return true;
+}
+
+function checkGateUnknownSourceNode(ctx: ValidationContext): void {
+  iterateGateInputs(ctx, ({ gateNodeId, resolved, gateNode }) => {
+    if (resolved.sourceNode === undefined) return;
+    if (ctx.graph.nodes.has(resolved.sourceNode)) return;
+    ctx.diags.push({
+      rule: "unknown_source_node",
+      severity: "error",
+      message: `Gate "${gateNodeId}" references source node "${resolved.sourceNode}" in inputs:, but no such node exists in the graph.`,
+      location: gateNode.sourceLocation,
+    });
+  });
 }
 
 /**
