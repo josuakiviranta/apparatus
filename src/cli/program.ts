@@ -10,6 +10,7 @@ import { pipelineShowCommand } from "./commands/pipeline/show.js";
 import { pipelineExplainCommand } from "./commands/pipeline/explain.js";
 import { statusCommand } from "./commands/status.js";
 import { collectKV } from "./lib/collect-kv.js";
+import * as output from "./lib/output.js";
 
 export function createProgram(): Command {
   const program = new Command();
@@ -46,7 +47,7 @@ Pipeline engine (DOT-graph workflows):
   apparat pipeline show workflow.dot                 Render a pipeline as SVG next to the source
   apparat pipeline explain workflow.dot              Plain-text topology walkthrough or node prompt skeleton
   apparat pipeline run workflow.dot                  Execute a pipeline
-  apparat pipeline run review --project my-app       Run by workflow name
+  apparat pipeline run review my-app                 Run by workflow name (positional project)
   apparat pipeline run workflow.dot --resume         Continue a pipeline after Ctrl-C or node failure
                                                      (checkpoint in <project>/.apparat/runs/<runId>/checkpoint.json)
 
@@ -114,16 +115,16 @@ Mission control (one verb, zoom by appending tokens):
   const pipeline = program.command("pipeline").description("Pipeline engine commands");
 
   pipeline
-    .command("run <dotfile>")
-    .description("Run a .dot pipeline file")
+    .command("run <pipeline> [project]")
+    .description("Run a pipeline (name or .dot path); optional positional project folder")
     .addHelpText("after", `
 Examples:
-  apparat pipeline run smoke.dot                          # smoke test — no work nodes
-  apparat pipeline run workflow.dot --project ./my-app   # work nodes operate on my-app
-  apparat pipeline run workflow.dot --resume             # continue after Ctrl-C or node failure
-  apparat pipeline run workflow.dot --var key=value      # pass caller variables (repeatable)
+  apparat pipeline run smoke.dot                       # smoke test — no work nodes
+  apparat pipeline run workflow.dot ./my-app           # work nodes operate on my-app
+  apparat pipeline run workflow.dot --resume           # continue after Ctrl-C or node failure
+  apparat pipeline run workflow.dot ./my-app --var key=value   # pass caller variables (repeatable)
 
-Work nodes (shape=box) require --project to know which codebase to operate on.
+Work nodes (shape=box) require <project> to know which codebase to operate on.
 Add max_iterations=N to cap how many agentic loop iterations a node can run.
 
 Checkpoints: the engine writes <project>/.apparat/runs/<runId>/checkpoint.json
@@ -134,15 +135,26 @@ crashes. Without --resume, a fresh run starts in a new <runId> directory; older
 runs are pruned lazily (keep last 50, override with APPARAT_RUNS_KEEP). Scripts
 called from tool nodes should still be idempotent so --resume can safely
 re-execute the node that failed.
+
+--project <folder> is accepted as a deprecated alias for the positional project
+arg (prints a one-line warning). Prefer the positional form.
 `)
-    .option("--project <folder>", "Project folder ($project variable and cwd for work nodes)")
+    .option("--project <folder>", "Deprecated alias for the positional project arg; prints a warning when used")
     .option("--resume [runId]", "Resume from a checkpoint. Bare flag auto-selects the only run; pass <runId> to pick one explicitly")
     .option("--run-id <id>", "Override the runId allocated for this run (used by the daemon to align home-global and project-local logs)")
     .option("--logs-root <path>", "Override the logs directory; defaults to <project>/.apparat/runs/<runId>")
     .option("--var <key=value>", "pass caller variable (repeatable)", collectKV, {} as Record<string, string>)
-    .action(async (dotFile: string, opts: { project?: string; resume?: boolean | string; runId?: string; logsRoot?: string }) => {
-      await pipelineRunCommand(dotFile, {
-        project: opts.project,
+    .action(async (
+      pipelineArg: string,
+      projectPositional: string | undefined,
+      opts: { project?: string; resume?: boolean | string; runId?: string; logsRoot?: string },
+    ) => {
+      const project = projectPositional ?? opts.project;
+      if (!projectPositional && opts.project) {
+        await output.warn("--project flag is deprecated; pass project as the second positional arg.");
+      }
+      await pipelineRunCommand(pipelineArg, {
+        project,
         resume: opts.resume,
         runId: opts.runId,
         logsRoot: opts.logsRoot,
