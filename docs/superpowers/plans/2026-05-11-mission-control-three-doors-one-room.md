@@ -2127,19 +2127,19 @@ git commit -m "feat(program): register status [project] [pipeline] [runId]; drop
 - Modify: `src/cli/tests/pipeline.test.ts` (replace the `describe("pipelineListCommand", …)` block at lines 354–426)
 - Modify: `src/cli/tests/pipeline-preflight.test.ts` (line ~119 — drop the `pipeline list` invocation)
 
-- [ ] **Step 1: Delete the source module**
+- [x] **Step 1: Delete the source module**
 
 ```bash
 git rm src/cli/commands/pipeline/list.ts
 ```
 
-- [ ] **Step 2: Delete the dedicated test files**
+- [x] **Step 2: Delete the dedicated test files**
 
 ```bash
 git rm src/cli/tests/pipeline-list-layer2.test.ts src/cli/tests/pipeline-list-resolver-parity.test.ts
 ```
 
-- [ ] **Step 3: Replace `describe("pipelineListCommand", …)` in `pipeline.test.ts:354-426`**
+- [x] **Step 3: Replace `describe("pipelineListCommand", …)` in `pipeline.test.ts:354-426`**
 
 In `src/cli/tests/pipeline.test.ts`, replace the entire block at lines 354–426 (the `describe("pipelineListCommand", …)` and its 5 `it(…)` cases) with:
 
@@ -2207,7 +2207,7 @@ import { statusCommand } from "../commands/status.js";
 ```
 and drop any `pipelineListCommand` import.)
 
-- [ ] **Step 4: Edit `src/cli/tests/pipeline-preflight.test.ts:119`**
+- [x] **Step 4: Edit `src/cli/tests/pipeline-preflight.test.ts:119`**
 
 The case at line ~109-138 spawns `apparat pipeline list --project <project>` to check the `requires:` annotation. With `pipeline list` deleted, the assertion shifts to `apparat status <project>` if that surface still shows pipeline `requires:` — but the new `renderProject` does NOT print `requires:` (only `name`). Therefore: delete this assertion entirely. The preflight check itself (`requires:`-annotated pipelines preflight-fail with missing variables) is asserted elsewhere in the same file via direct invocation of the runner. If after deletion the surrounding `describe` block has only one orphan case, remove the whole describe.
 
@@ -2215,19 +2215,19 @@ Concretely:
 - Identify the `describe("…")` that owns line 119. Delete the case spawning `apparat pipeline list --project …`.
 - If the file ends up with no cases, delete the file (`git rm src/cli/tests/pipeline-preflight.test.ts`) — but only after confirming preflight coverage exists in another test file. If unsure, leave the file with the deleted case as the only edit.
 
-- [ ] **Step 5: Run full suite + tsc**
+- [x] **Step 5: Run full suite + tsc**
 
 Run: `npx vitest run src/cli/tests && npx tsc --noEmit`
 Expected: PASS + clean.
 
-- [ ] **Step 6: Sanity grep**
+- [x] **Step 6: Sanity grep**
 
 ```bash
 grep -rnE "pipelineListCommand|pipeline list" src
 ```
 Expected: zero matches in `src/`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A src/cli/commands/pipeline/list.ts src/cli/tests/pipeline.test.ts \

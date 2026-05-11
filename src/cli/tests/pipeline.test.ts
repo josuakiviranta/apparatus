@@ -54,8 +54,8 @@ vi.mock("../lib/stream-formatter.js", () => ({
 import {
   pipelineRunCommand,
   pipelineValidateCommand,
-  pipelineListCommand,
 } from "../commands/pipeline.js";
+import { statusCommand } from "../commands/status.js";
 import { createProgram } from "../program.js";
 import type { Graph, Node, Edge } from "../../attractor/types.js";
 import * as engine from "../../attractor/core/engine.js";
@@ -352,77 +352,58 @@ describe("pipelineRunCommand — onInteractiveRequest", () => {
   });
 });
 
-describe("pipelineListCommand", () => {
+describe("statusCommand zoom-level equivalents (was: pipelineListCommand)", () => {
   let dir: string;
   let scratch: FakeApparatHome;
   beforeEach(() => {
     vi.clearAllMocks();
-    scratch = withFakeApparatHome("apparat-list-home");
-    dir = mkdtempSync(join(tmpdir(), "apparat-pipeline-test-"));
+    scratch = withFakeApparatHome("apparat-status-home");
+    dir = mkdtempSync(join(tmpdir(), "apparat-status-test-"));
   });
   afterEach(() => {
     scratch.cleanup();
     rmSync(dir, { recursive: true });
   });
 
-  // The mock for ../lib/assets.js at the top of this file (widened in
-  // Step 1a) keeps resolveBundledPipeline stubbed but PASSES THROUGH the
-  // real getBundledPipelinesDir, so the bundled tier rendered by
-  // pipelineListCommand reads from the real src/cli/pipelines/ folder
-  // during dev (implement, janitor, meditate). The "tags fork pairs"
-  // case below relies on that.
-
   it("never prints the broken 'apparat pipeline create' hint, even on a fresh project", async () => {
-    await pipelineListCommand({ project: dir });
+    require("fs").writeFileSync(
+      join(scratch.path, "projects.json"),
+      JSON.stringify([{ path: dir, lastSeen: Date.now() }], null, 2) + "\n",
+    );
+    await statusCommand({ project: dir });
     const calls = (out.info as ReturnType<typeof vi.fn>).mock.calls.map(c => String(c[0]));
     expect(calls.join("\n")).not.toContain("apparat pipeline create");
   });
 
-  it("prints two grouped headers — Local pipelines and Bundled pipelines", async () => {
-    await pipelineListCommand({ project: dir });
-    expect(out.info).toHaveBeenCalledWith(expect.stringContaining("Local pipelines:"));
-    expect(out.info).toHaveBeenCalledWith(expect.stringContaining("Bundled pipelines:"));
-  });
-
-  it("renders '(none)' under Local pipelines when project has no .apparat/pipelines folder", async () => {
-    await pipelineListCommand({ project: dir });
-    const calls = (out.info as ReturnType<typeof vi.fn>).mock.calls.map(c => String(c[0]));
-    const localIdx = calls.findIndex(s => s.includes("Local pipelines:"));
-    const bundledIdx = calls.findIndex(s => s.includes("Bundled pipelines:"));
-    expect(localIdx).toBeGreaterThanOrEqual(0);
-    expect(bundledIdx).toBeGreaterThan(localIdx);
-    const localBlock = calls.slice(localIdx + 1, bundledIdx).join("\n");
-    expect(localBlock).toContain("(none)");
-  });
-
-  it("lists local pipelines under Local pipelines: with their goal attribute", async () => {
+  it("lists local pipelines under the project header with their names", async () => {
+    require("fs").writeFileSync(
+      join(scratch.path, "projects.json"),
+      JSON.stringify([{ path: dir, lastSeen: Date.now() }], null, 2) + "\n",
+    );
     mkdirSync(join(dir, ".apparat", "pipelines"), { recursive: true });
     writeFileSync(join(dir, ".apparat", "pipelines", "review.dot"),
       `digraph g {\n  goal="Run review"\n  start [shape=Mdiamond]\n  done [shape=Msquare]\n  start -> done\n}`);
-    writeFileSync(join(dir, ".apparat", "pipelines", "deploy.dot"),
-      `digraph g {\n  start [shape=Mdiamond]\n  done [shape=Msquare]\n  start -> done\n}`);
-    await pipelineListCommand({ project: dir });
+    await statusCommand({ project: dir });
     expect(out.info).toHaveBeenCalledWith(expect.stringContaining("review"));
-    expect(out.info).toHaveBeenCalledWith(expect.stringContaining("Run review"));
-    expect(out.info).toHaveBeenCalledWith(expect.stringContaining("deploy"));
-    expect(out.info).toHaveBeenCalledWith(expect.stringContaining("no goal defined"));
   });
 
-  it("tags fork pairs on BOTH rows when a local pipeline shadows a bundled one", async () => {
-    // Use a real bundled folder (default in dev). 'janitor' is bundled at
-    // src/cli/pipelines/janitor/pipeline.dot, so a local janitor folder
-    // here will be tagged "(forked → local)" and the bundled row
-    // "(shadowed by local)".
-    const localJanitor = join(dir, ".apparat", "pipelines", "janitor");
-    mkdirSync(localJanitor, { recursive: true });
-    writeFileSync(
-      join(localJanitor, "pipeline.dot"),
-      `digraph janitor {\n  goal="local fork"\n  start [shape=Mdiamond]\n  done [shape=Msquare]\n  start -> done\n}`,
+  it("renders the runs table at level pipeline (was: layer-2 pipeline list)", async () => {
+    require("fs").writeFileSync(
+      join(scratch.path, "projects.json"),
+      JSON.stringify([{ path: dir, lastSeen: Date.now() }], null, 2) + "\n",
     );
-    await pipelineListCommand({ project: dir });
+    mkdirSync(join(dir, ".apparat", "pipelines"), { recursive: true });
+    writeFileSync(join(dir, ".apparat", "pipelines", "demo.dot"),
+      `digraph g {\n  goal="x"\n  start [shape=Mdiamond]\n  done [shape=Msquare]\n  start -> done\n}`);
+    mkdirSync(join(dir, ".apparat", "runs", "r-1"), { recursive: true });
+    writeFileSync(join(dir, ".apparat", "runs", "r-1", "pipeline.jsonl"),
+      JSON.stringify({ kind: "pipeline-start", pipelineName: "demo", timestamp: "2026-05-11T10:00:00Z" }) + "\n" +
+      JSON.stringify({ kind: "pipeline-end", outcome: "success", timestamp: "2026-05-11T10:00:01Z" }) + "\n"
+    );
+    await statusCommand({ project: dir, pipeline: "demo" });
     const calls = (out.info as ReturnType<typeof vi.fn>).mock.calls.map(c => String(c[0]));
-    expect(calls.some(s => s.includes("janitor (forked → local)"))).toBe(true);
-    expect(calls.some(s => s.includes("janitor (shadowed by local)"))).toBe(true);
+    expect(calls.join("\n")).toContain("recent runs:");
+    expect(calls.join("\n")).toContain("r-1");
   });
 });
 

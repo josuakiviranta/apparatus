@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { spawnSync } from "child_process";
-import { writeFileSync, mkdtempSync, mkdirSync } from "fs";
+import { writeFileSync, mkdtempSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { withFakeApparatHome, type FakeApparatHome } from "./_apparatHome";
@@ -85,65 +85,3 @@ describe("pipeline run pre-flight check", () => {
   });
 });
 
-describe("pipeline list shows requires:", () => {
-  let scratch: FakeApparatHome;
-
-  beforeEach(() => {
-    scratch = withFakeApparatHome("apparat-preflight-list-home");
-  });
-
-  afterEach(() => {
-    scratch.cleanup();
-  });
-
-  it("prints 'requires:' for pipelines with inputs=, omits it for legacy pipelines", () => {
-    const project = mkdtempSync(join(tmpdir(), "apparat-list-"));
-    const pipelinesDir = join(project, ".apparat", "pipelines");
-    mkdirSync(pipelinesDir, { recursive: true });
-    writeFileSync(join(pipelinesDir, "with-inputs.dot"), `digraph with_inputs {
-      goal="declares contract"
-      inputs="foo, bar"
-      start [shape=Mdiamond]
-      done [shape=Msquare]
-      start -> done
-    }`);
-    writeFileSync(join(pipelinesDir, "no-inputs.dot"), `digraph no_inputs {
-      goal="legacy"
-      start [shape=Mdiamond]
-      done [shape=Msquare]
-      start -> done
-    }`);
-
-    const r = spawnSync(
-      "node",
-      [CLI, "pipeline", "list", "--project", project],
-      { encoding: "utf-8" },
-    );
-    const combined = (r.stdout ?? "") + (r.stderr ?? "");
-    expect(combined).toContain("with-inputs");
-    expect(combined).toContain("requires: foo, bar");
-    expect(combined).toContain("no-inputs");
-    // Legacy pipeline must NOT have a `requires:` line on its own row.
-    // Parse line-by-line so the assertion survives bundled rows being added
-    // to the listing (Local pipelines: / Bundled pipelines: groups).
-    const lines = combined.split(/\r?\n/);
-    let foundNoInputs = false;
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      // Match the row that names "no-inputs" — the renderer prints it as the
-      // padded name column followed by the goal, so a startsWith on the
-      // trimmed leading whitespace is enough.
-      if (/^\s+no-inputs\b/.test(line)) {
-        foundNoInputs = true;
-        // The renderer would emit "requires:" on the very next line for that
-        // pipeline if inputs= were declared. Confirm the next non-empty,
-        // still-indented line either belongs to a different row or to a
-        // group header.
-        const next = lines[i + 1] ?? "";
-        expect(next.includes("requires:")).toBe(false);
-        break;
-      }
-    }
-    expect(foundNoInputs).toBe(true);
-  });
-});

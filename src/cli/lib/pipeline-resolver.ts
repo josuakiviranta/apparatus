@@ -37,11 +37,10 @@ export function resolvePipelineArg(arg: string, project: string): string {
   return resolveBundledPipeline(arg);
 }
 
-// ─── Discovery seam shared by `pipeline list` and the parity test ────────
+// ─── Discovery seam shared by mission-control status and resolvePipelineArg ──
 //
 // Walk order MUST mirror resolvePipelineArg above: local-folder, then
-// local-flat, then bundled. The parity test in pipeline-list-resolver-parity
-// fails the suite if the two surfaces drift.
+// local-flat, then bundled.
 
 export type PipelineOrigin = "local-folder" | "local-flat" | "bundled";
 
