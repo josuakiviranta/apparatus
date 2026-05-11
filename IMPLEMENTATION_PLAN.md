@@ -1123,6 +1123,21 @@ git add pipelines/smoke/parallel-implement-test.dot pipelines/smoke/parallel-imp
 git commit -m "test(parallel-impl): smoke pipeline with stubbed orchestrator"
 ```
 
+#### Learnings (post-implementation)
+
+Two spec gaps surfaced during Task 2.5 implementation — noted here so Tasks 2.6+ authors avoid the same traps.
+
+**Gap A — `$project` is not expanded in `script_args`.**
+`src/attractor/transforms/variable-expansion.ts:60` skips the reserved vars `goal` and `project` during `expandVariables`, so `$project` remains a literal string at runtime.
+- Workaround: drop `$project` from any `script_args` value. If the script needs the project root, use `project=$(pwd)` inside the stub script — the DOT already sets `cwd="$project"` on the node, so `pwd` is correct.
+- Future task authors: do not put `$project` inside `script_args`; use `cwd` instead, or derive the path inside the script.
+
+**Gap B — Every agent referenced in a DOT needs a sibling `.md` file, even for smoke pipelines.**
+The agents-next-to-pipeline rule means a node with `agent="plan-scheduler"` requires `pipelines/smoke/plan-scheduler.md` in the same folder. Task 2.5's spec listed 5 files; it omitted this sibling file.
+- The smoke DOT only consumes `$plan_scheduler.dag_path`, so the sibling agent file was trimmed to a single output declaration (`outputs: dag_path`). Declaring extra outputs triggers the `orphan_output` validator rule and fails validation.
+- The full agent definition lives at `.apparat/pipelines/parallel-implement-test/plan-scheduler.md`; the smoke sibling is intentionally minimal.
+- Future task authors: for every `agent="X"` reference in a smoke DOT, create a `pipelines/smoke/X.md` that declares only the outputs the smoke actually consumes.
+
 ### Task 2.6: Wire the smoke into the smoke-runner test (if one exists)
 
 **Files:**
