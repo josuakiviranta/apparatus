@@ -30,8 +30,8 @@ vi.mock("child_process", () => ({
   })),
   spawnSync: vi.fn(() => ({ status: 0, stdout: "main\n" })),
 }));
-vi.mock("../components/PipelineApp.js", () => ({
-  renderPipelineApp: vi.fn(async () => ({
+vi.mock("../components/PipelineRunView.js", () => ({
+  renderPipelineRunView: vi.fn(async () => ({
     callbacks: {
       emit: vi.fn(),
       done: vi.fn(),
@@ -145,9 +145,9 @@ describe("pipelineRunCommand", () => {
     writeFileSync(dotFile, VALID_DOT);
     await pipelineRunCommand(dotFile, { logsRoot: dir, project: dir });
     expect(engine.runPipeline).toHaveBeenCalledTimes(1);
-    // The new adapter calls done() on PipelineApp after runPipeline resolves.
-    const { renderPipelineApp } = await import("../components/PipelineApp.js");
-    const mockApp = renderPipelineApp as ReturnType<typeof vi.fn>;
+    // The new adapter calls done() on PipelineRunView after runPipeline resolves.
+    const { renderPipelineRunView } = await import("../components/PipelineRunView.js");
+    const mockApp = renderPipelineRunView as ReturnType<typeof vi.fn>;
     const result = await mockApp.mock.results[0].value;
     expect(result.callbacks.done).toHaveBeenCalled();
   });
@@ -217,9 +217,9 @@ describe("pipelineRunCommand", () => {
     writeFileSync(dotFile, dot);
     await pipelineRunCommand(dotFile, { logsRoot: dir, project: dir });
 
-    // The new adapter passes node IDs directly as the `nodes` prop to renderPipelineApp.
-    const { renderPipelineApp } = await import("../components/PipelineApp.js");
-    const mockApp = renderPipelineApp as ReturnType<typeof vi.fn>;
+    // The new adapter passes node IDs directly as the `nodes` prop to renderPipelineRunView.
+    const { renderPipelineRunView } = await import("../components/PipelineRunView.js");
+    const mockApp = renderPipelineRunView as ReturnType<typeof vi.fn>;
     const call = mockApp.mock.calls[0][0];
     const nodes: string[] = call.nodes;
 

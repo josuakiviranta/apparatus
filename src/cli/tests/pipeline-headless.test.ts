@@ -31,8 +31,8 @@ vi.mock("child_process", () => ({
   })),
   spawnSync: vi.fn(() => ({ status: 0, stdout: "main\n" })),
 }));
-vi.mock("../components/PipelineApp.js", () => ({
-  renderPipelineApp: vi.fn(async () => ({
+vi.mock("../components/PipelineRunView.js", () => ({
+  renderPipelineRunView: vi.fn(async () => ({
     callbacks: {
       emit: vi.fn(),
       done: vi.fn(),

@@ -1,19 +1,19 @@
 import React from "react";
 import { describe, it, expect } from "vitest";
 import { render } from "ink-testing-library";
-import { PipelineApp } from "../components/PipelineApp.js";
-import type { PipelineAppCallbacks } from "../components/PipelineApp.js";
+import { PipelineRunView } from "../components/PipelineRunView.js";
+import type { PipelineRunViewCallbacks } from "../components/PipelineRunView.js";
 import { createFakeChildHandle } from "./helpers/fake-child-handle.js";
 
 // React 18 batches dispatch() calls made outside event handlers. Flushing
 // to the Ink frame requires yielding a microtask so the scheduler commits.
 const flush = () => new Promise<void>((r) => setTimeout(r, 0));
 
-describe("PipelineApp integration: chat → summarize full flow", () => {
+describe("PipelineRunView integration: chat → summarize full flow", () => {
   it("renders chat block, freezes on end, then renders summarize block — no stacked borders", async () => {
-    let captured: PipelineAppCallbacks | null = null;
+    let captured: PipelineRunViewCallbacks | null = null;
     const { lastFrame } = render(
-      <PipelineApp
+      <PipelineRunView
         pipelineName="chat_end_to_end"
         pid={12345}
         goal={undefined}
@@ -90,9 +90,9 @@ describe("PipelineApp integration: chat → summarize full flow", () => {
   });
 
   it("renders the failure-handoff block as a static item after a fail", async () => {
-    let captured: PipelineAppCallbacks | null = null;
+    let captured: PipelineRunViewCallbacks | null = null;
     const { lastFrame } = render(
-      <PipelineApp
+      <PipelineRunView
         pipelineName="failtest"
         pid={1}
         goal={undefined}
@@ -132,9 +132,9 @@ describe("PipelineApp integration: chat → summarize full flow", () => {
   });
 
   it("abort path: emitting end with status=abort freezes live block and does not crash", () => {
-    let captured: PipelineAppCallbacks | null = null;
+    let captured: PipelineRunViewCallbacks | null = null;
     render(
-      <PipelineApp
+      <PipelineRunView
         pipelineName="p"
         pid={1}
         goal={undefined}
