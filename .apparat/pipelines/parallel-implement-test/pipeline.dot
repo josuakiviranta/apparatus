@@ -1,0 +1,15 @@
+digraph parallel_implement_test {
+  goal="Test DAG-scheduled parallel implementation of a pre-written plan via local worktrees"
+  headless_safe=false
+  inputs="project, plan_path"
+
+  start [shape=Mdiamond]
+  plan_scheduler [agent="plan-scheduler",
+                  default_parallel_worthwhile="",
+                  default_batch_count="",
+                  default_chunk_count=""]
+  done [shape=Msquare]
+
+  start -> plan_scheduler
+  plan_scheduler -> done
+}

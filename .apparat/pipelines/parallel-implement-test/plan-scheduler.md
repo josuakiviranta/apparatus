@@ -16,8 +16,8 @@ inputs:
 outputs:
   dag_path: string
   parallel_worthwhile: boolean
-  batch_count: integer
-  chunk_count: integer
+  batch_count: number
+  chunk_count: number
 ---
 
 # Mission
