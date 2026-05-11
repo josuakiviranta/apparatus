@@ -73,6 +73,10 @@ function summarize(runId: string, runDir: string): RunSummary {
   };
 }
 
+export function summarizeRun(runsRoot: string, runId: string): RunSummary {
+  return summarize(runId, join(runsRoot, runId));
+}
+
 export function listAllRuns(runsRoot: string): RunSummary[] {
   if (!existsSync(runsRoot)) return [];
   const out: RunSummary[] = [];

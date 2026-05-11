@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { listAllRuns, listRunsForPipeline, type RunSummary } from "../lib/runs-index.js";
+import { listAllRuns, listRunsForPipeline, summarizeRun, type RunSummary } from "../lib/runs-index.js";
 
 function writeRun(
   root: string,
@@ -124,5 +124,43 @@ describe("listRunsForPipeline", () => {
       { kind: "pipeline-end", runId: "deadbeef", outcome: "success", timestamp: "2026-05-09T19:00:01.000Z" },
     ]);
     expect(listRunsForPipeline(root, "meditate").map(r => r.runId)).toEqual(["deadbeef"]);
+  });
+});
+
+describe("summarizeRun", () => {
+  it("returns a RunSummary for an existing run dir with a finished trace", () => {
+    const root = mkdtempSync(join(tmpdir(), "runs-summary-"));
+    const dir = join(root, "r-1");
+    mkdirSync(dir);
+    writeFileSync(join(dir, "pipeline.jsonl"),
+      JSON.stringify({ kind: "pipeline-start", pipelineName: "demo", timestamp: "2026-05-11T10:00:00Z" }) + "\n" +
+      JSON.stringify({ kind: "pipeline-end",   outcome: "success",   timestamp: "2026-05-11T10:00:01Z" }) + "\n"
+    );
+    const s = summarizeRun(root, "r-1");
+    expect(s.runId).toBe("r-1");
+    expect(s.pipelineName).toBe("demo");
+    expect(s.outcome).toBe("success");
+    rmSync(root, { recursive: true });
+  });
+
+  it("returns outcome 'crashed' when the run dir has no pipeline.jsonl", () => {
+    const root = mkdtempSync(join(tmpdir(), "runs-summary-"));
+    const dir = join(root, "r-2");
+    mkdirSync(dir);
+    const s = summarizeRun(root, "r-2");
+    expect(s.outcome).toBe("crashed");
+    expect(s.runId).toBe("r-2");
+    rmSync(root, { recursive: true });
+  });
+
+  it("returns outcome 'in-progress' when pipeline-end is missing", () => {
+    const root = mkdtempSync(join(tmpdir(), "runs-summary-"));
+    const dir = join(root, "r-3");
+    mkdirSync(dir);
+    writeFileSync(join(dir, "pipeline.jsonl"),
+      JSON.stringify({ kind: "pipeline-start", pipelineName: "demo", timestamp: "2026-05-11T10:00:00Z" }) + "\n"
+    );
+    expect(summarizeRun(root, "r-3").outcome).toBe("in-progress");
+    rmSync(root, { recursive: true });
   });
 });
