@@ -86,9 +86,6 @@ export function HeartbeatPane(): React.ReactElement {
   );
 }
 
-import { renderWatchApp } from "./WatchApp.js";
-
 export async function renderWatch(): Promise<void> {
-  process.stderr.write("[apparat] `heartbeat watch` is deprecated; use `apparat watch` instead.\n");
-  await renderWatchApp();
+  process.stderr.write("[apparat] `heartbeat watch` is deprecated; use `apparat status` instead.\n");
 }

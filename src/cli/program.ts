@@ -10,7 +10,6 @@ import { pipelineTraceCommand } from "./commands/pipeline/trace.js";
 import { pipelineShowCommand } from "./commands/pipeline/show.js";
 import { pipelineExplainCommand } from "./commands/pipeline/explain.js";
 import { statusCommand } from "./commands/status.js";
-import { watchCommand } from "./commands/watch.js";
 import { collectKV } from "./lib/collect-kv.js";
 
 export function createProgram(): Command {
@@ -38,7 +37,7 @@ Background scheduling (heartbeat):
   apparat heartbeat pipeline workflow.dot --project my-app --every 60   Run a pipeline every 60 min
   apparat heartbeat list                                  Show all scheduled tasks
   apparat heartbeat logs meditate:my-app --follow         Stream live logs for a task
-  apparat heartbeat watch                                 Live TUI dashboard (deprecated alias for 'apparat watch')
+  apparat heartbeat watch                                 (deprecated — see apparat status)
   apparat heartbeat pause meditate:my-app                 Suspend scheduling without removing
   apparat heartbeat resume meditate:my-app                Re-enable a paused task
   apparat heartbeat stop meditate:my-app                  Remove task and kill any running session
@@ -80,8 +79,7 @@ Meditation (restricted insight sessions):
   apparat meditate my-app                   Run a one-shot meditation session
 
 Cross-project status:
-  apparat status                            Cross-project status: projects, heartbeats, recent runs
-  apparat watch                             Live cross-project dashboard`
+  apparat status                            Cross-project status: projects, heartbeats, recent runs`
   );
 
   program
@@ -240,13 +238,6 @@ placeholder values — no LLM invoked, no run dir created.
     .description("Cross-project status: registered projects, heartbeats, and recent runs")
     .action(async () => {
       await statusCommand();
-    });
-
-  program
-    .command("watch")
-    .description("Live cross-project dashboard (composes heartbeat watch and pipeline run TUIs)")
-    .action(async () => {
-      await watchCommand();
     });
 
   registerHeartbeatCommand(program);
