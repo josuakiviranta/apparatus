@@ -143,6 +143,29 @@ describe("meditateCommand (shim)", () => {
     expect(calls[0].opts.variables.steer).toBe("focus on auth flow");
   });
 
+  it("prefers opts.steer over opts.variables.steer when both are passed", async () => {
+    const calls: Array<{ dotFile: string; opts: any }> = [];
+    vi.spyOn(pipelineMod, "pipelineRunCommand").mockImplementation(async (dotFile, opts) => {
+      calls.push({ dotFile, opts });
+    });
+    await meditateCommand(tmpDir, {
+      steer: "from-flag",
+      variables: { steer: "from-var" },
+    });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].opts.variables.steer).toBe("from-flag");
+  });
+
+  it("uses opts.steer when opts.variables is absent", async () => {
+    const calls: Array<{ dotFile: string; opts: any }> = [];
+    vi.spyOn(pipelineMod, "pipelineRunCommand").mockImplementation(async (dotFile, opts) => {
+      calls.push({ dotFile, opts });
+    });
+    await meditateCommand(tmpDir, { steer: "first-class only" });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].opts.variables.steer).toBe("first-class only");
+  });
+
   it("hands the bare 'meditate' name through so the runtime resolver can pick a project-local override", async () => {
     const calls: Array<{ dotFile: string; opts: any }> = [];
     vi.spyOn(pipelineMod, "pipelineRunCommand").mockImplementation(async (dotFile, opts) => {
