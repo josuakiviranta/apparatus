@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { mkdtempSync, writeFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { replayTraceIntoApp } from "../lib/replayTraceIntoApp.js";
+import { replayTraceIntoApp, mapTraceLineToEvent } from "../lib/replayTraceIntoApp.js";
 
 describe("replayTraceIntoApp", () => {
   it("emits a start+end pair for a node-start/node-end pair in the trace", () => {
@@ -105,5 +105,55 @@ describe("replayTraceIntoApp", () => {
     expect(ev.outcome.reason).toBe("timed out");
 
     rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe("mapTraceLineToEvent", () => {
+  it("maps node-start trace line to a NodeEvent of kind 'start'", () => {
+    const line = JSON.stringify({
+      kind: "node-start",
+      nodeId: "verifier",
+      nodeReceiveId: "rcv-1",
+      contextSnapshot: { foo: "bar" },
+    });
+    const ev = mapTraceLineToEvent(line);
+    expect(ev).toEqual({
+      kind: "start",
+      nodeId: "verifier",
+      label: "verifier",
+      blockKind: "agent",
+      nodeReceiveId: "rcv-1",
+      hasContext: true,
+    });
+  });
+
+  it("maps node-end success to a NodeEvent of kind 'end' with success status", () => {
+    const line = JSON.stringify({ kind: "node-end", success: true });
+    expect(mapTraceLineToEvent(line)).toEqual({
+      kind: "end",
+      outcome: { status: "success", reason: undefined },
+    });
+  });
+
+  it("maps node-end failure with failureReason", () => {
+    const line = JSON.stringify({
+      kind: "node-end", success: false, failureReason: "rubric failed",
+    });
+    expect(mapTraceLineToEvent(line)).toEqual({
+      kind: "end",
+      outcome: { status: "fail", reason: "rubric failed" },
+    });
+  });
+
+  it("returns null for pipeline-start / pipeline-end / validation-failure / unknown kinds", () => {
+    expect(mapTraceLineToEvent(JSON.stringify({ kind: "pipeline-start" }))).toBeNull();
+    expect(mapTraceLineToEvent(JSON.stringify({ kind: "pipeline-end" }))).toBeNull();
+    expect(mapTraceLineToEvent(JSON.stringify({ kind: "validation-failure" }))).toBeNull();
+    expect(mapTraceLineToEvent(JSON.stringify({ kind: "node-foo" }))).toBeNull();
+  });
+
+  it("returns null for malformed JSON", () => {
+    expect(mapTraceLineToEvent("{not json")).toBeNull();
+    expect(mapTraceLineToEvent("")).toBeNull();
   });
 });
