@@ -31,7 +31,7 @@ Each iteration runs in a fresh context window. Per-iteration state lives in `dag
 
 2. **Compute the ready batch.**
    - Filter chunks where `status = "ready"` AND every chunk in `depends_on` has `status = "merged"`.
-   - If batch is empty AND any chunk has `status = "conflicted"` → emit `{ "done": false, "conflicts_present": true, "reason": "conflicts_to_resolve" }`. Stop. (Pipeline routes to `merge_resolver`, which routes back here after the conflict clears or the chunk is marked `failed`.)
+   - If batch is empty AND any chunk has `status = "conflicted"` → emit `{ "done": true, "conflicts_present": true, "reason": "conflicts_to_resolve" }`. Stop. **`done:true` exits this deep loop so outer routing fires;** `conflicts_present=true` then routes to `merge_resolver`, which routes back here (fresh deep-loop session) after the conflict clears or the chunk is marked `failed`.
    - If batch is empty AND every chunk has `status` in `{"merged", "failed"}` (terminal states) → emit terminal `{ "done": true, "conflicts_present": false, "reason": "no_chunks_remaining" }`. Stop. The pipeline advances to `tmux_tester` against whatever did merge. Any `failed` chunks surface to the user via `dag.json`.
    - If batch is empty AND chunks remain `ready` or `blocked` with unresolved dependencies on `failed` chunks (transitive dead-end) → emit terminal `{ "done": true, "conflicts_present": false, "reason": "stuck" }`. Stop. Same terminal route; user inspects `dag.json` to find the unreachable chunks.
 
@@ -71,10 +71,10 @@ Each iteration runs in a fresh context window. Per-iteration state lives in `dag
 
     Emit:
     - `terminal=true` → `{ "done": true, "conflicts_present": false, "reason": "no_chunks_remaining" }`. Pipeline advances to `tmux_tester` against whatever merged.
-    - `any_conflicted=true` → `{ "done": false, "conflicts_present": true, "reason": "conflicts_to_resolve" }`. Pipeline routes to `merge_resolver`; resolver routes back here after each resolution.
+    - `any_conflicted=true` → `{ "done": true, "conflicts_present": true, "reason": "conflicts_to_resolve" }`. **Exits the deep loop** so outer routing can dispatch to `merge_resolver`; resolver routes back here (fresh deep-loop session) after each resolution.
     - Otherwise (ready/blocked chunks remain, no conflicts) → `{ "done": false, "conflicts_present": false, "reason": "" }`. Deep-loop re-invokes this agent for the next batch.
 
-    **NEVER emit `done:true` while any chunk's status is `conflicted` or `ready` or `blocked`.** `done:true` means "every chunk has reached a terminal state (`merged` or `failed`)"; any earlier exit must be `done:false` paired with the right `conflicts_present` / `reason` so the pipeline routes correctly.
+    **Routing model:** `done` is the deep-loop exit signal, NOT a "work complete" signal. `conflicts_present` is the outer routing signal. Both must be set together when handing off to `merge_resolver` — otherwise the loop keeps re-invoking this agent and the resolver is unreachable.
 
 # Hard rules
 

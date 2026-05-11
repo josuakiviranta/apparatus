@@ -30,9 +30,9 @@
       ],
       "branch": "parallel-impl/c2-add-gate-side-unknown-source-node-rule-tdd",
       "worktree_path": null,
-      "status": "ready",
-      "head_sha": null,
-      "merge_sha": null,
+      "status": "merged",
+      "head_sha": "b90c90af8f55f0876591e74d07d6e2a715b21493",
+      "merge_sha": "8e84aee3d9fdd98fde7be20de6d365824ff889c8",
       "conflict_files": null,
       "resolver_attempts": 0
     },
@@ -50,9 +50,9 @@
       ],
       "branch": "parallel-impl/c3-add-gate-side-source-missing-output-key-audit-bundled-gates",
       "worktree_path": null,
-      "status": "ready",
-      "head_sha": null,
-      "merge_sha": null,
+      "status": "merged",
+      "head_sha": "c96f474bc55cdb51eb448341b29c9e3142e374d3",
+      "merge_sha": "2852de9f91e849a05b756a240608918b70ba2981",
       "conflict_files": null,
       "resolver_attempts": 0
     }

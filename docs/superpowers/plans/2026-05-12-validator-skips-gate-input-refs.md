@@ -182,7 +182,7 @@ Refs: docs/superpowers/specs/2026-05-12-validator-skips-gate-input-refs-design.m
 **Files:**
 - Modify: `src/attractor/tests/graph-validator-inputs.test.ts:63-108` (the existing `describe("validator — unknown_source_node")` block)
 
-- [ ] **Step 1: Add the failing case at the end of the `unknown_source_node` describe block**
+- [x] **Step 1: Add the failing case at the end of the `unknown_source_node` describe block**
 
 Insert before the closing `});` at `src/attractor/tests/graph-validator-inputs.test.ts:108`:
 
@@ -223,7 +223,7 @@ gate body`,
   });
 ```
 
-- [ ] **Step 2: Run the test to confirm it fails**
+- [x] **Step 2: Run the test to confirm it fails**
 
 Run: `npx vitest run src/attractor/tests/graph-validator-inputs.test.ts -t "errors when gate inputs reference a non-existent node"`
 Expected: FAIL — `expect(d).toBeDefined()` reports `received: undefined`. (The current validator only fires `unknown_source_node` on agent inputs, so no diagnostic with `Gate "tmux_confirm_gate"` exists.)
@@ -233,7 +233,7 @@ Expected: FAIL — `expect(d).toBeDefined()` reports `received: undefined`. (The
 **Files:**
 - Modify: `src/attractor/core/validators/inputs-refs.ts:44-50` (the Block D dispatcher) and append a new rule function
 
-- [ ] **Step 3: Add `checkGateUnknownSourceNode` immediately above `iterateGateInputs` (or wherever neighbours read well — keep file-local helpers grouped)**
+- [x] **Step 3: Add `checkGateUnknownSourceNode` immediately above `iterateGateInputs` (or wherever neighbours read well — keep file-local helpers grouped)**
 
 ```ts
 function checkGateUnknownSourceNode(ctx: ValidationContext): void {
@@ -250,7 +250,7 @@ function checkGateUnknownSourceNode(ctx: ValidationContext): void {
 }
 ```
 
-- [ ] **Step 4: Insert into Block D immediately before `checkOrphanOutput`**
+- [x] **Step 4: Insert into Block D immediately before `checkOrphanOutput`**
 
 Edit `src/attractor/core/validators/inputs-refs.ts:44-50` so Block D reads:
 
@@ -267,12 +267,12 @@ if (ctx.dotDir) {
 
 Insertion order is named by §3.4 of the design — placing it immediately before `checkOrphanOutput` keeps any future snapshot delta contiguous.
 
-- [ ] **Step 5: Re-run the failing test to confirm it now passes**
+- [x] **Step 5: Re-run the failing test to confirm it now passes**
 
 Run: `npx vitest run src/attractor/tests/graph-validator-inputs.test.ts -t "errors when gate inputs reference a non-existent node"`
 Expected: PASS.
 
-- [ ] **Step 6: Run the full `graph-validator-inputs` suite**
+- [x] **Step 6: Run the full `graph-validator-inputs` suite**
 
 Run: `npx vitest run src/attractor/tests/graph-validator-inputs.test.ts`
 Expected: PASS — both the new gate case and every existing agent case stay green.
@@ -282,39 +282,39 @@ Expected: PASS — both the new gate case and every existing agent case stay gre
 **Files:**
 - Modify: `src/attractor/tests/__snapshots__/graph-validator-byte-identical.test.ts.snap`
 
-- [ ] **Step 7: Regenerate the snapshot**
+- [x] **Step 7: Regenerate the snapshot**
 
 Run: `npx vitest run src/attractor/tests/graph-validator-byte-identical.test.ts -u`
 Expected: PASS — snapshot file updated. ADR-0009 names this break-and-regenerate as the contract when rules are added.
 
-- [ ] **Step 8: Inspect the snapshot diff before committing**
+- [x] **Step 8: Inspect the snapshot diff before committing**
 
 Run: `git diff src/attractor/tests/__snapshots__/graph-validator-byte-identical.test.ts.snap`
 Expected: per the verifier's confirmation (no current bundled hexagon gate declares a stale `inputs:` ref against a missing node), the diff should be **empty**. If any new `unknown_source_node` lines appear, that means a real bundled stale-ref slipped through — investigate the named gate before continuing. Either:
 - (a) it is a real bug → fix the gate in the same PR; or
 - (b) it is intentional (e.g. a fixture deliberately exercising a broken graph) → accept the snapshot change.
 
-- [ ] **Step 9: Run the full validator regression suite**
+- [x] **Step 9: Run the full validator regression suite**
 
 Run: `npx vitest run src/attractor/tests/`
 Expected: PASS.
 
-- [ ] **Step 10: Run the bundled-pipelines self-sufficient suite**
+- [x] **Step 10: Run the bundled-pipelines self-sufficient suite**
 
 Run: `npx vitest run src/cli/tests/bundled-pipelines-self-sufficient.test.ts`
 Expected: PASS — verifier confirmed no current bundled gate trips this rule.
 
-- [ ] **Step 11: Smoke the post-fix incident artifact**
+- [x] **Step 11: Smoke the post-fix incident artifact**
 
 Run: `npx tsx src/cli/index.ts pipeline validate .apparat/pipelines/parallel-illumination-to-implementation/pipeline.dot`
 Expected: exit 0, `✔ Pipeline valid …`. The post-fix `tmux_confirm_gate.md` declares only valid source nodes (`run_id`, `batch_orchestrator.*`, `tmux_tester.*`), so the new rule does not fire.
 
-- [ ] **Step 11b: Type-check before committing**
+- [x] **Step 11b: Type-check before committing**
 
 Run: `npx tsc --noEmit`
 Expected: clean. Catches any type drift introduced by the new rule function.
 
-- [ ] **Step 12: Commit**
+- [x] **Step 12: Commit**
 
 ```bash
 git add src/attractor/core/validators/inputs-refs.ts \
@@ -355,7 +355,7 @@ Refs: docs/superpowers/specs/2026-05-12-validator-skips-gate-input-refs-design.m
 **Files:**
 - Modify: `src/attractor/tests/graph-validator-inputs.test.ts:110-…` (the existing `describe("validator — source_missing_output_key")` block)
 
-- [ ] **Step 1: Add a failing case at the end of the `source_missing_output_key` describe block**
+- [x] **Step 1: Add a failing case at the end of the `source_missing_output_key` describe block**
 
 Insert before the block's closing `});`:
 
@@ -398,7 +398,7 @@ gate body`,
   });
 ```
 
-- [ ] **Step 2: Run the test to confirm it fails**
+- [x] **Step 2: Run the test to confirm it fails**
 
 Run: `npx vitest run src/attractor/tests/graph-validator-inputs.test.ts -t "errors when gate inputs request a key not in producer outputs:"`
 Expected: FAIL — no diagnostic with `Gate "my_gate"` and `rule: "source_missing_output_key"` exists. (The agent-surface variant doesn't reach gate nodes today.)
@@ -408,7 +408,7 @@ Expected: FAIL — no diagnostic with `Gate "my_gate"` and `rule: "source_missin
 **Files:**
 - Modify: `src/attractor/core/validators/inputs-refs.ts` — add the new rule function and a second line in Block D
 
-- [ ] **Step 3: Add `checkGateSourceMissingOutputKey` next to `checkGateUnknownSourceNode`**
+- [x] **Step 3: Add `checkGateSourceMissingOutputKey` next to `checkGateUnknownSourceNode`**
 
 ```ts
 function checkGateSourceMissingOutputKey(ctx: ValidationContext): void {
@@ -446,7 +446,7 @@ function checkGateSourceMissingOutputKey(ctx: ValidationContext): void {
 
 The tool-branch and agent-branch mirror the agent-surface logic at `src/attractor/core/validators/inputs-refs.ts:234-258`. `tryResolveAgent` is already imported at `:4`.
 
-- [ ] **Step 4: Wire into Block D immediately after `checkGateUnknownSourceNode`**
+- [x] **Step 4: Wire into Block D immediately after `checkGateUnknownSourceNode`**
 
 Block D should now read:
 
@@ -461,12 +461,12 @@ if (ctx.dotDir) {
 }
 ```
 
-- [ ] **Step 5: Re-run the failing test to confirm it now passes**
+- [x] **Step 5: Re-run the failing test to confirm it now passes**
 
 Run: `npx vitest run src/attractor/tests/graph-validator-inputs.test.ts -t "errors when gate inputs request a key not in producer outputs:"`
 Expected: PASS.
 
-- [ ] **Step 6: Run the full `graph-validator-inputs` suite**
+- [x] **Step 6: Run the full `graph-validator-inputs` suite**
 
 Run: `npx vitest run src/attractor/tests/graph-validator-inputs.test.ts`
 Expected: PASS — every case green.
@@ -476,17 +476,17 @@ Expected: PASS — every case green.
 **Files:**
 - Modify (possibly): `src/attractor/tests/__snapshots__/graph-validator-byte-identical.test.ts.snap`
 
-- [ ] **Step 7: Regenerate the snapshot**
+- [x] **Step 7: Regenerate the snapshot**
 
 Run: `npx vitest run src/attractor/tests/graph-validator-byte-identical.test.ts -u`
 Expected: PASS.
 
-- [ ] **Step 8: Inspect the snapshot diff**
+- [x] **Step 8: Inspect the snapshot diff**
 
 Run: `git diff src/attractor/tests/__snapshots__/graph-validator-byte-identical.test.ts.snap`
 Expected: empty diff (verifier confirmed no current bundled hexagon gate has a stale `inputs:` ref against a missing output key). If any new `source_missing_output_key` lines appear, treat exactly as Chunk 2 Step 8: real bug → fix in this PR; intentional fixture → accept snapshot.
 
-- [ ] **Step 9: Audit bundled and project-local gates**
+- [x] **Step 9: Audit bundled and project-local gates**
 
 Run the audit script named in design §4.4. Use the Bash tool with the following one-liner (avoids global grep on the whole repo):
 
@@ -513,27 +513,27 @@ Expected output:
 
 If the audit surfaces a stale ref, that pipeline's `apparat pipeline validate` will now fail; fix the gate in this same PR before continuing. If everything is clean, log "audit: 0 stale refs" in the commit body for the next reviewer.
 
-- [ ] **Step 10: Validate the post-fix incident artifact**
+- [x] **Step 10: Validate the post-fix incident artifact**
 
 Run: `npx tsx src/cli/index.ts pipeline validate .apparat/pipelines/parallel-illumination-to-implementation/pipeline.dot`
 Expected: exit 0, `✔ Pipeline valid …`.
 
-- [ ] **Step 11: Validate every bundled pipeline**
+- [x] **Step 11: Validate every bundled pipeline**
 
 Run: `npx vitest run src/cli/tests/bundled-pipelines-self-sufficient.test.ts`
 Expected: PASS.
 
-- [ ] **Step 12: Full vitest sweep**
+- [x] **Step 12: Full vitest sweep**
 
 Run: `npx vitest run`
 Expected: PASS — no regressions vs. `main` (modulo any pre-existing flakes).
 
-- [ ] **Step 13: Type-check**
+- [x] **Step 13: Type-check**
 
 Run: `npx tsc --noEmit`
 Expected: clean.
 
-- [ ] **Step 14: Grep invariants from design §8**
+- [x] **Step 14: Grep invariants from design §8**
 
 Quick post-merge sanity, run each:
 
@@ -546,7 +546,7 @@ grep -nE 'rule: "source_missing_output_key"' src/attractor/core/validators/input
 
 Expected: each count meets the design's `≥ N` constraint.
 
-- [ ] **Step 15: Commit**
+- [x] **Step 15: Commit**
 
 ```bash
 git add src/attractor/core/validators/inputs-refs.ts \
