@@ -828,7 +828,7 @@ git commit -m "chore: delete PipelineApp.tsx + its test (split into Run/Trace vi
 
 The `heartbeat watch` shim today says "deprecated; use `apparat watch` instead" and forwards to `renderWatchApp`. After this task, `apparat watch` no longer exists. The shim is rewritten to print a one-line deprecation pointer to `apparat status` and exit 0 — no Ink rendering.
 
-- [ ] **Step 1: Rewrite `HeartbeatWatch.tsx` `renderWatch` (lines ~89-93)**
+- [x] **Step 1: Rewrite `HeartbeatWatch.tsx` `renderWatch` (lines ~89-93)**
 
 Edit the `renderWatch` export in `src/cli/components/HeartbeatWatch.tsx`. Replace:
 ```ts
@@ -848,13 +848,13 @@ export async function renderWatch(): Promise<void> {
 
 Drop the `import { renderWatchApp }` line entirely.
 
-- [ ] **Step 2: Delete the source files**
+- [x] **Step 2: Delete the source files**
 
 ```bash
 git rm src/cli/components/WatchApp.tsx src/cli/tests/watch-composition.test.tsx src/cli/commands/watch.ts
 ```
 
-- [ ] **Step 3: Drop `program.command("watch")` and its import in `src/cli/program.ts`**
+- [x] **Step 3: Drop `program.command("watch")` and its import in `src/cli/program.ts`**
 
 Edit `src/cli/program.ts`:
 - Remove line 13: `import { watchCommand } from "./commands/watch.js";`
@@ -867,7 +867,7 @@ Concretely the line at 41 becomes:
   apparat heartbeat watch                                 (deprecated — see apparat status)
 ```
 
-- [ ] **Step 4: Rewrite `src/cli/tests/watch.test.ts`**
+- [x] **Step 4: Rewrite `src/cli/tests/watch.test.ts`**
 
 Replace the entire contents of `src/cli/tests/watch.test.ts` with:
 
@@ -887,7 +887,7 @@ describe("`heartbeat watch` deprecation shim", () => {
 });
 ```
 
-- [ ] **Step 5: Run watch test + full suite + tsc**
+- [x] **Step 5: Run watch test + full suite + tsc**
 
 Run:
 ```bash
@@ -897,7 +897,7 @@ npx vitest run src/cli/tests/watch.test.ts && \
 ```
 Expected: PASS — the new watch.test passes; `apparat watch` references are gone; no other test broke.
 
-- [ ] **Step 6: Sanity grep**
+- [x] **Step 6: Sanity grep**
 
 ```bash
 grep -rnE "from .*WatchApp(\\.js)?\"|from .*WatchApp(\\.js)?'" src
@@ -906,7 +906,7 @@ grep -nE "program\\.command\\(\"watch\"" src/cli/program.ts
 ```
 Expected: all three return zero matches.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/cli/components/HeartbeatWatch.tsx src/cli/program.ts src/cli/tests/watch.test.ts
