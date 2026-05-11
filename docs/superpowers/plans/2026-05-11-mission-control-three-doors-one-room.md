@@ -1258,7 +1258,7 @@ git commit -m "feat(mission-control): add MissionZoom/MissionState + level:all p
 - Modify: `src/cli/lib/mission-control.ts`
 - Modify: `src/cli/tests/mission-control.test.ts`
 
-- [ ] **Step 1: Add failing tests**
+- [x] **Step 1: Add failing tests**
 
 Append to `mission-control.test.ts`:
 
@@ -1288,12 +1288,12 @@ describe("getMissionControlState — level: project", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify both new cases fail**
+- [x] **Step 2: Run test to verify both new cases fail**
 
 Run: `npx vitest run src/cli/tests/mission-control.test.ts`
 Expected: FAIL on the two new cases ("not implemented in this step").
 
-- [ ] **Step 3: Replace the `case "project":` branch + add `projectOne`**
+- [x] **Step 3: Replace the `case "project":` branch + add `projectOne`**
 
 In `src/cli/lib/mission-control.ts`, replace the `case "project":` line with `case "project":  return projectOne(zoom.projectPath, projects);`. Refactor `getMissionControlState` to fetch `projects` once and pass into branch helpers, OR move `readProjects()` into each branch (chosen — simpler diff).
 
@@ -1337,17 +1337,19 @@ async function projectOne(projectPath: string): Promise<MissionState> {
 }
 ```
 
-- [ ] **Step 4: Run tests + tsc**
+- [x] **Step 4: Run tests + tsc**
 
 Run: `npx vitest run src/cli/tests/mission-control.test.ts && npx tsc --noEmit`
 Expected: all 5 cases PASS, tsc clean.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/cli/lib/mission-control.ts src/cli/tests/mission-control.test.ts
 git commit -m "feat(mission-control): add level:project projection (with error case)"
 ```
+
+> **Implementer note (2026-05-11):** Shipped at commit `cbd74bb`. All 5 mission-control tests pass; `tsc --noEmit` clean. Spec-compliance + code-quality reviewers both approved without changes. The remaining `void listRunsForPipeline; void summarizeRun; void existsSync; void join;` references in `mission-control.ts` are still reserved for Tasks 3.4/3.5.
 
 ### Task 3.4: Implement `level: "pipeline"` projection
 
