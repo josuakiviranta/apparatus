@@ -122,3 +122,52 @@ describe("getMissionControlState — level: pipeline", () => {
     rmSync(projDir, { recursive: true });
   });
 });
+
+describe("getMissionControlState — level: run", () => {
+  it("returns isLive=false + tracePath for a finished run", async () => {
+    const projDir = mkdtempSync(join(tmpdir(), "mc-proj-run-"));
+    const runDir = join(projDir, ".apparat", "runs", "r-fin");
+    mkdirSync(runDir, { recursive: true });
+    writeFileSync(join(runDir, "pipeline.jsonl"),
+      JSON.stringify({ kind: "pipeline-start", pipelineName: "demo", timestamp: "2026-05-11T10:00:00Z" }) + "\n" +
+      JSON.stringify({ kind: "pipeline-end",   outcome: "success", timestamp: "2026-05-11T10:00:01Z" }) + "\n"
+    );
+    registerProject(projDir);
+    const s = await getMissionControlState({
+      level: "run", projectPath: projDir, pipelineName: "demo", runId: "r-fin",
+    });
+    if (s.level !== "run") throw new Error("type guard");
+    expect(s.isLive).toBe(false);
+    expect(s.tracePath).toBe(join(runDir, "pipeline.jsonl"));
+    expect(s.zoomHint).toBe("");
+    rmSync(projDir, { recursive: true });
+  });
+
+  it("returns isLive=true for an in-progress run", async () => {
+    const projDir = mkdtempSync(join(tmpdir(), "mc-proj-run-live-"));
+    const runDir = join(projDir, ".apparat", "runs", "r-live");
+    mkdirSync(runDir, { recursive: true });
+    writeFileSync(join(runDir, "pipeline.jsonl"),
+      JSON.stringify({ kind: "pipeline-start", pipelineName: "demo", timestamp: "2026-05-11T10:00:00Z" }) + "\n"
+    );
+    registerProject(projDir);
+    const s = await getMissionControlState({
+      level: "run", projectPath: projDir, pipelineName: "demo", runId: "r-live",
+    });
+    if (s.level !== "run") throw new Error("type guard");
+    expect(s.isLive).toBe(true);
+    rmSync(projDir, { recursive: true });
+  });
+
+  it("returns level: 'error' when runId not found", async () => {
+    const projDir = mkdtempSync(join(tmpdir(), "mc-proj-run-missing-"));
+    registerProject(projDir);
+    const s = await getMissionControlState({
+      level: "run", projectPath: projDir, pipelineName: "demo", runId: "nope",
+    });
+    expect(s.level).toBe("error");
+    if (s.level !== "error") throw new Error("type guard");
+    expect(s.message).toContain("run not found");
+    rmSync(projDir, { recursive: true });
+  });
+});

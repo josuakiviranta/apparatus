@@ -90,7 +90,7 @@ export async function getMissionControlState(zoom: MissionZoom): Promise<Mission
     case "all":      return projectAll();
     case "project":  return projectOne(zoom.projectPath);
     case "pipeline": return projectPipeline(zoom.projectPath, zoom.pipelineName);
-    case "run":      return Promise.reject(new Error("not implemented in this step"));
+    case "run":      return projectRun(zoom.projectPath, zoom.pipelineName, zoom.runId);
   }
 }
 
@@ -175,9 +175,33 @@ async function projectPipeline(
   return { level: "pipeline", project, pipeline, runs, liveRun, zoomHint };
 }
 
-// NOTE: summarizeRun, existsSync, join are imported
-// for use in Task 3.5 (run projection). They are intentionally
-// referenced here to prevent tree-shaking until those stubs are filled in.
-void summarizeRun;
-void existsSync;
-void join;
+async function projectRun(
+  projectPath: string,
+  pipelineName: string,
+  runId: string,
+): Promise<MissionState> {
+  const projects = readProjects();
+  const project = projects.find(p => p.path === projectPath);
+  if (!project) {
+    return { level: "error", message: `project not registered: ${projectPath} (apparat status to see roster)` };
+  }
+  const root = runsDir(project.path);
+  if (!existsSync(join(root, runId))) {
+    return {
+      level: "error",
+      message: `run not found: ${runId} (apparat status ${projectPath} ${pipelineName} to see runs)`,
+    };
+  }
+  const run = summarizeRun(root, runId);
+  const tracePath = join(root, runId, "pipeline.jsonl");
+  const pipeline = listAllPipelines(project.path).find(e => e.name === pipelineName) ?? null;
+  return {
+    level: "run",
+    project,
+    pipeline,
+    run,
+    tracePath,
+    isLive: run.outcome === "in-progress",
+    zoomHint: "",
+  };
+}

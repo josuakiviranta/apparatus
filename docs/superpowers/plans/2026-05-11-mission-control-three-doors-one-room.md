@@ -1455,7 +1455,7 @@ git commit -m "feat(mission-control): add level:pipeline projection"
 - Modify: `src/cli/lib/mission-control.ts`
 - Modify: `src/cli/tests/mission-control.test.ts`
 
-- [ ] **Step 1: Add failing tests**
+- [x] **Step 1: Add failing tests**
 
 Append to `mission-control.test.ts`:
 
@@ -1510,12 +1510,12 @@ describe("getMissionControlState — level: run", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run src/cli/tests/mission-control.test.ts`
 Expected: FAIL.
 
-- [ ] **Step 3: Add `projectRun` helper, wire branch**
+- [x] **Step 3: Add `projectRun` helper, wire branch**
 
 In `mission-control.ts`:
 - Switch case: `case "run": return projectRun(zoom.projectPath, zoom.pipelineName, zoom.runId);`
@@ -1554,12 +1554,12 @@ async function projectRun(
 }
 ```
 
-- [ ] **Step 4: Run tests + tsc**
+- [x] **Step 4: Run tests + tsc**
 
 Run: `npx vitest run src/cli/tests/mission-control.test.ts && npx tsc --noEmit`
 Expected: PASS + clean.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/cli/lib/mission-control.ts src/cli/tests/mission-control.test.ts
