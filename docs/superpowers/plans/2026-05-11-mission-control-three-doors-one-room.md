@@ -1029,7 +1029,7 @@ git commit -m "feat(runs-index): export summarizeRun(runsRoot, runId)"
 - Create: `src/cli/lib/mission-control.ts`
 - Create: `src/cli/tests/mission-control.test.ts`
 
-- [ ] **Step 1: Write the failing test for `level: "all"`**
+- [x] **Step 1: Write the failing test for `level: "all"`**
 
 Create `src/cli/tests/mission-control.test.ts`:
 
@@ -1103,12 +1103,12 @@ describe("getMissionControlState — level: all", () => {
 
 > **Helper note for the executing session:** `withFakeApparatHome` is the existing test fixture at `src/cli/tests/_apparatHome.ts`. The returned object exposes `{ path, cleanup }` — `path` (not `dir`) is the temp APPARAT_HOME directory. The import path in the test snippet above is correct.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run src/cli/tests/mission-control.test.ts`
 Expected: FAIL — `Cannot find module '../lib/mission-control.js'`.
 
-- [ ] **Step 3: Create `src/cli/lib/mission-control.ts` with the `all` projection**
+- [x] **Step 3: Create `src/cli/lib/mission-control.ts` with the `all` projection**
 
 ```ts
 // src/cli/lib/mission-control.ts
@@ -1238,17 +1238,19 @@ async function projectAll(): Promise<MissionStateAll> {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes + tsc**
+- [x] **Step 4: Run test to verify it passes + tsc**
 
 Run: `npx vitest run src/cli/tests/mission-control.test.ts && npx tsc --noEmit`
 Expected: PASS + clean.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/cli/lib/mission-control.ts src/cli/tests/mission-control.test.ts
 git commit -m "feat(mission-control): add MissionZoom/MissionState + level:all projection"
 ```
+
+> **Implementer note (2026-05-11):** Shipped at commit `830b2e6`. All 3 new tests pass; `tsc --noEmit` clean. The forward-declared imports (`listRunsForPipeline`, `summarizeRun`, `listAllPipelines`, `existsSync`, `join`) needed by Tasks 3.3–3.5 are retained and silenced with `void`; tsconfig has no `noUnusedLocals` so they compile cleanly.
 
 ### Task 3.3: Implement `level: "project"` projection
 
