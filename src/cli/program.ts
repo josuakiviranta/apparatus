@@ -28,7 +28,6 @@ Bootstrap a project:
 
 Getting started (typical workflow):
   apparat implement my-app                  Run the agentic build loop (Ctrl-C to stop)
-  apparat implement my-app --max 3          Run at most 3 iterations
 
 Background scheduling (heartbeat):
   apparat heartbeat meditate my-app --every 30            Run meditate on my-app every 30 min
@@ -87,11 +86,9 @@ Mission control (one verb, zoom by appending tokens):
   program
     .command("implement <project-folder>")
     .description("Run the implement pipeline — Claude reads prompts, writes code, commits, and pushes")
-    .addHelpText("after", "\nExamples:\n  apparat implement my-app\n  apparat implement my-app --max 5\n  apparat implement my-app --max 0   # unlimited iterations\n  apparat implement my-app --scenarios .apparat/scenarios   # write & verify scenario tests (requires tmux)\n\nThe pipeline can be overridden by placing pipelines/implement.dot in your project folder.\n")
-    .option("--max <n>", "Maximum iterations (0 = unlimited, default: 0)", parseInt)
-    .option("--scenarios <path>", "Relative path under <project-folder> for scenario tests; enables scenario-author + tester branch (requires tmux)")
-    .action(async (projectFolder: string, options: { max?: number; scenarios?: string }) => {
-      await implementCommand(projectFolder, options);
+    .addHelpText("after", "\nExamples:\n  apparat implement my-app\n\nThe pipeline can be overridden by placing a project-local implement pipeline in your project folder.\n")
+    .action(async (projectFolder: string) => {
+      await implementCommand(projectFolder);
     });
 
   program
