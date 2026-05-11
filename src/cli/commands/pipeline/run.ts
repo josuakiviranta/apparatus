@@ -23,7 +23,7 @@ import { PassThrough } from "stream";
 import { parseStreamJsonEvents, streamEvents } from "../../lib/stream-formatter.js";
 import * as output from "../../lib/output.js";
 import { loadFailureHandoff, renderFailureFooter } from "../../lib/failure-handoff.js";
-import { renderPipelineApp } from "../../components/PipelineApp.js";
+import { renderPipelineRunView } from "../../components/PipelineRunView.js";
 import { classifyNode } from "../../lib/classifyNode.js";
 import { parseClaudeEvent } from "../../lib/parseClaudeEvent.js";
 import { loadPipeline, PipelineLoadError, type LoadedPipeline } from "../pipeline-invocation.js";
@@ -169,12 +169,12 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
     onValidationFailure(meta) { jsonlTracer.onValidationFailure?.(meta); },
   };
 
-  // Mount the new single-<Static> PipelineApp.
+  // Mount the live PipelineRunView.
   const overviewNodeIds = [...graph.nodes.values()]
     .filter((n) => n.shape !== "Mdiamond" && n.shape !== "Msquare")
     .map((n) => n.id);
 
-  const { callbacks, waitUntilExit } = await renderPipelineApp({
+  const { callbacks, waitUntilExit } = await renderPipelineRunView({
     pipelineName: graph.name,
     pid: process.pid,
     goal: graph.goal,
