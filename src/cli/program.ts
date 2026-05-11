@@ -102,11 +102,13 @@ Mission control (one verb, zoom by appending tokens):
   program
     .command("meditate <project-folder>")
     .description("Run a restricted Claude session that writes insights to .apparat/meditations/illuminations/")
-    .addHelpText("after", "\nExamples:\n  apparat meditate my-app\n\nThe pipeline can be overridden by placing pipelines/meditate/pipeline.dot in your project folder.\n")
+    .addHelpText("after", "\nExamples:\n  apparat meditate my-app\n  apparat meditate my-app --steer \"focus on auth flow\"\n\n--steer <text> is equivalent to --var steer=<text>. The pipeline can be overridden by placing pipelines/meditate/pipeline.dot in your project folder.\n")
+    .option("--steer <text>", "Initial steering message injected at session start (shorthand for --var steer=<text>)")
     .option("--var <key=value>", "pass caller variable (repeatable, e.g. --var steer=...)", collectKV, {} as Record<string, string>)
     .action(async (projectFolder: string, opts: Record<string, unknown>) => {
+      const steer = opts["steer"] as string | undefined;
       const variables = opts["var"] as Record<string, string> | undefined;
-      await meditateCommand(projectFolder, { variables });
+      await meditateCommand(projectFolder, { steer, variables });
     });
 
   const pipeline = program.command("pipeline").description("Pipeline engine commands");

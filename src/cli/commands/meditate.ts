@@ -15,7 +15,7 @@ import {
 
 export async function meditateCommand(
   projectFolder: string,
-  opts: { variables?: Record<string, string> } = {},
+  opts: { steer?: string; variables?: Record<string, string> } = {},
 ): Promise<void> {
   const absPath = resolve(projectFolder);
   if (!existsSync(absPath)) {
@@ -31,9 +31,10 @@ export async function meditateCommand(
   appendMeditateGitignore(absPath);
   writePid(absPath, process.pid);
   try {
+    const steer = opts.steer ?? opts.variables?.steer ?? "";
     return await self.pipelineRunCommand("meditate", {
       project: absPath,
-      variables: { steer: opts.variables?.steer ?? "" },
+      variables: { steer },
     });
   } finally {
     removePid(absPath);
