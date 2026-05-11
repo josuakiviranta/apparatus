@@ -46,6 +46,7 @@ export function run(ctx: ValidationContext): void {
     checkMissingInputProducer(ctx);
     checkInputTypeMismatch(ctx);
     checkGateUnknownSourceNode(ctx);
+    checkGateSourceMissingOutputKey(ctx);
     checkOrphanOutput(ctx);
     checkOutputsSchemaShape(ctx);
   }
@@ -518,6 +519,38 @@ function checkGateUnknownSourceNode(ctx: ValidationContext): void {
       message: `Gate "${gateNodeId}" references source node "${resolved.sourceNode}" in inputs:, but no such node exists in the graph.`,
       location: gateNode.sourceLocation,
     });
+  });
+}
+
+function checkGateSourceMissingOutputKey(ctx: ValidationContext): void {
+  const { dotDir, graph } = ctx;
+  iterateGateInputs(ctx, ({ gateNodeId, decl, resolved, gateNode }) => {
+    if (resolved.sourceNode === undefined) return;
+    const source = graph.nodes.get(resolved.sourceNode);
+    if (!source) return; // unknown_source_node handles this
+    if (source.type === "tool") {
+      if (!source.producesFromStdout) {
+        ctx.diags.push({
+          rule: "source_missing_output_key",
+          severity: "error",
+          message: `Gate "${gateNodeId}" input "${decl}" references key "${resolved.localKey}" which "${resolved.sourceNode}" does not declare in produces_from_stdout`,
+          location: gateNode.sourceLocation,
+        });
+      }
+      return;
+    }
+    if (source.agent) {
+      const sourceCfg = tryResolveAgent(source, dotDir);
+      if (!sourceCfg || sourceCfg.outputs === undefined) return;
+      if (!(resolved.localKey in sourceCfg.outputs)) {
+        ctx.diags.push({
+          rule: "source_missing_output_key",
+          severity: "error",
+          message: `Gate "${gateNodeId}" input "${decl}" references key "${resolved.localKey}" which "${resolved.sourceNode}" does not declare in outputs:`,
+          location: gateNode.sourceLocation,
+        });
+      }
+    }
   });
 }
 
