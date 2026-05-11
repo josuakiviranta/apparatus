@@ -62,4 +62,20 @@ describe("scenario: pipeline-failure-footer", () => {
     expect(writtenStderr).not.toContain("(agent:");
     expect(writtenStderr).not.toContain("raw output:");
   });
+
+  it("includes --project in the resume line when project was passed", async () => {
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(((_code?: number) => {
+      throw new Error("__exit__");
+    }) as never);
+
+    await expect(
+      pipelineRunCommand(join(work, "pipeline.dot"), { project: work }),
+    ).rejects.toThrow("__exit__");
+
+    exitSpy.mockRestore();
+
+    expect(writtenStderr).toMatch(
+      new RegExp(`\\n\\nresume: apparat pipeline run .*--resume \\S+ --project '${work.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}'`),
+    );
+  });
 });
