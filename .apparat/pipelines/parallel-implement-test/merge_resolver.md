@@ -12,7 +12,7 @@ inputs:
   - plan_scheduler.dag_path
 outputs:
   done: boolean
-  resolved_this_iteration: integer
+  resolved_this_iteration: number
 ---
 
 # Mission

@@ -15,6 +15,8 @@ digraph parallel_implement_test {
 
   batch_orchestrator [agent="batch_orchestrator"]
 
+  merge_resolver [agent="merge_resolver"]
+
   done [shape=Msquare]
 
   start -> plan_scheduler
@@ -24,5 +26,9 @@ digraph parallel_implement_test {
   capture_pre_sha -> batch_orchestrator
 
   batch_orchestrator -> batch_orchestrator [condition="batch_orchestrator.done=false"]
-  batch_orchestrator -> done               [condition="batch_orchestrator.done=true"]
+  batch_orchestrator -> merge_resolver     [condition="batch_orchestrator.conflicts_present=true"]
+  batch_orchestrator -> done               [condition="batch_orchestrator.conflicts_present=false"]
+
+  merge_resolver -> merge_resolver         [condition="merge_resolver.done=false"]
+  merge_resolver -> done                   [condition="merge_resolver.done=true"]
 }
