@@ -793,25 +793,25 @@ git commit -m "test: migrate PipelineApp mounts to PipelineRunView"
 - Delete: `src/cli/components/PipelineApp.tsx`
 - Delete: `src/cli/tests/PipelineApp.test.tsx`
 
-- [ ] **Step 1: Verify no remaining importers**
+- [x] **Step 1: Verify no remaining importers**
 
 ```bash
 grep -rnE "from .*PipelineApp(\\.js)?\"|from .*PipelineApp(\\.js)?'" src
 ```
 Expected: zero matches. If any, fix them first (re-run Task 2.2 for the offender) before deleting.
 
-- [ ] **Step 2: Delete the files**
+- [x] **Step 2: Delete the files**
 
 ```bash
 git rm src/cli/components/PipelineApp.tsx src/cli/tests/PipelineApp.test.tsx
 ```
 
-- [ ] **Step 3: Run full CLI suite + tsc**
+- [x] **Step 3: Run full CLI suite + tsc**
 
 Run: `npx tsc --noEmit && npx vitest run src/cli/tests`
 Expected: clean + green.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git commit -m "chore: delete PipelineApp.tsx + its test (split into Run/Trace views)"
