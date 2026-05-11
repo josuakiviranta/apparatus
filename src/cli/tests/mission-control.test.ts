@@ -4,6 +4,10 @@ import { join } from "path";
 import { tmpdir } from "os";
 import { withFakeApparatHome, type FakeApparatHome } from "./_apparatHome.js";
 import { getMissionControlState } from "../lib/mission-control.js";
+import * as output from "../lib/output.js";
+import {
+  renderAll, renderProject, renderPipeline, renderRun,
+} from "../lib/mission-control-render.js";
 
 vi.mock("../../lib/daemon-client.js", () => ({
   request: vi.fn().mockResolvedValue({ type: "tasks", data: [] }),
@@ -169,5 +173,74 @@ describe("getMissionControlState — level: run", () => {
     if (s.level !== "error") throw new Error("type guard");
     expect(s.message).toContain("run not found");
     rmSync(projDir, { recursive: true });
+  });
+});
+
+describe("mission-control-render — renderAll", () => {
+  it("prints 'No projects registered yet.' when projects empty", async () => {
+    const infoSpy = vi.spyOn(output, "info").mockResolvedValue();
+    await renderAll({
+      level: "all", projects: [], runningNow: [], lastRunPerProject: {},
+      tasks: [], zoomHint: "",
+    });
+    const all = infoSpy.mock.calls.map(c => String(c[0])).join("\n");
+    expect(all).toContain("No projects registered yet.");
+    expect(all).not.toContain("running now:");
+    expect(all).not.toContain("zoom in:");
+    infoSpy.mockRestore();
+  });
+
+  it("prints a running-now block + zoom-in line when both present", async () => {
+    const infoSpy = vi.spyOn(output, "info").mockResolvedValue();
+    await renderAll({
+      level: "all",
+      projects: [{ path: "/p", lastSeen: 0 }],
+      runningNow: [{ projectPath: "/p", pipelineName: "demo", runId: "r-1", startedAt: "2026-05-11T10:00:00Z" }],
+      lastRunPerProject: { "/p": null },
+      tasks: [],
+      zoomHint: "apparat status /p",
+    });
+    const all = infoSpy.mock.calls.map(c => String(c[0])).join("\n");
+    expect(all).toContain("running now:");
+    expect(all).toContain("/p");
+    expect(all).toContain("demo");
+    expect(all).toContain("r-1");
+    expect(all).toContain("zoom in: apparat status /p");
+    infoSpy.mockRestore();
+  });
+});
+
+describe("mission-control-render — zoom-hint byte shape", () => {
+  it("renderProject ends with literal 'zoom in: apparat status <projectPath> <pipelineName>'", async () => {
+    const infoSpy = vi.spyOn(output, "info").mockResolvedValue();
+    await renderProject({
+      level: "project",
+      project: { path: "/p", lastSeen: 0 },
+      pipelines: [{ name: "demo", origin: "local-flat", absPath: "/p/.apparat/pipelines/demo.dot" }],
+      recentRuns: [],
+      tasks: [],
+      zoomHint: "apparat status /p demo",
+    });
+    const last = String(infoSpy.mock.calls[infoSpy.mock.calls.length - 1][0]);
+    expect(last).toBe("zoom in: apparat status /p demo");
+    infoSpy.mockRestore();
+  });
+
+  it("renderPipeline emits zoom hint with runId when runs present", async () => {
+    const infoSpy = vi.spyOn(output, "info").mockResolvedValue();
+    await renderPipeline({
+      level: "pipeline",
+      project: { path: "/p", lastSeen: 0 },
+      pipeline: { name: "demo", origin: "local-flat", absPath: "/x.dot" },
+      runs: [{
+        runId: "r-1", pipelineName: "demo", startedAt: "2026-05-11T10:00:00Z",
+        outcome: "success", durationMs: 1200, failedNodeId: null,
+      }],
+      liveRun: null,
+      zoomHint: "apparat status /p demo r-1",
+    });
+    const last = String(infoSpy.mock.calls[infoSpy.mock.calls.length - 1][0]);
+    expect(last).toBe("zoom in: apparat status /p demo r-1");
+    infoSpy.mockRestore();
   });
 });

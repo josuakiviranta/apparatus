@@ -1574,7 +1574,7 @@ git commit -m "feat(mission-control): add level:run projection with isLive + err
 
 Pure formatters — no IO. Each takes a `MissionState…` and an `output` writer (the existing `src/cli/lib/output.ts` module). The leaf `renderRun` is special: it does NOT print text, it mounts `<PipelineTraceView>` and awaits a pipeline-end signal for live runs. We isolate the Ink mount inside `renderRun` so the static-output cases stay testable as plain string assertions.
 
-- [ ] **Step 1: Add failing tests**
+- [x] **Step 1: Add failing tests**
 
 Append to `mission-control.test.ts`:
 
@@ -1654,12 +1654,12 @@ describe("mission-control-render — zoom-hint byte shape", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify failures**
+- [x] **Step 2: Run test to verify failures**
 
 Run: `npx vitest run src/cli/tests/mission-control.test.ts`
 Expected: FAIL — `Cannot find module '../lib/mission-control-render.js'`.
 
-- [ ] **Step 3: Implement `src/cli/lib/mission-control-render.ts`**
+- [x] **Step 3: Implement `src/cli/lib/mission-control-render.ts`**
 
 ```ts
 // src/cli/lib/mission-control-render.ts
@@ -1760,12 +1760,12 @@ export async function renderRun(s: MissionStateRun): Promise<void> {
 
 > **Note for executing session:** `renderRun` ships with a placeholder body here; Chunk 4 Task 4.1 will replace it with the Ink `<PipelineTraceView>` mount that supports auto-tail and pipeline-end exit. Tests in this chunk only assert the string output of `renderAll`, `renderProject`, `renderPipeline`.
 
-- [ ] **Step 4: Run tests + tsc**
+- [x] **Step 4: Run tests + tsc**
 
 Run: `npx vitest run src/cli/tests/mission-control.test.ts && npx tsc --noEmit`
 Expected: PASS + clean.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/cli/lib/mission-control-render.ts src/cli/tests/mission-control.test.ts
