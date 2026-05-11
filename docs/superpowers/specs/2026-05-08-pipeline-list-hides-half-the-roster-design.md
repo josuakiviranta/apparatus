@@ -1,5 +1,7 @@
 # Design: `pipeline list` lists the whole roster (bundled + local), grouped + fork-aware
 
+> **Superseded** for the cross-verb surface by `docs/superpowers/specs/2026-05-11-mission-control-three-doors-one-room-design.md`. The cluster-deepening insight remains valid; the chosen surface (deepening `pipeline list` alone) was replaced by collapsing three verbs into one `apparat status [project] [pipeline] [runId]`.
+
 **Date:** 2026-05-08
 **Status:** draft (pending review)
 **Originating illumination:** `.apparat/meditations/illuminations/2026-05-07T2210-pipeline-list-hides-half-the-roster.md`

@@ -2244,14 +2244,14 @@ git commit -m "chore: delete apparat pipeline list verb; migrate tests to status
 - Modify: `docs/superpowers/specs/2026-05-07-pipeline-mission-control-fragmentation-design.md` (header)
 - Modify: `docs/superpowers/specs/2026-05-08-pipeline-list-hides-half-the-roster-design.md` (header)
 
-- [ ] **Step 1: Grep README.md for stale references**
+- [x] **Step 1: Grep README.md for stale references**
 
 ```bash
 grep -nE "apparat (watch|pipeline list)" README.md
 ```
 Expected: matches at lines 97, 112, 114 (or thereabouts).
 
-- [ ] **Step 2: Rewrite the relevant README block under "Mission control"**
+- [x] **Step 2: Rewrite the relevant README block under "Mission control"**
 
 Locate the existing command section in `README.md`. Insert a new subsection titled `Mission control` containing:
 
@@ -2270,7 +2270,7 @@ Every non-leaf output ends with a `zoom in:` line containing the exact next comm
 
 Delete any lines referring to `apparat watch` or `apparat pipeline list` in the surrounding command section.
 
-- [ ] **Step 3: Grep CONTEXT.md and patch any stale references**
+- [x] **Step 3: Grep CONTEXT.md and patch any stale references**
 
 ```bash
 grep -nE "apparat (watch|pipeline list)" CONTEXT.md
@@ -2278,7 +2278,7 @@ grep -nE "apparat (watch|pipeline list)" CONTEXT.md
 
 For each hit, replace with `apparat status` (or the closest equivalent in context). If no hits, no edit.
 
-- [ ] **Step 4: Add supersession header to the two prior specs**
+- [x] **Step 4: Add supersession header to the two prior specs**
 
 Edit `docs/superpowers/specs/2026-05-07-pipeline-mission-control-fragmentation-design.md`. Add at the top, immediately after the `# …` title:
 
@@ -2288,7 +2288,7 @@ Edit `docs/superpowers/specs/2026-05-07-pipeline-mission-control-fragmentation-d
 
 Edit `docs/superpowers/specs/2026-05-08-pipeline-list-hides-half-the-roster-design.md`. Add the same supersession header (referencing the same 2026-05-11 doc).
 
-- [ ] **Step 5: Manual smoke (operator-eyes check)**
+- [x] **Step 5: Manual smoke (operator-eyes check)**
 
 ```bash
 node ./dist/cli/index.js --help 2>&1 | grep -E "Mission control|watch|pipeline list"
@@ -2297,7 +2297,7 @@ Expected: `Mission control` line present; `apparat watch` and `pipeline list` ab
 
 (Skip if `dist/` isn't built locally; the help test added in Task 4.3 already asserts the same invariant.)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add README.md CONTEXT.md \

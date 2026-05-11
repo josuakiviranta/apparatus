@@ -1,5 +1,7 @@
 # Design: Deepen `pipeline list` into a mission-control view + auto-render SVG on `pipeline validate` success
 
+> **Superseded** for the cross-verb surface by `docs/superpowers/specs/2026-05-11-mission-control-three-doors-one-room-design.md`. The cluster-deepening insight remains valid; the chosen surface (deepening `pipeline list` alone) was replaced by collapsing three verbs into one `apparat status [project] [pipeline] [runId]`.
+
 **Date:** 2026-05-07
 **Status:** draft (pending review)
 **Originating illumination:** `.apparat/meditations/illuminations/2026-05-07T1907-pipeline-mission-control-fragmentation.md`
