@@ -970,7 +970,7 @@ git commit -m "feat(parallel-impl): pipeline DOT — chunk-2 orchestrator routin
 - Create: `pipelines/smoke/parallel-implement-test/plan.md`
 - Create: `pipelines/smoke/parallel-implement-test/capture-pre-sha.sh` (local copy — no `..` segments in `script_file=`)
 
-- [ ] **Step 1: Author the fixture plan**
+- [x] **Step 1: Author the fixture plan**
 
 ```markdown
 <!-- pipelines/smoke/parallel-implement-test/plan.md -->
@@ -989,7 +989,7 @@ Append a single line `foo` to `foo.txt`.
 Append a single line `bar` to `bar.txt`.
 ```
 
-- [ ] **Step 2: Author the setup-fixture script**
+- [x] **Step 2: Author the setup-fixture script**
 
 ```bash
 #!/usr/bin/env bash
@@ -1010,7 +1010,7 @@ git commit -q -m "add plan"
 echo "$target"
 ```
 
-- [ ] **Step 3: Author the orchestrator stub**
+- [x] **Step 3: Author the orchestrator stub**
 
 ```bash
 #!/usr/bin/env bash
@@ -1048,7 +1048,7 @@ fs.writeFileSync('$dag', JSON.stringify(dag, null, 2));
 printf '{"done":true,"conflicts_present":false,"reason":"no_chunks_remaining"}\n'
 ```
 
-- [ ] **Step 4: Copy `capture-pre-sha.sh` into the smoke folder**
+- [x] **Step 4: Copy `capture-pre-sha.sh` into the smoke folder**
 
 To avoid `..` segments in `script_file=` (untested code path even though `path.resolve` would normalise them), copy the script locally:
 
@@ -1058,7 +1058,7 @@ cp .apparat/pipelines/parallel-implement-test/capture-pre-sha.sh \
 chmod +x pipelines/smoke/parallel-implement-test/capture-pre-sha.sh
 ```
 
-- [ ] **Step 5: Author the smoke DOT**
+- [x] **Step 5: Author the smoke DOT**
 
 ```dot
 digraph parallel_implement_test_smoke {
@@ -1091,19 +1091,19 @@ digraph parallel_implement_test_smoke {
 
 Both `script_file=` paths resolve relative to the smoke DOT's directory (`pipelines/smoke/`) per the existing tool-node semantics (`README.md:117-118`). The orchestrator output JSON is captured as `produces=orchestrator_result` so the smoke runner can assert on it.
 
-- [ ] **Step 6: Make the scripts executable**
+- [x] **Step 6: Make the scripts executable**
 
 ```bash
 chmod +x pipelines/smoke/parallel-implement-test/setup-fixture.sh
 chmod +x pipelines/smoke/parallel-implement-test/batch-orchestrator-stub.sh
 ```
 
-- [ ] **Step 7: Validate the smoke pipeline**
+- [x] **Step 7: Validate the smoke pipeline**
 
 Run: `npx tsx src/cli/index.ts pipeline validate pipelines/smoke/parallel-implement-test.dot`
 Expected: zero errors, zero warnings.
 
-- [ ] **Step 8: Run the smoke end-to-end**
+- [x] **Step 8: Run the smoke end-to-end**
 
 ```bash
 TMP=$(mktemp -d)
@@ -1116,7 +1116,7 @@ rm -rf "$TMP"
 ```
 Expected: prints `smoke ok`. Pipeline exits successfully. Both files exist in the project tree.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add pipelines/smoke/parallel-implement-test.dot pipelines/smoke/parallel-implement-test/
