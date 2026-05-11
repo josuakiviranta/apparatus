@@ -264,6 +264,43 @@ body`,
     const diags = validateGraph(graph, dir);
     expect(diags.find(d => d.rule === "source_missing_output_key")).toBeUndefined();
   });
+
+  it("errors when gate inputs request a key not in producer outputs:", () => {
+    const dir = join(tmpdir(), `rule-smok-gate-${Date.now()}`);
+    setup(dir, {
+      "producer.md": `---
+name: producer
+description: x
+inputs: []
+outputs: { foo: string }
+---
+body`,
+      "my_gate.md": `---
+type: gate
+choices: [Approve, Retry]
+inputs: [producer.bar]
+---
+gate body`,
+    });
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      producer [agent="producer"]
+      my_gate [shape=hexagon]
+      done [shape=Msquare]
+      start -> producer -> my_gate -> done
+    }`;
+    writeFileSync(join(dir, "p.dot"), dot);
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    const d = diags.find(
+      x => x.rule === "source_missing_output_key" && /Gate "my_gate"/.test(x.message),
+    );
+    expect(d).toBeDefined();
+    expect(d!.severity).toBe("error");
+    expect(d!.message).toMatch(/producer\.bar/);
+    expect(d!.message).toMatch(/"bar"/);
+    expect(d!.message).toMatch(/outputs:/);
+  });
 });
 
 describe("validator — bare_input_not_in_caller_inputs_or_system", () => {
