@@ -755,7 +755,7 @@ git commit -m "refactor(run): switch from renderPipelineApp to renderPipelineRun
 - Modify: `src/cli/tests/pipeline-headless.test.ts`
 - Modify: `src/cli/tests/LiveFooter.test.tsx` (only if it imports `PipelineApp`; verify)
 
-- [ ] **Step 1: Inspect each file for `PipelineApp` imports + usages**
+- [x] **Step 1: Inspect each file for `PipelineApp` imports + usages**
 
 ```bash
 grep -nE "PipelineApp|renderPipelineApp" \
@@ -764,7 +764,7 @@ grep -nE "PipelineApp|renderPipelineApp" \
   src/cli/tests/LiveFooter.test.tsx
 ```
 
-- [ ] **Step 2: For each occurrence, rename in place**
+- [x] **Step 2: For each occurrence, rename in place**
 
 In each file:
 - `import { PipelineApp, … } from "../components/PipelineApp.js"` → `import { PipelineRunView, … } from "../components/PipelineRunView.js"`.
@@ -775,12 +775,12 @@ In each file:
 
 No assertion changes — behavior is identical.
 
-- [ ] **Step 3: Run the migrated tests**
+- [x] **Step 3: Run the migrated tests**
 
 Run: `FORCE_COLOR=0 npx vitest run src/cli/tests/pipeline-app-integration.test.tsx src/cli/tests/pipeline-headless.test.ts src/cli/tests/LiveFooter.test.tsx`
 Expected: PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/cli/tests/pipeline-app-integration.test.tsx src/cli/tests/pipeline-headless.test.ts src/cli/tests/LiveFooter.test.tsx
