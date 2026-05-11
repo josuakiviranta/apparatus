@@ -249,3 +249,63 @@ describe("loadFailureHandoff", () => {
     expect(handoff.agentRelPath).toMatch(/implement\.md$/);
   });
 });
+
+import { buildResumeCommand } from "../lib/failure-handoff.js";
+
+describe("buildResumeCommand", () => {
+  it("matches the legacy two-slot template when project and variables are absent", () => {
+    expect(buildResumeCommand({
+      dotFile: "pipelines/my.dot",
+      runId: "a1b2c3d4",
+    })).toBe("apparat pipeline run pipelines/my.dot --resume a1b2c3d4");
+  });
+
+  it("appends --project '<folder>' when project is set", () => {
+    expect(buildResumeCommand({
+      dotFile: "pipelines/my.dot",
+      runId: "a1b2c3d4",
+      project: ".",
+    })).toBe("apparat pipeline run pipelines/my.dot --resume a1b2c3d4 --project '.'");
+  });
+
+  it("appends one --var clause per entry in variables, in insertion order", () => {
+    expect(buildResumeCommand({
+      dotFile: "pipelines/my.dot",
+      runId: "a1b2c3d4",
+      variables: { lens: "tests", steer: "auth" },
+    })).toBe(
+      "apparat pipeline run pipelines/my.dot --resume a1b2c3d4 " +
+      "--var 'lens=tests' --var 'steer=auth'",
+    );
+  });
+
+  it("emits both --project and --var clauses, with --project first", () => {
+    expect(buildResumeCommand({
+      dotFile: "pipelines/my.dot",
+      runId: "a1b2c3d4",
+      project: ".",
+      variables: { steer: "focus on auth", lens: "tests" },
+    })).toBe(
+      "apparat pipeline run pipelines/my.dot --resume a1b2c3d4 " +
+      "--project '.' --var 'steer=focus on auth' --var 'lens=tests'",
+    );
+  });
+
+  it("quotes values containing single quotes via the canonical '\\'' pattern", () => {
+    expect(buildResumeCommand({
+      dotFile: "pipelines/my.dot",
+      runId: "a1b2c3d4",
+      variables: { note: "it's fine" },
+    })).toBe(
+      "apparat pipeline run pipelines/my.dot --resume a1b2c3d4 --var 'note=it'\\''s fine'",
+    );
+  });
+
+  it("emits no --var clauses when variables is an empty record", () => {
+    expect(buildResumeCommand({
+      dotFile: "pipelines/my.dot",
+      runId: "a1b2c3d4",
+      variables: {},
+    })).toBe("apparat pipeline run pipelines/my.dot --resume a1b2c3d4");
+  });
+});
