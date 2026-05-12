@@ -1,4 +1,4 @@
-- [ ] When meditator takes this task it should explore the workspace and think are there some tools that would make codebase searches easier and should be whitelisted. If everything is already almost optimal for workspace exploration this should be also noted.
+- [x] When meditator takes this task it should explore the workspace and think are there some tools that would make codebase searches easier and should be whitelisted. If everything is already almost optimal for workspace exploration this should be also noted.
 
 - [ ] Currently almost every agent uses Opus model in pipelines/ -> Burns tokens and opus models extended thinking makes pipeline runs very long. We should investigate is there possibilities to use different models and thinking levels that can be configured for agents. Then we should go through each pipeline and think deeply which agents need extended thinking capacilities and stronger models and which nodes can use sonnet for example without thinking. After this we should also update apparatus skill with a section how to select models and thinking capabilities.
 
