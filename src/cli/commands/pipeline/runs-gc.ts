@@ -92,6 +92,23 @@ export function gcOldRunsPerPipeline(runsRoot: string, retention: GcRetention): 
   }
 }
 
+/**
+ * Tail GC for two run-scoped scratch paths, fired only on a green pipeline
+ * outcome (see ADR-0015 + design 2026-05-12-pipeline-write-consume-pairing).
+ *
+ *   <project>/.apparat/runs/<runId>/
+ *   <project>/.apparat/meditations/illuminations/.triage/<runId>/
+ *
+ * `force: true` makes a missing path a silent no-op so pipelines that never
+ * invoke chat-summarizer (no .triage/<runId>/ written) do not error here.
+ */
+export function gcRunScopedArtefactsOnSuccess(project: string, runId: string): void {
+  const runDir = join(project, ".apparat", "runs", runId);
+  const triageDir = join(project, ".apparat", "meditations", "illuminations", ".triage", runId);
+  rmSync(runDir, { recursive: true, force: true });
+  rmSync(triageDir, { recursive: true, force: true });
+}
+
 function safeMtime(path: string): number {
   try { return lstatSync(path).mtimeMs; } catch { return 0; }
 }

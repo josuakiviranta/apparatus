@@ -27,7 +27,7 @@ import { renderPipelineRunView } from "../../components/PipelineRunView.js";
 import { classifyNode } from "../../lib/classifyNode.js";
 import { parseClaudeEvent } from "../../lib/parseClaudeEvent.js";
 import { loadPipeline, PipelineLoadError, type LoadedPipeline } from "../pipeline-invocation.js";
-import { gcOldRunsPerPipeline, resolveResumeLogsRoot } from "./runs-gc.js";
+import { gcOldRunsPerPipeline, gcRunScopedArtefactsOnSuccess, resolveResumeLogsRoot } from "./runs-gc.js";
 
 export interface PipelineRunOptions {
   project?: string;
@@ -412,6 +412,10 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
 
     done();
     await waitUntilExit();
+
+    if (!pipelineFailed) {
+      gcRunScopedArtefactsOnSuccess(project, runId);
+    }
 
     if (pipelineFailed) {
       if (handoff) {
