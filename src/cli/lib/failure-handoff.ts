@@ -2,6 +2,7 @@ import { readFileSync } from "fs";
 import type { Graph } from "../../attractor/types.js";
 import { resolveAgentFileForNode } from "./agent-paths.js";
 import { shellQuote } from "./shell-quote.js";
+import { inspectCommand } from "./node-receive-inspector.js";
 
 export interface FailureHandoff {
   /** id of the node whose Outcome.status was non-success. */
@@ -46,7 +47,7 @@ export function renderFailureFooter(h: FailureHandoff): string {
   lines.push(`trace: ${h.tracePath}`);
   if (h.rawOutputPath) lines.push(`raw output: ${h.rawOutputPath}`);
   if (h.nodeReceiveId) {
-    lines.push(`inspect: apparat pipeline trace ${h.runId} --node-receive ${h.nodeReceiveId} --full`);
+    lines.push(`inspect: ${inspectCommand(h.runId, h.nodeReceiveId, { full: true })}`);
   }
   lines.push("");
   lines.push(`resume: ${h.resumeCommand}`);
