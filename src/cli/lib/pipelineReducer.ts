@@ -6,6 +6,7 @@ import type {
   Stats,
 } from "./pipelineEvents.js";
 import { drivers } from "./interactions/drivers/index.js";
+import { isInteractionKind } from "./classifyNode.js";
 import { claudeTracePath } from "./claudeTracePath.js";
 
 /**
@@ -66,7 +67,7 @@ export function pipelineReducer(state: PipelineState, event: NodeEvent): Pipelin
     }
 
     case "driver-event": {
-      if (!state.live) return state;
+      if (!state.live || !isInteractionKind(state.live.kind)) return state;
       const driver = drivers[state.live.kind];
       const newLive = driver.reduce(event.payload, state.live);
       return newLive === state.live ? state : { ...state, live: newLive };
@@ -78,8 +79,9 @@ export function pipelineReducer(state: PipelineState, event: NodeEvent): Pipelin
     case "end": {
       if (!state.live) return state;
       const filled = fillStats(state.live, event.stats);
-      const driver = drivers[state.live.kind];
-      const freezeExtras = driver.onFreeze?.(state.live, event.outcome) ?? {};
+      const freezeExtras = isInteractionKind(state.live.kind)
+        ? (drivers[state.live.kind].onFreeze?.(state.live, event.outcome) ?? {})
+        : {};
       const frozen: Block = {
         id: state.live.id,
         nodeId: state.live.nodeId,

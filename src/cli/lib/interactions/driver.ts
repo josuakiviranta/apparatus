@@ -1,5 +1,5 @@
 // src/cli/lib/interactions/driver.ts
-import type { BlockKind } from "../classifyNode.js";
+import type { InteractionKind } from "../classifyNode.js";
 import type { LiveBlock, Block, Outcome } from "../pipelineEvents.js";
 import type { ChildHandle } from "../agent.js";
 import type { ReactNode } from "react";
@@ -24,7 +24,7 @@ export interface DriverRenderCtx {
   onInputSubmit: (v: string) => Promise<void>;
 }
 
-export interface InteractionDriver<K extends BlockKind> {
+export interface InteractionDriver<K extends InteractionKind> {
   readonly kind: K;
   initState(block: LiveBlock): unknown;
   reduce(payload: DriverPayload, state: LiveBlock): LiveBlock;
