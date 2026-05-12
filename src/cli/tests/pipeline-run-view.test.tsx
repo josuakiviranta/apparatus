@@ -142,4 +142,21 @@ describe("PipelineRunView", () => {
     __agentStatesForTest.clear();
     m.unmount();
   });
+
+  it("emits the live receive-context recipe without --full", async () => {
+    const m = await mountPipelineRunView();
+    m.cbs.emit({
+      kind: "start",
+      nodeId: "verifier",
+      label: "agent",
+      blockKind: "agent",
+      nodeReceiveId: "7f3e9c1a",
+      hasContext: true,
+    } as any);
+    await flush();
+    const out = m.currentFrame();
+    expect(out).toContain("apparat pipeline trace r1 --node-receive 7f3e9c1a");
+    expect(out).not.toContain("apparat pipeline trace r1 --node-receive 7f3e9c1a --full");
+    m.unmount();
+  });
 });
