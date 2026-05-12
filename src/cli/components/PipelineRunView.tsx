@@ -5,11 +5,11 @@ import { initialPipelineState, type NodeEvent, type Block, type BodyLine } from 
 import { BodyLineView } from "./BlockView.js";
 import { LiveFooter } from "./LiveFooter.js";
 import { parseSlashCommand } from "../lib/slash-commands.js";
+import { drivers } from "../lib/interactions/drivers/index.js";
 import { claudeTracePath } from "../lib/claudeTracePath.js";
 import type { StreamEvent } from "../lib/stream-formatter.js";
 import type { FailureHandoff } from "../lib/failure-handoff.js";
 import { StreamLine } from "./ui.js";
-import { drivers } from "../lib/interactions/drivers/index.js";
 import { __agentStatesForTest } from "../lib/interactions/drivers/agent.js";
 
 export interface PipelineRunViewCallbacks {

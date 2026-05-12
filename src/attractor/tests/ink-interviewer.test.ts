@@ -71,16 +71,18 @@ describe("InkInterviewer", () => {
 
   it("recognises ABORT_CHOICE in onChoose and resolves Answer with the sentinel value", async () => {
     const { ABORT_CHOICE } = await import("../../cli/lib/interactions/drivers/gate.js");
-    const emitted: NodeEvent[] = [];
-    const iv = new InkInterviewer((e) => emitted.push(e));
-    const answer = iv.ask({ type: "MULTIPLE_CHOICE", prompt: "Go?", options: ["Approve"] });
-    const evt = emitted.find(e => e.kind === "driver-event");
-    expect(evt).toBeDefined();
-    if (evt && evt.kind === "driver-event" && evt.payload.driver === "wait-human") {
-      evt.payload.onChoose(ABORT_CHOICE);
+    const { interviewer, emitted } = makeInterviewer();
+    const promise = interviewer.ask({
+      type: "MULTIPLE_CHOICE",
+      prompt: "Proceed?",
+      options: ["Approve"],
+    });
+    if (emitted[0].kind === "driver-event" && emitted[0].payload.driver === "wait-human") {
+      emitted[0].payload.onChoose(ABORT_CHOICE);
     }
-    await expect(answer).resolves.toEqual({ value: ABORT_CHOICE });
-    // No additional "you" text should be emitted on abort.
-    expect(emitted.filter(e => e.kind === "text" && e.role === "you")).toHaveLength(0);
+    const answer = await promise;
+    expect(answer).toEqual({ value: ABORT_CHOICE });
+    // No "you" text should be emitted on abort.
+    expect(emitted.filter(e => e.kind === "text" && (e as { role: string }).role === "you")).toHaveLength(0);
   });
 });
