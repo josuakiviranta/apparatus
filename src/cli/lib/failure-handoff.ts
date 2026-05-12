@@ -24,22 +24,18 @@ export interface FailureHandoff {
 }
 
 /**
- * Format a `FailureHandoff` into the two-block footer string.
- * Pure — no I/O, no globals — easy to snapshot-test.
+ * Return the failure footer as one string per line — the complete on-screen
+ * shape including the unconditional blank line before `resume:`. No trailing
+ * terminator. Consumers:
  *
- * Shape:
- *   ✗ failed at <nodeId>[ (agent: <relPath>)]: <reason>
- *   trace: <tracePath>
- *   [raw output: <rawOutputPath>]
- *   [inspect: apparat pipeline trace <runId> --node-receive <receiveId> --full]
- *
- *   resume: <resumeCommand>
+ *   - `renderFailureFooter` joins with "\n" and appends "\n" (CLI stderr contract).
+ *   - `PipelineRunView` maps each entry to an Ink `<Text>` element.
  *
  * Bracketed lines drop when the field is null. Blank line before `resume:`
  * is unconditional — chat-refinement rule round 1, bullet 3 (separation of
  * investigation from retry).
  */
-export function renderFailureFooter(h: FailureHandoff): string {
+export function renderFailureFooterLines(h: FailureHandoff): string[] {
   const lines: string[] = [];
 
   const agentClause = h.agentRelPath ? ` (agent: ${h.agentRelPath})` : "";
@@ -52,7 +48,25 @@ export function renderFailureFooter(h: FailureHandoff): string {
   lines.push("");
   lines.push(`resume: ${h.resumeCommand}`);
 
-  return lines.join("\n") + "\n";
+  return lines;
+}
+
+/**
+ * Format a `FailureHandoff` into the two-block footer string.
+ * Thin wrapper around `renderFailureFooterLines` — joins with "\n" and
+ * appends a trailing "\n" (CLI stderr contract; pinned by
+ * `failure-handoff.test.ts` `endsWith("\n")`).
+ *
+ * Shape:
+ *   ✗ failed at <nodeId>[ (agent: <relPath>)]: <reason>
+ *   trace: <tracePath>
+ *   [raw output: <rawOutputPath>]
+ *   [inspect: apparat pipeline trace <runId> --node-receive <receiveId> --full]
+ *
+ *   resume: <resumeCommand>
+ */
+export function renderFailureFooter(h: FailureHandoff): string {
+  return renderFailureFooterLines(h).join("\n") + "\n";
 }
 
 export interface LoadFailureHandoffArgs {
