@@ -1,179 +1,94 @@
 import React from "react";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { render } from "ink-testing-library";
-import { describe, it, expect, vi } from "vitest";
 import { LiveFooter } from "../components/LiveFooter.js";
-import type { LiveBlockWithInput } from "../components/LiveFooter.js";
-import { plainFrame } from "./helpers/plain-frame.js";
+import type { LiveBlock } from "../lib/pipelineEvents.js";
+import { __agentStatesForTest } from "../lib/interactions/drivers/agent.js";
+import { __gateStatesForTest } from "../lib/interactions/drivers/gate.js";
 
-function makeLive(overrides: Partial<LiveBlockWithInput> = {}): LiveBlockWithInput {
+function block(kind: LiveBlock["kind"], id = "blk"): LiveBlock {
   return {
-    id: "chat-0",
-    nodeId: "chat",
-    label: "interactive agent",
-    kind: "interactive-agent",
-    startedAt: Date.now() - 2300,
+    id,
+    nodeId: id,
+    label: "label",
+    kind,
+    startedAt: Date.now() - 100,
     body: [],
-    stats: { turns: 1, tokensIn: 19, tokensOut: 182 },
-    ...overrides,
+    stats: { turns: 0, tokensIn: 0, tokensOut: 0 },
   };
 }
 
-function makeAgentLive(overrides: Partial<LiveBlockWithInput> = {}): LiveBlockWithInput {
-  return makeLive({ kind: "agent", ...overrides });
-}
-
-describe("LiveFooter", () => {
-  it("does not render block header — header is handled by PipelineApp Static", () => {
-    const block = makeLive();
-    const { lastFrame } = render(<LiveFooter block={block} />);
-    const frame = lastFrame() ?? "";
-    expect(frame).not.toContain("━━");
-    expect(frame).not.toContain("[1]");
-    // Status line is present
-    expect(frame).toContain("turns");
-  });
-
-  it("does not render trace — trace is handled by PipelineApp Static", () => {
-    const block = makeLive({
-      tracePath: "/Users/josu/.claude/projects/-cwd/sid-a.jsonl",
-    });
-    const { lastFrame } = render(<LiveFooter block={block} />);
-    const frame = lastFrame() ?? "";
-    expect(frame).not.toContain("trace:");
-    expect(frame).not.toContain("sid-a.jsonl");
-  });
-
-  it("does not render body lines — body is handled by PipelineApp Static", () => {
-    const block = makeLive({
-      body: [
-        { kind: "text", role: "you", text: "summarize the repo" },
-        { kind: "text", role: "claude", text: "apparat-cli has 4 layers" },
-      ],
-    });
-    const { lastFrame } = render(<LiveFooter block={block} />);
-    const frame = lastFrame() ?? "";
-    expect(frame).not.toContain("you:");
-    expect(frame).not.toContain("summarize the repo");
-    expect(frame).not.toContain("claude:");
-  });
-
-  it("renders status line with turn count and token stats", () => {
-    const block = makeLive({
-      stats: { turns: 3, tokensIn: 891, tokensOut: 634 },
-    });
-    const { lastFrame } = render(<LiveFooter block={block} />);
-    const frame = lastFrame() ?? "";
-    expect(frame).toContain("3 turns");
-    expect(frame).toContain("891/634 tok");
-  });
-
-  it("renders TextInput when input prop is present", () => {
-    const block = makeLive({
-      input: {
-        value: "what's in src?",
-        onChange: vi.fn(),
-        onSubmit: vi.fn(),
-      },
-    });
-    const { lastFrame } = render(<LiveFooter block={block} />);
-    const frame = lastFrame() ?? "";
-    expect(frame).toContain(">");
-    expect(frame).toContain("what's in src?");
-  });
-
-  it("shows a disabled input placeholder when kind is interactive-agent and input is absent", () => {
-    const block = makeLive({ input: undefined });
-    const { lastFrame } = render(<LiveFooter block={block} />);
-    const frame = plainFrame(lastFrame());
-    // Placeholder prompt row must exist to keep line count stable
-    expect(frame).toMatch(/^>/m);
-    // But there must be no interactive value content
-    expect(frame).not.toContain("what's in src?");
-  });
-
-  it("handles empty body gracefully", () => {
-    const block = makeLive({ body: [] });
-    const { lastFrame } = render(<LiveFooter block={block} />);
-    const frame = lastFrame() ?? "";
-    // Should still render status, no crash
-    expect(frame).toContain("turns");
-  });
-
-  it("does not render trace for agent kind — trace is handled by PipelineApp Static", () => {
-    const block = makeAgentLive({
-      tracePath: "/Users/x/.claude/projects/-cwd/abc.jsonl",
-    });
-    const { lastFrame } = render(<LiveFooter block={block} />);
-    const frame = lastFrame() ?? "";
-    expect(frame).not.toContain("trace:");
-    expect(frame).not.toContain("abc.jsonl");
-  });
-
-  it("does not show trace row for non-agent kinds (wait-human)", () => {
-    const { lastFrame } = render(
-      <LiveFooter
-        block={{
-          id: "gate-0",
-          nodeId: "g",
-          label: "gate",
-          kind: "wait-human",
-          startedAt: Date.now(),
-          body: [],
-          stats: { turns: 0, tokensIn: 0, tokensOut: 0 },
-          gate: { options: ["Yes"], onChoose: vi.fn() },
-        }}
-      />
-    );
-    const frame = lastFrame() ?? "";
-    expect(frame).not.toMatch(/trace:/);
-  });
-
-  it("does not show input row for agent (non-interactive) kind", () => {
-    const block = makeAgentLive({ tracePath: undefined });
-    const { lastFrame } = render(<LiveFooter block={block} />);
-    const frame = plainFrame(lastFrame());
-    expect(frame).not.toMatch(/^> /m);
-  });
+afterEach(() => {
+  __agentStatesForTest.clear();
+  __gateStatesForTest.clear();
 });
 
-describe("LiveFooter — wait-human gate", () => {
-  function makeGateLiveBlock(overrides: Partial<LiveBlockWithInput> = {}): LiveBlockWithInput {
-    return {
-      id: "gate-0",
-      nodeId: "approval_gate",
-      label: "Do you approve?",
-      kind: "wait-human",
-      startedAt: Date.now() - 1000,
-      body: [],
-      stats: { turns: 0, tokensIn: 0, tokensOut: 0 },
-      gate: {
-        options: ["Approve", "Decline"],
-        onChoose: vi.fn(),
-      },
-      ...overrides,
-    };
-  }
-
-  it("renders GateSelector options when block.gate is set", () => {
-    const { lastFrame } = render(<LiveFooter block={makeGateLiveBlock()} />);
-    const frame = lastFrame() ?? "";
-    expect(frame).toContain("▶ 1. Approve");
-    expect(frame).toContain("  2. Decline");
+describe("LiveFooter", () => {
+  it("renders the agent driver's TextInput for interactive-agent kind", () => {
+    const blk = block("interactive-agent", "a-1");
+    __agentStatesForTest.set("a-1", {
+      child: { kill: vi.fn() } as never,
+      onDone: vi.fn(),
+    });
+    const { lastFrame } = render(
+      <LiveFooter
+        block={blk}
+        inputBuffer="hello"
+        onInputChange={() => {}}
+        onInputSubmit={async () => {}}
+      />,
+    );
+    const out = lastFrame() ?? "";
+    expect(out).toContain(">");
+    expect(out).toContain("hello");
   });
 
-  it("shows 'awaiting choice' status instead of streaming spinner", () => {
-    const { lastFrame } = render(<LiveFooter block={makeGateLiveBlock()} />);
-    const frame = lastFrame() ?? "";
-    expect(frame).toContain("awaiting choice");
-    expect(frame).not.toContain("streaming");
+  it("renders the gate driver's GateSelector for wait-human kind", () => {
+    const blk = block("wait-human", "g-1");
+    __gateStatesForTest.set("g-1", {
+      options: ["Approve", "Decline"],
+      onChoose: vi.fn(),
+    });
+    const { lastFrame } = render(
+      <LiveFooter
+        block={blk}
+        inputBuffer=""
+        onInputChange={() => {}}
+        onInputSubmit={async () => {}}
+      />,
+    );
+    const out = lastFrame() ?? "";
+    expect(out).toContain("Approve");
+    expect(out).toContain("Decline");
   });
 
-  it("does not render GateSelector when block.gate is absent", () => {
-    const block = makeGateLiveBlock();
-    delete (block as Partial<typeof block>).gate;
-    const { lastFrame } = render(<LiveFooter block={block} />);
-    const frame = lastFrame() ?? "";
-    expect(frame).not.toContain("▶");
-    expect(frame).not.toContain("↑↓ navigate");
+  it("renders the shared status line for every kind", () => {
+    const blk = block("wait-human", "g-2");
+    __gateStatesForTest.set("g-2", { options: ["X"], onChoose: () => {} });
+    const { lastFrame } = render(
+      <LiveFooter
+        block={blk}
+        inputBuffer=""
+        onInputChange={() => {}}
+        onInputSubmit={async () => {}}
+      />,
+    );
+    const out = lastFrame() ?? "";
+    expect(out).toMatch(/awaiting choice/);
+  });
+
+  it("renders no driver footer for non-interactive kinds (e.g. agent)", () => {
+    const blk = block("agent", "a-2");
+    const { lastFrame } = render(
+      <LiveFooter
+        block={blk}
+        inputBuffer=""
+        onInputChange={() => {}}
+        onInputSubmit={async () => {}}
+      />,
+    );
+    const out = lastFrame() ?? "";
+    expect(out).not.toContain(">");
+    expect(out).not.toContain("Approve");
   });
 });

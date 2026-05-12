@@ -1,4 +1,4 @@
-// src/cli/lib/interactions/drivers/agent.ts
+// src/cli/lib/interactions/drivers/agent.tsx
 import React from "react";
 import { Box, Text } from "ink";
 import type { InteractionDriver, DriverPayload, DriverRenderCtx } from "../driver.js";

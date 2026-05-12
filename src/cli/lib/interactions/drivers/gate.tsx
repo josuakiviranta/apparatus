@@ -1,4 +1,4 @@
-// src/cli/lib/interactions/drivers/gate.ts
+// src/cli/lib/interactions/drivers/gate.tsx
 import React from "react";
 import type { InteractionDriver, DriverPayload } from "../driver.js";
 import type { LiveBlock } from "../../pipelineEvents.js";
