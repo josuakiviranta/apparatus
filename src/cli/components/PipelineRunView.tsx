@@ -9,6 +9,7 @@ import { drivers } from "../lib/interactions/drivers/index.js";
 import { claudeTracePath } from "../lib/claudeTracePath.js";
 import type { StreamEvent } from "../lib/stream-formatter.js";
 import type { FailureHandoff } from "../lib/failure-handoff.js";
+import { inspectCommand } from "../lib/node-receive-inspector.js";
 import { StreamLine } from "./ui.js";
 import { __agentStatesForTest } from "../lib/interactions/drivers/agent.js";
 
@@ -193,7 +194,7 @@ export function PipelineRunView({ pipelineName, pid, goal, nodes, runId, tracePa
             return <Text key={item.id}>{prefix + "━".repeat(pad)}</Text>;
           }
           if (item.kind === "received-context") {
-            const cmd = `apparat pipeline trace ${item.runId} --node-receive ${item.nodeReceiveId}`;
+            const cmd = inspectCommand(item.runId, item.nodeReceiveId);
             const suffix = item.hasContext ? "" : "  (empty)";
             return (
               <Text key={item.id} dimColor>
@@ -231,7 +232,7 @@ export function PipelineRunView({ pipelineName, pid, goal, nodes, runId, tracePa
                 <Text>{`trace: ${h.tracePath}`}</Text>
                 {h.rawOutputPath && <Text>{`raw output: ${h.rawOutputPath}`}</Text>}
                 {h.nodeReceiveId && (
-                  <Text>{`inspect: apparat pipeline trace ${h.runId} --node-receive ${h.nodeReceiveId} --full`}</Text>
+                  <Text>{`inspect: ${inspectCommand(h.runId, h.nodeReceiveId, { full: true })}`}</Text>
                 )}
                 <Text> </Text>
                 <Text>{`resume: ${h.resumeCommand}`}</Text>
