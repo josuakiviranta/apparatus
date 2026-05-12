@@ -178,8 +178,9 @@ function normaliseReason(raw: string): string {
 export interface BuildResumeCommandArgs {
   dotFile: string;
   runId: string;
-  /** Optional: appends `--project <folder>` when set. Quoted in case the
-   *  folder path contains shell metacharacters. */
+  /** Optional: emits the project folder as the second positional arg (the
+   *  preferred shape; matches `apparat pipeline run <pipeline> [project]`).
+   *  Quoted in case the folder path contains shell metacharacters. */
   project?: string;
   /** Optional: appends `--var k=v` per entry, in `Object.entries()` order.
    *  Values are shell-quoted so spaces, single quotes, $, and backticks
@@ -190,19 +191,20 @@ export interface BuildResumeCommandArgs {
 /**
  * Build the `resume:` recipe line. Pure — no I/O. Output shape:
  *
- *   apparat pipeline run <dotFile> --resume <runId>
- *     [--project '<folder>']
+ *   apparat pipeline run <dotFile> ['<folder>'] --resume <runId>
  *     [--var 'k=v'] ...
  *
- * Argument order is stable: `--resume` first (paired with the bare positional),
- * then `--project`, then `--var` pairs in insertion order. Test fixtures pin
- * this order.
+ * Argument order is stable: pipeline + optional project as positionals (matches
+ * `pipeline run`'s signature), then `--resume`, then `--var` pairs in insertion
+ * order. Test fixtures pin this order. The recipe uses the positional project
+ * form rather than the deprecated `--project <folder>` flag so a copy-paste
+ * does not trigger a deprecation warning.
  */
 export function buildResumeCommand(args: BuildResumeCommandArgs): string {
-  const parts = [`apparat pipeline run ${args.dotFile} --resume ${args.runId}`];
-  if (args.project !== undefined) {
-    parts.push(`--project ${shellQuote(args.project)}`);
-  }
+  const head = args.project !== undefined
+    ? `apparat pipeline run ${args.dotFile} ${shellQuote(args.project)}`
+    : `apparat pipeline run ${args.dotFile}`;
+  const parts = [`${head} --resume ${args.runId}`];
   if (args.variables) {
     for (const [k, v] of Object.entries(args.variables)) {
       parts.push(`--var ${shellQuote(`${k}=${v}`)}`);

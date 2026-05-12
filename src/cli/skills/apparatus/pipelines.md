@@ -13,8 +13,8 @@ Read this once before any pipeline-authoring work. Then follow the workflow in �
 3. **Write `pipeline.dot`** — the graph (see §3–§7).
 4. **Write sibling files** — one `.md` per agent or gate node referenced by the graph; one `.mjs`/`.sh`/etc. per `script_file=` reference.
 5. **Validate** — run `apparat pipeline validate <name>` and fix every reported error. Re-run until clean. Validation is mandatory; the runtime trusts the validator.
-6. **Run** — `apparat pipeline run <name> --project <target>`. Pass `--var k=v` for each declared `inputs="k"` the pipeline expects from the caller.
-7. **Inspect on failure** — `apparat pipeline trace <runId>` to read the per-node context + trace logs from `<project>/.apparat/runs/<runId>/`. For a chronological table of recent runs of one pipeline, use `apparat pipeline list <name>`.
+6. **Run** — `apparat pipeline run <name> <target>`. Pass the target project as the second positional. Pass `--var k=v` for each declared `inputs="k"` the pipeline expects from the caller.
+7. **Inspect on failure** — `apparat pipeline trace <runId>` to read the per-node context + trace logs from `<project>/.apparat/runs/<runId>/`. For a chronological view of recent runs of one pipeline, use `apparat status <project> <name>`.
 
 Step 5 is non-optional. Skipping validation wastes runtime cycles and produces confusing errors mid-run.
 
@@ -30,7 +30,7 @@ Step 5 is non-optional. Skipping validation wastes runtime cycles and produces c
 └── <script>.mjs|.sh|.py|...      ← one per script_file="<name>" reference
 ```
 
-Pipelines are discovered by folder. The folder name is the pipeline name. There is no pipeline registry — what's on disk under `<project>/.apparat/pipelines/` (and the bundled fallback `<npmRoot>/apparat-cli/dist/pipelines/`) is what `pipeline list` returns.
+Pipelines are discovered by folder. The folder name is the pipeline name. There is no pipeline registry — what's on disk under `<project>/.apparat/pipelines/` (and the bundled fallback `<npmRoot>/apparat-cli/dist/pipelines/`) is what `apparat status <project>` surfaces.
 
 ---
 
@@ -409,7 +409,7 @@ Within fenced code blocks (\` \` \` ... \` \` \`) substitution is **skipped** �
 
 ### `$project` vs `--var project=`
 
-If any node references `$project`, `pipeline run` requires `--project <folder>`. Passing `--var project=...` is **not** a substitute; the validator and runtime treat them as different surfaces.
+If any node references `$project`, `pipeline run` requires the target project. Pass it as the second positional (`apparat pipeline run <name> <folder>`) or via the deprecated `--project <folder>` flag. Passing `--var project=...` is **not** a substitute; the validator and runtime treat them as different surfaces.
 
 ---
 
@@ -472,16 +472,16 @@ The validator exits 0 on warnings, non-zero on errors. Both are printed with fil
 ### Run
 
 ```bash
-apparat pipeline run <name> --project <target> [--var k=v]...
+apparat pipeline run <name> <target> [--var k=v]...
 ```
 
-If any node references `$project`, `--project` is required.
+If any node references `$project`, the target project must be passed (as the second positional). `--project <folder>` is still accepted but deprecated.
 
 ### Resume
 
 ```bash
-apparat pipeline run <name> --project <target> --resume
-apparat pipeline run <name> --project <target> --resume <runId>
+apparat pipeline run <name> <target> --resume
+apparat pipeline run <name> <target> --resume <runId>
 ```
 
 Bare `--resume` auto-picks when exactly one prior run exists for the project. State lives at `<project>/.apparat/runs/<runId>/checkpoint.json`. The trace JSONL is in the same directory.
@@ -494,13 +494,13 @@ For `--resume` to work, tool-node scripts must be idempotent — detect "the des
 
 ```bash
 apparat pipeline trace <runId>
-apparat pipeline trace <runId> --node-receive <nodeId>
+apparat pipeline trace <runId> --node-receive <nodeReceiveId>
 apparat pipeline trace <runId> --full
 ```
 
-`--node-receive <id>` filters to a specific node execution. `--full` dumps the raw `pipeline.jsonl`.
+`--node-receive <nodeReceiveId>` filters to a specific node invocation (a per-execution id from the trace, not the static node id). `--full` dumps the raw `pipeline.jsonl`.
 
-Run IDs are composed as `<pipeline-slug>-<8hex>` (e.g. `meditate-2f8a91c3`) so `<project>/.apparat/runs/` is self-describing on disk. Both `pipeline trace` and `pipeline run --resume` accept the slug-prefixed shape and the legacy bare 8-char shape, so older run dirs remain readable and resumable. To list a pipeline's recent runs without remembering a runId, run `apparat pipeline list <name>` — each row prints a copy-pasteable `→ apparat pipeline trace <runId>` line.
+Run IDs are composed as `<pipeline-slug>-<8hex>` (e.g. `meditate-2f8a91c3`) so `<project>/.apparat/runs/` is self-describing on disk. Both `pipeline trace` and `pipeline run --resume` accept the slug-prefixed shape and the legacy bare 8-char shape, so older run dirs remain readable and resumable. To list a pipeline's recent runs without remembering a runId, run `apparat status <project> <name>` — the renderer prints a copy-pasteable `zoom in: apparat status <project> <name> <runId>` line on each row.
 
 ---
 

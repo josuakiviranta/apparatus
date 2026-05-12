@@ -321,8 +321,8 @@ describe("loadFailureHandoff", () => {
     });
 
     expect(handoff.resumeCommand).toBe(
-      "apparat pipeline run /work/my.dot --resume a1b2c3d4 " +
-      "--project '.' --var 'steer=focus on auth'",
+      "apparat pipeline run /work/my.dot '.' --resume a1b2c3d4 " +
+      "--var 'steer=focus on auth'",
     );
   });
 
@@ -358,12 +358,12 @@ describe("buildResumeCommand", () => {
     })).toBe("apparat pipeline run pipelines/my.dot --resume a1b2c3d4");
   });
 
-  it("appends --project '<folder>' when project is set", () => {
+  it("emits project as the second positional, shell-quoted, when project is set", () => {
     expect(buildResumeCommand({
       dotFile: "pipelines/my.dot",
       runId: "a1b2c3d4",
       project: ".",
-    })).toBe("apparat pipeline run pipelines/my.dot --resume a1b2c3d4 --project '.'");
+    })).toBe("apparat pipeline run pipelines/my.dot '.' --resume a1b2c3d4");
   });
 
   it("appends one --var clause per entry in variables, in insertion order", () => {
@@ -377,15 +377,15 @@ describe("buildResumeCommand", () => {
     );
   });
 
-  it("emits both --project and --var clauses, with --project first", () => {
+  it("emits project as positional then --var clauses in insertion order", () => {
     expect(buildResumeCommand({
       dotFile: "pipelines/my.dot",
       runId: "a1b2c3d4",
       project: ".",
       variables: { steer: "focus on auth", lens: "tests" },
     })).toBe(
-      "apparat pipeline run pipelines/my.dot --resume a1b2c3d4 " +
-      "--project '.' --var 'steer=focus on auth' --var 'lens=tests'",
+      "apparat pipeline run pipelines/my.dot '.' --resume a1b2c3d4 " +
+      "--var 'steer=focus on auth' --var 'lens=tests'",
     );
   });
 

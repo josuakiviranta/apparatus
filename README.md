@@ -78,7 +78,7 @@ apparat pipeline run pipelines/my-pipeline.dot ./my-app \
 
 Pass `--resume [runId]` to continue a pipeline after Ctrl-C, a node failure, or a crash. The engine checkpoints after every node advance to `<project>/.apparat/runs/<runId>/checkpoint.json` — the trace `pipeline.jsonl` lives in the same directory. Bare `--resume` auto-selects when exactly one prior run exists for the project; pass an explicit `<runId>` to disambiguate. Older runs are pruned lazily (last 50 per project, override with `APPARAT_RUNS_KEEP`). For `--resume` to be useful, tool-node scripts must be idempotent — a script that hard-requires "state before I act" will fail on retry; detect the desired outcome is already present and exit 0 as a no-op instead.
 
-When a pipeline run fails, the stderr footer prints a copy-pasteable recipe instead of just a trace path: a bird's-eye line naming the failed node and its agent file, then `trace:` / `raw output:` (latest validation-retry attempt) / `inspect:` (the exact `pipeline trace --node-receive --full` command for that invocation), a blank line, and finally `resume:` (the exact `pipeline run … --resume <runId>` command for after you fix it — includes any `--project <folder>` and `--var k=v` flags from the original invocation so the line is paste-ready even from scrollback). Tool-node failures omit the `agent:` clause and the `raw output:` line; pre-handler crashes omit the `inspect:` and `raw output:` lines. The recipe is mirrored inside the in-frame Ink fail block so the same hand-off is visible whether the run dies inside the TUI or after it unmounts.
+When a pipeline run fails, the stderr footer prints a copy-pasteable recipe instead of just a trace path: a bird's-eye line naming the failed node and its agent file, then `trace:` / `raw output:` (latest validation-retry attempt) / `inspect:` (the exact `pipeline trace --node-receive --full` command for that invocation), a blank line, and finally `resume:` (the exact `pipeline run … --resume <runId>` command for after you fix it — re-emits the project folder as the second positional and re-emits any `--var k=v` flags from the original invocation so the line is paste-ready even from scrollback). Tool-node failures omit the `agent:` clause and the `raw output:` line; pre-handler crashes omit the `inspect:` and `raw output:` lines. The recipe is mirrored inside the in-frame Ink fail block so the same hand-off is visible whether the run dies inside the TUI or after it unmounts.
 
 ```bash
 apparat pipeline validate <pipeline.dot>
@@ -113,7 +113,7 @@ Every non-leaf output ends with a `zoom in:` line containing the exact next comm
 
 ### Pipeline script files
 
-Tool nodes can externalise their logic into a sibling script file next to `pipeline.dot` rather than embedding shell in the `.dot` file. Reference the script from a node with `script_file="<name>.<ext>"` (resolved relative to the pipeline folder), plus optional `script_args="..."` and `produces_from_stdout="<context-key>"`. See [`.apparat/pipelines/illumination-to-implementation/consume.mjs`](.apparat/pipelines/illumination-to-implementation/consume.mjs) for a working example, and the [design doc](docs/superpowers/specs/2026-04-17-pipeline-script-files-design.md) for the full attribute surface and rationale.
+Tool nodes can externalise their logic into a sibling script file next to `pipeline.dot` rather than embedding shell in the `.dot` file. Reference the script from a node with `script_file="<name>.<ext>"` (resolved relative to the pipeline folder), plus optional `script_args="..."` and `produces_from_stdout="<context-key>"`. See [`.apparat/pipelines/illumination-to-implementation/consume.mjs`](.apparat/pipelines/illumination-to-implementation/consume.mjs) for a working example.
 
 ### Parallel illumination-to-implementation pipeline
 
@@ -217,7 +217,9 @@ Press `Ctrl+C`. apparat cleanly terminates its own claude subprocess without aff
 - **`CONTEXT.md`** — domain language and glossary
 - **`docs/adr/`** — decision records (why things are the way they are)
 - **`src/`** — TypeScript source (CLI, pipeline engine, daemon, MCP servers)
-- **`pipelines/`** — project-local `.dot` pipelines (also `src/cli/pipelines/` for bundled ones shipped to consumers)
+- **`.apparat/pipelines/`** — project-local pipelines (one folder per pipeline; `pipeline.dot` + sibling agent `.md` / script files)
+- **`src/cli/pipelines/`** — bundled pipelines shipped to consumers (`implement`, `meditate`, `janitor`)
+- **`pipelines/smoke/`** — smoke-test fixtures used by the repo's own test suite (not user-facing)
 
 ## Development
 
