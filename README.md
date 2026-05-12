@@ -28,6 +28,11 @@ Requires: Node.js >=18, [`claude` CLI](https://www.npmjs.com/package/@anthropic-
 ## Commands
 
 ```bash
+apparat init [project-folder]
+```
+Scaffold an apparat-shaped project. Defaults to cwd if no folder is passed. Idempotent — safe to re-run; never overwrites existing files. See "Bootstrap a project" above for what it creates.
+
+```bash
 apparat implement <project-folder>
 ```
 Runs the agentic build loop. Claude iterates, commits, and pushes changes until the pipeline finishes. Override caps or enable scenario tests via the generic escape hatch: `apparat pipeline run implement <project-folder> --var max_iterations=N --var scenarios_dir=<path>` (the `scenarios_dir` branch requires a tmux session; see `docs/adr/0003-scenario-tests-in-implement-pipeline.md`).
@@ -37,11 +42,6 @@ Each agent turn is annotated with:
 - `→ [grep] pattern`, `→ [glob] pattern`, `→ [bash] command` — search and shell
 - `▶ SUBAGENT: task` / `◀ SUBAGENT DONE` — subagent boundaries
 - `◈ ctx: N tokens` — main agent context window size after each turn
-
-```bash
-apparat <project-folder>
-```
-Shorthand for `implement`.
 
 ```bash
 apparat meditate <project-folder> [--steer <text>]
@@ -61,6 +61,8 @@ Pass `--var key=value` (repeatable) to steer scheduled pipelines the same way `a
 ```bash
 apparat heartbeat pipeline janitor --project . --every 720 --var lens=tests
 ```
+
+Manage scheduled tasks with `apparat heartbeat list` (roster + status), `pause <id>` / `resume <id>` (suspend or re-enable scheduling without losing the task), `kill <id>` (terminate the currently running session but keep the schedule), and `stop <id>` (remove the task entirely + kill any running session). Stream live output with `apparat heartbeat logs <id> --follow`.
 
 ```bash
 apparat pipeline run <pipeline> [project] [--var <key=value>...] [--resume]
@@ -84,14 +86,19 @@ apparat pipeline validate <pipeline.dot>
 Check a pipeline for structural errors and `portability_heuristic` warnings (hardcoded paths that would break when the pipeline runs in a different environment).
 
 ```bash
+apparat pipeline show <pipeline.dot>
+```
+Render the pipeline as an SVG next to the source `.dot` file. Useful for sharing topology snapshots or eyeballing branching structure.
+
+```bash
 apparat pipeline explain <pipeline> [nodeId]
 ```
 Plain-text walkthrough of a pipeline's topology (per-node `consumes:` / `produces:` / `branches:` / `next:`, plus `Loops:` and `Reachability:`). With a node id, renders that agent's prompt skeleton with `<placeholder:…>` values — useful for iterating on agent `.md` files without spawning an LLM.
 
 ```bash
-apparat pipeline trace <runId> [--node-receive <nodeId>] [--full]
+apparat pipeline trace <runId> [--node-receive <nodeReceiveId>] [--full]
 ```
-Inspect the context and trace logs for a completed pipeline run. `<runId>` accepts both the slug-prefixed shape (`meditate-2f8a91c3`, the new default) and the bare 8-char shape (`2f8a91c3`, used by older runs and daemon-spawned tasks). `--node-receive` filters to a specific node execution; `--full` shows the raw JSONL trace.
+Inspect the context and trace logs for a completed pipeline run. `<runId>` accepts both the slug-prefixed shape (`meditate-2f8a91c3`, the new default) and the bare 8-char shape (`2f8a91c3`, used by older runs and daemon-spawned tasks). `--node-receive` filters to a specific node invocation (a per-execution id from the trace, not the static node id); `--full` shows the raw JSONL trace.
 
 ### Mission control
 
