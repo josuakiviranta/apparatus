@@ -124,6 +124,27 @@ describe("PipelineRunView", () => {
     m.unmount();
   });
 
+  it("typing text and pressing Enter calls child.submit with the typed text", async () => {
+    const { __agentStatesForTest } = await import("../lib/interactions/drivers/agent.js");
+    __agentStatesForTest.clear();
+    const m = await mountPipelineRunView();
+    m.cbs.emit({ kind: "start", nodeId: "chat", label: "agent", blockKind: "interactive-agent" });
+    const submit = vi.fn().mockResolvedValue(undefined);
+    const child = { kill: vi.fn().mockResolvedValue(undefined), submit, end: vi.fn() } as unknown as ChildHandle;
+    m.cbs.emit({
+      kind: "driver-event",
+      payload: { driver: "interactive-agent", kind: "agent.ready", child, onDone: vi.fn() },
+    });
+    await flush();
+    m.stdin.write("hi");
+    await flush();
+    m.stdin.write("\r");
+    await flush();
+    expect(submit).toHaveBeenCalledWith("hi");
+    __agentStatesForTest.clear();
+    m.unmount();
+  });
+
   it("Esc on a live interactive-agent calls child.kill('SIGTERM')", async () => {
     const { __agentStatesForTest } = await import("../lib/interactions/drivers/agent.js");
     __agentStatesForTest.clear();

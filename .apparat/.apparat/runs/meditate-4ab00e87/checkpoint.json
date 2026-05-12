@@ -1,0 +1,24 @@
+{
+  "timestamp": "2026-05-12T08:29:09.812Z",
+  "currentNode": "end",
+  "completedNodes": [
+    "start",
+    "read_vision",
+    "read_notes",
+    "meditate",
+    "end"
+  ],
+  "nodeRetries": {},
+  "context": {
+    "$goal": "",
+    "project": "/Users/josu/Documents/projects/apparatus/.apparat",
+    "$project": "/Users/josu/Documents/projects/apparatus/.apparat",
+    "steer": "",
+    "run_id": "meditate-4ab00e87",
+    "tool.output": "{\"notes\":\"\"}\n",
+    "read_vision.vision": "",
+    "read_notes.notes": "",
+    "meditate.iterations": "1",
+    "meditate.success": "true"
+  }
+}

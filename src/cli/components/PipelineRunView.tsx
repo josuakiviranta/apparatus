@@ -258,7 +258,7 @@ export function PipelineRunView({ pipelineName, pid, goal, nodes, runId, tracePa
               dispatch({ kind: "text", role: "system", text: `unknown command: ${parsed.raw}` });
               return;
             }
-            const id = liveBlockIdRef.current;
+            const id = state.live?.id ?? null;
             const childEntry = id ? __agentStatesForTest.get(id) : undefined;
             const child = childEntry?.child;
             if (!child) return;
