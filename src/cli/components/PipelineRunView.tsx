@@ -8,7 +8,7 @@ import { parseSlashCommand } from "../lib/slash-commands.js";
 import { drivers } from "../lib/interactions/drivers/index.js";
 import { claudeTracePath } from "../lib/claudeTracePath.js";
 import type { StreamEvent } from "../lib/stream-formatter.js";
-import type { FailureHandoff } from "../lib/failure-handoff.js";
+import { renderFailureFooterLines, type FailureHandoff } from "../lib/failure-handoff.js";
 import { inspectCommand } from "../lib/node-receive-inspector.js";
 import { StreamLine } from "./ui.js";
 import { __agentStatesForTest } from "../lib/interactions/drivers/agent.js";
@@ -221,21 +221,12 @@ export function PipelineRunView({ pipelineName, pid, goal, nodes, runId, tracePa
             );
           }
           if (item.kind === "failure-handoff") {
-            const h = item.handoff;
+            const lines = renderFailureFooterLines(item.handoff);
             return (
-              <Box key={item.id} flexDirection="column" marginBottom={1}>
-                <Text>
-                  {"✗ failed at "}{h.nodeId}
-                  {h.agentRelPath ? ` (agent: ${h.agentRelPath})` : ""}
-                  {": "}{h.reason}
-                </Text>
-                <Text>{`trace: ${h.tracePath}`}</Text>
-                {h.rawOutputPath && <Text>{`raw output: ${h.rawOutputPath}`}</Text>}
-                {h.nodeReceiveId && (
-                  <Text>{`inspect: ${inspectCommand(h.runId, h.nodeReceiveId, { full: true })}`}</Text>
-                )}
-                <Text> </Text>
-                <Text>{`resume: ${h.resumeCommand}`}</Text>
+              <Box key={item.id} flexDirection="column">
+                {lines.map((line, i) => (
+                  <Text key={i}>{line === "" ? " " : line}</Text>
+                ))}
               </Box>
             );
           }
