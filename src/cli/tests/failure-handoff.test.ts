@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
   renderFailureFooter,
+  renderFailureFooterLines,
   type FailureHandoff,
 } from "../lib/failure-handoff.js";
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "fs";
@@ -78,6 +79,58 @@ describe("renderFailureFooter", () => {
 
   it("ends with a trailing newline", () => {
     expect(renderFailureFooter(FULL).endsWith("\n")).toBe(true);
+  });
+});
+
+describe("renderFailureFooterLines", () => {
+  it("returns the full footer split into lines with no terminator", () => {
+    expect(renderFailureFooterLines(FULL)).toEqual([
+      "✗ failed at runner (agent: pipelines/my/runner.md): boom-stderr",
+      "trace: /work/.apparat/runs/a1b2c3d4/pipeline.jsonl",
+      "raw output: /work/.apparat/runs/a1b2c3d4/runner/raw-3.txt",
+      "inspect: apparat pipeline trace a1b2c3d4 --node-receive 7f3e9c1a --full",
+      "",
+      "resume: apparat pipeline run /work/pipelines/my.dot --resume a1b2c3d4",
+    ]);
+  });
+
+  it("omits the agent clause when agentRelPath is null (tool node)", () => {
+    const tool: FailureHandoff = { ...FULL, agentRelPath: null };
+    expect(renderFailureFooterLines(tool)[0]).toBe(
+      "✗ failed at runner: boom-stderr"
+    );
+  });
+
+  it("omits the inspect line when nodeReceiveId is null (early crash)", () => {
+    const early: FailureHandoff = { ...FULL, nodeReceiveId: null, rawOutputPath: null };
+    expect(renderFailureFooterLines(early)).toEqual([
+      "✗ failed at runner (agent: pipelines/my/runner.md): boom-stderr",
+      "trace: /work/.apparat/runs/a1b2c3d4/pipeline.jsonl",
+      "",
+      "resume: apparat pipeline run /work/pipelines/my.dot --resume a1b2c3d4",
+    ]);
+  });
+
+  it("omits the raw output line when rawOutputPath is null but keeps inspect", () => {
+    const noRaw: FailureHandoff = { ...FULL, rawOutputPath: null };
+    const out = renderFailureFooterLines(noRaw);
+    expect(out).not.toContain("raw output:");
+    expect(out).toContain(
+      "inspect: apparat pipeline trace a1b2c3d4 --node-receive 7f3e9c1a --full"
+    );
+  });
+
+  it("always includes the unconditional blank line before resume", () => {
+    const lines = renderFailureFooterLines(FULL);
+    const resumeIdx = lines.findIndex(l => l.startsWith("resume: "));
+    expect(resumeIdx).toBeGreaterThan(0);
+    expect(lines[resumeIdx - 1]).toBe("");
+  });
+
+  it("renderFailureFooter equals renderFailureFooterLines joined + trailing newline", () => {
+    expect(renderFailureFooter(FULL)).toBe(
+      renderFailureFooterLines(FULL).join("\n") + "\n"
+    );
   });
 });
 
