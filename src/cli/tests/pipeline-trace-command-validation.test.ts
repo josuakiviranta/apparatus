@@ -1,9 +1,10 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll } from "vitest";
-import { mkdtempSync, writeFileSync, mkdirSync } from "node:fs";
+import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pipelineTraceCommand } from "../commands/pipeline.js";
 import { runDir } from "../lib/apparat-paths.js";
+import * as output from "../lib/output.js";
 
 describe("pipeline trace --node-receive surfaces validation attempts", () => {
   const logs: string[] = [];
@@ -80,5 +81,25 @@ describe("pipeline trace --node-receive surfaces validation attempts", () => {
     const out = logs.join("\n");
     expect(out).toMatch(/received: T0/);
     expect(out).not.toMatch(/prompt:\s/);
+  });
+
+  it("emits an ADR-0015 hint line when the trace is missing", async () => {
+    const errors: string[] = [];
+    const errSpy = vi.spyOn(output, "error").mockImplementation(async (msg: string) => {
+      errors.push(msg);
+    });
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+      throw new Error(`exit:${code ?? 0}`);
+    }) as never);
+
+    const tmp = mkdtempSync(join(tmpdir(), "apparat-trace-hint-"));
+    try {
+      await expect(pipelineTraceCommand("ghost-runid", { project: tmp })).rejects.toThrow(/exit:1/);
+      expect(errors.some(l => l.includes("ADR-0015"))).toBe(true);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+      errSpy.mockRestore();
+      exitSpy.mockRestore();
+    }
   });
 });
