@@ -106,24 +106,42 @@ describe("pipelineReducer — invariants (regression guards)", () => {
     expect(s.frozen[0].stats.durationMs).toBeLessThan(Date.now() - before + 50);
   });
 
-  it("interactive-ready stores child + onDone without invoking them", () => {
-    const fakeChild = {} as ChildHandle;
+  it("driver-event/agent.ready stores agent state without invoking callbacks", async () => {
+    const { __agentStatesForTest } = await import("../lib/interactions/drivers/agent.js");
+    __agentStatesForTest.clear();
+    const fakeChild = { kill: () => Promise.resolve() } as unknown as ChildHandle;
     const onDone = () => { throw new Error("reducer must not call onDone"); };
     let s = pipelineReducer(initialPipelineState, {
       kind: "start", nodeId: "chat", label: "agent", blockKind: "interactive-agent",
     });
-    s = pipelineReducer(s, { kind: "interactive-ready", child: fakeChild, onDone });
-    expect(s.live?.child).toBe(fakeChild);
-    expect(s.live?.onDone).toBe(onDone);
+    s = pipelineReducer(s, {
+      kind: "driver-event",
+      payload: {
+        driver: "interactive-agent",
+        kind: "agent.ready",
+        child: fakeChild,
+        onDone,
+      },
+    });
+    expect(s.live).not.toBeNull();
+    const entry = __agentStatesForTest.get(s.live!.id);
+    expect(entry?.child).toBe(fakeChild);
+    expect(entry?.onDone).toBe(onDone);
+    __agentStatesForTest.clear();
   });
 
-  it("end does NOT invoke live.onDone and carries the reference onto the frozen block", () => {
-    const fakeChild = {} as ChildHandle;
+  it("end runs the driver's onFreeze hook and carries onDone onto the frozen block", async () => {
+    const { __agentStatesForTest } = await import("../lib/interactions/drivers/agent.js");
+    __agentStatesForTest.clear();
+    const fakeChild = { kill: () => Promise.resolve() } as unknown as ChildHandle;
     const onDone = () => { throw new Error("reducer must not call onDone at end time"); };
     let s = pipelineReducer(initialPipelineState, {
       kind: "start", nodeId: "chat", label: "agent", blockKind: "interactive-agent",
     });
-    s = pipelineReducer(s, { kind: "interactive-ready", child: fakeChild, onDone });
+    s = pipelineReducer(s, {
+      kind: "driver-event",
+      payload: { driver: "interactive-agent", kind: "agent.ready", child: fakeChild, onDone },
+    });
     expect(() => {
       s = pipelineReducer(s, {
         kind: "end",
@@ -134,6 +152,7 @@ describe("pipelineReducer — invariants (regression guards)", () => {
     expect(s.live).toBeNull();
     expect(s.frozen).toHaveLength(1);
     expect(s.frozen[0].onDone).toBe(onDone);
+    __agentStatesForTest.clear();
   });
 
   it("events targeting live when live is null are no-ops (all four mutators)", () => {
@@ -142,7 +161,13 @@ describe("pipelineReducer — invariants (regression guards)", () => {
     const s3 = pipelineReducer(initialPipelineState, { kind: "end", outcome: { status: "fail" } });
     const s4 = pipelineReducer(initialPipelineState, { kind: "trace-path", sessionId: "x" });
     const s5 = pipelineReducer(initialPipelineState, {
-      kind: "interactive-ready", child: {} as ChildHandle, onDone: () => {},
+      kind: "driver-event",
+      payload: {
+        driver: "interactive-agent",
+        kind: "agent.ready",
+        child: {} as ChildHandle,
+        onDone: () => {},
+      },
     });
     expect(s1).toEqual(initialPipelineState);
     expect(s2).toEqual(initialPipelineState);
@@ -255,41 +280,59 @@ describe("pipelineReducer — stream-line", () => {
   });
 });
 
-describe("pipelineReducer — gate-ready", () => {
-  it("stores options and onChoose on live.gate", () => {
+describe("pipelineReducer — gate driver-event", () => {
+  it("delegates to gateDriver.reduce which stores options + onChoose in the gate state map", async () => {
+    const { __gateStatesForTest } = await import("../lib/interactions/drivers/gate.js");
+    __gateStatesForTest.clear();
     let s = pipelineReducer(initialPipelineState, {
       kind: "start", nodeId: "g", label: "Gate?", blockKind: "wait-human",
     });
     const onChoose = vi.fn();
-    s = pipelineReducer(s, { kind: "gate-ready", options: ["Yes", "No"], onChoose });
-    expect(s.live?.gate?.options).toEqual(["Yes", "No"]);
-    expect(s.live?.gate?.onChoose).toBe(onChoose);
+    s = pipelineReducer(s, {
+      kind: "driver-event",
+      payload: { driver: "wait-human", kind: "gate.ready", options: ["Yes", "No"], onChoose },
+    });
+    const entry = __gateStatesForTest.get(s.live!.id);
+    expect(entry?.options).toEqual(["Yes", "No"]);
+    expect(entry?.onChoose).toBe(onChoose);
+    __gateStatesForTest.clear();
   });
 
   it("is a no-op when live is null", () => {
     const onChoose = vi.fn();
     const s = pipelineReducer(initialPipelineState, {
-      kind: "gate-ready", options: ["Yes"], onChoose,
+      kind: "driver-event",
+      payload: { driver: "wait-human", kind: "gate.ready", options: ["Yes"], onChoose },
     });
     expect(s).toEqual(initialPipelineState);
   });
 
-  it("does not call onChoose (reducer never invokes callbacks)", () => {
+  it("does not call onChoose (reducer never invokes callbacks)", async () => {
+    const { __gateStatesForTest } = await import("../lib/interactions/drivers/gate.js");
+    __gateStatesForTest.clear();
     let s = pipelineReducer(initialPipelineState, {
       kind: "start", nodeId: "g", label: "Gate?", blockKind: "wait-human",
     });
     const onChoose = vi.fn();
-    s = pipelineReducer(s, { kind: "gate-ready", options: ["Yes"], onChoose });
+    s = pipelineReducer(s, {
+      kind: "driver-event",
+      payload: { driver: "wait-human", kind: "gate.ready", options: ["Yes"], onChoose },
+    });
     expect(onChoose).not.toHaveBeenCalled();
+    __gateStatesForTest.clear();
   });
 
-  it("gate-ready does not affect frozen array", () => {
+  it("driver-event does not affect frozen array", async () => {
+    const { __gateStatesForTest } = await import("../lib/interactions/drivers/gate.js");
+    __gateStatesForTest.clear();
     let s = pipelineReducer(initialPipelineState, {
       kind: "start", nodeId: "g", label: "Gate?", blockKind: "wait-human",
     });
     s = pipelineReducer(s, {
-      kind: "gate-ready", options: ["Yes"], onChoose: vi.fn(),
+      kind: "driver-event",
+      payload: { driver: "wait-human", kind: "gate.ready", options: ["Yes"], onChoose: vi.fn() },
     });
     expect(s.frozen).toHaveLength(0);
+    __gateStatesForTest.clear();
   });
 });

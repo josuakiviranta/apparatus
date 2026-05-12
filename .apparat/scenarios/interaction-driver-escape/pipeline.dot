@@ -1,0 +1,20 @@
+digraph "interaction-driver-escape" {
+  goal="Freeze the Esc-aborts-gate contract"
+
+  start [shape=Mdiamond]
+  done  [shape=Msquare]
+
+  gate [shape=hexagon, label="Approve or Decline\n\nA: Approve  B: Decline"]
+
+  after [
+    type="tool",
+    cwd="$project",
+    shape=parallelogram,
+    tool_command="echo 'after gate'"
+  ]
+
+  start -> gate
+  gate  -> after [label="Approve"]
+  gate  -> done  [label="__abort__"]
+  after -> done
+}

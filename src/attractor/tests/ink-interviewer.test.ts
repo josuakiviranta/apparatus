@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { InkInterviewer } from "../interviewer/ink.js";
 import type { NodeEvent } from "../../cli/lib/pipelineEvents.js";
 
@@ -10,7 +10,7 @@ function makeInterviewer() {
 }
 
 describe("InkInterviewer", () => {
-  it("emits gate-ready with the provided options", async () => {
+  it("emits driver-event/gate.ready with the provided options", async () => {
     const { interviewer, emitted } = makeInterviewer();
     // don't await — the promise is pending until onChoose is called
     const promise = interviewer.ask({
@@ -20,23 +20,21 @@ describe("InkInterviewer", () => {
     });
 
     expect(emitted).toHaveLength(1);
-    expect(emitted[0].kind).toBe("gate-ready");
-    if (emitted[0].kind === "gate-ready") {
-      expect(emitted[0].options).toEqual(["Approve", "Decline"]);
+    expect(emitted[0].kind).toBe("driver-event");
+    if (emitted[0].kind === "driver-event" && emitted[0].payload.driver === "wait-human") {
+      expect(emitted[0].payload.options).toEqual(["Approve", "Decline"]);
+      emitted[0].payload.onChoose("Approve");
     }
-
-    // resolve so vitest doesn't hang
-    if (emitted[0].kind === "gate-ready") emitted[0].onChoose("Approve");
     await promise;
   });
 
   it("falls back to ['continue'] when options is undefined", async () => {
     const { interviewer, emitted } = makeInterviewer();
     const promise = interviewer.ask({ type: "FREEFORM", prompt: "Go?" });
-    expect(emitted[0].kind).toBe("gate-ready");
-    if (emitted[0].kind === "gate-ready") {
-      expect(emitted[0].options).toEqual(["continue"]);
-      emitted[0].onChoose("continue");
+    expect(emitted[0].kind).toBe("driver-event");
+    if (emitted[0].kind === "driver-event" && emitted[0].payload.driver === "wait-human") {
+      expect(emitted[0].payload.options).toEqual(["continue"]);
+      emitted[0].payload.onChoose("continue");
     }
     await promise;
   });
@@ -48,7 +46,9 @@ describe("InkInterviewer", () => {
       prompt: "Proceed?",
       options: ["Approve", "Decline"],
     });
-    if (emitted[0].kind === "gate-ready") emitted[0].onChoose("Approve");
+    if (emitted[0].kind === "driver-event" && emitted[0].payload.driver === "wait-human") {
+      emitted[0].payload.onChoose("Approve");
+    }
     await promise;
 
     expect(emitted).toHaveLength(2);
@@ -62,8 +62,27 @@ describe("InkInterviewer", () => {
       prompt: "Proceed?",
       options: ["Approve", "Decline"],
     });
-    if (emitted[0].kind === "gate-ready") emitted[0].onChoose("Decline");
+    if (emitted[0].kind === "driver-event" && emitted[0].payload.driver === "wait-human") {
+      emitted[0].payload.onChoose("Decline");
+    }
     const answer = await promise;
     expect(answer).toEqual({ value: "Decline" });
+  });
+
+  it("recognises ABORT_CHOICE in onChoose and resolves Answer with the sentinel value", async () => {
+    const { ABORT_CHOICE } = await import("../../cli/lib/interactions/drivers/gate.js");
+    const { interviewer, emitted } = makeInterviewer();
+    const promise = interviewer.ask({
+      type: "MULTIPLE_CHOICE",
+      prompt: "Proceed?",
+      options: ["Approve"],
+    });
+    if (emitted[0].kind === "driver-event" && emitted[0].payload.driver === "wait-human") {
+      emitted[0].payload.onChoose(ABORT_CHOICE);
+    }
+    const answer = await promise;
+    expect(answer).toEqual({ value: ABORT_CHOICE });
+    // No "you" text should be emitted on abort.
+    expect(emitted.filter(e => e.kind === "text" && (e as { role: string }).role === "you")).toHaveLength(0);
   });
 });

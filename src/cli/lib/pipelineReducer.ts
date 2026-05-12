@@ -5,6 +5,7 @@ import type {
   Block,
   Stats,
 } from "./pipelineEvents.js";
+import { drivers } from "./interactions/drivers/index.js";
 import { claudeTracePath } from "./claudeTracePath.js";
 
 /**
@@ -13,12 +14,13 @@ import { claudeTracePath } from "./claudeTracePath.js";
  * Invariants (see spec "Reducer invariants"):
  *  1. Only `start` creates a live block.
  *  2. Only `end` moves a block from live to frozen. Each block moves exactly once.
- *  3. `trace-path`, `text`, `tool_use`, `interactive-ready` only mutate live.
+ *  3. `trace-path`, `text`, `tool_use`, `driver-event` only mutate live.
  *  4. frozen is append-only. No existing frozen element is ever mutated.
  *  5. Exactly one new state returned per event.
  *  6. On `end` with missing stats, reducer fills from live.stats + (now - startedAt).
- *  7. The reducer NEVER calls functions stored on live (child, onDone). Those are
- *     pass-through references dispatched by PipelineApp after commit.
+ *  7. The reducer NEVER calls functions stored in driver state (child, onDone,
+ *     onChoose). Drivers expose them; PipelineRunView dispatches them after
+ *     commit.
  */
 export function pipelineReducer(state: PipelineState, event: NodeEvent): PipelineState {
   switch (event.kind) {
@@ -63,20 +65,11 @@ export function pipelineReducer(state: PipelineState, event: NodeEvent): Pipelin
       }}};
     }
 
-    case "interactive-ready": {
+    case "driver-event": {
       if (!state.live) return state;
-      return {
-        ...state,
-        live: { ...state.live, child: event.child, onDone: event.onDone },
-      };
-    }
-
-    case "gate-ready": {
-      if (!state.live) return state;
-      return {
-        ...state,
-        live: { ...state.live, gate: { options: event.options, onChoose: event.onChoose } },
-      };
+      const driver = drivers[state.live.kind];
+      const newLive = driver.reduce(event.payload, state.live);
+      return newLive === state.live ? state : { ...state, live: newLive };
     }
 
     case "stream-line":
@@ -85,6 +78,8 @@ export function pipelineReducer(state: PipelineState, event: NodeEvent): Pipelin
     case "end": {
       if (!state.live) return state;
       const filled = fillStats(state.live, event.stats);
+      const driver = drivers[state.live.kind];
+      const freezeExtras = driver.onFreeze?.(state.live, event.outcome) ?? {};
       const frozen: Block = {
         id: state.live.id,
         nodeId: state.live.nodeId,
@@ -94,7 +89,7 @@ export function pipelineReducer(state: PipelineState, event: NodeEvent): Pipelin
         body: state.live.body,
         outcome: event.outcome,
         stats: filled,
-        onDone: state.live.onDone,
+        ...freezeExtras,
       };
       return { frozen: [...state.frozen, frozen], live: null };
     }

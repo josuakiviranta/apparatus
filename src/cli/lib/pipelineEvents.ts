@@ -1,7 +1,7 @@
-import type { ChildHandle } from "./agent.js";
 import type { BlockKind } from "./classifyNode.js";
 import type { StreamEvent } from "./stream-formatter.js";
 import type { FailureHandoff } from "./failure-handoff.js";
+import type { DriverPayload } from "./interactions/driver.js";
 
 export type BodyLine =
   | { kind: "text"; role: "you" | "claude" | "system"; text: string }
@@ -25,8 +25,7 @@ export type NodeEvent =
   | { kind: "text"; role: "you" | "claude" | "system"; text: string }
   | { kind: "tool_use"; name: string; summary: string }
   | { kind: "stats"; tokensIn: number; tokensOut: number }
-  | { kind: "interactive-ready"; child: ChildHandle; onDone: () => void }
-  | { kind: "gate-ready"; options: string[]; onChoose: (choice: string) => void }
+  | { kind: "driver-event"; payload: DriverPayload }
   | { kind: "stream-line"; event: StreamEvent }
   | { kind: "end"; outcome: Outcome; stats?: Partial<Stats> }
   | { kind: "failure-handoff"; handoff: FailureHandoff };
@@ -54,12 +53,6 @@ export type LiveBlock = {
   startedAt: number;
   body: BodyLine[];
   stats: { turns: number; tokensIn: number; tokensOut: number };
-  child?: ChildHandle;
-  onDone?: () => void;
-  gate?: {
-    options: string[];
-    onChoose: (choice: string) => void;
-  };
 };
 
 export type PipelineState = {

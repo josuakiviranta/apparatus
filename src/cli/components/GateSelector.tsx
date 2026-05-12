@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
+import { ABORT_CHOICE } from "../lib/interactions/drivers/gate.js";
 
 export function GateSelector({
   options,
@@ -11,6 +12,7 @@ export function GateSelector({
   const [selected, setSelected] = useState(0);
 
   useInput((input, key) => {
+    if (key.escape) { onChoose(ABORT_CHOICE); return; }
     if (key.upArrow) setSelected((i) => Math.max(0, i - 1));
     if (key.downArrow) setSelected((i) => Math.min(options.length - 1, i + 1));
     if (key.return) onChoose(options[selected]);
@@ -28,7 +30,7 @@ export function GateSelector({
           {i + 1}. {opt}
         </Text>
       ))}
-      <Text dimColor>{"  "}↑↓ navigate · Enter or 1-{options.length} to choose</Text>
+      <Text dimColor>{"  "}↑↓ navigate · Enter or 1-{options.length} to choose · Esc to abort</Text>
     </Box>
   );
 }

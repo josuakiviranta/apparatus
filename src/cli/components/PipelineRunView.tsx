@@ -3,8 +3,9 @@ import { render as inkRender, Box, Static, Text, useApp, useInput } from "ink";
 import { pipelineReducer } from "../lib/pipelineReducer.js";
 import { initialPipelineState, type NodeEvent, type Block, type BodyLine } from "../lib/pipelineEvents.js";
 import { BodyLineView } from "./BlockView.js";
-import { LiveFooter, type LiveBlockWithInput } from "./LiveFooter.js";
+import { LiveFooter } from "./LiveFooter.js";
 import { parseSlashCommand } from "../lib/slash-commands.js";
+import { drivers } from "../lib/interactions/drivers/index.js";
 import { claudeTracePath } from "../lib/claudeTracePath.js";
 import type { StreamEvent } from "../lib/stream-formatter.js";
 import type { FailureHandoff } from "../lib/failure-handoff.js";
@@ -95,6 +96,10 @@ export function PipelineRunView({ pipelineName, pid, goal, nodes, runId, tracePa
   useInput((input, key) => {
     if (key.ctrl && input === "c") {
       process.kill(process.pid, "SIGINT");
+      return;
+    }
+    if (key.escape && state.live) {
+      drivers[state.live.kind].keymap.escape(state.live);
     }
   }, { isActive: !!process.stdin.isTTY });
 
@@ -164,58 +169,6 @@ export function PipelineRunView({ pipelineName, pid, goal, nodes, runId, tracePa
       done: () => exit(),
     });
   }, []);
-
-  // Build the render-layer LiveBlockWithInput from the reducer state + local
-  // input buffer + slash-command dispatch.
-  const liveForRender: LiveBlockWithInput | null = (() => {
-    if (!state.live) return null;
-    if (state.live.kind !== "interactive-agent" || !state.live.child) {
-      return state.live;
-    }
-    const child = state.live.child;
-    return {
-      ...state.live,
-      input: {
-        value: inputBuffer,
-        onChange: setInputBuffer,
-        onSubmit: async (raw: string) => {
-          setInputBuffer("");
-          const parsed = parseSlashCommand(raw);
-          if (parsed.kind === "help") {
-            dispatch({ kind: "text", role: "system", text: "commands: /end /abort /help" });
-            return;
-          }
-          if (parsed.kind === "unknown") {
-            dispatch({ kind: "text", role: "system", text: `unknown command: ${parsed.raw}` });
-            return;
-          }
-          if (parsed.kind === "end") {
-            try { await child.end(); } catch { /* ignore */ }
-            return;
-          }
-          if (parsed.kind === "abort") {
-            try { await child.kill("SIGTERM"); } catch { /* ignore */ }
-            return;
-          }
-          // Plain message
-          if (parsed.text.trim().length === 0) return;
-          const msgIndex = liveBodyCountRef.current++;
-          setStaticItems(prev => [
-            ...prev,
-            { kind: "body-line", id: `${liveBlockIdRef.current!}-body-${msgIndex}`,
-              line: { kind: "text", role: "you", text: parsed.text } },
-          ]);
-          dispatch({ kind: "text", role: "you", text: parsed.text });
-          try { await child.submit(parsed.text); } catch (err) {
-            dispatch({
-              kind: "text", role: "system",
-              text: `Failed to send: ${(err as Error).message}`,
-            });
-          }
-        },
-      },
-    };
-  })();
 
   return (
     <>
@@ -288,8 +241,55 @@ export function PipelineRunView({ pipelineName, pid, goal, nodes, runId, tracePa
           return null;
         }}
       </Static>
-      {liveForRender && (
-        <LiveFooter block={liveForRender} />
+      {state.live && (
+        <LiveFooter
+          block={state.live}
+          inputBuffer={inputBuffer}
+          onInputChange={setInputBuffer}
+          onInputSubmit={async (raw: string) => {
+            setInputBuffer("");
+            const parsed = parseSlashCommand(raw);
+            if (parsed.kind === "help") {
+              dispatch({ kind: "text", role: "system", text: "commands: /end /abort /help" });
+              return;
+            }
+            if (parsed.kind === "unknown") {
+              dispatch({ kind: "text", role: "system", text: `unknown command: ${parsed.raw}` });
+              return;
+            }
+            const id = liveBlockIdRef.current;
+            const { __agentStatesForTest } = await import("../lib/interactions/drivers/agent.js");
+            const childEntry = id ? __agentStatesForTest.get(id) : undefined;
+            const child = childEntry?.child;
+            if (!child) return;
+            if (parsed.kind === "end") {
+              try { await child.end(); } catch { /* ignore */ }
+              return;
+            }
+            if (parsed.kind === "abort") {
+              try { await child.kill("SIGTERM"); } catch { /* ignore */ }
+              return;
+            }
+            if (parsed.text.trim().length === 0) return;
+            const msgIndex = liveBodyCountRef.current++;
+            setStaticItems(prev => [
+              ...prev,
+              {
+                kind: "body-line",
+                id: `${id}-body-${msgIndex}`,
+                line: { kind: "text", role: "you", text: parsed.text },
+              },
+            ]);
+            dispatch({ kind: "text", role: "you", text: parsed.text });
+            try { await child.submit(parsed.text); } catch (err) {
+              dispatch({
+                kind: "text",
+                role: "system",
+                text: `Failed to send: ${(err as Error).message}`,
+              });
+            }
+          }}
+        />
       )}
     </>
   );
