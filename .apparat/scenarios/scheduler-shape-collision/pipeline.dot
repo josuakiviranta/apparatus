@@ -1,0 +1,31 @@
+digraph "scheduler-shape-collision" {
+  goal="Freeze the shape-consumer collision contract: with a propagated Modify: declaration in the consuming chunk, plan_scheduler's literal-overlap emits c2.depends_on === [c1]."
+
+  start [shape=Mdiamond]
+  done  [shape=Msquare]
+
+  // Documentation-only DOT: the contract is asserted by
+  // src/cli/tests/scheduler-shape-collision-scenario.test.ts which runs the
+  // literal-overlap regex from plan-scheduler.md:30 over chunked-plan.md.
+  // The graph below names the conceptual flow; it is not executed in CI.
+
+  plan_writer [
+    label="plan_writer\n(propagates shared-thing.ts\ninto c2.Modify:)",
+    shape=ellipse
+  ]
+
+  plan_scheduler [
+    label="plan_scheduler\n(literal-overlap over\nfiles_touched sets)",
+    shape=ellipse
+  ]
+
+  assert_dag [
+    label="assert c2.depends_on == [c1]",
+    shape=parallelogram
+  ]
+
+  start          -> plan_writer
+  plan_writer    -> plan_scheduler
+  plan_scheduler -> assert_dag
+  assert_dag     -> done
+}
