@@ -2,6 +2,7 @@ import { readFileSync, existsSync } from "fs";
 import { resolve, join } from "path";
 import { runDir } from "../../lib/apparat-paths.js";
 import * as output from "../../lib/output.js";
+import { renderNodeReceive } from "../../lib/node-receive-inspector.js";
 
 export async function pipelineTraceCommand(
   runId: string,
@@ -37,8 +38,6 @@ export async function pipelineTraceCommand(
       process.exit(1);
       return;
     }
-    const snapshot = (event.contextSnapshot as Record<string, unknown>) ?? {};
-    const keys = Object.keys(snapshot);
 
     const thisIdx = lines.indexOf(event);
     const completedStages = lines
@@ -46,42 +45,31 @@ export async function pipelineTraceCommand(
       .filter(l => l.kind === "node-end" && l.success === true)
       .map(l => String(l.nodeId));
 
-    console.log(`\nnode:     ${event.nodeId}`);
-    console.log(`kind:     ${event.nodeKind}`);
-    console.log(`received: ${event.timestamp}`);
     const promptPath = join(runDir(project, runId), String(event.nodeId), "prompt.md");
-    if (existsSync(promptPath)) {
-      console.log(`prompt:   ${promptPath}`);
-    }
-    console.log(`\ncontext snapshot (${keys.length} key${keys.length === 1 ? "" : "s"}):`);
-    if (keys.length === 0) {
-      console.log("  (empty — first node)");
-    } else {
-      const maxLen = Math.max(...keys.map(k => k.length));
-      for (const key of keys) {
-        const val = JSON.stringify(snapshot[key]);
-        if (opts.full || val.length <= 80) {
-          console.log(`  ${key.padEnd(maxLen + 2)}${val}`);
-        } else {
-          console.log(`  ${key}`);
-          console.log(`    ${val}`);
-        }
-      }
-    }
-    const failures = lines.filter(l =>
-      l.kind === "validation-failure" && l.nodeReceiveId === opts.nodeReceive,
+    const validationFailures = (lines
+      .filter(l => l.kind === "validation-failure" && l.nodeReceiveId === opts.nodeReceive) as Array<Record<string, unknown>>)
+      .map(f => ({
+        attempt: Number(f.attempt),
+        errors: (f.errors as Array<{ path: string; message: string }>) ?? [],
+        rawOutputPath: String(f.rawOutputPath),
+      }));
+
+    const out = renderNodeReceive(
+      {
+        nodeId: String(event.nodeId),
+        nodeKind: String(event.nodeKind),
+        timestamp: String(event.timestamp),
+        contextSnapshot: (event.contextSnapshot as Record<string, unknown>) ?? {},
+      },
+      {
+        full: opts.full,
+        promptPath: existsSync(promptPath) ? promptPath : null,
+        validationFailures,
+        completedStages,
+      },
     );
-    if (failures.length > 0) {
-      console.log(`\nvalidation attempts:`);
-      for (const f of failures as Array<Record<string, unknown>>) {
-        const errs = (f.errors as Array<{ path: string; message: string }>)
-          .map(e => `${e.path}: ${e.message}`)
-          .join(", ");
-        console.log(`  [${f.attempt}] ✗ failed — ${errs}`);
-        console.log(`      raw: ${f.rawOutputPath}`);
-      }
-    }
-    console.log(`\ncompleted stages: ${completedStages.length > 0 ? completedStages.join(" · ") : "(none)"}`);
+
+    for (const line of out) console.log(line);
     console.log();
     return;
   }
