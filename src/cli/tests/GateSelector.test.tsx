@@ -86,4 +86,22 @@ describe("GateSelector", () => {
     stdin.write("9");
     expect(onChoose).not.toHaveBeenCalled();
   });
+
+  it("Esc invokes onChoose(ABORT_CHOICE)", async () => {
+    const { ABORT_CHOICE } = await import("../lib/interactions/drivers/gate.js");
+    const onChoose = vi.fn();
+    const { stdin } = render(
+      <GateSelector options={["Approve", "Decline"]} onChoose={onChoose} />,
+    );
+    stdin.write("\u001b"); // ESC
+    await delay();
+    expect(onChoose).toHaveBeenCalledWith(ABORT_CHOICE);
+  });
+
+  it("hint text includes Esc to abort", () => {
+    const { lastFrame } = render(
+      <GateSelector options={["A", "B"]} onChoose={() => {}} />,
+    );
+    expect(lastFrame() ?? "").toMatch(/Esc to abort/);
+  });
 });

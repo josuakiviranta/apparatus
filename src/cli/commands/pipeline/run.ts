@@ -241,7 +241,15 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
           interactiveResolve = resolve;
           markInteractiveAbort = () => { session.exitReason = "abort"; };
           killInteractiveChild = () => { child.kill("SIGTERM").catch(() => {}); };
-          emit({ kind: "interactive-ready", child, onDone: resolve });
+          emit({
+            kind: "driver-event",
+            payload: {
+              driver: "interactive-agent",
+              kind: "agent.ready",
+              child,
+              onDone: resolve,
+            },
+          });
           if (child.sessionId) {
             emit({ kind: "trace-path", sessionId: child.sessionId });
           }

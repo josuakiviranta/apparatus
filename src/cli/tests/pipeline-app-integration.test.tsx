@@ -33,7 +33,15 @@ describe("PipelineRunView integration: chat → summarize full flow", () => {
     const chatDonePromise = new Promise<void>((res) => { chatDone = res; });
 
     emit({ kind: "start", nodeId: "chat", label: "interactive", blockKind: "interactive-agent" });
-    emit({ kind: "interactive-ready", child: chatChild, onDone: chatDone });
+    emit({
+      kind: "driver-event",
+      payload: {
+        driver: "interactive-agent",
+        kind: "agent.ready",
+        child: chatChild,
+        onDone: chatDone,
+      },
+    });
     emit({ kind: "trace-path", sessionId: "sid-abc" });
     emit({ kind: "text", role: "you", text: "hello" });
     emit({ kind: "text", role: "claude", text: "hi, what did you learn today?" });
