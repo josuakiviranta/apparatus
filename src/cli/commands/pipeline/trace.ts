@@ -13,6 +13,7 @@ export async function pipelineTraceCommand(
   if (!existsSync(tracePath)) {
     await output.error(`No trace found for run: ${runId}`);
     await output.error(`Expected: ${tracePath}`);
+    await output.error(`(successful runs are cleaned at tail; trace is retained only for failed runs — see ADR-0015)`);
     process.exit(1);
     return;
   }
@@ -23,6 +24,7 @@ export async function pipelineTraceCommand(
   } catch {
     await output.error(`No trace found for run: ${runId}`);
     await output.error(`Expected: ${tracePath}`);
+    await output.error(`(successful runs are cleaned at tail; trace is retained only for failed runs — see ADR-0015)`);
     process.exit(1);
     return;
   }
