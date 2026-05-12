@@ -65,6 +65,35 @@ emit-lambda site. That file was deleted in commit `aeba3c3` (PipelineApp
 split) and the god-pattern moved verbatim to `PipelineRunView.tsx` — the
 structural gap is unchanged.
 
+## Refinement (2026-05-12)
+
+The original Decision pinned `drivers` as
+`Record<BlockKind, InteractionDriver<BlockKind>>` for exhaustiveness.
+Once `interactive-agent` + `wait-human` were the only kinds with real
+drivers, the satisfies guard required five `noopDriver` entries whose
+`initState` / `reduce` / `renderFooter` / `keymap.escape` all returned /
+did nothing. The padding violated the deep-modules lens
+(`.apparat/meditations/stimuli/deep-modules-hide-complexity.md`) — the
+seam read as if every kind had interaction behavior. Worse, the noop
+`keymap.escape: () => {}` silently swallows Esc on non-interactive
+blocks the moment any future hotkey lets focus land there.
+
+The registry is now narrowed to
+`Record<InteractionKind, InteractionDriver<InteractionKind>>`, where
+`InteractionKind = "interactive-agent" | "wait-human"` is declared in
+`src/cli/lib/classifyNode.ts` alongside the type-guard
+`isInteractionKind`. The four internal call sites
+(`LiveFooter.tsx:42`, `PipelineRunView.tsx:103`,
+`pipelineReducer.ts:70`, `pipelineReducer.ts:81`) gate their registry
+access on the predicate; tsc enforces the atomicity. Future
+interaction kinds (e.g. `approve-diff`) are added to `InteractionKind`,
+never by un-padding a deleted noop.
+
+`BlockKind` itself remains unchanged at 7 kinds. The `pipelineEvents`
+contract (`start.blockKind`, `Block.kind`, `LiveBlock.kind` all
+`BlockKind`) is untouched — this is an internal refinement, not an
+external breaking change.
+
 ## References
 
 - Design doc: `docs/superpowers/specs/2026-05-12-interaction-kinds-need-deep-drivers-design.md`

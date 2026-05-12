@@ -2,6 +2,7 @@ import React from "react";
 import { Box, Text } from "ink";
 import type { LiveBlock } from "../lib/pipelineEvents.js";
 import { drivers } from "../lib/interactions/drivers/index.js";
+import { isInteractionKind } from "../lib/classifyNode.js";
 
 function formatElapsed(startedAt: number): string {
   const ms = Date.now() - startedAt;
@@ -39,11 +40,13 @@ export function LiveFooter({
     const id = setInterval(() => tick(n => n + 1), 100);
     return () => clearInterval(id);
   }, []);
-  const footer = drivers[block.kind].renderFooter(block, {
-    inputBuffer,
-    onInputChange,
-    onInputSubmit,
-  });
+  const footer = isInteractionKind(block.kind)
+    ? drivers[block.kind].renderFooter(block, {
+        inputBuffer,
+        onInputChange,
+        onInputSubmit,
+      })
+    : null;
   return (
     <Box flexDirection="column">
       {footer}

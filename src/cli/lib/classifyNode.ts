@@ -10,6 +10,12 @@ export type BlockKind =
   | "conditional"
   | "marker";
 
+export type InteractionKind = "interactive-agent" | "wait-human";
+
+export function isInteractionKind(k: BlockKind): k is InteractionKind {
+  return k === "interactive-agent" || k === "wait-human";
+}
+
 /**
  * Classifies a pipeline node into a BlockKind used by the renderer.
  * Mirrors resolveHandlerType() for handler routing, then collapses

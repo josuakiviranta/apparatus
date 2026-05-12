@@ -6,6 +6,7 @@ import { BodyLineView } from "./BlockView.js";
 import { LiveFooter } from "./LiveFooter.js";
 import { parseSlashCommand } from "../lib/slash-commands.js";
 import { drivers } from "../lib/interactions/drivers/index.js";
+import { isInteractionKind } from "../lib/classifyNode.js";
 import { claudeTracePath } from "../lib/claudeTracePath.js";
 import type { StreamEvent } from "../lib/stream-formatter.js";
 import { renderFailureFooterLines, type FailureHandoff } from "../lib/failure-handoff.js";
@@ -99,7 +100,7 @@ export function PipelineRunView({ pipelineName, pid, goal, nodes, runId, tracePa
       process.kill(process.pid, "SIGINT");
       return;
     }
-    if (key.escape && state.live) {
+    if (key.escape && state.live && isInteractionKind(state.live.kind)) {
       drivers[state.live.kind].keymap.escape(state.live);
     }
   }, { isActive: !!process.stdin.isTTY });
