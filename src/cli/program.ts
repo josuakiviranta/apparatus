@@ -1,4 +1,7 @@
 import { Command } from "commander";
+import { readFileSync } from "fs";
+import { dirname, join } from "path";
+import { fileURLToPath } from "url";
 import { implementCommand } from "./commands/implement";
 import { meditateCommand } from "./commands/meditate";
 import { initCommand } from "./commands/init";
@@ -12,13 +15,22 @@ import { statusCommand } from "./commands/status.js";
 import { collectKV } from "./lib/collect-kv.js";
 import * as output from "./lib/output.js";
 
+function readPackageVersion(): string {
+  // dev: src/cli/program.ts → ../../package.json
+  // prod: dist/cli/program.js → ../../package.json (same relative offset)
+  const here = dirname(fileURLToPath(import.meta.url));
+  const pkgPath = join(here, "..", "..", "package.json");
+  const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as { version: string };
+  return pkg.version;
+}
+
 export function createProgram(): Command {
   const program = new Command();
 
   program
     .name("apparat")
     .description("Agentic loop runner for AI-assisted project development")
-    .version("0.1.1");
+    .version(readPackageVersion());
 
   program.addHelpText(
     "after",
