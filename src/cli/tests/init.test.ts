@@ -122,4 +122,21 @@ describe("apparat init", () => {
     const refPath = join(projectDir, ".claude/skills/apparatus/pipelines.md");
     expect(existsSync(refPath)).toBe(false);
   });
+
+  it("scaffolds an empty notes.md stub at .apparat/notes.md", async () => {
+    await initCommand(projectDir);
+    const notesPath = join(projectDir, ".apparat/notes.md");
+    expect(existsSync(notesPath)).toBe(true);
+    const body = readFileSync(notesPath, "utf8");
+    expect(body).toContain("- [ ]");
+  });
+
+  it("does not overwrite an existing notes.md", async () => {
+    mkdirSync(join(projectDir, ".apparat"), { recursive: true });
+    writeFileSync(join(projectDir, ".apparat/notes.md"), "- [ ] my real note\n");
+    await initCommand(projectDir);
+    expect(readFileSync(join(projectDir, ".apparat/notes.md"), "utf8")).toBe(
+      "- [ ] my real note\n",
+    );
+  });
 });

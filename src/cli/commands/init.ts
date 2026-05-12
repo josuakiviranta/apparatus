@@ -39,6 +39,14 @@ export async function initCommand(projectRoot: string): Promise<void> {
     writeFileSync(readmePath, "# Project\n\n_Top-level entry point for human readers._\n");
   }
 
+  const notesPath = join(apparatDir(projectRoot), "notes.md");
+  if (!existsSync(notesPath)) {
+    writeFileSync(
+      notesPath,
+      "# Notes\n\n_Quick mentions for meditate. Lines like `- [ ] thing` are open; meditate may flip them to `- [x]` after using them._\n\n- [ ] \n",
+    );
+  }
+
   appendGitignoreLine(projectRoot, ".apparat/runs/");
 
   copyApparatusSkillShim(projectRoot);

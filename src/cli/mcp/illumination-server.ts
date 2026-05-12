@@ -130,6 +130,59 @@ export function consumePlan(
   return { success: true, filename, reason };
 }
 
+const OPEN_NOTE_RE = /^(\s*)-\s+\[ \]\s+(.+?)\s*$/;
+const CLOSED_NOTE_PREFIX_RE = /^\s*-\s+\[x\]\s/;
+
+export function parseOpenNotes(content: string): string[] {
+  const out: string[] = [];
+  for (const line of content.split("\n")) {
+    if (CLOSED_NOTE_PREFIX_RE.test(line)) continue;
+    const m = line.match(OPEN_NOTE_RE);
+    if (m) out.push(m[2]);
+  }
+  return out;
+}
+
+export function notesFile(projectRoot: string): string {
+  return join(projectRoot, ".apparat", "notes.md");
+}
+
+export type MarkNoteResult =
+  | { success: true; text: string }
+  | { success: false; error: string };
+
+export function markNotePicked(projectRoot: string, text: string): MarkNoteResult {
+  const filePath = notesFile(projectRoot);
+  if (!existsSync(filePath)) {
+    return { success: false, error: `notes.md not found at ${filePath}` };
+  }
+  const original = readFileSync(filePath, "utf8");
+  const lines = original.split("\n");
+  let flipped = false;
+  for (let i = 0; i < lines.length; i++) {
+    if (flipped) break;
+    const m = lines[i].match(OPEN_NOTE_RE);
+    if (!m) continue;
+    if (m[2] !== text) continue;
+    lines[i] = `${m[1]}- [x] ${m[2]}`;
+    flipped = true;
+  }
+  if (!flipped) {
+    return { success: false, error: `Open note matching "${text}" not found in notes.md` };
+  }
+  writeFileSync(filePath, lines.join("\n"), "utf8");
+  try {
+    execSync(`git -C "${projectRoot}" add "${filePath}"`, { stdio: "ignore" });
+    execSync(
+      `git -C "${projectRoot}" commit -m "meditate: mark note picked"`,
+      { stdio: "ignore" },
+    );
+  } catch {
+    // git unavailable / not a repo / nothing to commit — non-fatal.
+  }
+  return { success: true, text };
+}
+
 export function assertWithinRoot(inputPath: string, projectRoot: string): void {
   const resolvedPath = resolve(inputPath);
   const resolvedRoot = resolve(projectRoot);
@@ -452,6 +505,22 @@ if (!isTestEnv) {
       },
       async ({ filename, reason }: { filename: string; reason: "implemented" | "declined" }) => {
         const result = consume(projectRoot, filename, reason);
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+        };
+      },
+    );
+
+    server.tool(
+      "mark_note_picked",
+      "Mark an open note in .apparat/notes.md as picked — flips '- [ ] <text>' to '- [x] <text>'. " +
+        "Pass the exact note body (everything after '- [ ] ' on the line, trimmed). " +
+        "Call this once per note the meditation actually drew on. " +
+        "Returns success=false if the file is missing or no matching open note is found — non-fatal; the meditate run continues. " +
+        "Commits the change with message 'meditate: mark note picked'.",
+      { text: z.string() },
+      async ({ text }: { text: string }) => {
+        const result = markNotePicked(projectRoot, text);
         return {
           content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
         };

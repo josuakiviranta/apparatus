@@ -11,7 +11,7 @@ vi.mock("node:child_process", () => ({
   execSync: mockExecSync,
 }));
 
-import { validateFilename, validateSlug, composeIlluminationFilename, writeIllumination, assertWithinRoot, readFile, validateGlobPattern, globFiles, projectTree, listStimuli, readStimulus, listIlluminations, listPlans, consume, consumePlan } from "../mcp/illumination-server";
+import { validateFilename, validateSlug, composeIlluminationFilename, writeIllumination, assertWithinRoot, readFile, validateGlobPattern, globFiles, projectTree, listStimuli, readStimulus, listIlluminations, listPlans, consume, consumePlan, parseOpenNotes, markNotePicked } from "../mcp/illumination-server";
 
 let tmpDir: string;
 
@@ -627,6 +627,118 @@ describe("listIlluminations — single-folder semantics", () => {
 
   it("returns the no-illuminations sentinel when folder is empty", () => {
     expect(listIlluminations(tmpDir)).toMatch(/no illuminations found/i);
+  });
+});
+
+describe("parseOpenNotes", () => {
+  it("returns an empty array when content is empty", () => {
+    expect(parseOpenNotes("")).toEqual([]);
+  });
+
+  it("extracts a single open-note body, stripping the prefix", () => {
+    expect(parseOpenNotes("- [ ] fix the validator hint")).toEqual([
+      "fix the validator hint",
+    ]);
+  });
+
+  it("ignores closed notes (- [x])", () => {
+    const md = "- [ ] open one\n- [x] closed one\n- [ ] open two\n";
+    expect(parseOpenNotes(md)).toEqual(["open one", "open two"]);
+  });
+
+  it("ignores plain prose and section headers", () => {
+    const md = [
+      "# Notes",
+      "",
+      "Some intro paragraph.",
+      "",
+      "## Section",
+      "- [ ] real note",
+      "- not a note (no checkbox)",
+      "",
+    ].join("\n");
+    expect(parseOpenNotes(md)).toEqual(["real note"]);
+  });
+
+  it("tolerates leading whitespace before the dash", () => {
+    const md = "  - [ ] indented note\n    - [ ] deeper note\n";
+    expect(parseOpenNotes(md)).toEqual(["indented note", "deeper note"]);
+  });
+
+  it("trims trailing whitespace from note bodies", () => {
+    expect(parseOpenNotes("- [ ] padded text   ")).toEqual(["padded text"]);
+  });
+
+  it("returns [] when all notes are closed", () => {
+    expect(parseOpenNotes("- [x] done\n- [x] also done\n")).toEqual([]);
+  });
+});
+
+describe("markNotePicked", () => {
+  function seedNotes(content: string): string {
+    const filePath = join(tmpDir, ".apparat", "notes.md");
+    mkdirSync(join(tmpDir, ".apparat"), { recursive: true });
+    writeFileSync(filePath, content, "utf8");
+    return filePath;
+  }
+
+  it("flips a matching '- [ ] text' line to '- [x] text'", () => {
+    seedNotes("- [ ] fix the validator\n- [ ] other thing\n");
+    const result = markNotePicked(tmpDir, "fix the validator");
+    expect(result).toEqual({ success: true, text: "fix the validator" });
+    const after = readFileSync(join(tmpDir, ".apparat", "notes.md"), "utf8");
+    expect(after).toBe("- [x] fix the validator\n- [ ] other thing\n");
+  });
+
+  it("preserves leading whitespace when flipping", () => {
+    seedNotes("  - [ ] indented note\n");
+    markNotePicked(tmpDir, "indented note");
+    const after = readFileSync(join(tmpDir, ".apparat", "notes.md"), "utf8");
+    expect(after).toBe("  - [x] indented note\n");
+  });
+
+  it("commits the change with 'meditate: mark note picked' message", () => {
+    seedNotes("- [ ] fix the validator\n");
+    markNotePicked(tmpDir, "fix the validator");
+    const calls = mockExecSync.mock.calls.map((c) => c[0] as string);
+    expect(calls.some((cmd) => cmd.includes("git -C") && cmd.includes("add"))).toBe(true);
+    expect(calls.some((cmd) => cmd.includes("commit -m") && cmd.includes("meditate: mark note picked"))).toBe(true);
+  });
+
+  it("returns { success: false } when the text does not match any open note", () => {
+    seedNotes("- [ ] something else\n");
+    const result = markNotePicked(tmpDir, "no such note");
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toMatch(/not found/i);
+    }
+  });
+
+  it("returns { success: false } when the note exists but is already closed", () => {
+    seedNotes("- [x] already done\n");
+    const result = markNotePicked(tmpDir, "already done");
+    expect(result.success).toBe(false);
+  });
+
+  it("returns { success: false } when notes.md does not exist", () => {
+    const result = markNotePicked(tmpDir, "anything");
+    expect(result.success).toBe(false);
+  });
+
+  it("returns success even when git commands fail (fail-open)", () => {
+    seedNotes("- [ ] fix the validator\n");
+    mockExecSync.mockImplementation(() => { throw new Error("git not found"); });
+    const result = markNotePicked(tmpDir, "fix the validator");
+    expect(result).toEqual({ success: true, text: "fix the validator" });
+    const after = readFileSync(join(tmpDir, ".apparat", "notes.md"), "utf8");
+    expect(after).toBe("- [x] fix the validator\n");
+  });
+
+  it("only flips the first matching line when duplicate texts exist", () => {
+    seedNotes("- [ ] dup\n- [ ] dup\n");
+    markNotePicked(tmpDir, "dup");
+    const after = readFileSync(join(tmpDir, ".apparat", "notes.md"), "utf8");
+    expect(after).toBe("- [x] dup\n- [ ] dup\n");
   });
 });
 

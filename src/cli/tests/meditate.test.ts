@@ -43,7 +43,7 @@ describe("meditate template agent tool whitelist", () => {
     expect(tools).toContain("mcp__illumination__list_illuminations");
   });
 
-  it("whitelists exactly the 7 reflective-only tools", () => {
+  it("whitelists exactly the 8 reflective tools (7 read + mark_note_picked)", () => {
     const agentMd = readFileSync(templatePath, "utf-8");
     const toolsMatch = agentMd.match(/^tools:\n((?:\s+-\s+.+\n)+)/m);
     expect(toolsMatch).not.toBeNull();
@@ -51,7 +51,7 @@ describe("meditate template agent tool whitelist", () => {
       .split("\n")
       .map((l) => l.replace(/^\s+-\s+/, "").trim())
       .filter(Boolean);
-    expect(tools).toHaveLength(7);
+    expect(tools).toHaveLength(8);
 
     const expected = [
       "mcp__illumination__list_illuminations",
@@ -61,6 +61,7 @@ describe("meditate template agent tool whitelist", () => {
       "mcp__illumination__write_illumination",
       "mcp__illumination__list_stimuli",
       "mcp__illumination__read_stimulus",
+      "mcp__illumination__mark_note_picked",
     ];
     for (const tool of expected) {
       expect(tools).toContain(tool);

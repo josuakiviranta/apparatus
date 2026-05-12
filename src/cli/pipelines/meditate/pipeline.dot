@@ -9,7 +9,12 @@ digraph meditate {
                script_file="read-vision.mjs",
                produces_from_stdout=true]
 
-  meditate [shape=box, agent="meditate", default_vision=""];
+  read_notes [type="tool",
+              cwd="$project",
+              script_file="read-notes.mjs",
+              produces_from_stdout=true]
 
-  start -> read_vision -> meditate -> end;
+  meditate [shape=box, agent="meditate", default_vision="", default_notes=""];
+
+  start -> read_vision -> read_notes -> meditate -> end;
 }

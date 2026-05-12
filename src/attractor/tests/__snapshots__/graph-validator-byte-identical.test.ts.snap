@@ -85,9 +85,9 @@ exports[`graph-validator byte-identical (Chunk 1 oracle) > pins diagnostics for 
   {
     "location": {
       "column": 3,
-      "endColumn": 61,
-      "endLine": 12,
-      "line": 12,
+      "endColumn": 79,
+      "endLine": 17,
+      "line": 17,
     },
     "message": "Agent "meditate" at node "meditate" has outputs: {} with no keys. Declare at least one output key, or remove outputs: if this agent intentionally produces nothing.",
     "rule": "agent_outputs_empty",

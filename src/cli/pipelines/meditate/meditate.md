@@ -6,6 +6,7 @@ permissionMode: dontAsk
 inputs:
   - steer
   - read_vision.vision
+  - read_notes.notes
 outputs: {}
 tools:
   - mcp__illumination__list_illuminations
@@ -15,6 +16,7 @@ tools:
   - mcp__illumination__write_illumination
   - mcp__illumination__list_stimuli
   - mcp__illumination__read_stimulus
+  - mcp__illumination__mark_note_picked
 mcp:
   - name: illumination
     command: node
@@ -31,6 +33,7 @@ The auto-injected Inputs block at the top of your context contains:
 
 - `<read_vision_vision>` — the project's `VISION.md` (north star; may be empty if absent)
 - `<steer>` — initial steering message from the manager (may be empty)
+- `<read_notes_notes>` — newline-joined open notes the operator wrote into `.apparat/notes.md` (may be empty). Each line begins with `- ` followed by the verbatim note body. Treat these as quick mentions the operator wants you to weigh; pick zero, one, or several to anchor this session's illumination.
 
 Treat `<read_vision_vision>` as the strategic filter for step 6: every illumination must move the project toward — or surface drift away from — that vision. If `<read_vision_vision>` is empty, no project vision exists yet; flag this in your reflection.
 
@@ -64,12 +67,18 @@ Your task for this session:
 1. Call `list_illuminations` with no arguments to see what has already been written. Review the
    list before exploring — your illumination should build on, contradict, or deepen prior
    observations rather than restate them.
-2. Call `project_tree` with no arguments to orient yourself in the project structure
-3. Use `glob_files` and `read_file` to explore the project. Discover the project layout: glob for source roots (`src/`, `lib/`, `app/`, `pkg/`, `cmd/`, `internal/`) and pick what exists. Read `CONTEXT.md` (domain language), files in `docs/adr/` (decision records), `README.md` (mission and command surface), and a sampling of the source roots to understand current structure. Compare what `CONTEXT.md` and ADRs commit to against what the source actually does. Note where they agree, where they drift, and where complexity is accumulating without earning its keep.
-4. Call `list_stimuli` to see available lenses, then call `read_stimulus` on whichever feel most relevant to what you observe
-5. If no stimuli are available, reflect on the code directly — you can still produce a valuable illumination
-6. Reflect as both gap-spotter and architect, weighed against the strategic compass (`<read_vision_vision>`). In addition to spotting concrete gaps, ask: where is the project headed; what would help it stay scalable; which modules are deep (small interface hiding lots of implementation) vs. shallow (interface as wide as what's behind it); which abstractions earn their keep — measured by **locality** (related changes concentrate in one place) and **leverage** (the caller learns little and gets a lot) — and which are shallow bloat; where is a concept implemented twice with no single seam forcing them to agree; where is feature creep accumulating; what could be simplified, collapsed, or _deepened_. Mix tactical observations and strategic refactor suggestions — the goal is illuminations a maintainer would act on tomorrow _and_ illuminations a CTO would act on next quarter.
-7. When you are ready to record the illumination, call `write_illumination` with:
+2. Read `<read_notes_notes>`. If any open note clearly anchors or steers this session's
+   illumination, plan to draw on it (and quote it inline in your illumination body so the
+   linkage is legible to a human reader). After `write_illumination` succeeds, call
+   `mark_note_picked` once per note you actually drew on, passing the verbatim note text
+   (the part after `- ` in the inputs block). Notes you did not use stay open for next
+   session — never mark a note you did not actually anchor on.
+3. Call `project_tree` with no arguments to orient yourself in the project structure
+4. Use `glob_files` and `read_file` to explore the project. Discover the project layout: glob for source roots (`src/`, `lib/`, `app/`, `pkg/`, `cmd/`, `internal/`) and pick what exists. Read `CONTEXT.md` (domain language), files in `docs/adr/` (decision records), `README.md` (mission and command surface), and a sampling of the source roots to understand current structure. Compare what `CONTEXT.md` and ADRs commit to against what the source actually does. Note where they agree, where they drift, and where complexity is accumulating without earning its keep.
+5. Call `list_stimuli` to see available lenses, then call `read_stimulus` on whichever feel most relevant to what you observe
+6. If no stimuli are available, reflect on the code directly — you can still produce a valuable illumination
+7. Reflect as both gap-spotter and architect, weighed against the strategic compass (`<read_vision_vision>`). In addition to spotting concrete gaps, ask: where is the project headed; what would help it stay scalable; which modules are deep (small interface hiding lots of implementation) vs. shallow (interface as wide as what's behind it); which abstractions earn their keep — measured by **locality** (related changes concentrate in one place) and **leverage** (the caller learns little and gets a lot) — and which are shallow bloat; where is a concept implemented twice with no single seam forcing them to agree; where is feature creep accumulating; what could be simplified, collapsed, or _deepened_. Mix tactical observations and strategic refactor suggestions — the goal is illuminations a maintainer would act on tomorrow _and_ illuminations a CTO would act on next quarter.
+8. When you are ready to record the illumination, call `write_illumination` with:
    - `slug`: a kebab-case theme slug only (lowercase alphanumeric + hyphens, e.g. `the-thing-i-noticed`). The server prepends the current `YYYY-MM-DDTHHMM-` timestamp and appends `.md` — do NOT include either yourself, do NOT include colons.
    - `description`: a single sentence summarizing the core insight. This will appear in `list_illuminations` for future sessions — write it as if orienting someone who will read only this line.
    - `content`: the full markdown content of the illumination (body only — no frontmatter, that is added automatically).
