@@ -2,7 +2,7 @@
 
 - [x] Currently almost every agent uses Opus model in pipelines/ -> Burns tokens and opus models extended thinking makes pipeline runs very long. We should investigate is there possibilities to use different models and thinking levels that can be configured for agents. Then we should go through each pipeline and think deeply which agents need extended thinking capacilities and stronger models and which nodes can use sonnet for example without thinking. After this we should also update apparatus skill with a section how to select models and thinking capabilities.
 
-- [ ] We should think how to pipelines' agents frontmatters could decide which model to use. -> Faster pipeline runs + less token consumption.
+- [x] We should think how to pipelines' agents frontmatters could decide which model to use. -> Faster pipeline runs + less token consumption.
 
 - [x] Pipeline show command should create svg as it does right now but also then open the svg automatically in firefox (if possible to detect user's default browser and open there even better but if introduce a lot complicance should be forgotten)
 
