@@ -11,3 +11,10 @@ describe("gcOldRuns is removed in favour of gcOldRunsPerPipeline", () => {
     expect(typeof mod.gcOldRunsPerPipeline).toBe("function");
   });
 });
+
+describe("gcRunScopedArtefactsOnSuccess is exported from runs-gc", () => {
+  it("is callable from the module path used by run.ts", async () => {
+    const mod = await import("../commands/pipeline/runs-gc.js") as Record<string, unknown>;
+    expect(typeof mod.gcRunScopedArtefactsOnSuccess).toBe("function");
+  });
+});

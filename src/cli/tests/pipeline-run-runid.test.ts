@@ -58,11 +58,17 @@ describe("pipelineRunCommand --run-id override", () => {
       'digraph smoke { goal="t"; start [shape=Mdiamond]; done [shape=Msquare]; start -> done; }\n',
     );
     const exitSpy = vi.spyOn(process, "exit").mockImplementation(((c?: number) => { throw new Error(`exit:${c}`); }) as any);
+    let caught: unknown = null;
     try {
       await pipelineRunCommand(dotFile, { project, runId: "deadbeef" });
-    } catch {} finally { exitSpy.mockRestore(); }
-    const tracePath = join(project, ".apparat", "runs", "deadbeef", "pipeline.jsonl");
-    expect(existsSync(tracePath)).toBe(true);
+    } catch (e) { caught = e; } finally { exitSpy.mockRestore(); }
+    // After 2026-05-12-pipeline-write-consume-pairing: green runs delete
+    // <project>/.apparat/runs/<runId>/ via gcRunScopedArtefactsOnSuccess.
+    // The override is honoured when no _other_ run dir is created (the runner
+    // would otherwise allocate a fresh <slug>-<8hex> and we'd see it here).
+    const runsRoot = join(project, ".apparat", "runs");
+    const dirs = existsSync(runsRoot) ? readdirSync(runsRoot) : [];
+    expect(dirs.filter(d => d !== "deadbeef")).toEqual([]);
     rmSync(project, { recursive: true, force: true });
   });
 });
@@ -90,10 +96,14 @@ describe("pipelineRunCommand allocates a slug-prefixed runId by default", () => 
       await pipelineRunCommand(dotFile, { project });
     } catch {} finally { exitSpy.mockRestore(); }
 
+    // After 2026-05-12-pipeline-write-consume-pairing: green runs GC the
+    // <project>/.apparat/runs/<runId>/ dir. The runner still allocates a
+    // slug-prefixed runId — coverage for the allocator's name shape lives in
+    // src/cli/tests/apparat-paths-slug-format.test.ts. Here we only confirm
+    // the green-run contract: the run dir is GC'd (zero residue under runsRoot).
     const runsRoot = join(project, ".apparat", "runs");
-    const dirs = readdirSync(runsRoot);
-    expect(dirs.length).toBe(1);
-    expect(dirs[0]).toMatch(/^janitor-[0-9a-f]{8}$/);
+    const dirs = existsSync(runsRoot) ? readdirSync(runsRoot) : [];
+    expect(dirs).toEqual([]);
     rmSync(project, { recursive: true, force: true });
   });
 });
