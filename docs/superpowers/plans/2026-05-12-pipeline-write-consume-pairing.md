@@ -551,7 +551,7 @@ Ships the documentation half of the change and verifies the asymmetric rule end-
 
 ### Task 4.1: Write ADR-0015
 
-- [ ] **Step 1: Create `docs/adr/0015-asymmetric-gc-pipeline-tail-success.md`**
+- [x] **Step 1: Create `docs/adr/0015-asymmetric-gc-pipeline-tail-success.md`**
 
 Use this content (matches the §3.8 skeleton; ADR-0002 voice — terse, decision-first):
 
@@ -666,7 +666,7 @@ No new declarative system, no validator rule, no MCP tool, no
   identical.
 ```
 
-- [ ] **Step 2: Verify the ADR is well-formed**
+- [x] **Step 2: Verify the ADR is well-formed**
 
 ```bash
 test -f docs/adr/0015-asymmetric-gc-pipeline-tail-success.md && head -3 docs/adr/0015-asymmetric-gc-pipeline-tail-success.md
@@ -676,7 +676,7 @@ Expected: `# Asymmetric success/failure GC of run-scoped scratch paths` + blank 
 
 ### Task 4.2: Update the README retention paragraph
 
-- [ ] **Step 3: Replace the existing retention sentence in `README.md`**
+- [x] **Step 3: Replace the existing retention sentence in `README.md`**
 
 Open `README.md`. Find the paragraph at line 79 (the one starting with `Pass --resume [runId]…`). The sentence to replace is:
 
@@ -688,7 +688,7 @@ Replace **only that sentence** with this multi-sentence block (preserve the surr
 
 The "(last 50 per project, override with `APPARAT_RUNS_KEEP`)" parenthetical was already stale — the actual default is 10, not 50. The new paragraph also corrects that.
 
-- [ ] **Step 4: Confirm the README still parses**
+- [x] **Step 4: Confirm the README still parses**
 
 ```bash
 grep -n "ADR-0015\|APPARAT_RUNS_KEEP" README.md
@@ -698,7 +698,7 @@ Expected: at least one match for each. `ADR-0015` appears in the new sentence; `
 
 ### Task 4.3: End-to-end smoke
 
-- [ ] **Step 5: Build and run a real green pipeline; assert the run dir is gone after exit**
+- [x] **Step 5: Build and run a real green pipeline; assert the run dir is gone after exit**
 
 Build the CLI:
 
@@ -721,7 +721,7 @@ ls .apparat/meditations/illuminations/.triage/ 2>/dev/null
 
 Expected: the `janitor` run prints its TUI, exits 0, and **both** `ls` commands print nothing (the dirs do not exist, or exist but are empty). If `.apparat/runs/` still contains a directory matching the runId after the green exit, the wiring in Chunk 2 is wrong.
 
-- [ ] **Step 6: Smoke a red run; assert the run dir survives**
+- [x] **Step 6: Smoke a red run; assert the run dir survives**
 
 Force a red outcome by attempting a pipeline that fails (e.g., a missing-variable invocation, or use a known-failing fixture pipeline if one exists; otherwise SIGINT during a long run):
 
@@ -734,7 +734,7 @@ ls .apparat/runs/
 
 Expected: at least one directory under `.apparat/runs/`, named `illumination-to-implementation-<8hex>`. The dir's `pipeline.jsonl` is intact for `pipeline trace <runId>`.
 
-- [ ] **Step 7: Smoke `pipeline trace` on a green run hits the new hint**
+- [x] **Step 7: Smoke `pipeline trace` on a green run hits the new hint**
 
 Pick any runId that has been GC'd (any green run from Step 5). Or invent one:
 
@@ -745,7 +745,7 @@ apparat pipeline trace ghost-runid . 2>&1 | grep -E "No trace found|ADR-0015"
 
 Expected: three lines — `No trace found for run: ghost-runid`, `Expected: …/pipeline.jsonl`, and the parenthetical hint line containing `ADR-0015`. Exit 1.
 
-- [ ] **Step 8: Clean up the scratch project**
+- [x] **Step 8: Clean up the scratch project**
 
 ```bash
 rm -rf /tmp/smoke-tail-gc
@@ -753,7 +753,7 @@ rm -rf /tmp/smoke-tail-gc
 
 ### Task 4.4: Final regression sweep
 
-- [ ] **Step 9: Full test suite**
+- [x] **Step 9: Full test suite**
 
 ```bash
 npx vitest run
@@ -768,7 +768,7 @@ Expected: PASS — all suites green. Pay particular attention to:
 
 If `runs-gc-per-pipeline.test.ts` or `runs-index.test.ts` go red, audit per design §4.8 — they likely pre-stage fixtures and do **not** exercise the live finally path, so the conditional edit should not be needed. If a real conflict surfaces, retarget the assertion to a pre-staged dir rather than a live-run-output dir, then re-commit alongside the rest of this chunk.
 
-- [ ] **Step 10: Final type-check**
+- [x] **Step 10: Final type-check**
 
 ```bash
 npx tsc --noEmit
@@ -776,7 +776,7 @@ npx tsc --noEmit
 
 Expected: clean.
 
-- [ ] **Step 11: Final grep invariants (per design §10.1)**
+- [x] **Step 11: Final grep invariants (per design §10.1)**
 
 ```bash
 grep -n "gcRunScopedArtefactsOnSuccess" src/cli/commands/pipeline/runs-gc.ts src/cli/commands/pipeline/run.ts src/cli/tests/post-tail-gc.test.ts src/cli/tests/pipeline-runs-gc.test.ts
@@ -787,7 +787,7 @@ Expected:
 - `gcRunScopedArtefactsOnSuccess` present in `runs-gc.ts` (1 export), `run.ts` (1 import + 1 call), `post-tail-gc.test.ts` (≥ 7 uses), `pipeline-runs-gc.test.ts` (≥ 1 use).
 - `ADR-0015` present in `docs/adr/0015-asymmetric-gc-pipeline-tail-success.md` (filename + status), `trace.ts` (2 hint emissions, one per missing-trace branch), `README.md` (1 paragraph mention).
 
-- [ ] **Step 12: Commit**
+- [x] **Step 12: Commit**
 
 ```bash
 git add docs/adr/0015-asymmetric-gc-pipeline-tail-success.md README.md
