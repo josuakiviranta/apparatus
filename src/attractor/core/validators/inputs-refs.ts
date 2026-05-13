@@ -11,6 +11,7 @@ import { STRING_ATTRS } from "../../transforms/variable-expansion.js";
 import { computeVarsInScope, computeVarsInAnyScope } from "../flow-analyzer.js";
 import { buildForwardAdj, toCamel } from "../dot-common.js";
 import * as interactive from "./interactive.js";
+import { checkModelRequired } from "./model-required.js";
 
 const VAR_RE = /\$([a-zA-Z_][\w.]*)/g;
 
@@ -28,6 +29,7 @@ export function run(ctx: ValidationContext): void {
   if (ctx.dotDir) {
     for (const node of ctx.graph.nodes.values()) {
       checkAgentMissingOutputs(ctx, node);
+      checkModelRequired(ctx, node);
       interactive.checkLoopRequiresDoneField(ctx, node);
       interactive.checkInteractiveWithOutputs(ctx, node);
       interactive.checkInteractiveWithLoop(ctx, node);
