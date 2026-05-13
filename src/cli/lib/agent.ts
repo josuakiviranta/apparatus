@@ -166,6 +166,18 @@ export class Agent {
     return args;
   }
 
+  // Spawn env contract — design 2026-05-14 §3.2. Env-var spelling pinned against
+  // Claude CLI 2.1.112 (Claude Code). Help excerpt: NO_MATCH: claude --help does
+  // not mention thinking/budget/env.
+  // If a future CLI version exposes a canonical thinking env var with a different
+  // name, change the literal here in one place.
+  private buildSpawnEnv(): NodeJS.ProcessEnv {
+    if (this.config.thinking && this.config.thinking !== "off") {
+      return { ...process.env, CLAUDE_THINKING_BUDGET: this.config.thinking };
+    }
+    return process.env;
+  }
+
   buildArgs(options: RunOptions): string[] {
     const args = this.buildCommonArgs();
 
@@ -255,6 +267,7 @@ export class Agent {
       const spawnOptions: any = {
         cwd: options.cwd,
         detached: true,
+        env: this.buildSpawnEnv(),
       };
 
       if (isInteractive) {
@@ -406,6 +419,7 @@ export class Agent {
     const child = spawn("claude", args, {
       cwd: opts.cwd,
       stdio: ["pipe", "pipe", "pipe"],
+      env: this.buildSpawnEnv(),
     });
 
     // Capture stderr into a rolling tail so crashes are visible to the UI.
