@@ -2,6 +2,7 @@
 name: design-writer
 description: Turn a verified illumination + approved explainer + refinements into a superpowers-style design doc, iterating with the spec-document-reviewer subagent until both reviewer and writer agree the doc is ready
 model: opus
+thinking: high
 permissionMode: dangerouslySkipPermissions
 tools:
   - Read

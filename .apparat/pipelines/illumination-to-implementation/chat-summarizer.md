@@ -11,7 +11,8 @@ outputs:
   refinements: string
   scope_changed: boolean
   illumination_path: string
-model: opus
+model: sonnet
+thinking: off
 permissionMode: dangerouslySkipPermissions
 tools:
   - Read

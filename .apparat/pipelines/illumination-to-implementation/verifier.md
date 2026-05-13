@@ -2,6 +2,7 @@
 name: verifier
 description: Read-only verification of illuminations against current code, specs, and project goals
 model: opus
+thinking: high
 permissionMode: dangerouslySkipPermissions
 tools:
   - Read

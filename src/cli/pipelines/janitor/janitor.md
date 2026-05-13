@@ -2,6 +2,7 @@
 name: janitor
 description: Janitor — read-only workspace scanner that surfaces bloat, YAGNI violations, and refactor opportunities as new illuminations
 model: sonnet
+thinking: off
 permissionMode: dontAsk
 tools:
   - Grep

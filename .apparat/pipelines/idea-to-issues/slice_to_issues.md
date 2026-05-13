@@ -1,7 +1,8 @@
 ---
 name: slice_to_issues
 description: Break the PRD into vertical-slice tracer-bullet issues, write them as JSON for review, and present the breakdown to the user
-model: opus
+model: sonnet
+thinking: off
 permissionMode: dangerouslySkipPermissions
 tools:
   - Read

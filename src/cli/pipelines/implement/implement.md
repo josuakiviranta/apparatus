@@ -2,6 +2,7 @@
 name: implement
 description: Autonomous code implementation loop
 model: opus
+thinking: high
 permissionMode: dangerouslySkipPermissions
 tools: []
 mcp: []

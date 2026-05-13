@@ -2,6 +2,7 @@
 name: change-explainer
 description: Render a concrete before/after explainer of a verified illumination for the approval gate
 model: opus
+thinking: high
 permissionMode: dangerouslySkipPermissions
 tools:
   - Read

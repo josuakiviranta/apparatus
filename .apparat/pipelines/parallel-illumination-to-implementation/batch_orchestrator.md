@@ -2,6 +2,7 @@
 name: batch_orchestrator
 description: Drive one batch of parallel chunk implementation per iteration; orchestrator owns dag.json mutation and merge decisions
 model: opus
+thinking: off
 permissionMode: dangerouslySkipPermissions
 tools: []
 mcp: []

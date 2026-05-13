@@ -2,6 +2,7 @@
 name: plan-scheduler
 description: Parse a chunked implementation plan and emit a topological DAG over chunks for parallel execution
 model: opus
+thinking: off
 permissionMode: dangerouslySkipPermissions
 tools:
   - Read
