@@ -48,6 +48,10 @@ apparat meditate <project-folder> [--steer <text>]
 ```
 Runs a meditate session against the project's meditations. `--steer <text>` injects an initial steering message at session start; `--var steer=<text>` is the equivalent generic form (`--steer` wins if both are passed). Backed by the bundled folder pipeline `src/cli/pipelines/meditate/`. Equivalent to `apparat pipeline run meditate <project-folder>` — the shorthand only adds a PID lock and `.gitignore` entries.
 
+> Preflight: `apparat meditate <path>` refuses paths whose basename is
+> `.apparat` or that lack any of `VISION.md` / `CONTEXT.md` / `.apparat/` /
+> `.git/`. The error message points at the intended parent folder.
+
 For unattended workspace hygiene scanning, schedule the bundled janitor pipeline:
 
 ```bash
