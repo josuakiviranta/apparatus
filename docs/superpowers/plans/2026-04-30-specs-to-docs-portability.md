@@ -292,7 +292,7 @@ git commit -am "refactor(implement): \$specs_dir variable + docs/specs default"
 
 ## Chunk 3: Project-local pipeline portability (`pipelines/`)
 
-The repo's project-local `pipelines/` mirror is what self-development uses. `illumination-to-implementation/design-writer.md` already uses `$specs_dir` — good. Hold-outs: `implement.md`, `verifier.md`, `memory-writer.md` (in same pipeline) and standalone `janitor/janitor.md`. These don't have unit tests, so verification is via portability validator + smoke pipeline runs.
+The repo's project-local `pipelines/` mirror is what self-development uses. `illumination-to-implementation/design-writer.md` already uses `$specs_dir` — good. Hold-outs: `implement.md`, `verifier.md`, `memory-writer.md` (in same pipeline; removed 2026-05-13 — see design `2026-05-13-adr-0015-failure-half-has-no-reaper-and-sessions-misclassified-design.md`) and standalone `janitor/janitor.md`. These don't have unit tests, so verification is via portability validator + smoke pipeline runs.
 
 ### Task 3.1: Rewrite literal `specs/` in illumination-to-implementation rubrics
 
@@ -300,11 +300,11 @@ The repo's project-local `pipelines/` mirror is what self-development uses. `ill
 - Modify: `pipelines/illumination-to-implementation/implement.md:16,37` (path-refs)
 - Modify: `pipelines/illumination-to-implementation/verifier.md:40,48,67` (path-refs)
 - **Do NOT modify:** `pipelines/illumination-to-implementation/verifier.md:65` ("Cited specs:" — concept-reference, English noun, not a filesystem path)
-- **Do NOT modify:** `pipelines/illumination-to-implementation/memory-writer.md:144` ("Do not touch source code, specs, or pipelines" — concept-reference, English noun)
+- **Do NOT modify:** `pipelines/illumination-to-implementation/memory-writer.md:144` ("Do not touch source code, specs, or pipelines" — concept-reference, English noun) (file removed 2026-05-13 — see design `2026-05-13-adr-0015-failure-half-has-no-reaper-and-sessions-misclassified-design.md`)
 
 - [ ] **Step 1: For each path-ref line above, replace literal `specs/` → `$specs_dir/`. Skip the two concept-reference lines.**
 
-- [ ] **Step 1b: Add empty-value fallback to each migrated agent rubric.** Since `$specs_dir` is read from the auto-injected Inputs block (Chunk 2 preamble), an unset value would yield an empty string and silently break globs like `$specs_dir/*.md` (becomes `/*.md`). Add a single sentence near the first use of `$specs_dir` in each rubric: "If `$specs_dir` is empty in the Inputs block, default to `docs/specs`." Apply to: `implement.md`, `verifier.md`. (`memory-writer.md` was a concept-ref — no fallback needed.)
+- [ ] **Step 1b: Add empty-value fallback to each migrated agent rubric.** Since `$specs_dir` is read from the auto-injected Inputs block (Chunk 2 preamble), an unset value would yield an empty string and silently break globs like `$specs_dir/*.md` (becomes `/*.md`). Add a single sentence near the first use of `$specs_dir` in each rubric: "If `$specs_dir` is empty in the Inputs block, default to `docs/specs`." Apply to: `implement.md`, `verifier.md`. (`memory-writer.md` was a concept-ref — no fallback needed; file removed 2026-05-13 — see design `2026-05-13-adr-0015-failure-half-has-no-reaper-and-sessions-misclassified-design.md`.)
 
 - [ ] **Step 2: Run portability validator**
 

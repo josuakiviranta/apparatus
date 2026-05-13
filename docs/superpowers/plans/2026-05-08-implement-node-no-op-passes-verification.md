@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Close the `implement` no-op → `tmux_tester` pass collusion in `illumination-to-implementation` by adding three orthogonal disambiguating signals (`implement.pre_sha`, `implement.reason`, `tmux_tester.plan_files_touched`), a richer `tmux_confirm_gate` render, a memory-writer Warnings cross-check, and a backfill smoke test.
+**Goal:** Close the `implement` no-op → `tmux_tester` pass collusion in `illumination-to-implementation` by adding three orthogonal disambiguating signals (`implement.pre_sha`, `implement.reason`, `tmux_tester.plan_files_touched`), a richer `tmux_confirm_gate` render, a memory-writer Warnings cross-check (memory-writer removed 2026-05-13 — see design `2026-05-13-adr-0015-failure-half-has-no-reaper-and-sessions-misclassified-design.md`; the Warnings signal now has no consumer), and a backfill smoke test.
 
 **Architecture:** Agent-driven diff guard inside `implement.md` (frontmatter outputs extension + Step 0c capture / Step N+1 verify) — no `LoopingAgentHandler` change. Plan-coverage signal in `tmux-tester.md` sourced from `plan_writer.plan_path` and the `implement.pre_sha`-anchored diff range. `tmux_confirm_gate` body renders all three signals so the operator decides on independent evidence. Memory-writer prepends a `## Warnings` section when `tmux_tester.test_summary` matches a no-op substring set.
 
@@ -453,7 +453,9 @@ git commit -m "feat(tmux_confirm_gate): render implement.done, test_result, plan
 
 ---
 
-## Chunk 4: `memory-writer.md` — Warnings cross-check
+## Chunk 4: `memory-writer.md` — Warnings cross-check (OBSOLETE 2026-05-13)
+
+> **Obsolete:** `memory-writer.md` and `memory-reflector.md` were removed from both `illumination-to-implementation/` and `parallel-illumination-to-implementation/` on 2026-05-13. See design `2026-05-13-adr-0015-failure-half-has-no-reaper-and-sessions-misclassified-design.md` (PR1). The Warnings cross-check below is preserved as historical context but no longer applies — there is no memory-writer to host Step 4a.
 
 Inserts Step 4a between Step 4 (compose memory) and Step 5 (commit). Step 4a scans `$tmux_tester.test_summary` for a four-substring no-op set and prepends a `## Warnings` section to the memory body so memory-reflector reads the gap pre-distilled.
 
@@ -624,22 +626,16 @@ describe("pipeline-smoke: illumination-to-implementation no-op refusal interlock
     expect(gate).toMatch(/\$tmux_tester\.plan_files_touched/);
   });
 
-  it("memory-writer.md Step 4a scans test_summary for the four no-op substrings", () => {
-    const memw = readFileSync(MEMORY_WRITER_MD, "utf-8");
-    expect(memw).toMatch(/4a\./);
-    expect(memw).toContain("no in-scope diff");
-    expect(memw).toContain("nothing to verify");
-    expect(memw).toContain("implement node committed only");
-    expect(memw).toContain("no_diff_produced");
-    expect(memw).toMatch(/##\s*Warnings/);
-  });
+  // The "memory-writer.md Step 4a scans test_summary for the four no-op substrings"
+  // assertion was REMOVED 2026-05-13 — memory-writer.md no longer exists. See design
+  // 2026-05-13-adr-0015-failure-half-has-no-reaper-and-sessions-misclassified-design.md.
 
-  it("pipeline.dot routing between implement → review_gate → tmux_tester → tmux_confirm_gate → memory_writer is unchanged", () => {
+  it("pipeline.dot routing between implement → review_gate → tmux_tester → tmux_confirm_gate → done is unchanged (memory_writer/memory_reflector removed 2026-05-13)", () => {
     const dot = readFileSync(join(PIPELINE_DIR, "pipeline.dot"), "utf-8");
     expect(dot).toMatch(/implement\s*->\s*review_gate/);
     expect(dot).toMatch(/review_gate\s*->\s*tmux_tester\s*\[label="Tmux"\]/);
     expect(dot).toMatch(/tmux_tester\s*->\s*tmux_confirm_gate/);
-    expect(dot).toMatch(/tmux_confirm_gate\s*->\s*memory_writer\s*\[label="Commit"\]/);
+    expect(dot).toMatch(/tmux_confirm_gate\s*->\s*done\s*\[label="Commit"\]/);
   });
 });
 ```
@@ -767,11 +763,11 @@ git commit -m "docs(readme): document pre_sha output and agent-driven no-op refu
 
 ## Open Questions (carried from design doc §9, plus this plan's §OQ1)
 
-- **§OQ1 — Engine-driven smoke vs. content-shape smoke.** This plan uses content-shape assertions because no `runPipelineForTest` helper exists in `src/cli/tests/`. A real engine-driven smoke that drives `apparat pipeline run` against a fixture project, stubs the implement agent to return `done=true` without touching files, and asserts the pipeline halts at `review_gate` with `implement.done=false reason=no_diff_produced` would be stronger evidence. That helper is a separate design (it would have to wire `engine.runPipeline` to a stub agent factory). Leave for a follow-up plan. The interlock smoke (Chunk 5) is sufficient evidence that the four file edits cohere; the live engine path is exercised every time a real `illumination-to-implementation` run executes, so post-merge real-world runs (memory-writer's session memory) catch regressions in the contract.
+- **§OQ1 — Engine-driven smoke vs. content-shape smoke.** This plan uses content-shape assertions because no `runPipelineForTest` helper exists in `src/cli/tests/`. A real engine-driven smoke that drives `apparat pipeline run` against a fixture project, stubs the implement agent to return `done=true` without touching files, and asserts the pipeline halts at `review_gate` with `implement.done=false reason=no_diff_produced` would be stronger evidence. That helper is a separate design (it would have to wire `engine.runPipeline` to a stub agent factory). Leave for a follow-up plan. The interlock smoke (Chunk 5) is sufficient evidence that the four file edits cohere; the live engine path is exercised every time a real `illumination-to-implementation` run executes, so post-merge real-world runs (memory-writer's session memory; removed 2026-05-13 — see design `2026-05-13-adr-0015-failure-half-has-no-reaper-and-sessions-misclassified-design.md`) catch regressions in the contract.
 - **Handler-side `pre_sha` shape validator** (design §9 item 1). Default: skip — ship without. Revisit if a real run produces a malformed `pre_sha`.
 - **New ADR?** (design §9 item 2). Default: no — change fits inside ADR-0003 + ADR-0012 precedents. Surface in the implementing session if the reviewer disagrees.
 - **CONTEXT.md term `plan_files_touched`?** (design §9 item 3). Default: no — keep scoped to the pipeline frontmatter and gate body.
-- **Diff-guard substring set configurability** (design §9 item 5). Default: ship the four-substring set inline in `memory-writer.md`; lift to config only if a third pipeline starts needing the same scan.
+- **Diff-guard substring set configurability** (design §9 item 5). Default: ship the four-substring set inline in `memory-writer.md` (file removed 2026-05-13 — see design `2026-05-13-adr-0015-failure-half-has-no-reaper-and-sessions-misclassified-design.md`); lift to config only if a third pipeline starts needing the same scan.
 - **Plan with zero file mentions** (design §9 item 4). Mitigation lives in `tmux_confirm_gate`: the operator sees the three signals together and decides. The pipeline does not have to disambiguate at the gate; the operator does.
 
 ---
@@ -785,7 +781,7 @@ git commit -m "docs(readme): document pre_sha output and agent-driven no-op refu
   - [x] `.apparat/pipelines/illumination-to-implementation/implement.md` contains `pre_sha`, `no_diff_produced`, `Step 0c`.
   - [x] `.apparat/pipelines/illumination-to-implementation/tmux-tester.md` contains `plan_files_touched`, `implement.pre_sha`, `Phase 0a`, `Phase 1c`.
   - [x] `.apparat/pipelines/illumination-to-implementation/tmux_confirm_gate.md` contains `$implement.done`, `$tmux_tester.plan_files_touched`, `### Signals`.
-  - [x] `.apparat/pipelines/illumination-to-implementation/memory-writer.md` contains `## Warnings`, `no_op_substrings`, `4a.`.
+  - [x] `.apparat/pipelines/illumination-to-implementation/memory-writer.md` contains `## Warnings`, `no_op_substrings`, `4a.`. (file removed 2026-05-13 — see design `2026-05-13-adr-0015-failure-half-has-no-reaper-and-sessions-misclassified-design.md`)
   - [x] `src/cli/tests/pipeline-smoke-implement-noop-folder.test.ts` exists and passes.
 - [x] Loop-break check at `src/attractor/handlers/looping-agent-handler.ts:151` is byte-identical to pre-change (no handler edit in this plan).
 - [x] `commit_push`, `review_gate`, `memory_reflector`, `verifier`, `explainer`, `chat_session`, `chat_summarizer`, `design_writer`, `plan_writer`, `pipeline.dot` — all unchanged.

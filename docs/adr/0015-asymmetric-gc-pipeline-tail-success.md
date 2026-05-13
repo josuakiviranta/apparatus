@@ -68,9 +68,16 @@ No new declarative system, no validator rule, no MCP tool, no
 
 - **Universal `lifecycle:` frontmatter system across all agents +
   validator artefact-flow rule + `consume_design` MCP tool.** Rejected:
-  only `runs/` and `.triage/` are unambiguously trash; specs, sessions,
+  only `runs/` and `.triage/` are unambiguously trash; specs,
   illuminations, and stimuli function as institutional memory that
-  survives context resets.
+  survives context resets. (Reclassified 2026-05-13: `.apparat/sessions/`
+  previously listed here as memory was found to have zero downstream
+  consumers — see
+  `docs/superpowers/specs/2026-05-13-adr-0015-failure-half-has-no-reaper-and-sessions-misclassified-design.md`.
+  The producer was removed from both `illumination-to-implementation/`
+  and `parallel-illumination-to-implementation/` pipelines; existing
+  sediment is reapable via `apparat sweep` once shipped — see PR2 in the
+  same design.)
 - **Quantity-based tail GC (keep-newest-N regardless of outcome).**
   Rejected: the operator wants red runs preserved for debugging, green
   runs disposable. Symmetry destroys the contract.
@@ -106,3 +113,9 @@ No new declarative system, no validator rule, no MCP tool, no
 - No new env var, no new CLI flag, no new MCP tool. No new tracer
   field; `pipeline-start` / `pipeline-end` JSONL events are byte-
   identical.
+- **2026-05-13 update:** The `.apparat/sessions/` producer in
+  `memory-writer.md` (both `illumination-to-implementation/` and
+  `parallel-illumination-to-implementation/`) has been removed.
+  Pipelines no longer write session files at the tail. The `apparat
+  sweep` operator surface (introduced in PR2 of the same design) reaps
+  any pre-rule sediment in `.apparat/sessions/` at operator discretion.
