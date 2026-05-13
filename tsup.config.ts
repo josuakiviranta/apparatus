@@ -1,5 +1,5 @@
 import { defineConfig } from "tsup";
-import { cpSync } from "fs";
+import { cpSync, readFileSync } from "fs";
 
 export default defineConfig({
   entry: [
@@ -11,7 +11,10 @@ export default defineConfig({
   format: ["esm"],
   outDir: "dist",
   clean: true,
-  define: { __APPARAT_PROD__: "true" },
+  define: {
+    __APPARAT_PROD__: "true",
+    "process.env.NODE_ENV": JSON.stringify("production"),
+  },
   banner: {
     js: "#!/usr/bin/env node",
   },
