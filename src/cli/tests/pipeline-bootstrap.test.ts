@@ -1,5 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync, existsSync, readFileSync, mkdirSync, writeFileSync } from "fs";
+import {
+  mkdtempSync,
+  rmSync,
+  existsSync,
+  readFileSync,
+  mkdirSync,
+  writeFileSync,
+  utimesSync,
+  statSync,
+  readdirSync,
+} from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 
@@ -13,6 +23,7 @@ import {
   appendMeditateGitignore,
   assertApparatShape,
   ApparatShapeError,
+  gcStaleRuns,
 } from "../lib/pipeline-bootstrap";
 
 let tmpDir: string;
@@ -157,5 +168,70 @@ describe("assertApparatShape", () => {
     expect((caught as Error).message).toMatch(/CONTEXT\.md/);
     expect((caught as Error).message).toMatch(/\.apparat/);
     expect((caught as Error).message).toMatch(/\.git/);
+  });
+});
+
+describe("gcStaleRuns", () => {
+  const HEARTBEAT_STALE_MS = 5 * 60_000;
+  const fiveMinPlus = HEARTBEAT_STALE_MS + 5_000;
+
+  const seedRun = (runId: string, heartbeatAgeMs: number | null): string => {
+    const runDir = join(tmpDir, ".apparat", "runs", runId);
+    mkdirSync(runDir, { recursive: true });
+    writeFileSync(join(runDir, "checkpoint.json"), "{}");
+    if (heartbeatAgeMs !== null) {
+      const hb = join(runDir, "heartbeat");
+      writeFileSync(hb, "");
+      const past = new Date(Date.now() - heartbeatAgeMs);
+      utimesSync(hb, past, past);
+    }
+    return runDir;
+  };
+
+  it("removes a folder whose heartbeat is older than 5 min", () => {
+    const stale = seedRun("stale-1", fiveMinPlus);
+    const removed = gcStaleRuns(tmpDir);
+    expect(existsSync(stale)).toBe(false);
+    expect(removed).toBe(1);
+  });
+
+  it("preserves a folder whose heartbeat is fresh", () => {
+    const fresh = seedRun("fresh-1", 1_000);
+    const removed = gcStaleRuns(tmpDir);
+    expect(existsSync(fresh)).toBe(true);
+    expect(removed).toBe(0);
+  });
+
+  it("preserves a folder with no heartbeat (completed run / pre-rule)", () => {
+    const completed = seedRun("completed-1", null);
+    const removed = gcStaleRuns(tmpDir);
+    expect(existsSync(completed)).toBe(true);
+    expect(removed).toBe(0);
+  });
+
+  it("is a no-op when .apparat/runs/ does not exist", () => {
+    expect(() => gcStaleRuns(tmpDir)).not.toThrow();
+    expect(gcStaleRuns(tmpDir)).toBe(0);
+  });
+
+  it("returns the count of removed folders", () => {
+    seedRun("stale-a", fiveMinPlus);
+    seedRun("stale-b", fiveMinPlus);
+    seedRun("fresh-c", 1_000);
+    expect(gcStaleRuns(tmpDir)).toBe(2);
+  });
+
+  it("tolerates ENOENT during the unlink (concurrent sweep)", () => {
+    const stale = seedRun("racy-1", fiveMinPlus);
+    // Simulate a sibling sweeper that beat us to it.
+    rmSync(stale, { recursive: true, force: true });
+    expect(() => gcStaleRuns(tmpDir)).not.toThrow();
+  });
+
+  it("ignores non-directory entries inside runs/", () => {
+    mkdirSync(join(tmpDir, ".apparat", "runs"), { recursive: true });
+    writeFileSync(join(tmpDir, ".apparat", "runs", "stray-file"), "");
+    expect(() => gcStaleRuns(tmpDir)).not.toThrow();
+    expect(existsSync(join(tmpDir, ".apparat", "runs", "stray-file"))).toBe(true);
   });
 });

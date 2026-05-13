@@ -1,4 +1,13 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from "fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from "fs";
 import { basename, dirname, join } from "path";
 import { MCP_CONFIG_GLOB } from "./agent.js";
 import { illuminationsDir } from "./apparat-paths.js";
@@ -80,4 +89,47 @@ export function assertApparatShape(absPath: string): void {
       `Did you mean its parent?`,
     );
   }
+}
+
+/** Touch cadence for the heartbeat file. */
+export const HEARTBEAT_INTERVAL_MS = 60_000;
+
+/** Threshold beyond which a run folder is considered crashed and reapable. */
+export const HEARTBEAT_STALE_MS = 5 * 60_000;
+
+/**
+ * Sweep crashed run folders under <projectFolder>/.apparat/runs/. Three-state
+ * heartbeat semantics:
+ *   - fresh  (mtime < HEARTBEAT_STALE_MS): pipeline alive → skip.
+ *   - stale  (mtime ≥ HEARTBEAT_STALE_MS): pipeline crashed → rm -rf.
+ *   - absent: completed run (ADR-0015 tail-GC) or pre-rule dir → preserve for debug.
+ *
+ * ENOENT during the unlink is tolerated (concurrent sweep race). Returns the
+ * number of folders removed.
+ */
+export function gcStaleRuns(projectFolder: string): number {
+  const runsRoot = join(projectFolder, ".apparat", "runs");
+  if (!existsSync(runsRoot)) return 0;
+  const now = Date.now();
+  let removed = 0;
+  for (const name of readdirSync(runsRoot)) {
+    const runDir = join(runsRoot, name);
+    let stat;
+    try { stat = statSync(runDir); } catch { continue; }
+    if (!stat.isDirectory()) continue;
+    const heartbeatPath = join(runDir, "heartbeat");
+    let hbStat;
+    try { hbStat = statSync(heartbeatPath); } catch {
+      continue;                                              // absent → preserve
+    }
+    if (now - hbStat.mtimeMs >= HEARTBEAT_STALE_MS) {
+      try {
+        rmSync(runDir, { recursive: true, force: true });
+        removed += 1;
+      } catch {
+        // ENOENT tolerated — sibling sweep won the race.
+      }
+    }
+  }
+  return removed;
 }
