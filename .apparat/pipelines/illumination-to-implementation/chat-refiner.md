@@ -1,7 +1,8 @@
 ---
 name: chat-refiner
 description: Interactive Claude session that refines an illumination's scope/constraints with the user, then writes the agreed conclusions to a notes file
-model: opus
+model: sonnet
+thinking: off
 permissionMode: dangerouslySkipPermissions
 tools:
   - Read

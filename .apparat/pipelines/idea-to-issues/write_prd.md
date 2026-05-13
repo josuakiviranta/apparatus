@@ -1,7 +1,8 @@
 ---
 name: write_prd
 description: Synthesise the grilling session into a PRD and publish it as a GitHub issue with the needs-triage label
-model: opus
+model: sonnet
+thinking: off
 permissionMode: dangerouslySkipPermissions
 tools:
   - Read

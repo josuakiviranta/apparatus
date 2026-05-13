@@ -1,7 +1,8 @@
 ---
 name: meditate
 description: Reflective analysis of project patterns
-model: opus
+model: sonnet
+thinking: off
 permissionMode: dontAsk
 inputs:
   - steer

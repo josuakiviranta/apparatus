@@ -59,6 +59,13 @@ export const GateMdFrontmatterSchema = z.object({
   type: z.literal("gate").describe("Discriminator — must be the literal \"gate\"."),
   choices: z.array(z.string().min(1)).min(1, "gate choices: must declare at least one choice").describe("Ordered list of choices presented to the user at this gate."),
   inputs: z.array(z.string().min(1)).optional().describe("Context keys this gate reads from upstream nodes."),
+  // model + thinking on gate frontmatter is accepted for uniformity with agent
+  // frontmatter (design 2026-05-14 §3.5). Gates do not spawn claude, so the
+  // values are documentary — they surface in the `apparat pipeline show` label
+  // render. The validator pass (Chunk 2) is the source of enforcement; here we
+  // simply allow the keys so .strict() does not reject migrated gate files.
+  model: z.string().optional().describe("Optional model tier for documentation/rendering — gates do not spawn claude."),
+  thinking: z.string().optional().describe("Optional thinking budget for documentation/rendering — gates do not spawn claude."),
 }).strict();
 
 export type GateMdFrontmatter = z.infer<typeof GateMdFrontmatterSchema>;

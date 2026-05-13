@@ -1,7 +1,8 @@
 ---
 name: implementation-tester
 description: Drive scenario tests through a tmux window — read each scenario .md, execute its Action, verify each Expect bullet, fix code red-green on failure, commit fixes, loop until pass or stuck
-model: opus
+model: sonnet
+thinking: off
 permissionMode: dangerouslySkipPermissions
 tools:
   - Read

@@ -1,4 +1,6 @@
 ---
+model: sonnet
+thinking: off
 type: gate
 choices:
   - Archive

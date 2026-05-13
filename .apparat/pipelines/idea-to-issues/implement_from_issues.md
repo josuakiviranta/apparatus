@@ -1,7 +1,8 @@
 ---
 name: implement_from_issues
 description: Pull open ready-for-agent issues from GitHub one at a time, implement, commit, push, close the issue, repeat until none remain
-model: opus
+model: sonnet
+thinking: off
 permissionMode: dangerouslySkipPermissions
 tools:
   - Read

@@ -1,7 +1,8 @@
 ---
 name: scenario-author
 description: Read the diff produced by the implementer; decide whether existing scenario tests cover the just-shipped behavior; write feasible new ones if not
-model: opus
+model: sonnet
+thinking: off
 permissionMode: dangerouslySkipPermissions
 tools:
   - Read

@@ -2,6 +2,7 @@
 name: grill
 description: Interview the user one question at a time about a rough idea, exploring the codebase to harden it into a tight set of decisions
 model: opus
+thinking: high
 permissionMode: dangerouslySkipPermissions
 tools:
   - Read
