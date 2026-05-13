@@ -205,19 +205,26 @@ When a plain name is given (no path separators or .dot extension), resolves to
 
   pipeline
     .command("show <dotfile>")
-    .description("Render a pipeline as SVG next to the source file")
+    .description("Render a pipeline as SVG next to the source file (auto-opens in your OS default viewer)")
     .addHelpText("after", `
 Examples:
   apparat pipeline show .apparat/pipelines/illumination-to-implementation/pipeline.dot
   apparat pipeline show review --project my-app
+  apparat pipeline show review --project my-app --no-open       # skip the auto-open
 
 Validates the DOT file (same gate as 'pipeline validate'). On success, writes
 <basename>.svg next to the source file using the bundled WASM graphviz —
-no system 'dot' install required. On any validation error, prints
-file:line:col diagnostics and writes nothing.
+no system 'dot' install required, and auto-opens the SVG in the OS default
+viewer when stdout is a TTY. Pass --no-open to skip the auto-open even in
+an interactive shell; pass --open to force the auto-open even when stdout
+is not a TTY (e.g. piped). Spawn failure is non-fatal — exits 0 with a
+warn-level message telling you the on-disk path to open manually. On any
+validation error, prints file:line:col diagnostics and writes nothing.
 `)
     .option("--project <folder>", "Project folder (for name shorthand resolution, defaults to cwd)")
-    .action(async (dotFile: string, opts: { project?: string }) => {
+    .option("--open", "Auto-open the rendered SVG (default: when stdout is a TTY)")
+    .option("--no-open", "Skip auto-open even in an interactive shell")
+    .action(async (dotFile: string, opts: { project?: string; open?: boolean }) => {
       const code = await pipelineShowCommand(dotFile, opts);
       process.exit(code);
     });

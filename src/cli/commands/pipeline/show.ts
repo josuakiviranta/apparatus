@@ -1,4 +1,5 @@
 import { writeFileSync } from "fs";
+import { spawn } from "child_process";
 import { join, basename, dirname, relative } from "path";
 import {
   loadPipeline,
@@ -13,12 +14,34 @@ import type { Diagnostic } from "../../../attractor/types.js";
 export interface PipelineShowOptions {
   /** Project folder used for name-shorthand resolution (mirrors validate/run). */
   project?: string;
+  /**
+   * Auto-open the rendered SVG via the OS default opener after writing it.
+   * Default: `process.stdout.isTTY` — opens in interactive shells, skips in
+   * vitest / CI / piped-stdout contexts so callers like
+   * `pipeline-show-annotation.test.ts:40` (`pipelineShowCommand(..., {})`)
+   * don't spawn `open` against a worker process.
+   */
+  open?: boolean;
 }
 
 async function renderDotToSvg(dotSrc: string): Promise<string> {
   const { Graphviz } = await import("@hpcc-js/wasm-graphviz");
   const gv = await Graphviz.load();
   return gv.dot(dotSrc);
+}
+
+function openWithOSDefault(filePath: string): void {
+  const platform = process.platform;
+  const child =
+    platform === "darwin"
+      ? spawn("open", [filePath], { stdio: "ignore", detached: true })
+      : platform === "win32"
+      ? spawn("cmd", ["/c", "start", "", filePath], { stdio: "ignore", detached: true })
+      : spawn("xdg-open", [filePath], { stdio: "ignore", detached: true });
+  child.on("error", () => {
+    /* swallowed — the parent already logged a warning via the outer try/catch */
+  });
+  child.unref();
 }
 
 export async function pipelineShowCommand(
@@ -68,9 +91,20 @@ export async function pipelineShowCommand(
     return 1;
   }
 
+  const relSvg = relative(process.cwd(), svgPath) || svgPath;
   await output.success(
-    `Wrote ${relative(process.cwd(), svgPath) || svgPath} ` +
-    `(${graph.nodes.size} nodes, ${graph.edges.length} edges)`,
+    `Wrote ${relSvg} (${graph.nodes.size} nodes, ${graph.edges.length} edges)`,
   );
+
+  const shouldOpen = opts.open ?? Boolean(process.stdout.isTTY);
+  if (shouldOpen) {
+    try {
+      openWithOSDefault(svgPath);
+    } catch (err) {
+      await output.warn(
+        `Could not auto-open SVG (${(err as Error).message}); open manually at ${relSvg}`,
+      );
+    }
+  }
   return 0;
 }
