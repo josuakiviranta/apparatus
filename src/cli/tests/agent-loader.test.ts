@@ -45,6 +45,7 @@ You are a reviewer.`;
       const md = `---
 name: foo
 description: x
+model: sonnet
 auto_inputs: true
 inputs: [a, b]
 ---
@@ -59,6 +60,7 @@ body content`;
       const md = `---
 name: deep
 description: deep loop agent
+model: sonnet
 auto_inputs: true
 loop: true
 maxIterations: 5

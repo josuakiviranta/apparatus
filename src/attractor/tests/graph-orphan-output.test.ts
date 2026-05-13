@@ -19,6 +19,7 @@ describe("validator — orphan_output", () => {
       "producer.md": `---
 name: producer
 description: produces stale_key + active_key
+model: sonnet
 auto_inputs: true
 outputs:
   stale_key: string
@@ -29,6 +30,7 @@ body
       "consumer.md": `---
 name: consumer
 description: consumes active_key
+model: sonnet
 auto_inputs: true
 inputs:
   - active_key
@@ -59,6 +61,7 @@ body
       "producer.md": `---
 name: producer
 description: produces summary
+model: sonnet
 auto_inputs: true
 outputs:
   summary: string
@@ -68,6 +71,7 @@ body
       "consumer.md": `---
 name: consumer
 description: consumes summary
+model: sonnet
 auto_inputs: true
 inputs:
   - summary
@@ -93,6 +97,7 @@ body
       "verifier.md": `---
 name: verifier
 description: verifier
+model: sonnet
 auto_inputs: true
 outputs:
   preferred_label:
@@ -120,6 +125,7 @@ body
       "producer.md": `---
 name: producer
 description: produces summary
+model: sonnet
 auto_inputs: true
 outputs:
   summary: string
@@ -145,6 +151,7 @@ body
       "producer.md": `---
 name: producer
 description: produces topic
+model: sonnet
 auto_inputs: true
 outputs:
   topic: string
@@ -170,6 +177,7 @@ body
       "producer.md": `---
 name: producer
 description: produces a + b
+model: sonnet
 auto_inputs: true
 outputs:
   a: string
@@ -180,6 +188,7 @@ body
       "consumer.md": `---
 name: consumer
 description: consumes a
+model: sonnet
 auto_inputs: true
 inputs:
   - a
@@ -220,6 +229,7 @@ body
       "producer.md": `---
 name: producer
 description: produces value
+model: sonnet
 auto_inputs: true
 outputs:
   value: string
@@ -229,6 +239,7 @@ body
       "consumer.md": `---
 name: consumer
 description: consumes someNode.value
+model: sonnet
 auto_inputs: true
 inputs:
   - someNode.value
@@ -254,6 +265,7 @@ body
       "producer.md": `---
 name: producer
 description: produces output
+model: sonnet
 auto_inputs: true
 outputs:
   output: string
@@ -289,6 +301,7 @@ Pick.
       "looper.md": `---
 name: looper
 description: loops until done
+model: sonnet
 auto_inputs: true
 loop: true
 outputs:

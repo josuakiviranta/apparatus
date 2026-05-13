@@ -19,6 +19,7 @@ describe("validator — outputs_schema_invalid", () => {
       "broken.md": `---
 name: broken
 description: declares an unsupported shorthand
+model: sonnet
 auto_inputs: true
 outputs:
   paths: string[]
@@ -49,6 +50,7 @@ body
       "okay.md": `---
 name: okay
 description: declares a supported array shape
+model: sonnet
 auto_inputs: true
 outputs:
   paths: {type: array, items: string}

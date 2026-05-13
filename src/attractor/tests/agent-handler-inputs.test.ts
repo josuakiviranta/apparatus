@@ -17,6 +17,7 @@ describe("agent-handler auto_inputs path", () => {
       "v.md": `---
 name: v
 description: t
+model: sonnet
 inputs: [project, run_id]
 outputs:
   result: string

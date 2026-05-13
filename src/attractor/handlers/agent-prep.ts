@@ -72,7 +72,7 @@ export function buildAgentPrompt(
     return { fail: `Failed to resolve agent "${agentName}": ${(err as Error).message}` };
   }
 
-  if (node.llmModel) config = { ...config, model: node.llmModel as string };
+  if (node.llmModel) config = { ...config, model: node.llmModel as AgentConfig["model"] };
 
   const { logsRoot, cwd, completedNodes, nodeRetries } = meta;
 

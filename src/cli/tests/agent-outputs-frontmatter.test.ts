@@ -61,6 +61,7 @@ describe("validateAgentConfig — outputs", () => {
     const config = validateAgentConfig({
       name: "verifier",
       description: "Verifier agent",
+      model: "sonnet",
       outputs: {
         preferred_label: { enum: ["true", "false", "empty"] },
         illumination_path: "string",
@@ -88,7 +89,7 @@ describe("validateAgentConfig — outputs", () => {
 
   it("normalizes shorthand strings to {type: ...} fragments", () => {
     const config = validateAgentConfig({
-      name: "x", description: "x agent",
+      name: "x", description: "x agent", model: "sonnet",
       outputs: { foo: "string", bar: "number", baz: "boolean" },
       prompt: "",
     } as any);
@@ -102,7 +103,7 @@ describe("validateAgentConfig — outputs", () => {
 
   it("does not set outputs or jsonSchema when outputs absent", () => {
     const config = validateAgentConfig({
-      name: "x", description: "x agent", prompt: "Body",
+      name: "x", description: "x agent", model: "sonnet", prompt: "Body",
     } as any);
     expect(config.outputs).toBeUndefined();
     expect(config.jsonSchema).toBeUndefined();
@@ -113,7 +114,7 @@ describe("validateAgentConfig — outputs", () => {
     // agents that stream chat. Deriving a schema from {} would conflict with
     // interactive=true in agent-handler, blocking those agents from running.
     const config = validateAgentConfig({
-      name: "x", description: "x agent",
+      name: "x", description: "x agent", model: "sonnet",
       outputs: {},
       prompt: "",
     } as any);
@@ -124,7 +125,7 @@ describe("validateAgentConfig — outputs", () => {
   it("does NOT overwrite an explicit jsonSchema string when outputs is also set", () => {
     const explicit = '{"type":"object","properties":{},"required":[]}';
     const config = validateAgentConfig({
-      name: "x", description: "x agent",
+      name: "x", description: "x agent", model: "sonnet",
       jsonSchema: explicit,
       outputs: { foo: "string" },
       prompt: "",
@@ -146,6 +147,7 @@ describe("loadAgent — outputs end-to-end", () => {
     writeFileSync(join(dir, "demo-agent.md"), `---
 name: demo-agent
 description: demo
+model: sonnet
 outputs:
   foo: string
   status: {enum: [ok, fail]}

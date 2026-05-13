@@ -12,6 +12,7 @@ describe("validator — outputs/jsonSchemaFile conflict", () => {
     writeFileSync(join(dir, "verifier.md"), `---
 name: verifier
 description: verifier agent
+model: sonnet
 auto_inputs: true
 outputs:
   foo: string
@@ -37,6 +38,7 @@ prompt body
     writeFileSync(join(dir, "verifier.md"), `---
 name: verifier
 description: verifier agent
+model: sonnet
 auto_inputs: true
 outputs:
   foo: string

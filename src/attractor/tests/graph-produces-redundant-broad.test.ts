@@ -10,6 +10,7 @@ function setupAgent(dir: string) {
   writeFileSync(join(dir, "verifier.md"), `---
 name: verifier
 description: verifier
+model: sonnet
 auto_inputs: true
 outputs:
   foo: string
@@ -86,6 +87,7 @@ describe("produces_redundant_with_outputs — broad (D2)", () => {
     writeFileSync(join(dir, "legacy.md"), `---
 name: legacy
 description: legacy
+model: sonnet
 auto_inputs: true
 ---
 body

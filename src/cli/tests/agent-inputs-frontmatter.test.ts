@@ -28,7 +28,7 @@ body`);
 describe("validateAgentConfig — inputs", () => {
   it("attaches inputs array to AgentConfig", () => {
     const config = validateAgentConfig({
-      name: "x", description: "x agent",
+      name: "x", description: "x agent", model: "sonnet",
       inputs: ["foo", "bar"],
       prompt: "",
     } as any);
@@ -37,7 +37,7 @@ describe("validateAgentConfig — inputs", () => {
 
   it("does not set inputs when absent", () => {
     const config = validateAgentConfig({
-      name: "x", description: "x agent",
+      name: "x", description: "x agent", model: "sonnet",
       prompt: "",
     } as any);
     expect(config.inputs).toBeUndefined();
@@ -45,7 +45,7 @@ describe("validateAgentConfig — inputs", () => {
 
   it("treats empty inputs array as valid (zero-input agent)", () => {
     const config = validateAgentConfig({
-      name: "x", description: "x agent",
+      name: "x", description: "x agent", model: "sonnet",
       inputs: [],
       prompt: "",
     } as any);

@@ -20,6 +20,7 @@ describe("validator — required_caller_vars", () => {
       "producer.md": `---
 name: producer
 description: produces foo
+model: sonnet
 outputs:
   foo: string
 ---
@@ -28,6 +29,7 @@ body
       "consumer.md": `---
 name: consumer
 description: consumes foo
+model: sonnet
 inputs:
   - foo
 ---
@@ -63,6 +65,7 @@ body
       "agent-a.md": `---
 name: agent-a
 description: no special inputs
+model: sonnet
 ---
 body
 `,
@@ -91,6 +94,7 @@ body
       "agent-a.md": `---
 name: agent-a
 description: uses reserved vars
+model: sonnet
 ---
 Use $run_id and $goal here.
 `,
@@ -114,6 +118,7 @@ Use $run_id and $goal here.
       "consumer.md": `---
 name: consumer
 description: needs external_key
+model: sonnet
 inputs:
   - external_key
 ---
@@ -140,6 +145,7 @@ body
       "producer.md": `---
 name: producer
 description: produces my_key
+model: sonnet
 outputs:
   my_key: string
 ---
@@ -148,6 +154,7 @@ body
       "consumer.md": `---
 name: consumer
 description: needs my_key
+model: sonnet
 inputs:
   - my_key
 ---
@@ -174,6 +181,7 @@ body
       "consumer.md": `---
 name: consumer
 description: needs sha and max_iterations
+model: sonnet
 inputs:
   - tool_node.sha
   - max_iterations

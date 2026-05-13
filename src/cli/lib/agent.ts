@@ -21,6 +21,9 @@ export type JsonSchemaFragment =
   | JsonSchemaShorthand
   | { type?: string; enum?: unknown[]; [k: string]: unknown };
 
+export type AgentModel = "opus" | "sonnet" | "haiku";
+export type AgentThinking = "off" | "low" | "high";
+
 interface DerivedJsonSchema {
   type: "object";
   properties: Record<string, { type?: string; enum?: unknown[]; [k: string]: unknown }>;
@@ -49,7 +52,8 @@ function deriveJsonSchemaString(outputs: Record<string, JsonSchemaFragment>): st
 export interface AgentConfig {
   name: string;
   description: string;
-  model: string;
+  model: AgentModel;
+  thinking?: AgentThinking;
   permissionMode: string;
   tools: string[];
   mcp: McpServerConfig[];
@@ -113,7 +117,6 @@ export interface RunResult {
 }
 
 const DEFAULTS: Partial<AgentConfig> = {
-  model: "opus",
   permissionMode: "dangerouslySkipPermissions",
   tools: [],
   mcp: [],
@@ -487,6 +490,20 @@ export function validateAgentConfig(
   // Empty string is valid (procedure-less agents like `task`); only missing field is invalid.
   if (typeof config.prompt !== "string") throw new Error("prompt body is required");
 
+  if (config.model !== "opus" && config.model !== "sonnet" && config.model !== "haiku") {
+    throw new Error(
+      `model is required and must be one of opus|sonnet|haiku (got: ${config.model ?? "undefined"})`
+    );
+  }
+  if (config.thinking !== undefined &&
+      config.thinking !== "off" &&
+      config.thinking !== "low" &&
+      config.thinking !== "high") {
+    throw new Error(
+      `thinking must be one of off|low|high (got: ${config.thinking})`
+    );
+  }
+
   if (config.loop !== undefined && typeof config.loop !== "boolean") {
     throw new Error("loop must be a boolean");
   }
@@ -509,7 +526,7 @@ export function validateAgentConfig(
   return {
     name: config.name,
     description: config.description,
-    model: config.model ?? DEFAULTS.model!,
+    model: config.model,
     permissionMode: config.permissionMode ?? DEFAULTS.permissionMode!,
     tools: config.tools ?? DEFAULTS.tools!,
     mcp: config.mcp ?? DEFAULTS.mcp!,
@@ -517,6 +534,7 @@ export function validateAgentConfig(
     ...(derivedJsonSchema !== undefined ? { jsonSchema: derivedJsonSchema } : {}),
     ...(config.outputs !== undefined ? { outputs: config.outputs } : {}),
     ...(config.inputs !== undefined ? { inputs: config.inputs } : {}),
+    ...(config.thinking !== undefined ? { thinking: config.thinking } : {}),
     ...(config.loop !== undefined ? { loop: config.loop } : {}),
     ...(config.maxIterations !== undefined ? { maxIterations: config.maxIterations } : {}),
   };
