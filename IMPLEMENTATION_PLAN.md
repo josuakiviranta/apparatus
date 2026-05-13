@@ -147,7 +147,9 @@ See docs/adr/0018 + docs/superpowers/specs/2026-05-13-prevent-system-sleep-desig
 
 ---
 
-## Chunk 2: Wire into pipelineRunCommand + docs — [ ] PENDING
+## Chunk 2: Wire into pipelineRunCommand + docs — [x] DONE (893ff2b)
+
+**Note on test mocks:** `pipeline.test.ts` and `pipeline-headless.test.ts` previously stubbed `spawn()` with an object missing `unref()`. Once `preventSleep()` ran as the first statement of `pipelineRunCommand`, every test through that path crashed with `TypeError: child.unref is not a function`. Fix was a single-line addition (`unref: vi.fn()`) to each mock — bundled in the Chunk 2 commit. Future test files that mock `child_process` for `pipelineRunCommand` coverage must include `unref` on the spawn stub.
 
 ### Step 2.1 — Add the call site
 
