@@ -110,4 +110,19 @@ describe("LiveFooter", () => {
     expect(vi.getTimerCount()).toBe(0);
     vi.useRealTimers();
   });
+
+  it("schedules a 500ms interval for streaming kind", () => {
+    vi.useFakeTimers();
+    const blk = block("streaming", "s-1");
+    render(
+      <LiveFooter
+        block={blk}
+        inputBuffer=""
+        onInputChange={() => {}}
+        onInputSubmit={async () => {}}
+      />,
+    );
+    expect(vi.getTimerCount()).toBe(1);
+    vi.useRealTimers();
+  });
 });
