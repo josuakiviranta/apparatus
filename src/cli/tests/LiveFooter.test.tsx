@@ -91,4 +91,23 @@ describe("LiveFooter", () => {
     expect(out).not.toContain(">");
     expect(out).not.toContain("Approve");
   });
+
+  it("schedules no interval for non-streaming kinds", () => {
+    vi.useFakeTimers();
+    const blk = block("interactive-agent", "a-3");
+    __agentStatesForTest.set("a-3", {
+      child: { kill: vi.fn() } as never,
+      onDone: vi.fn(),
+    });
+    render(
+      <LiveFooter
+        block={blk}
+        inputBuffer=""
+        onInputChange={() => {}}
+        onInputSubmit={async () => {}}
+      />,
+    );
+    expect(vi.getTimerCount()).toBe(0);
+    vi.useRealTimers();
+  });
 });
