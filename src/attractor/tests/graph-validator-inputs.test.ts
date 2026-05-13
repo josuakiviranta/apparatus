@@ -17,6 +17,7 @@ describe("validator — inputs_missing_frontmatter", () => {
       "a.md": `---
 name: a
 description: x
+model: sonnet
 outputs: { foo: string }
 ---
 body`,
@@ -42,6 +43,7 @@ body`,
       "a.md": `---
 name: a
 description: x
+model: sonnet
 inputs: []
 outputs: { foo: string }
 ---
@@ -67,6 +69,7 @@ describe("validator — unknown_source_node", () => {
       "consumer.md": `---
 name: consumer
 description: x
+model: sonnet
 inputs: [ghost.value]
 outputs: { foo: string }
 ---
@@ -91,6 +94,7 @@ body`,
       "consumer.md": `---
 name: consumer
 description: x
+model: sonnet
 outputs: { foo: string }
 ---
 body`,
@@ -112,6 +116,7 @@ body`,
       "batch_orchestrator.md": `---
 name: batch_orchestrator
 description: x
+model: sonnet
 inputs: []
 outputs: { done: boolean }
 ---
@@ -149,6 +154,7 @@ describe("validator — source_missing_output_key", () => {
       "producer.md": `---
 name: producer
 description: x
+model: sonnet
 inputs: []
 outputs: { foo: string }
 ---
@@ -156,6 +162,7 @@ body`,
       "consumer.md": `---
 name: consumer
 description: x
+model: sonnet
 inputs: [producer.bar]
 outputs: { result: string }
 ---
@@ -185,6 +192,7 @@ body`,
       "producer.md": `---
 name: producer
 description: x
+model: sonnet
 inputs: []
 outputs: { bar: string }
 ---
@@ -192,6 +200,7 @@ body`,
       "consumer.md": `---
 name: consumer
 description: x
+model: sonnet
 inputs: [producer.bar]
 outputs: { result: string }
 ---
@@ -215,6 +224,7 @@ body`,
       "consumer.md": `---
 name: consumer
 description: x
+model: sonnet
 inputs: [tool_node.bar]
 outputs:
   result:
@@ -246,6 +256,7 @@ body`,
       "consumer.md": `---
 name: consumer
 description: x
+model: sonnet
 inputs: [tool_node.bar]
 outputs:
   result:
@@ -271,6 +282,7 @@ body`,
       "producer.md": `---
 name: producer
 description: x
+model: sonnet
 inputs: []
 outputs: { foo: string }
 ---
@@ -310,6 +322,7 @@ describe("validator — bare_input_not_in_caller_inputs_or_system", () => {
       "consumer.md": `---
 name: consumer
 description: x
+model: sonnet
 inputs: [unknown_var]
 outputs: { foo: string }
 ---
@@ -336,6 +349,7 @@ body`,
       "consumer.md": `---
 name: consumer
 description: x
+model: sonnet
 inputs: [unknown_var]
 outputs: { foo: string }
 ---
@@ -359,6 +373,7 @@ body`,
       "consumer.md": `---
 name: consumer
 description: x
+model: sonnet
 inputs: [PROJECT_ROOT, ILLUMINATION_SERVER_PATH]
 outputs: { foo: string }
 ---
@@ -381,6 +396,7 @@ body`,
       "consumer.md": `---
 name: consumer
 description: x
+model: sonnet
 outputs: { foo: string }
 ---
 body`,
@@ -402,6 +418,7 @@ body`,
       "consumer.md": `---
 name: consumer
 description: x
+model: sonnet
 inputs: [optional_thing]
 outputs: { foo: string }
 ---
@@ -426,6 +443,7 @@ describe("validator — steering_has_var_token", () => {
       "x.md": `---
 name: x
 description: x
+model: sonnet
 inputs: []
 outputs: { result: string }
 ---
@@ -456,6 +474,7 @@ describe("validator — rendered_tag_collision", () => {
       "verifier.md": `---
 name: verifier
 description: x
+model: sonnet
 inputs: []
 outputs: { summary: string }
 ---
@@ -463,6 +482,7 @@ body`,
       "consumer.md": `---
 name: consumer
 description: x
+model: sonnet
 inputs: [verifier.summary, verifier_summary]
 outputs: { result: string }
 ---
@@ -493,6 +513,7 @@ body`,
       "a_b.md": `---
 name: a_b
 description: x
+model: sonnet
 inputs: []
 outputs: { c: string }
 ---
@@ -500,6 +521,7 @@ body`,
       "a.md": `---
 name: a
 description: x
+model: sonnet
 inputs: []
 outputs: { b_c: string }
 ---
@@ -507,6 +529,7 @@ body`,
       "consumer.md": `---
 name: consumer
 description: x
+model: sonnet
 inputs: [a_b.c, a.b_c]
 outputs: { result: string }
 ---
@@ -536,6 +559,7 @@ body`,
       "verifier.md": `---
 name: verifier
 description: x
+model: sonnet
 inputs: []
 outputs: { summary: string }
 ---
@@ -543,6 +567,7 @@ body`,
       "consumer.md": `---
 name: consumer
 description: x
+model: sonnet
 inputs: [verifier.summary, project]
 outputs: { result: string }
 ---
@@ -567,6 +592,7 @@ body`,
       "consumer.md": `---
 name: consumer
 description: x
+model: sonnet
 outputs: { result: string }
 ---
 body`,
@@ -593,6 +619,7 @@ describe("validator — missing_input_producer (qualified inputs)", () => {
       "verifier.md": `---
 name: verifier
 description: x
+model: sonnet
 inputs: []
 outputs: { summary: string }
 ---
@@ -600,6 +627,7 @@ body`,
       "bypass.md": `---
 name: bypass
 description: x
+model: sonnet
 inputs: []
 outputs: { other: string }
 ---
@@ -607,6 +635,7 @@ body`,
       "consumer.md": `---
 name: consumer
 description: x
+model: sonnet
 inputs: [verifier.summary]
 outputs: { result: string }
 ---
@@ -639,6 +668,7 @@ body`,
       "verifier.md": `---
 name: verifier
 description: x
+model: sonnet
 inputs: []
 outputs: { summary: string }
 ---
@@ -646,6 +676,7 @@ body`,
       "consumer.md": `---
 name: consumer
 description: x
+model: sonnet
 inputs: [verifier.summary]
 outputs: { result: string }
 ---
@@ -669,6 +700,7 @@ body`,
       "verifier.md": `---
 name: verifier
 description: x
+model: sonnet
 inputs: []
 outputs: { summary: string }
 ---
@@ -676,6 +708,7 @@ body`,
       "bypass.md": `---
 name: bypass
 description: x
+model: sonnet
 inputs: []
 outputs: { other: string }
 ---
@@ -683,6 +716,7 @@ body`,
       "consumer.md": `---
 name: consumer
 description: x
+model: sonnet
 inputs: [verifier.summary]
 outputs: { result: string }
 ---
@@ -715,6 +749,7 @@ describe("validator — malformed input declarations", () => {
       "consumer.md": `---
 name: consumer
 description: x
+model: sonnet
 inputs: [a.b.c]
 outputs: { foo: string }
 ---
@@ -739,6 +774,7 @@ describe("validator — bare_input_from_qualified_producer", () => {
       "consumer.md": `---
 name: consumer
 description: x
+model: sonnet
 inputs: [vision]
 outputs: { foo: string }
 ---
@@ -767,6 +803,7 @@ body`,
       "consumer.md": `---
 name: consumer
 description: x
+model: sonnet
 inputs: [vision]
 outputs: { foo: string }
 ---

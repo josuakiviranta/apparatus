@@ -12,6 +12,7 @@ describe("validator — missing_input_producer", () => {
     writeFileSync(join(dir, "consumer.md"), `---
 name: consumer
 description: needs foo
+model: sonnet
 auto_inputs: true
 inputs:
   - foo
@@ -40,6 +41,7 @@ body
     writeFileSync(join(dir, "producer.md"), `---
 name: producer
 description: produces foo
+model: sonnet
 auto_inputs: true
 outputs:
   foo: string
@@ -49,6 +51,7 @@ body
     writeFileSync(join(dir, "consumer.md"), `---
 name: consumer
 description: needs foo
+model: sonnet
 auto_inputs: true
 inputs:
   - foo
@@ -74,6 +77,7 @@ body
     writeFileSync(join(dir, "consumer.md"), `---
 name: consumer
 description: needs project
+model: sonnet
 auto_inputs: true
 inputs:
   - project
@@ -99,6 +103,7 @@ body
     writeFileSync(join(dir, "consumer.md"), `---
 name: consumer
 description: needs foo
+model: sonnet
 auto_inputs: true
 inputs:
   - foo
@@ -124,6 +129,7 @@ body
     writeFileSync(join(dir, "consumer.md"), `---
 name: consumer
 description: needs run_id (auto-injected by runtime)
+model: sonnet
 auto_inputs: true
 inputs:
   - run_id
@@ -153,6 +159,7 @@ describe("validator — branch_incomplete_input", () => {
     writeFileSync(join(dir, "producer.md"), `---
 name: producer
 description: produces foo
+model: sonnet
 auto_inputs: true
 outputs:
   foo: string
@@ -162,6 +169,7 @@ body
     writeFileSync(join(dir, "passthrough.md"), `---
 name: passthrough
 description: does not produce foo
+model: sonnet
 auto_inputs: true
 ---
 body
@@ -169,6 +177,7 @@ body
     writeFileSync(join(dir, "consumer.md"), `---
 name: consumer
 description: needs foo
+model: sonnet
 auto_inputs: true
 inputs:
   - foo
@@ -206,6 +215,7 @@ body
     writeFileSync(join(dir, "producer.md"), `---
 name: producer
 description: produces foo
+model: sonnet
 auto_inputs: true
 outputs:
   foo: string
@@ -215,6 +225,7 @@ body
     writeFileSync(join(dir, "consumer.md"), `---
 name: consumer
 description: needs foo
+model: sonnet
 auto_inputs: true
 inputs:
   - foo
@@ -247,6 +258,7 @@ body
     writeFileSync(join(dir, "producer.md"), `---
 name: producer
 description: produces foo
+model: sonnet
 auto_inputs: true
 outputs:
   foo: string
@@ -256,6 +268,7 @@ body
     writeFileSync(join(dir, "passthrough.md"), `---
 name: passthrough
 description: does not produce foo
+model: sonnet
 auto_inputs: true
 ---
 body
@@ -263,6 +276,7 @@ body
     writeFileSync(join(dir, "consumer.md"), `---
 name: consumer
 description: needs foo
+model: sonnet
 auto_inputs: true
 inputs:
   - foo
@@ -295,6 +309,7 @@ body
     writeFileSync(join(dir, "consumer.md"), `---
 name: consumer
 description: needs foo
+model: sonnet
 auto_inputs: true
 inputs:
   - foo
@@ -322,6 +337,7 @@ describe("validator — input_type_mismatch", () => {
     writeFileSync(join(dir, "classifier.md"), `---
 name: classifier
 description: emits preferred_label
+model: sonnet
 auto_inputs: true
 outputs:
   preferred_label:
@@ -335,6 +351,7 @@ body
     writeFileSync(join(dir, "next.md"), `---
 name: next
 description: downstream
+model: sonnet
 auto_inputs: true
 ---
 body
@@ -390,6 +407,7 @@ body
     writeFileSync(join(dir, "producer.md"), `---
 name: producer
 description: emits foo with no enum
+model: sonnet
 auto_inputs: true
 outputs:
   foo: string
@@ -399,6 +417,7 @@ body
     writeFileSync(join(dir, "next.md"), `---
 name: next
 description: downstream
+model: sonnet
 auto_inputs: true
 ---
 body
@@ -425,6 +444,7 @@ body
     writeFileSync(join(dir, "agent.md"), `---
 name: a
 description: anything
+model: sonnet
 auto_inputs: true
 ---
 body
@@ -451,6 +471,7 @@ body
     writeFileSync(join(dir, "classifier.md"), `---
 name: classifier
 description: emits two outputs
+model: sonnet
 auto_inputs: true
 outputs:
   preferred_label:
@@ -467,6 +488,7 @@ body
     writeFileSync(join(dir, "next.md"), `---
 name: next
 description: downstream
+model: sonnet
 auto_inputs: true
 ---
 body

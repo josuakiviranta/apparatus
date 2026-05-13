@@ -7,6 +7,7 @@ describe("validateAgentConfig — deep loop fields", () => {
     const cfg = validateAgentConfig({
       name: "x",
       description: "y",
+      model: "sonnet",
       prompt: "z",
       auto_inputs: true,
       loop: true,
@@ -18,6 +19,7 @@ describe("validateAgentConfig — deep loop fields", () => {
     const cfg = validateAgentConfig({
       name: "x",
       description: "y",
+      model: "sonnet",
       prompt: "z",
       auto_inputs: true,
       loop: true,
@@ -30,6 +32,7 @@ describe("validateAgentConfig — deep loop fields", () => {
     const cfg = validateAgentConfig({
       name: "x",
       description: "y",
+      model: "sonnet",
       prompt: "z",
       auto_inputs: true,
     });
@@ -41,6 +44,7 @@ describe("validateAgentConfig — deep loop fields", () => {
     expect(() => validateAgentConfig({
       name: "x",
       description: "y",
+      model: "sonnet",
       prompt: "z",
       loop: "yes" as any,
     })).toThrow(/loop must be a boolean/i);
@@ -50,6 +54,7 @@ describe("validateAgentConfig — deep loop fields", () => {
     expect(() => validateAgentConfig({
       name: "x",
       description: "y",
+      model: "sonnet",
       prompt: "z",
       maxIterations: 1.5 as any,
     })).toThrow(/maxIterations must be a non-negative integer/i);
@@ -59,6 +64,7 @@ describe("validateAgentConfig — deep loop fields", () => {
     expect(() => validateAgentConfig({
       name: "x",
       description: "y",
+      model: "sonnet",
       prompt: "z",
       maxIterations: -1 as any,
     })).toThrow(/maxIterations must be a non-negative integer/i);
@@ -68,6 +74,7 @@ describe("validateAgentConfig — deep loop fields", () => {
     const cfg = validateAgentConfig({
       name: "x",
       description: "y",
+      model: "sonnet",
       prompt: "z",
       auto_inputs: true,
       maxIterations: 0,
@@ -82,6 +89,7 @@ describe("parseAgentFile — deep loop fields round-trip", () => {
       "---",
       "name: looper",
       "description: x",
+      "model: sonnet",
       "auto_inputs: true",
       "loop: true",
       "maxIterations: 50",

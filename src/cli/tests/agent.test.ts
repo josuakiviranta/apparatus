@@ -57,17 +57,62 @@ describe("validateAgentConfig", () => {
     expect(() => validateAgentConfig(config)).toThrow("prompt body is required");
   });
 
-  it("applies defaults for optional fields", () => {
+  it("applies defaults for optional fields (model and prompt now required)", () => {
     const minimal = {
       name: "test",
       description: "test agent",
+      model: "sonnet" as const,
       prompt: "Do things.",
     };
     const result = validateAgentConfig(minimal);
-    expect(result.model).toBe("opus");
+    expect(result.model).toBe("sonnet");
     expect(result.permissionMode).toBe("dangerouslySkipPermissions");
     expect(result.tools).toEqual([]);
     expect(result.mcp).toEqual([]);
+    expect(result.thinking).toBeUndefined();
+  });
+
+  it("rejects missing model field", () => {
+    const config = { ...validConfig };
+    delete (config as Partial<AgentConfig>).model;
+    expect(() => validateAgentConfig(config)).toThrow(
+      /model is required and must be one of opus\|sonnet\|haiku/
+    );
+  });
+
+  it("rejects non-enum model value", () => {
+    const config = { ...validConfig, model: "gpt4" as any };
+    expect(() => validateAgentConfig(config)).toThrow(
+      /model is required and must be one of opus\|sonnet\|haiku/
+    );
+  });
+
+  it("accepts each model enum value", () => {
+    for (const model of ["opus", "sonnet", "haiku"] as const) {
+      const config = { ...validConfig, model };
+      expect(() => validateAgentConfig(config)).not.toThrow();
+      expect(validateAgentConfig(config).model).toBe(model);
+    }
+  });
+
+  it("accepts each thinking enum value", () => {
+    for (const thinking of ["off", "low", "high"] as const) {
+      const config = { ...validConfig, thinking };
+      expect(() => validateAgentConfig(config)).not.toThrow();
+      expect(validateAgentConfig(config).thinking).toBe(thinking);
+    }
+  });
+
+  it("treats thinking as optional", () => {
+    const config = { ...validConfig };
+    expect(validateAgentConfig(config).thinking).toBeUndefined();
+  });
+
+  it("rejects non-enum thinking value", () => {
+    const config = { ...validConfig, thinking: "extreme" as any };
+    expect(() => validateAgentConfig(config)).toThrow(
+      /thinking must be one of off\|low\|high/
+    );
   });
 });
 

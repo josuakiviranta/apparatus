@@ -12,6 +12,7 @@ describe("validator — derive produces from agent outputs", () => {
     writeFileSync(join(dir, "verifier.md"), `---
 name: verifier
 description: verifier
+model: sonnet
 auto_inputs: true
 outputs:
   preferred_label: {enum: ["true", "false"]}
@@ -22,6 +23,7 @@ body
     writeFileSync(join(dir, "consumer.md"), `---
 name: consumer
 description: consumes preferred_label
+model: sonnet
 auto_inputs: true
 inputs:
   - preferred_label
@@ -58,6 +60,7 @@ body
     writeFileSync(join(dir, "legacy.md"), `---
 name: legacy
 description: legacy
+model: sonnet
 auto_inputs: true
 ---
 body
@@ -65,6 +68,7 @@ body
     writeFileSync(join(dir, "consumer.md"), `---
 name: consumer
 description: consumes manual_key
+model: sonnet
 auto_inputs: true
 inputs:
   - manual_key
