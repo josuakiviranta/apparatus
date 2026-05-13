@@ -198,6 +198,13 @@ describe("Agent.buildArgs", () => {
     expect(args).toContain("stream-json");
     expect(args).not.toContain("--json-schema");
   });
+
+  it("does NOT push a --thinking flag (env-only contract)", () => {
+    const agent = new Agent({ ...baseConfig, thinking: "high" });
+    const args = agent.buildArgs({ cwd: process.cwd() });
+    expect(args).not.toContain("--thinking");
+    expect(args).not.toContain("--thinking-budget");
+  });
 });
 
 describe("Agent.expandPrompt", () => {
@@ -465,5 +472,54 @@ describe("Agent.run abort signal", () => {
     await runPromise;
 
     expect(killFn).toHaveBeenCalledWith("SIGTERM");
+  });
+});
+
+describe("Agent#buildSpawnEnv", () => {
+  const baseConfig: AgentConfig = {
+    name: "thinker",
+    description: "Thinks",
+    model: "opus",
+    permissionMode: "dangerouslySkipPermissions",
+    tools: [],
+    mcp: [],
+    prompt: "Reason.",
+  };
+
+  it("returns process.env unchanged when thinking is omitted", () => {
+    const agent = new Agent(baseConfig);
+    const env = (agent as unknown as { buildSpawnEnv(): NodeJS.ProcessEnv }).buildSpawnEnv();
+    expect(env.CLAUDE_THINKING_BUDGET).toBeUndefined();
+    // Same object reference as process.env (no clone needed when no injection).
+    expect(env).toBe(process.env);
+  });
+
+  it("returns process.env unchanged when thinking is 'off'", () => {
+    const agent = new Agent({ ...baseConfig, thinking: "off" });
+    const env = (agent as unknown as { buildSpawnEnv(): NodeJS.ProcessEnv }).buildSpawnEnv();
+    expect(env.CLAUDE_THINKING_BUDGET).toBeUndefined();
+    expect(env).toBe(process.env);
+  });
+
+  it("injects CLAUDE_THINKING_BUDGET=high when thinking: high", () => {
+    const agent = new Agent({ ...baseConfig, thinking: "high" });
+    const env = (agent as unknown as { buildSpawnEnv(): NodeJS.ProcessEnv }).buildSpawnEnv();
+    expect(env.CLAUDE_THINKING_BUDGET).toBe("high");
+    // Cloned (not same ref) so process.env is not mutated.
+    expect(env).not.toBe(process.env);
+    expect(process.env.CLAUDE_THINKING_BUDGET).toBeUndefined();
+  });
+
+  it("injects CLAUDE_THINKING_BUDGET=low when thinking: low", () => {
+    const agent = new Agent({ ...baseConfig, thinking: "low" });
+    const env = (agent as unknown as { buildSpawnEnv(): NodeJS.ProcessEnv }).buildSpawnEnv();
+    expect(env.CLAUDE_THINKING_BUDGET).toBe("low");
+    expect(env).not.toBe(process.env);
+  });
+
+  it("preserves PATH and other ambient env when injecting", () => {
+    const agent = new Agent({ ...baseConfig, thinking: "high" });
+    const env = (agent as unknown as { buildSpawnEnv(): NodeJS.ProcessEnv }).buildSpawnEnv();
+    expect(env.PATH).toBe(process.env.PATH);
   });
 });
