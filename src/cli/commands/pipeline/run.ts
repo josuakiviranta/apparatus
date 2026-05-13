@@ -1,4 +1,6 @@
 import { join, dirname } from "path";
+import { mkdirSync, writeFileSync, utimesSync } from "fs";
+import { HEARTBEAT_INTERVAL_MS } from "../../lib/pipeline-bootstrap.js";
 import { JsonlPipelineTracer } from "../../../attractor/tracer/jsonl-pipeline-tracer.js";
 import type { PipelineTracer } from "../../../attractor/tracer/pipeline-tracer.js";
 import { validateOrRaise } from "../../../attractor/core/graph-validator.js";
@@ -139,6 +141,22 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
   } else {
     logsRoot = join(runsRoot, runId);
   }
+  // The runner owns the mkdir (was previously done asynchronously by engine.ts:168)
+  // so the initial heartbeat write below lands before any await and before any
+  // sibling sweep can possibly fire. Engine's mkdir is idempotent and stays in
+  // place — it still covers callers that bypass the runner.
+  mkdirSync(logsRoot, { recursive: true });
+  const heartbeatPath = join(logsRoot, "heartbeat");
+  writeFileSync(heartbeatPath, "");
+  const heartbeatTimer = setInterval(() => {
+    try {
+      utimesSync(heartbeatPath, new Date(), new Date());
+    } catch {
+      // ENOENT tolerated — folder may have been swept by a sibling in
+      // pathological races (see ADR-0016).
+    }
+  }, HEARTBEAT_INTERVAL_MS);
+  heartbeatTimer.unref();                                    // don't keep the event loop alive
   const tracePath = join(logsRoot, "pipeline.jsonl");
   const jsonlTracer = new JsonlPipelineTracer(tracePath);
   let latestContext: Record<string, unknown> = {};
@@ -390,6 +408,7 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
       pipelineFailed = true;
     }
   } finally {
+    clearInterval(heartbeatTimer);
     process.off("SIGINT", onSignal);
     process.off("SIGTERM", onSignal);
     await new Promise((resolve) => setImmediate(resolve));

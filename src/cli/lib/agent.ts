@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { Readable, PassThrough } from "node:stream";
+import { gcStaleRuns, HEARTBEAT_STALE_MS } from "./pipeline-bootstrap.js";
 import * as readline from "node:readline";
 import type { Session } from "./session.js";
 import { formatUserTurn } from "./stream-json-input.js";
@@ -224,6 +225,15 @@ export class Agent {
 
   async run(options: RunOptions): Promise<RunResult> {
     const expandedPrompt = this.expandPrompt(options.variables);
+
+    // Sweep stale run folders before writing any new scratch (ADR-0016).
+    const swept = gcStaleRuns(options.cwd);
+    if (swept > 0) {
+      const minutes = Math.round(HEARTBEAT_STALE_MS / 60_000);
+      process.stderr.write(
+        `[apparat] swept ${swept} stale run folder(s) (no heartbeat for ≥ ${minutes} min)\n`,
+      );
+    }
 
     // Write MCP config if needed (expand variables in server args)
     this.writeMcpConfig({ cwd: options.cwd, runId: options.runId, variables: options.variables });
