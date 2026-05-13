@@ -94,6 +94,53 @@ If `npm root -g` does not contain `apparat-cli`, the user has a per-project inst
 
 Step 4 is mandatory before step 5. The validator catches missing `cwd=`, `loop:true` without `done:boolean`, undeclared variables, and portability violations — all common authoring mistakes.
 
+## Choosing model + thinking
+
+Every agent must declare both axes in frontmatter. Pick by job, not by inertia.
+
+**Principle.** opus = decide / design / verify under ambiguity; sonnet = summarise /
+transform / format / mechanical glue; thinking = on only when the agent must reason
+under ambiguity, off for procedure.
+
+| Tier | Use for | Example agents |
+|---|---|---|
+| `opus + thinking: high` | Decide / design / verify under ambiguity | verifier, design-writer, plan-writer, change-explainer, implement, memory-reflector, grill |
+| `opus + thinking: off` | Procedure under opus reasoning (mechanical orchestration over many nodes) | tmux-tester, merge_resolver, batch_orchestrator, plan-scheduler |
+| `sonnet + thinking: off` | Summarise / transform / format / mechanical glue | task, chat-refiner, chat-summarizer, memory-writer, slice_to_issues, implement_from_issues, write_prd, meditate, all gates |
+
+### Example frontmatter per tier
+
+```yaml
+# opus + think:high — deep judgement
+---
+name: verifier
+description: Verifies illumination is implementable
+model: opus
+thinking: high
+permission_mode: dangerouslySkipPermissions
+inputs: []
+outputs:
+  preferred_label: boolean
+  summary: string
+---
+```
+
+```yaml
+# sonnet + think:off — mechanical transform
+---
+name: chat-summarizer
+description: Summarises the interactive turn for downstream context
+model: sonnet
+thinking: off
+permission_mode: dangerouslySkipPermissions
+inputs: [chat.output]
+outputs:
+  refinements: string
+---
+```
+
+If a node tiered to `sonnet` regresses on output quality, flip just that one to `opus` and note the exception in a comment — explicit per-node choice makes exceptions cheap to record and review.
+
 ## Stopping a running pipeline
 
 `Ctrl+C` cleanly terminates the apparat process and its claude subprocess. To resume after Ctrl-C, a node failure, or a crash:

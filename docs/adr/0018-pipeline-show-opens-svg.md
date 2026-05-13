@@ -48,3 +48,9 @@ The opener is spawned with `detached: true` + `child.unref()` so the long-lived 
 - ADR-0004 — rationale for recording the choice as an ADR rather than a session note.
 - Originating illumination: `.apparat/meditations/illuminations/2026-05-12T2324-inner-loop-ergonomics-debt.md`.
 - Design doc: `docs/superpowers/specs/2026-05-13-inner-loop-ergonomics-debt-design.md`.
+
+## 2026-05-14 amendment
+
+Agent node labels now render a third line below `out:` showing the agent's `model`
+and (when set to `low`/`high`) its `thinking:` budget — e.g. `opus · think:high`
+or `sonnet`. The label answers "where am I burning tokens?" at a glance.

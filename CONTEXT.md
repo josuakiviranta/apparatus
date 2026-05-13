@@ -23,6 +23,24 @@ All pipelines live in this repo (`src/cli/pipelines/` for bundled) or in
 a target project's `.apparat/pipelines/<name>/` folder. A pipeline is run
 against an external target project via `--project <folder>`.
 
+### Agent frontmatter
+
+Required:
+- `name:` — agent identifier (matches the `agent="…"` attribute on nodes).
+- `description:` — short human-readable summary.
+- `model:` — enum `opus | sonnet | haiku`.
+- `prompt:` — bare body (markdown after the frontmatter).
+
+Optional:
+- `thinking:` — enum `off | low | high` (default `off`). Plumbed via `CLAUDE_THINKING_BUDGET`.
+- `permission_mode:`, `tools:`, `mcp:`, `inputs:`, `outputs:`, `loop:`, `maxIterations:`.
+
+The `model:` field is enforced both by the in-code schema in
+`src/cli/lib/agent.ts` and by the per-node validator rule `model_required`
+(see ADR-0012 amendment 2026-05-14). Agents missing or mis-typing `model:`
+fail validation at the node site with `pipeline.dot` source-location.
+There is no silent `opus` default.
+
 ### Project-local layout
 
 A target project declares itself apparat-shaped by having a `<project>/.apparat/`

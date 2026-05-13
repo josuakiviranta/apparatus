@@ -61,6 +61,16 @@ See `docs/superpowers/specs/2026-05-06-graph-validator-context-and-clusters-desi
 - The `variables.ts` `runEarly` / `runLate` split preserves the original `validateGraph` ordering: variable-coverage and portability rules fire before interactive per-node checks; the `required_caller_vars` info banner fires after all per-node checks complete.
 - `interactive.ts` exports per-node helpers only (no standalone `run`). It is an internal dependency of `inputs-refs.ts`, not a top-level cluster, because the two share the same per-node iteration loop and interleaving their emissions is what the byte-identical test enforces.
 
+## 2026-05-14 amendment — `model_required` rule
+
+The validator cluster gains a new per-node rule `model_required`, implemented in
+`src/attractor/core/validators/model-required.ts` and wired into
+`inputs-refs.ts`'s Loop B alongside the `interactive.*` helpers. It fires
+when an agent `.md` resolved by `tryResolveAgent` is missing the `model:`
+field or sets it to a value outside the enum `opus | sonnet | haiku`,
+emitting a node-level diagnostic with `pipeline.dot` source location. The
+rule mirrors `interactive.checkLoopRequiresDoneField` in shape.
+
 ## References
 
 - Design doc: `docs/superpowers/specs/2026-05-06-graph-validator-context-and-clusters-design.md`
