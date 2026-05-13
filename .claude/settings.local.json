@@ -3,9 +3,23 @@
     "allow": [
       "mcp__plugin_context-mode_context-mode__ctx_batch_execute",
       "mcp__plugin_context-mode_context-mode__ctx_search",
+      "mcp__illumination__*",
+      "Bash(apparat:*)",
       "Bash(npm link:*)",
-      "Bash(ralph:*)",
-      "Bash(npm:*)"
+      "Bash(npm:*)",
+      "Bash(npm root:*)",
+      "Bash(npx:*)",
+      "Bash(node:*)",
+      "Bash(tsx:*)",
+      "Bash(vitest:*)",
+      "Bash(rg:*)",
+      "Bash(ast-grep:*)",
+      "Bash(open:*)",
+      "Bash(git status:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(git show:*)",
+      "Bash(git branch:*)"
     ]
   }
 }
