@@ -24,5 +24,14 @@ export default defineConfig({
     cpSync("src/cli/pipelines", "dist/pipelines", { recursive: true });
     cpSync("src/cli/skills", "dist/skills", { recursive: true });
     console.log("Assets copied to dist/");
+
+    const bundle = readFileSync("dist/cli/index.js", "utf8");
+    const devMarkers = ["react-dom.development", "react-reconciler.development"];
+    const found = devMarkers.filter((m) => bundle.includes(m));
+    if (found.length > 0) {
+      console.error(`Build failed: dev React markers in bundle: ${found.join(", ")}`);
+      console.error("Check that define['process.env.NODE_ENV'] is pinned to '\"production\"'.");
+      process.exit(1);
+    }
   },
 });
