@@ -9,6 +9,8 @@ import {
   isPidAlive,
   ensureMeditationDirs,
   appendMeditateGitignore,
+  assertApparatShape,
+  ApparatShapeError,
 } from "../lib/pipeline-bootstrap.js";
 
 // ─── Command entry point ──────────────────────────────────────────────────────
@@ -21,6 +23,15 @@ export async function meditateCommand(
   if (!existsSync(absPath)) {
     await output.error(`Error: project folder not found: ${absPath}`);
     process.exit(1);
+  }
+  try {
+    assertApparatShape(absPath);
+  } catch (err) {
+    if (err instanceof ApparatShapeError) {
+      await output.error(err.message);
+      process.exit(1);
+    }
+    throw err;
   }
   const runningPid = readPid(absPath);
   if (runningPid !== null && isPidAlive(runningPid)) {

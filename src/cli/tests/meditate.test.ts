@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync } from "fs";
+import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 
@@ -22,6 +22,9 @@ let tmpDir: string;
 
 beforeEach(() => {
   tmpDir = mkdtempSync(join(tmpdir(), "apparat-meditate-test-"));
+  // Existing cases assume tmpDir is apparat-shaped — seed VISION.md so the
+  // preflight added in Task 1.2 does not refuse the path.
+  writeFileSync(join(tmpDir, "VISION.md"), "# Vision\n");
 });
 
 afterEach(() => {
@@ -234,6 +237,38 @@ describe("meditateCommand (shim)", () => {
     await meditateCommand(tmpDir);
     expect(calls).toHaveLength(1);
     expect(calls[0].opts.variables).not.toHaveProperty("specs_dir");
+  });
+
+  it("exits 1 when called against an apparat-shape-less folder (no signals)", async () => {
+    // Override the beforeEach seed: build a fresh tmpDir with no VISION.md.
+    const shapeless = mkdtempSync(join(tmpdir(), "apparat-meditate-shapeless-"));
+    try {
+      const spy = vi.spyOn(pipelineMod, "pipelineRunCommand").mockImplementation(async () => {});
+      const exitSpy = vi.spyOn(process, "exit").mockImplementation(((_code?: number) => {
+        throw new Error("process.exit called");
+      }) as never);
+      await expect(meditateCommand(shapeless)).rejects.toThrow("process.exit called");
+      expect(spy).not.toHaveBeenCalled();
+      expect(exitSpy).toHaveBeenCalledWith(1);
+      // No illumination dir or pid file created.
+      expect(existsSync(join(shapeless, ".apparat", "meditations", "illuminations"))).toBe(false);
+      expect(existsSync(join(shapeless, ".meditate.pid"))).toBe(false);
+    } finally {
+      rmSync(shapeless, { recursive: true, force: true });
+    }
+  });
+
+  it("exits 1 when called against a path whose basename is '.apparat'", async () => {
+    const inner = join(tmpDir, ".apparat");
+    mkdirSync(inner, { recursive: true });
+    const spy = vi.spyOn(pipelineMod, "pipelineRunCommand").mockImplementation(async () => {});
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(((_code?: number) => {
+      throw new Error("process.exit called");
+    }) as never);
+    await expect(meditateCommand(inner)).rejects.toThrow("process.exit called");
+    expect(spy).not.toHaveBeenCalled();
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(existsSync(join(inner, "meditations", "illuminations"))).toBe(false);
   });
 });
 
