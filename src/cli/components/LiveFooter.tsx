@@ -37,9 +37,10 @@ export function LiveFooter({
 }) {
   const [, tick] = React.useState(0);
   React.useEffect(() => {
-    const id = setInterval(() => tick(n => n + 1), 100);
+    if (block.kind !== "streaming") return;
+    const id = setInterval(() => tick(n => n + 1), 500);
     return () => clearInterval(id);
-  }, []);
+  }, [block.kind]);
   const footer = isInteractionKind(block.kind)
     ? drivers[block.kind].renderFooter(block, {
         inputBuffer,
