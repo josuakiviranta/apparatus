@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from "fs";
-import { join } from "path";
+import { basename, dirname, join } from "path";
 import { MCP_CONFIG_GLOB } from "./agent.js";
 import { illuminationsDir } from "./apparat-paths.js";
 
@@ -45,4 +45,39 @@ export function appendMeditateGitignore(projectFolder: string): void {
   if (toAdd.length === 0) return;
   const sep = existing.length > 0 && !existing.endsWith("\n") ? "\n" : "";
   writeFileSync(gitignorePath, existing + sep + toAdd.join("\n") + "\n");
+}
+
+/**
+ * Shape signals that mark a folder as "apparat-shaped" for orient-before-write
+ * preflight. Order is irrelevant — any single signal is sufficient.
+ */
+const SHAPE_SIGNALS = ["VISION.md", "CONTEXT.md", ".apparat", ".git"];
+
+export class ApparatShapeError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ApparatShapeError";
+  }
+}
+
+/**
+ * Refuse paths that are not apparat-shaped, before any side effect runs.
+ * Hard-refuse `basename === ".apparat"` (a typo / autocomplete slip pointed at
+ * the project's internal folder). Otherwise require at least one shape signal:
+ * VISION.md, CONTEXT.md, .apparat/, or .git/.
+ */
+export function assertApparatShape(absPath: string): void {
+  if (basename(absPath) === ".apparat") {
+    throw new ApparatShapeError(
+      `${absPath} is an apparat-internal folder — did you mean ${dirname(absPath)}?`,
+    );
+  }
+  const hasSignal = SHAPE_SIGNALS.some((s) => existsSync(join(absPath, s)));
+  if (!hasSignal) {
+    throw new ApparatShapeError(
+      `${absPath} does not look like an apparat-shaped project root ` +
+      `(no VISION.md / CONTEXT.md / .apparat/ / .git/). ` +
+      `Did you mean its parent?`,
+    );
+  }
 }

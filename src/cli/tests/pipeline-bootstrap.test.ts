@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync, existsSync, readFileSync } from "fs";
+import { mkdtempSync, rmSync, existsSync, readFileSync, mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 
@@ -11,6 +11,8 @@ import {
   isPidAlive,
   ensureMeditationDirs,
   appendMeditateGitignore,
+  assertApparatShape,
+  ApparatShapeError,
 } from "../lib/pipeline-bootstrap";
 
 let tmpDir: string;
@@ -111,5 +113,49 @@ describe("isPidAlive", () => {
 
   it("returns false for a PID that is not running", () => {
     expect(isPidAlive(999999999)).toBe(false);
+  });
+});
+
+describe("assertApparatShape", () => {
+  it("passes when .apparat/ exists at the path", () => {
+    mkdirSync(join(tmpDir, ".apparat"), { recursive: true });
+    expect(() => assertApparatShape(tmpDir)).not.toThrow();
+  });
+
+  it("passes when VISION.md exists", () => {
+    writeFileSync(join(tmpDir, "VISION.md"), "# Vision\n");
+    expect(() => assertApparatShape(tmpDir)).not.toThrow();
+  });
+
+  it("passes when CONTEXT.md exists", () => {
+    writeFileSync(join(tmpDir, "CONTEXT.md"), "# Domain Language\n");
+    expect(() => assertApparatShape(tmpDir)).not.toThrow();
+  });
+
+  it("passes when .git/ exists", () => {
+    mkdirSync(join(tmpDir, ".git"), { recursive: true });
+    expect(() => assertApparatShape(tmpDir)).not.toThrow();
+  });
+
+  it("throws ApparatShapeError when path basename is '.apparat'", () => {
+    const inner = join(tmpDir, ".apparat");
+    mkdirSync(inner, { recursive: true });
+    // Even though the inner folder exists, the basename rule must hard-refuse.
+    let caught: unknown;
+    try { assertApparatShape(inner); } catch (e) { caught = e; }
+    expect(caught).toBeInstanceOf(ApparatShapeError);
+    expect((caught as Error).message).toMatch(/apparat-internal folder/i);
+    expect((caught as Error).message).toContain(tmpDir);
+  });
+
+  it("throws ApparatShapeError when no shape signal is present", () => {
+    let caught: unknown;
+    try { assertApparatShape(tmpDir); } catch (e) { caught = e; }
+    expect(caught).toBeInstanceOf(ApparatShapeError);
+    expect((caught as Error).message).toMatch(/does not look like an apparat-shaped project/i);
+    expect((caught as Error).message).toMatch(/VISION\.md/);
+    expect((caught as Error).message).toMatch(/CONTEXT\.md/);
+    expect((caught as Error).message).toMatch(/\.apparat/);
+    expect((caught as Error).message).toMatch(/\.git/);
   });
 });
