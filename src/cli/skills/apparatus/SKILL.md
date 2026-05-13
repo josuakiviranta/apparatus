@@ -16,7 +16,7 @@ apparat is an agentic-loop runner that executes graphs of agents (pipelines, def
 | `apparat meditate <project> [--steer <text>]` | Run a meditate session against the project's stimuli. |
 | `apparat pipeline run <name> [project] [--var k=v]... [--resume [runId]]` | Execute a pipeline by folder name; pass the target project as the second positional. |
 | `apparat pipeline validate <name>` | Structural + portability check. **Run before every `pipeline run`.** |
-| `apparat pipeline show <name>` | Render the pipeline as SVG next to the source `.dot`. |
+| `apparat pipeline show <name> [--no-open]` | Render the pipeline as SVG next to the source `.dot` and auto-open it in your OS default viewer; pass `--no-open` to skip. |
 | `apparat pipeline trace <runId> [--node-receive <nodeReceiveId>] [--full]` | Inspect a past run's context + trace logs. |
 | `apparat pipeline explain <name> [nodeId]` | Plain-text topology walkthrough; with `nodeId`, render the agent's prompt skeleton (placeholders, no LLM). |
 | `apparat status [project] [pipeline] [runId]` | Mission control — zoom by appending tokens. |
