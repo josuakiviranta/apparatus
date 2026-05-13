@@ -98,4 +98,42 @@ describe("gcRunScopedArtefactsOnSuccess", () => {
       existsSync(join(project, ".apparat", "meditations", "illuminations", "2026-05-12T0900-keep.md")),
     ).toBe(true);
   });
+
+  it("removes a populated .apparat/meditations/stimuli/.triage/<runId>/ dir", () => {
+    const runId = "meditate-abc12345";
+    const stimuliTriageDir = join(
+      project,
+      ".apparat",
+      "meditations",
+      "stimuli",
+      ".triage",
+      runId,
+    );
+    mkdirSync(stimuliTriageDir, { recursive: true });
+    writeFileSync(join(stimuliTriageDir, "lens.md"), "stimuli notes");
+
+    gcRunScopedArtefactsOnSuccess(project, runId);
+
+    expect(existsSync(stimuliTriageDir)).toBe(false);
+  });
+
+  it("does not touch sibling stimuli/.triage/<otherId>/ dirs", () => {
+    const targetId = "meditate-target";
+    const otherId = "meditate-other";
+    const stimuliTriageRoot = join(
+      project,
+      ".apparat",
+      "meditations",
+      "stimuli",
+      ".triage",
+    );
+    mkdirSync(join(stimuliTriageRoot, targetId), { recursive: true });
+    mkdirSync(join(stimuliTriageRoot, otherId), { recursive: true });
+    writeFileSync(join(stimuliTriageRoot, otherId, "lens.md"), "keep");
+
+    gcRunScopedArtefactsOnSuccess(project, targetId);
+
+    expect(existsSync(join(stimuliTriageRoot, targetId))).toBe(false);
+    expect(existsSync(join(stimuliTriageRoot, otherId))).toBe(true);
+  });
 });
