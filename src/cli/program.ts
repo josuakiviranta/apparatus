@@ -5,6 +5,7 @@ import { fileURLToPath } from "url";
 import { implementCommand } from "./commands/implement";
 import { meditateCommand } from "./commands/meditate";
 import { initCommand } from "./commands/init";
+import { sweepCommand } from "./commands/sweep";
 import { registerHeartbeatCommand } from "./commands/heartbeat";
 import { pipelineRunCommand } from "./commands/pipeline/run.js";
 import { pipelineValidateCommand } from "./commands/pipeline/validate.js";
@@ -122,6 +123,26 @@ Mission control (one verb, zoom by appending tokens):
       const steer = opts["steer"] as string | undefined;
       const variables = opts["var"] as Record<string, string> | undefined;
       await meditateCommand(projectFolder, { steer, variables });
+    });
+
+  program
+    .command("sweep [project-folder]")
+    .description("Interactively review and delete .apparat/ scratch substrates (curated entries warn before delete)")
+    .addHelpText("after", `
+Examples:
+  apparat sweep                  # in cwd
+  apparat sweep my-app           # in ./my-app
+  apparat sweep --dry-run        # list sizes + tags and exit, no prompt
+
+Lists every entry under <project>/.apparat/ with on-disk size and a
+curated/scratch tag. Scratch entries (runs/<runId>/, both .triage/<runId>/,
+sessions/) are pre-selected. Curated entries (illuminations, stimuli,
+pipelines, scenarios, notes.md, lessons, reasoning-memory) prompt for
+confirmation before delete.
+`)
+    .option("--dry-run", "List sizes and exit without prompting")
+    .action(async (projectFolder: string | undefined, opts: { dryRun?: boolean }) => {
+      await sweepCommand(projectFolder ?? process.cwd(), opts);
     });
 
   const pipeline = program.command("pipeline").description("Pipeline engine commands");
