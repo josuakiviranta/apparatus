@@ -88,6 +88,10 @@ export interface RunOptions {
   onStdout?: (stdout: NodeJS.ReadableStream) => Promise<void>;
   /** When provided, appended to the system prompt written to stdin. */
   message?: string;
+  /** When provided, MCP-config and other run-scoped scratch files land in
+   *  <cwd>/.apparat/runs/<runId>/ instead of <cwd>. Required for the
+   *  heartbeat-driven GC introduced in ADR-0016. */
+  runId?: string;
 }
 
 export interface ChildHandle {
@@ -176,9 +180,10 @@ export class Agent {
     return args;
   }
 
-  writeMcpConfig(cwd: string, variables?: Record<string, unknown>): string | null {
+  writeMcpConfig(opts: { cwd: string; runId?: string; variables?: Record<string, unknown> }): string | null {
     if (this.config.mcp.length === 0) return null;
 
+    const { cwd, runId, variables } = opts;
     const expand = (s: string): string => {
       if (!variables) return s;
       return s.replace(/\{\{(\w+)\}\}/g, (match, key) => {
@@ -196,7 +201,11 @@ export class Agent {
       };
     }
 
-    const configPath = path.join(cwd, `.mcp-${this.config.name}-${Date.now()}.json`);
+    const targetDir = runId
+      ? path.join(cwd, ".apparat", "runs", runId)
+      : cwd;
+    fs.mkdirSync(targetDir, { recursive: true });
+    const configPath = path.join(targetDir, `.mcp-${this.config.name}-${Date.now()}.json`);
     fs.writeFileSync(configPath, JSON.stringify({ mcpServers }, null, 2));
     this._mcpConfigPath = configPath;
     return configPath;
@@ -217,7 +226,7 @@ export class Agent {
     const expandedPrompt = this.expandPrompt(options.variables);
 
     // Write MCP config if needed (expand variables in server args)
-    this.writeMcpConfig(options.cwd, options.variables);
+    this.writeMcpConfig({ cwd: options.cwd, runId: options.runId, variables: options.variables });
 
     try {
       const args = this.buildArgs(options);
@@ -374,7 +383,7 @@ export class Agent {
     cwd: string;
     variables?: Record<string, unknown>;
   }): ChildHandle {
-    this.writeMcpConfig(opts.cwd, opts.variables);
+    this.writeMcpConfig({ cwd: opts.cwd, variables: opts.variables });
 
     const args = this.buildInteractiveArgs({
       systemPrompt: opts.systemPrompt,

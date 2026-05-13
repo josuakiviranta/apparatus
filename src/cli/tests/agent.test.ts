@@ -205,7 +205,7 @@ describe("Agent MCP config lifecycle", () => {
 
   it("writeMcpConfig returns null when no MCP servers", () => {
     const agent = new Agent(noMcpConfig);
-    const result = agent.writeMcpConfig("/tmp");
+    const result = agent.writeMcpConfig({ cwd: "/tmp" });
     expect(result).toBeNull();
   });
 
@@ -213,7 +213,7 @@ describe("Agent MCP config lifecycle", () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "agent-mcp-"));
     try {
       const agent = new Agent(mcpConfig);
-      const configPath = agent.writeMcpConfig(tmpDir);
+      const configPath = agent.writeMcpConfig({ cwd: tmpDir });
       expect(configPath).not.toBeNull();
       expect(fs.existsSync(configPath!)).toBe(true);
       const content = JSON.parse(fs.readFileSync(configPath!, "utf-8"));
@@ -230,7 +230,7 @@ describe("Agent MCP config lifecycle", () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "agent-mcp-"));
     try {
       const agent = new Agent(mcpConfig);
-      agent.writeMcpConfig(tmpDir);
+      agent.writeMcpConfig({ cwd: tmpDir });
       agent.cleanupMcpConfig();
       expect(agent.mcpConfigPath).toBeNull();
     } finally {
@@ -242,7 +242,7 @@ describe("Agent MCP config lifecycle", () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "agent-mcp-"));
     try {
       const agent = new Agent(mcpConfig);
-      agent.writeMcpConfig(tmpDir);
+      agent.writeMcpConfig({ cwd: tmpDir });
       const args = agent.buildArgs({ cwd: tmpDir });
       expect(args).toContain("--mcp-config");
       agent.cleanupMcpConfig();
@@ -265,10 +265,13 @@ describe("Agent MCP config lifecycle", () => {
         ],
       };
       const agent = new Agent(varConfig);
-      const configPath = agent.writeMcpConfig(tmpDir, {
-        SERVER_PATH: "/usr/bin/server.js",
-        PROJECT_ROOT: "/my/project",
-        META_DIR: "/my/meditations",
+      const configPath = agent.writeMcpConfig({
+        cwd: tmpDir,
+        variables: {
+          SERVER_PATH: "/usr/bin/server.js",
+          PROJECT_ROOT: "/my/project",
+          META_DIR: "/my/meditations",
+        },
       });
       expect(configPath).not.toBeNull();
       const content = JSON.parse(fs.readFileSync(configPath!, "utf-8"));
@@ -297,9 +300,23 @@ describe("Agent MCP config lifecycle", () => {
         ],
       };
       const agent = new Agent(varConfig);
-      const configPath = agent.writeMcpConfig(tmpDir, { CMD: "tsx" });
+      const configPath = agent.writeMcpConfig({ cwd: tmpDir, variables: { CMD: "tsx" } });
       const content = JSON.parse(fs.readFileSync(configPath!, "utf-8"));
       expect(content.mcpServers.test.command).toBe("tsx");
+      agent.cleanupMcpConfig();
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("writeMcpConfig writes to <cwd>/.apparat/runs/<runId>/ when runId is supplied", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "agent-mcp-runid-"));
+    try {
+      const agent = new Agent(mcpConfig);
+      const configPath = agent.writeMcpConfig({ cwd: tmpDir, runId: "abc-1234" });
+      expect(configPath).not.toBeNull();
+      expect(configPath!).toContain(path.join(".apparat", "runs", "abc-1234"));
+      expect(fs.existsSync(configPath!)).toBe(true);
       agent.cleanupMcpConfig();
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });

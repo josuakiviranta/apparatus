@@ -34,6 +34,10 @@ export interface HandlerExecutionContext {
   onValidationRetryStart?: (nodeId: string, attempt: number) => void;
   /** Absolute path to the project root — used for project-local agent resolution */
   projectDir?: string;
+  /** Run identifier propagated from the pipeline runner. Handlers that spawn
+   *  agents must forward this into RunOptions so MCP-config and other
+   *  run-scoped scratch land under runs/<runId>/. See ADR-0016. */
+  runId?: string;
 }
 
 export interface NodeHandler {

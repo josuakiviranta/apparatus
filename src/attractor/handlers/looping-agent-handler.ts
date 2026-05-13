@@ -75,7 +75,7 @@ export class LoopingAgentHandler implements NodeHandler {
         ? { ...baseAgentVariables, prev_note: prevNote }
         : baseAgentVariables;
 
-      let result = await agent.run({ cwd, signal, variables: iterVariables, onStdout });
+      let result = await agent.run({ cwd, signal, variables: iterVariables, onStdout, runId: meta.runId });
       iteration++;
       if (result.sessionId) lastSessionId = result.sessionId;
 
@@ -117,6 +117,7 @@ export class LoopingAgentHandler implements NodeHandler {
           const retryResult = await agent.run({
             cwd, signal, variables: iterVariables, onStdout,
             resume: lastSessionId, message: corrective,
+            runId: meta.runId,
           });
           result = retryResult;
           if (retryResult.sessionId) lastSessionId = retryResult.sessionId;

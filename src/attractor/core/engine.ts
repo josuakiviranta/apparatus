@@ -258,6 +258,7 @@ export async function runPipeline(graph: Graph, opts: EngineOptions): Promise<Pi
       },
       onValidationRetryStart: opts.onValidationRetryStart,
       projectDir: opts.project,
+      runId,
     };
     let outcome: Outcome;
     if (handlerType === "conditional") {

@@ -2,6 +2,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Agent, type AgentConfig } from "../lib/agent.js";
 import { EventEmitter } from "node:events";
 import { Readable } from "node:stream";
+import { mkdtempSync, rmSync, readdirSync } from "fs";
+import { join } from "path";
+import { tmpdir } from "os";
 
 // Mock child_process
 vi.mock("node:child_process", () => ({
@@ -161,6 +164,69 @@ describe("Agent.run", () => {
     const agent = new Agent(baseConfig);
     const result = await agent.run({ cwd: "/tmp/project" });
     expect(result.exitCode).toBe(1);
+  });
+
+  it("writes MCP config into <cwd>/.apparat/runs/<runId>/ when runId is supplied", async () => {
+    const child = createMockChild(0);
+    mockSpawn.mockReturnValue(child);
+
+    const tmp = mkdtempSync(join(tmpdir(), "apparat-mcp-relocate-"));
+    try {
+      const mcpAgent = new Agent({
+        ...baseConfig,
+        mcp: [{ name: "fake", command: "node", args: ["-e", "process.exit(0)"] }],
+      });
+      const result = await mcpAgent.run({
+        cwd: tmp,
+        runId: "test-run-id",
+        variables: { PROJECT: "my-app" },
+      });
+      expect(result.exitCode).toBe(0);
+
+      // cleanupMcpConfig() in finally removes the file before the test sees it,
+      // so assert location via spawn args (the path is set before cleanup).
+      const callArgs = mockSpawn.mock.calls.at(-1)?.[1] as string[] | undefined;
+      const idx = callArgs?.indexOf("--mcp-config") ?? -1;
+      expect(idx).toBeGreaterThanOrEqual(0);
+      const mcpPath = callArgs![idx + 1];
+      // Old behaviour would have written .mcp-runner-<ts>.json at tmp root.
+      // New behaviour writes it under .apparat/runs/test-run-id/.
+      const runDir = join(tmp, ".apparat", "runs", "test-run-id");
+      expect(mcpPath.startsWith(runDir)).toBe(true);
+      expect(/\.mcp-runner-\d+\.json$/.test(mcpPath)).toBe(true);
+      // Confirm the runs/<runId>/ directory was created (mkdirSync recursive).
+      expect(readdirSync(join(tmp, ".apparat", "runs")).includes("test-run-id")).toBe(true);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("writes MCP config at cwd root (back-compat) when runId is omitted", async () => {
+    const child = createMockChild(0);
+    mockSpawn.mockReturnValue(child);
+
+    const tmp = mkdtempSync(join(tmpdir(), "apparat-mcp-legacy-"));
+    try {
+      const mcpAgent = new Agent({
+        ...baseConfig,
+        mcp: [{ name: "fake", command: "node", args: ["-e", "process.exit(0)"] }],
+      });
+      const result = await mcpAgent.run({
+        cwd: tmp,
+        variables: { PROJECT: "my-app" },
+      });
+      expect(result.exitCode).toBe(0);
+      // cleanupMcpConfig() in finally removes the file — assertion via spawn args.
+      const callArgs = mockSpawn.mock.calls.at(-1)?.[1] as string[] | undefined;
+      const idx = callArgs?.indexOf("--mcp-config") ?? -1;
+      expect(idx).toBeGreaterThanOrEqual(0);
+      const mcpPath = callArgs![idx + 1];
+      // Path lives at cwd root, not under runs/<runId>/.
+      expect(mcpPath.startsWith(tmp)).toBe(true);
+      expect(mcpPath).not.toMatch(/\.apparat[\\\/]runs/);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
   });
 });
 
