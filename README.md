@@ -234,6 +234,13 @@ npm run build      # tsup → dist/
 npm link           # test apparat binary locally
 ```
 
+> **Troubleshooting.** Earlier `apparat-cli` releases occasionally emitted
+> `MaxPerformanceEntryBufferExceededWarning` after a long-idle interactive
+> chat. This was bundle-config drift (the React dev reconciler shipped),
+> not a real leak — fixed in this release. If the warning reappears against
+> a current build, the `onSuccess` regression scan in `tsup.config.ts`
+> should already have failed the build; see ADR-0017.
+
 ## Decisions
 
 See [`docs/adr/`](docs/adr/) for accepted decision records.
