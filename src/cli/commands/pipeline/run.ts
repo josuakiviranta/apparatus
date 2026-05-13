@@ -30,6 +30,7 @@ import { classifyNode } from "../../lib/classifyNode.js";
 import { parseClaudeEvent } from "../../lib/parseClaudeEvent.js";
 import { loadPipeline, PipelineLoadError, type LoadedPipeline } from "../pipeline-invocation.js";
 import { gcOldRunsPerPipeline, gcRunScopedArtefactsOnSuccess, resolveResumeLogsRoot } from "./runs-gc.js";
+import { preventSleep } from "../../../lib/prevent-sleep.js"; // src/lib (shared), not src/cli/lib
 
 export interface PipelineRunOptions {
   project?: string;
@@ -41,6 +42,7 @@ export interface PipelineRunOptions {
 }
 
 export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptions = {}): Promise<void> {
+  preventSleep();
   let loaded: LoadedPipeline;
   try {
     loaded = await loadPipeline(dotFile, { project: opts.project });

@@ -27,6 +27,7 @@ vi.mock("child_process", () => ({
     stdout: { on: vi.fn() },
     stderr: { on: vi.fn() },
     on: vi.fn((event: string, cb: () => void) => { if (event === "close") cb(); }),
+    unref: vi.fn(),
   })),
   spawnSync: vi.fn(() => ({ status: 0, stdout: "main\n" })),
 }));

@@ -212,6 +212,23 @@ Inside each iteration, the agent runs `git diff --stat $capture_pre_sha_pre_sha 
 
 The diff guard is **agent-driven**, not handler-side. The looping handler at `src/attractor/handlers/looping-agent-handler.ts:151` continues to trust the `done` field as-is. Forcing `done=false` from the handler would break the deep-loop public contract for every other agent that uses the looping handler. Keeping the policy in the agent prompt also keeps it readable and tweakable per pipeline (e.g. allow no-op for doc-only plans by editing the `.md`, not TypeScript). The pre-SHA capture stays out of the prose precisely because it's a deterministic side-effect, not a policy.
 
+## Sleep behaviour (macOS)
+
+Every `apparat pipeline run` (and `apparat implement` / `apparat meditate` /
+`apparat heartbeat`-scheduled run, all of which re-enter the same command)
+blocks system sleep for the lifetime of the engine process. The macOS
+`caffeinate -is -w <pid>` binary is spawned as a sibling and watches the
+engine PID; when the engine exits, caffeinate exits and the no-sleep
+assertion is released. Display sleep is not blocked — the screen can go
+black while the system stays awake.
+
+This is always on; there is no flag to disable it. macOS user logout
+(Apple menu → Log Out) is still terminal: the per-user `launchd` reaps
+the daemon. Lock the screen instead of logging out for overnight runs.
+
+Linux and Windows have no sleep protection today; the seam is stubbed
+for future expansion. See `docs/adr/0018-prevent-system-sleep-during-pipeline-runs.md`.
+
 ## Stopping the loop
 
 Press `Ctrl+C`. apparat cleanly terminates its own claude subprocess without affecting any other running claude sessions.
