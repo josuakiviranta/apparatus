@@ -43,6 +43,27 @@ A project is "apparat-shaped" when it has a `.apparat/` folder at root:
 └── docs/adr/                  ← decision records
 ```
 
+## Preflight discipline
+
+Every command that writes durable side-effects to a `<project>` path must
+**orient before writing**:
+
+1. Refuse paths that are not apparat-shaped. Hard-refuse paths whose basename
+   is `.apparat` (a typo or autocomplete slip pointed you at the project's
+   internal folder).
+2. Require at least one shape signal at the path: `VISION.md`, `CONTEXT.md`,
+   `.apparat/`, or `.git/`. Otherwise refuse with "did you mean its parent?".
+3. Sweep stale run folders (`<project>/.apparat/runs/<runId>/` with heartbeat
+   ≥ 5 min old) before writing new scratch. See ADR-0016.
+
+The helper for steps 1+2 is `assertApparatShape(absPath)` from
+`src/cli/lib/pipeline-bootstrap.ts`. Import it; do not re-derive the predicate.
+
+The helper for step 3 is `gcStaleRuns(projectFolder)` from the same module.
+It is already called inside `Agent.run`, so any command that spawns an agent
+cooperates with the sweep automatically; commands that write scratch outside
+the agent path (rare) should call it explicitly.
+
 ## Authoring or modifying pipelines — read the live reference FIRST
 
 The deep authoring reference (DSL syntax, frontmatter schemas, validator rules, worked examples) lives **inside the installed `apparat-cli` npm package** so it always matches the user's pinned CLI version. **Do not skip this step** — pipeline syntax is strict and the validator will reject malformed graphs.
