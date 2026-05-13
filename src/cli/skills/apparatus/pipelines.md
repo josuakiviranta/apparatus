@@ -56,7 +56,8 @@ Whenever the work needs LLM reasoning — drafting, judging, summarising, transf
 |---|---|---|---|
 | `name` | string | yes | Must equal `<name>` |
 | `description` | string | yes | One-line purpose |
-| `model` | `opus` \| `sonnet` \| `haiku` | yes | Claude tier |
+| `model` | `opus` \| `sonnet` \| `haiku` | yes | Claude tier. Required — no default. |
+| `thinking` | `off` \| `low` \| `high` | no | Categorical thinking budget. Default `off`. Plumbed to the spawned Claude CLI via `CLAUDE_THINKING_BUDGET`. |
 | `inputs` | list of keys | no | Keys this agent expects in scope (validator checks producers exist upstream) |
 | `outputs` | object | no | Keys this agent emits as final-text JSON. Boolean shorthand: `outputs: { done: boolean }` is equivalent to `outputs: { done: { type: "boolean" } }` |
 | `loop` | boolean | no | Enables deep-loop mode (§6) |
@@ -104,6 +105,7 @@ digraph minimal_agent_demo {
 name: drafter
 description: Drafts a one-paragraph summary of the input topic
 model: sonnet
+thinking: off
 inputs:
   - topic
 outputs:
@@ -113,6 +115,8 @@ Read $topic. Emit a one-paragraph summary as your FINAL TEXT response in this ex
 
 {"summary": "..."}
 ```
+
+For the rubric on which tier to pick, see SKILL.md's "Choosing model + thinking" section.
 
 ### Common pitfalls
 - `loop: true` without a `done: boolean` field → validator error `loop_missing_done_field`.
@@ -261,6 +265,7 @@ Long autonomous work where the agent must walk a backlog one item at a time — 
 name: my-deep-agent
 description: Iterates until the work stack is empty
 model: opus
+thinking: high          # optional: off | low | high
 loop: true              # required
 outputs:
   done: boolean         # required when loop: true

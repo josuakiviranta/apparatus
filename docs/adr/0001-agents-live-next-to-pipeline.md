@@ -57,3 +57,12 @@ options, the bundled-agents dir lookup in `assets.ts`, and the
   agents exist for a pipeline, `ls <pipeline-folder>/*.md`.
 - A future need for shared agents would require redesigning and
   reintroducing a registry — supersede this ADR if that happens.
+
+## 2026-05-14 amendment
+
+Agent frontmatter now requires an explicit `model:` field (enum: `opus`, `sonnet`, `haiku`).
+The previous silent `opus` default has been removed. An optional `thinking:` field
+(enum: `off`, `low`, `high`) plumbs the categorical thinking budget through to the
+spawned Claude CLI via the `CLAUDE_THINKING_BUDGET` env var. See
+[the model+thinking design](../superpowers/specs/2026-05-14-model-and-thinking-as-first-class-frontmatter-design.md)
+and [pipelines.md §3](../../src/cli/skills/apparatus/pipelines.md) for the rubric.

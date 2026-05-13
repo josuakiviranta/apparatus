@@ -172,6 +172,7 @@ agent walking an implementation plan one chunk at a time — opt in by adding
 name: my-deep-agent
 description: Iterates until the work stack is empty.
 model: opus
+thinking: high
 loop: true
 outputs:
   done: boolean
