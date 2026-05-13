@@ -92,7 +92,7 @@ Check a pipeline for structural errors and `portability_heuristic` warnings (har
 ```bash
 apparat pipeline show <pipeline.dot>
 ```
-Render the pipeline as an SVG next to the source `.dot` file. Useful for sharing topology snapshots or eyeballing branching structure.
+Render the pipeline as an SVG next to the source `.dot` file and auto-open it in your OS default SVG viewer. Pass `--no-open` to skip the auto-open (useful in scripts or non-interactive shells; the default already skips when stdout is not a TTY). Pass `--open` to force the auto-open even when stdout is piped. Useful for sharing topology snapshots or eyeballing branching structure.
 
 ```bash
 apparat pipeline explain <pipeline> [nodeId]
