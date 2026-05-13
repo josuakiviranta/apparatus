@@ -44,10 +44,6 @@ digraph illumination_to_implementation {
 
   tmux_confirm_gate [shape=hexagon]
 
-  memory_writer [agent="memory-writer", default_test_result="", default_test_summary="", default_illumination_path=""]
-
-  memory_reflector [agent="memory-reflector", default_illumination_path=""]
-
   done [shape=Msquare]
 
   // ── Routing: Phase 1 ─────────────────────────────────────────────────────
@@ -88,14 +84,11 @@ digraph illumination_to_implementation {
 
   implement -> implement           [condition="implement.success=false"]
   implement -> review_gate
-  review_gate -> memory_writer     [label="Approve"]
+  review_gate -> done              [label="Approve"]
   review_gate -> tmux_tester       [label="Tmux"]
   review_gate -> implement         [label="Retry"]
 
   tmux_tester -> tmux_confirm_gate
-  tmux_confirm_gate -> memory_writer [label="Commit"]
+  tmux_confirm_gate -> done        [label="Commit"]
   tmux_confirm_gate -> tmux_tester [label="Retry"]
-
-  memory_writer -> memory_reflector
-  memory_reflector -> done
 }

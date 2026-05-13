@@ -1,7 +1,6 @@
 // Head + tail copied from .apparat/pipelines/illumination-to-implementation/pipeline.dot
 // (verifier, chat loop, approval gate, design_writer, plan_writer at head; tmux_tester +
-// memory_writer + memory_reflector at tail). Keep in sync until parallel-impl is promoted
-// into illumination-to-implementation directly.
+// tmux_confirm_gate at tail).
 digraph parallel_illumination_to_implementation {
   goal="Triage an illumination into an approved plan, then ship it through DAG-scheduled parallel implementation"
   headless_safe=false
@@ -52,10 +51,6 @@ digraph parallel_illumination_to_implementation {
 
   tmux_confirm_gate [shape=hexagon]
 
-  memory_writer [agent="memory-writer", default_test_result="", default_test_summary="", default_illumination_path=""]
-
-  memory_reflector [agent="memory-reflector", default_illumination_path=""]
-
   done [shape=Msquare]
 
   // ── Routing: Phase 1 ─────────────────────────────────────────────────────
@@ -103,9 +98,6 @@ digraph parallel_illumination_to_implementation {
   // ── Routing: Phase 3 ─────────────────────────────────────────────────────
   // No review_gate — orchestrator/resolver feed tmux_tester directly per design.
   tmux_tester -> tmux_confirm_gate
-  tmux_confirm_gate -> memory_writer [label="Commit"]
+  tmux_confirm_gate -> done          [label="Commit"]
   tmux_confirm_gate -> tmux_tester   [label="Retry"]
-
-  memory_writer -> memory_reflector
-  memory_reflector -> done
 }

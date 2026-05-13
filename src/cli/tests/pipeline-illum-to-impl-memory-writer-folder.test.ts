@@ -1,48 +1,70 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const REPO_ROOT = resolve(__dirname, "../../..");
-const MEMORY_WRITER_MD = join(
-  REPO_ROOT,
-  ".apparat",
-  "pipelines",
-  "illumination-to-implementation",
-  "memory-writer.md",
-);
 
-describe(".apparat/pipelines/illumination-to-implementation/memory-writer.md — Warnings cross-check", () => {
-  const md = readFileSync(MEMORY_WRITER_MD, "utf-8");
+function pipelineDot(folder: string): string {
+  return readFileSync(
+    join(REPO_ROOT, ".apparat", "pipelines", folder, "pipeline.dot"),
+    "utf-8",
+  );
+}
 
-  it("declares Step 4a between Step 4 and Step 5", () => {
-    expect(md).toMatch(/4a\./);
-    const idx4 = md.indexOf("4. **Write the memory file");
-    const idx4a = md.indexOf("4a.");
-    const idx5 = md.indexOf("5. **Commit any pending work");
-    expect(idx4).toBeGreaterThan(-1);
-    expect(idx4a).toBeGreaterThan(idx4);
-    expect(idx5).toBeGreaterThan(idx4a);
+describe("PR1 sessions kill — illumination-to-implementation rewire", () => {
+  const dot = pipelineDot("illumination-to-implementation");
+
+  it("removes the memory_writer node declaration", () => {
+    expect(dot).not.toMatch(/^\s*memory_writer\s*\[/m);
   });
 
-  it("Step 4a defines the four no-op substrings to scan", () => {
-    expect(md).toContain("no in-scope diff");
-    expect(md).toContain("nothing to verify");
-    expect(md).toContain("implement node committed only");
-    expect(md).toContain("no_diff_produced");
+  it("removes the memory_reflector node declaration", () => {
+    expect(dot).not.toMatch(/^\s*memory_reflector\s*\[/m);
   });
 
-  it("Step 4a scans tmux_tester.test_summary case-insensitively and prepends ## Warnings", () => {
-    expect(md).toMatch(/\$tmux_tester\.test_summary/);
-    expect(md).toMatch(/case-insensitive/i);
-    expect(md).toMatch(/##\s*Warnings/);
+  it("removes any memory_writer / memory_reflector edges", () => {
+    expect(dot).not.toMatch(/memory_writer\b/);
+    expect(dot).not.toMatch(/memory_reflector\b/);
   });
 
-  it("Warnings section is prepended BEFORE ## What was implemented", () => {
-    expect(md).toMatch(/before\s+`?##\s*What was implemented`?/i);
+  it('routes review_gate -> done [label="Approve"]', () => {
+    expect(dot).toMatch(/review_gate\s*->\s*done\s*\[label="Approve"\]/);
   });
 
-  it("Step 7 pre-check on tmux_tester.test_result=fail is unchanged", () => {
-    expect(md).toMatch(/tmux_tester_test_result.*"fail"/);
-    expect(md).toMatch(/skip both 7a and 7b entirely/);
+  it('routes tmux_confirm_gate -> done [label="Commit"]', () => {
+    expect(dot).toMatch(/tmux_confirm_gate\s*->\s*done\s*\[label="Commit"\]/);
+  });
+
+  it("memory-writer.md and memory-reflector.md are deleted", () => {
+    const folder = join(REPO_ROOT, ".apparat", "pipelines", "illumination-to-implementation");
+    expect(existsSync(join(folder, "memory-writer.md"))).toBe(false);
+    expect(existsSync(join(folder, "memory-reflector.md"))).toBe(false);
+  });
+});
+
+describe("PR1 sessions kill — parallel-illumination-to-implementation rewire", () => {
+  const dot = pipelineDot("parallel-illumination-to-implementation");
+
+  it("removes the memory_writer node declaration", () => {
+    expect(dot).not.toMatch(/^\s*memory_writer\s*\[/m);
+  });
+
+  it("removes the memory_reflector node declaration", () => {
+    expect(dot).not.toMatch(/^\s*memory_reflector\s*\[/m);
+  });
+
+  it("removes any memory_writer / memory_reflector edges", () => {
+    expect(dot).not.toMatch(/memory_writer\b/);
+    expect(dot).not.toMatch(/memory_reflector\b/);
+  });
+
+  it('routes tmux_confirm_gate -> done [label="Commit"]', () => {
+    expect(dot).toMatch(/tmux_confirm_gate\s*->\s*done\s*\[label="Commit"\]/);
+  });
+
+  it("memory-writer.md and memory-reflector.md are deleted", () => {
+    const folder = join(REPO_ROOT, ".apparat", "pipelines", "parallel-illumination-to-implementation");
+    expect(existsSync(join(folder, "memory-writer.md"))).toBe(false);
+    expect(existsSync(join(folder, "memory-reflector.md"))).toBe(false);
   });
 });
