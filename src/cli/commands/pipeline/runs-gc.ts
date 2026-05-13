@@ -93,20 +93,26 @@ export function gcOldRunsPerPipeline(runsRoot: string, retention: GcRetention): 
 }
 
 /**
- * Tail GC for two run-scoped scratch paths, fired only on a green pipeline
- * outcome (see ADR-0015 + design 2026-05-12-pipeline-write-consume-pairing).
+ * Tail GC for three run-scoped scratch paths, fired only on a green pipeline
+ * outcome (see ADR-0015 + designs
+ * 2026-05-12-pipeline-write-consume-pairing and
+ * 2026-05-13-adr-0015-failure-half-has-no-reaper-and-sessions-misclassified).
  *
  *   <project>/.apparat/runs/<runId>/
  *   <project>/.apparat/meditations/illuminations/.triage/<runId>/
+ *   <project>/.apparat/meditations/stimuli/.triage/<runId>/
  *
  * `force: true` makes a missing path a silent no-op so pipelines that never
- * invoke chat-summarizer (no .triage/<runId>/ written) do not error here.
+ * invoke chat-summarizer (no illuminations/.triage/<runId>/ written) and
+ * pipelines that do not produce stimuli/.triage/<runId>/ do not error here.
  */
 export function gcRunScopedArtefactsOnSuccess(project: string, runId: string): void {
   const runDir = join(project, ".apparat", "runs", runId);
-  const triageDir = join(project, ".apparat", "meditations", "illuminations", ".triage", runId);
+  const illumTriageDir = join(project, ".apparat", "meditations", "illuminations", ".triage", runId);
+  const stimuliTriageDir = join(project, ".apparat", "meditations", "stimuli", ".triage", runId);
   rmSync(runDir, { recursive: true, force: true });
-  rmSync(triageDir, { recursive: true, force: true });
+  rmSync(illumTriageDir, { recursive: true, force: true });
+  rmSync(stimuliTriageDir, { recursive: true, force: true });
 }
 
 function safeMtime(path: string): number {
