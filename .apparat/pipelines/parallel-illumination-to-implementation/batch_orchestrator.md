@@ -2,7 +2,7 @@
 name: batch_orchestrator
 description: Drive one batch of parallel chunk implementation per iteration; orchestrator owns dag.json mutation and merge decisions
 model: opus
-thinking: off
+thinking: high
 permissionMode: dangerouslySkipPermissions
 tools: []
 mcp: []
@@ -15,7 +15,17 @@ inputs:
 outputs:
   done: boolean
   conflicts_present: boolean
-  reason: {enum: [no_chunks_remaining, conflicts_to_resolve, no_diff_produced, stuck, ""]}
+  reason:
+    {
+      enum:
+        [
+          no_chunks_remaining,
+          conflicts_to_resolve,
+          no_diff_produced,
+          stuck,
+          "",
+        ],
+    }
 ---
 
 # Mission
@@ -53,7 +63,7 @@ Each iteration runs in a fresh context window. Per-iteration state lives in `dag
 7. **Aggregate subagent results.** Each subagent returns a JSON object per the template's "Procedure step 7". Parse each result:
    - On `success=true` AND `tests_in_worktree_passed=true`: set `status = "green"`, `head_sha = <result.head_sha>`. Worktree stays in place for the merge step.
    - On `success=false` OR `tests_in_worktree_passed=false`: set `status = "conflicted"`, record `conflict_files = ["<summary>"]` (the subagent's prose summary serves as a marker; the resolver can re-attempt the merge to recreate real conflict markers).
-   Write `dag.json` back after each result is recorded.
+     Write `dag.json` back after each result is recorded.
 
 8. **Topologically merge.** For each chunk in this batch with `status = "green"`, in topological order (resolve by `depends_on`):
    - `git -C $project merge --no-ff <chunk.branch> -m "merge: <chunk.title>"`.

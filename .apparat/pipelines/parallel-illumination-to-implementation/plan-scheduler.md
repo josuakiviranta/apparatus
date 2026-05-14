@@ -2,7 +2,7 @@
 name: plan-scheduler
 description: Parse a chunked implementation plan and emit a topological DAG over chunks for parallel execution
 model: opus
-thinking: off
+thinking: high
 permissionMode: dangerouslySkipPermissions
 tools:
   - Read
@@ -28,7 +28,7 @@ Parse the chunked implementation plan at `$plan_writer_plan_path`, compute a top
 
 2. **Parse chunks.** Find every `## Chunk N: <title>` heading (regex `^##\s+Chunk\s+(\d+):\s+(.+)$`, multiline). For each chunk, capture the body (everything between this heading and the next chunk heading, or end-of-file for the last).
 
-3. **Extract `files_touched` per chunk.** For each chunk body, find every `- Create: \`<path>\``, `- Modify: \`<path>\``, or `- Test: \`<path>\`` line (regex `^\s*-\s+(?:Create|Modify|Test):\s+\`([^\`]+)\``, multiline). Collect the paths.
+3. **Extract `files_touched` per chunk.** For each chunk body, find every `- Create: \`<path>\``, `- Modify: \`<path>\``, or `- Test: \`<path>\``line (regex`^\s\*-\s+(?:Create|Modify|Test):\s+\`([^\`]+)\``, multiline). Collect the paths.
 
 4. **Compute `depends_on`.** For chunk B at index i: for each chunk A at index j < i, if `A.files_touched ∩ B.files_touched` is non-empty, append A's id to B's `depends_on`. Chunk ids are `c1`, `c2`, … in textual order. If B has empty `files_touched`, set `depends_on = [c1, c2, …, c{i}]` (every previous chunk) and emit a warning in your final text response.
 
@@ -82,7 +82,7 @@ Parse the chunked implementation plan at `$plan_writer_plan_path`, compute a top
 - Read-only on source code. Your only writes are `<plan_path>.dag.json` and the optional `.gitignore` append.
 - No LLM creativity in the DAG construction — the algorithm is mechanical. If you find yourself "interpreting" a chunk's intent to guess dependencies, stop: stick to literal `Files:` stanza overlap.
 - If the plan has zero chunks, emit `{ "dag_path": "<path>" }` with an empty `chunks` array in the file.
-- Warnings (e.g. "chunk c2 has no files_touched") go in your text response *before* the final JSON, not inside the JSON.
+- Warnings (e.g. "chunk c2 has no files_touched") go in your text response _before_ the final JSON, not inside the JSON.
 
 # Output
 

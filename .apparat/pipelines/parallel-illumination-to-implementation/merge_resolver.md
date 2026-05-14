@@ -2,7 +2,7 @@
 name: merge_resolver
 description: Resolve one conflicted chunk per iteration by re-creating the conflict and dispatching a Sonnet subagent for the resolution
 model: opus
-thinking: off
+thinking: high
 permissionMode: dangerouslySkipPermissions
 tools: []
 mcp: []

@@ -8,6 +8,10 @@ interface Props {
   disabled?: boolean;
   placeholder?: string;
   focus?: boolean;
+  // Columns already consumed on the same row by adjacent siblings (e.g. a
+  // "> " prefix renders at width 2). TextInput subtracts this from
+  // process.stdout.columns when computing its sliding view window.
+  prefixWidth?: number;
 }
 
 export function TextInput({
@@ -17,6 +21,7 @@ export function TextInput({
   disabled = false,
   placeholder = "",
   focus = true,
+  prefixWidth = 0,
 }: Props) {
   // Internal state drives rendering; external `value` prop syncs in via useEffect.
   // This avoids stale-closure issues when multiple keystrokes arrive in one React
@@ -101,15 +106,58 @@ export function TextInput({
     );
   }
 
-  const before = internal.slice(0, cursor);
-  const at = internal.slice(cursor, cursor + 1) || " ";
-  const after = internal.slice(cursor + 1);
+  const N = internal.length;
+  // Treat the cursor's resting position past EOL as index N: the inverse
+  // block occupies one cell even when there's no character there.
+  const logicalLen = N + 1;
+
+  const columns = process.stdout.columns ?? 80;
+  const reserve = 1; // block cursor at EOL
+  const budgetGross = Math.max(10, columns - prefixWidth - reserve);
+
+  // Anchor the window so the cursor sits ~70% across the visible width:
+  // typing past the right edge feels like the line scrolls under the cursor
+  // (address-bar UX from the approved explainer).
+  const VIEW_CURSOR_RATIO = 0.7;
+  let viewStart = Math.max(0, cursor - Math.floor(budgetGross * VIEW_CURSOR_RATIO));
+  viewStart = Math.min(viewStart, Math.max(0, logicalLen - budgetGross));
+  let viewEnd = Math.min(logicalLen, viewStart + budgetGross);
+
+  // Provisional indicator decision against the gross window.
+  let leftMarker = viewStart > 0;
+  let rightMarker = viewEnd < logicalLen;
+
+  // Indicators steal one column each. Re-anchor so the cursor stays in view
+  // when the window was right-pinned.
+  const budgetNet =
+    budgetGross - (leftMarker ? 1 : 0) - (rightMarker ? 1 : 0);
+  viewStart = Math.min(viewStart, Math.max(0, logicalLen - budgetNet));
+  viewEnd = Math.min(logicalLen, viewStart + budgetNet);
+
+  // Markers can flip after the re-anchor — recompute against the net window.
+  leftMarker = viewStart > 0;
+  rightMarker = viewEnd < logicalLen;
+
+  // Slice the three segments against the net view window.
+  const beforeStart = Math.max(viewStart, 0);
+  const beforeEnd = Math.min(cursor, viewEnd);
+  const beforeSlice = internal.slice(beforeStart, beforeEnd);
+
+  const cursorChar = internal.slice(cursor, cursor + 1) || " ";
+  const cursorVisible = cursor >= viewStart && cursor < viewEnd;
+  const atSlice = cursorVisible ? cursorChar : "";
+
+  const afterStart = Math.max(cursor + 1, viewStart);
+  const afterEnd = Math.min(N, viewEnd);
+  const afterSlice = afterStart < afterEnd ? internal.slice(afterStart, afterEnd) : "";
 
   return (
     <Box>
-      <Text>{before}</Text>
-      <Text inverse>{at}</Text>
-      <Text>{after}</Text>
+      {leftMarker ? <Text dimColor>{"\u2039"}</Text> : null}
+      <Text>{beforeSlice}</Text>
+      <Text inverse>{atSlice || " "}</Text>
+      <Text>{afterSlice}</Text>
+      {rightMarker ? <Text dimColor>{"\u203A"}</Text> : null}
     </Box>
   );
 }

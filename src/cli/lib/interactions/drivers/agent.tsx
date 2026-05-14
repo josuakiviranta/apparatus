@@ -29,6 +29,7 @@ export const agentDriver: InteractionDriver<"interactive-agent"> = {
       <Box>
         <Text color="gray">{"> "}</Text>
         <TextInput
+          prefixWidth={2}
           value={ctx.inputBuffer}
           onChange={ctx.onInputChange}
           onSubmit={ctx.onInputSubmit}

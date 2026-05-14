@@ -73,4 +73,69 @@ describe("TextInput", () => {
     await delay();
     expect(lastFrame()).toContain("abXc");
   });
+
+  // Strip SGR escapes so `.length` reflects rendered cells, not bytes.
+  // Inlined (rather than depending on `strip-ansi`) because the codebase
+  // has no other use case and adding a dep for one assertion is wasteful.
+  const stripAnsi = (s: string): string =>
+    // eslint-disable-next-line no-control-regex
+    s.replace(/\u001b\[[0-9;]*m/g, "");
+
+  it("clips the rendered row to terminal width minus prefix", async () => {
+    const cols = process.stdout.columns ?? 80;
+    const prefixWidth = 4;
+    const availableCols = Math.max(10, cols - prefixWidth - 1);
+    const bound = availableCols + prefixWidth;
+
+    const { lastFrame } = render(
+      <TextInput
+        value={"a".repeat(200)}
+        prefixWidth={prefixWidth}
+        onChange={() => {}}
+        onSubmit={() => {}}
+      />,
+    );
+    await delay();
+    const lines = stripAnsi(lastFrame() ?? "").split("\n");
+    for (const line of lines) {
+      expect(line.length).toBeLessThanOrEqual(bound);
+    }
+    // Inverse-block cursor must still be visible after clipping. Under
+    // FORCE_COLOR=0 (vitest.config.ts) Ink strips SGR escapes, so the
+    // cursor cell renders as its raw character (" " at EOL). The cursor
+    // is visible iff the rendered row ends with the EOL space cell.
+    const rendered = stripAnsi(lastFrame() ?? "");
+    expect(rendered).toMatch(/ ›$|a $/m);
+  });
+
+  it("shows a left indicator (‹) when the view is scrolled past the start", async () => {
+    // 200-char buffer with a small prefix forces viewStart > 0 because the
+    // cursor lands at EOL (length 200) and the 70%-anchor pulls the window
+    // right of column 0.
+    const { lastFrame } = render(
+      <TextInput
+        value={"b".repeat(200)}
+        prefixWidth={2}
+        onChange={() => {}}
+        onSubmit={() => {}}
+      />,
+    );
+    await delay();
+    expect(lastFrame()).toContain("\u2039");
+  });
+
+  it("shows a right indicator (›) when content extends past the visible window", async () => {
+    const { stdin, lastFrame } = render(
+      <TextInput
+        value={"c".repeat(200)}
+        prefixWidth={2}
+        onChange={() => {}}
+        onSubmit={() => {}}
+      />,
+    );
+    // Ctrl-A jumps the cursor home; the long tail must then sit past viewEnd.
+    stdin.write("\u0001"); // Ctrl-A
+    await delay();
+    expect(lastFrame()).toContain("\u203A");
+  });
 });
