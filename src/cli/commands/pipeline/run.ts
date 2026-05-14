@@ -130,17 +130,21 @@ export async function pipelineRunCommand(dotFile: string, opts: PipelineRunOptio
     process.exit(1);
   }
 
-  const runId = opts.runId ?? newRunId(loaded.graph.name);
   const runsRoot = runsDir(opts.project ?? process.cwd());
+  // Resolve resume dir first so runId can be derived from its basename —
+  // otherwise inspect:/resume: footer lines and engine-tagged pipeline.jsonl
+  // events diverge from the on-disk run dir (phantom-id bug).
+  const resumedDir = opts.resume ? resolveResumeLogsRoot(runsRoot, opts.resume) : null;
+  const runId = opts.runId
+    ?? (resumedDir ? resumedDir.split("/").pop()! : newRunId(loaded.graph.name));
   let logsRoot: string;
   if (opts.logsRoot) {
     logsRoot = opts.logsRoot;
-  } else if (opts.resume) {
-    const resolved = resolveResumeLogsRoot(runsRoot, opts.resume);
-    // resolved === null means 0 prior runs; engine.ts handles "no checkpoint"
-    // warning when --resume hits an empty logsRoot.
-    logsRoot = resolved ?? join(runsRoot, runId);
+  } else if (resumedDir) {
+    logsRoot = resumedDir;
   } else {
+    // resume with 0 prior runs falls through here; engine.ts handles
+    // "no checkpoint" warning when --resume hits an empty logsRoot.
     logsRoot = join(runsRoot, runId);
   }
   // The runner owns the mkdir (was previously done asynchronously by engine.ts:168)
