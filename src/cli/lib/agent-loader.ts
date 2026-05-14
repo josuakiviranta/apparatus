@@ -23,6 +23,8 @@ export function extractAgentMetadata(config: AgentConfig): AgentMetadata {
   return {
     inputs: Array.isArray(config.inputs) ? config.inputs : [],
     outputs: config.outputs ? Object.keys(config.outputs) : [],
+    model: config.model,
+    ...(config.thinking !== undefined ? { thinking: config.thinking } : {}),
   };
 }
 

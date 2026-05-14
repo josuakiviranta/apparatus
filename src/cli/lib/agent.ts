@@ -79,6 +79,8 @@ export interface AgentConfig {
 export interface AgentMetadata {
   inputs: string[];
   outputs: string[];
+  model: AgentModel;
+  thinking?: AgentThinking;
 }
 
 export interface RunOptions {
