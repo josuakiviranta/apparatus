@@ -73,7 +73,10 @@ export function annotateDotForShow(src: string, dotDir: string): string {
     const lines = [child.id.value];
     if (meta.inputs.length) lines.push(`in: ${meta.inputs.join(", ")}`);
     if (meta.outputs.length) lines.push(`out: ${meta.outputs.join(", ")}`);
-    if (lines.length === 1) continue;
+    const modelLine = meta.thinking && meta.thinking !== "off"
+      ? `${meta.model} · think:${meta.thinking}`
+      : meta.model;
+    lines.push(modelLine);
     const existing = findAttr(child.children, "label");
     if (existing >= 0) child.children.splice(existing, 1);
     child.children.push(attrAst("label", lines.join("\n")));
