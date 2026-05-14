@@ -241,6 +241,33 @@ the daemon. Lock the screen instead of logging out for overnight runs.
 Linux and Windows have no sleep protection today; the seam is stubbed
 for future expansion. See `docs/adr/0018-prevent-system-sleep-during-pipeline-runs.md`.
 
+## Notifications (macOS)
+
+`apparat` fires an OS banner via `osascript` at two points during a run:
+
+- **Run completion** — when `apparat pipeline run` (and any command
+  that re-enters it: `apparat implement`, `apparat meditate`,
+  `apparat heartbeat`) finishes. Banner reads
+  `apparat / <project> › <pipeline> / done` on success, `failed` on
+  a non-zero exit.
+- **Gate blocked** — when a `wait_human` node reaches its
+  `interviewer.ask(...)` call and is about to block on operator input.
+  Banner reads `apparat — gate / <project> › <pipeline> /
+  <truncated prompt> [choice / choice]`.
+
+This is always on; there is no flag to disable it. Linux and Windows
+have no notification today — the helper is a silent no-op on those
+platforms (same shape as the sleep block above).
+
+> **Focus / Do Not Disturb caveat.** macOS silences banners while
+> Focus or Do Not Disturb is on. That is an OS policy decision, not
+> apparatus's; the helper still fires its `osascript` call but the OS
+> drops the banner. Disable Focus / DND for the duration of long runs
+> if you want guaranteed visibility.
+
+Notification failures (missing `osascript`, broken Notification Centre,
+etc.) are swallowed so a banner glitch can never break a pipeline run.
+
 ## Stopping the loop
 
 Press `Ctrl+C`. apparat cleanly terminates its own claude subprocess without affecting any other running claude sessions.
