@@ -1,8 +1,14 @@
+import { basename } from "path";
 import type { NodeHandler, HandlerExecutionContext } from "./registry.js";
 import type { Node, Outcome, PipelineContext } from "../types.js";
 import type { Interviewer } from "../interviewer/index.js";
 import { expandVariables, extractDefaults } from "../transforms/variable-expansion.js";
 import { resolveGate } from "../../cli/lib/gate-registry.js";
+import { notifyUser } from "../../lib/notify.js";
+
+function truncate(s: string, max: number): string {
+  return s.length > max ? `${s.slice(0, max)}…` : s;
+}
 
 export class WaitHumanHandler implements NodeHandler {
   constructor(private interviewer: Interviewer, private dotDir?: string) {}
@@ -31,6 +37,14 @@ export class WaitHumanHandler implements NodeHandler {
     } else {
       return { status: "fail", failureReason: `Gate "${node.id}" has no inline label and no dotDir to resolve sibling .md` };
     }
+
+    const pipelineName = this.dotDir ? basename(this.dotDir) : "pipeline";
+    const projectName = meta.projectDir ? basename(meta.projectDir) : "apparat";
+    notifyUser(
+      "apparat — gate",
+      `${truncate(prompt, 60)} [${choices.join(" / ")}]`,
+      `${projectName} › ${pipelineName}`,
+    );
 
     const askPromise = this.interviewer.ask({
       type: "MULTIPLE_CHOICE",

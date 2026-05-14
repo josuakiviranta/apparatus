@@ -1,6 +1,6 @@
 import { spawn } from "child_process";
 import { existsSync, readFileSync, writeFileSync, unlinkSync } from "fs";
-import { join, dirname } from "path";
+import { join, dirname, basename } from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -8,6 +8,7 @@ import { newRunId, runsDir } from "../cli/lib/apparat-paths.js";
 import { resolveProjectFromArgs, injectRunArgs } from "./runner-args.js";
 import { createRun, appendLogLine, closeRun, getPidFilePath } from "./state";
 import type { Task } from "./state";
+import { notifyUser } from "../lib/notify.js";
 
 export function getRalphCliPath(): { command: string; args: string[]; shell: boolean } {
   // Allow test override
@@ -132,6 +133,14 @@ export async function runTask(task: Task): Promise<{ runId: string; exitCode: nu
         content: `Session ended (exit ${exitCode})`,
       });
       closeRun(task.id, runId, endedAt, exitCode);
+      const projectName = projectRoot ? basename(projectRoot) : "apparat";
+      const pipelineDot = task.command === "pipeline" && task.args[0] === "run" ? task.args[1] : undefined;
+      const pipelineName = pipelineDot ? basename(dirname(pipelineDot)) : "pipeline";
+      notifyUser(
+        "apparat",
+        exitCode === 0 ? "done" : "failed",
+        `${projectName} › ${pipelineName}`,
+      );
       resolve({ runId, exitCode });
     });
   });
