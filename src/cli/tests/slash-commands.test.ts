@@ -51,4 +51,16 @@ describe("parseSlashCommand", () => {
     expect(HELP_TEXT).toMatch(/\/abort/);
     expect(HELP_TEXT).toMatch(/\/help/);
   });
+
+  it("parses /edit-instructions", () => {
+    expect(parseSlashCommand("/edit-instructions")).toEqual({ kind: "edit-instructions" });
+  });
+
+  it("/edit-instructions is case-insensitive", () => {
+    expect(parseSlashCommand("/Edit-Instructions")).toEqual({ kind: "edit-instructions" });
+  });
+
+  it("HELP_TEXT mentions /edit-instructions", () => {
+    expect(HELP_TEXT).toMatch(/\/edit-instructions/);
+  });
 });
