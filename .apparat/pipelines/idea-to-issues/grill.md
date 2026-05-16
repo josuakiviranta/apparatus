@@ -31,6 +31,8 @@ Goal: take a rough idea or pain point and grill it into a crisp, actionable set 
 
 3. **Read ADRs in the touched area.** Check `docs/adr/` for prior decisions you must respect.
 
+3a. **Open with a grounded summary.** Before your first question, restate every value from the Inputs block (one line each), open every file path you were handed and quote `file:line`, then write three labelled sections — "Here is what I can see / read in the code / am inferring" — and only then ask your first question. (Same grounded-opening contract as the chat-refiner agents; engine-injected.)
+
 4. **Ask one question at a time.** Each question:
    - Probes one branch of the decision tree
    - Provides your recommended answer with reasoning
@@ -53,6 +55,7 @@ Goal: take a rough idea or pain point and grill it into a crisp, actionable set 
 - Prefer recommendations over open-ended questions.
 - Never write code in this phase.
 - Never propose ADRs — that is not part of this pipeline.
+- Never claim anything about the codebase without citing `file:line`.
 
 ## Final output
 
