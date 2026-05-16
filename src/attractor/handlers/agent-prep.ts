@@ -7,6 +7,8 @@ import { getIlluminationServerPath } from "../../cli/lib/assets.js";
 import { buildPreamble } from "../transforms/preamble.js";
 import { renderInputsBlock } from "../transforms/inputs-renderer.js";
 import { extractDefaults } from "../transforms/variable-expansion.js";
+import { isInteractiveAgent } from "../core/graph.js";
+import { GROUNDED_OPENING_BLOCK } from "../transforms/grounded-opening.js";
 
 /**
  * Keys auto-injected into every agent's variables by the pipeline engine.
@@ -112,7 +114,10 @@ export function buildAgentPrompt(
   const inputsBlock = renderInputsBlock(declaredInputs, agentVariables, nodeAttrs);
   const steeringRaw = (node.prompt ?? "").trim();
   const steeringBlock = steeringRaw ? `\n\n## Steering\n\n${steeringRaw}\n` : "";
-  const assembledPrompt = `${agentInstructions}\n\n---\n\n${inputsBlock}${steeringBlock}`;
+  const orientationBlock = isInteractiveAgent(node)
+    ? `\n\n---\n\n${GROUNDED_OPENING_BLOCK}`
+    : "";
+  const assembledPrompt = `${agentInstructions}\n\n---\n\n${inputsBlock}${steeringBlock}${orientationBlock}`;
 
   const fidelity = (node.fidelity as string | undefined) ?? "compact";
   const preamble = buildPreamble(
