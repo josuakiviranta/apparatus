@@ -4,7 +4,7 @@ import { pipelineReducer } from "../lib/pipelineReducer.js";
 import { initialPipelineState, type NodeEvent, type Block, type BodyLine } from "../lib/pipelineEvents.js";
 import { BodyLineView } from "./BlockView.js";
 import { LiveFooter } from "./LiveFooter.js";
-import { parseSlashCommand } from "../lib/slash-commands.js";
+import { parseSlashCommand, HELP_TEXT } from "../lib/slash-commands.js";
 import { drivers } from "../lib/interactions/drivers/index.js";
 import { isInteractionKind } from "../lib/classifyNode.js";
 import { claudeTracePath } from "../lib/claudeTracePath.js";
@@ -243,7 +243,7 @@ export function PipelineRunView({ pipelineName, pid, goal, nodes, runId, tracePa
             setInputBuffer("");
             const parsed = parseSlashCommand(raw);
             if (parsed.kind === "help") {
-              dispatch({ kind: "text", role: "system", text: "commands: /end /abort /help" });
+              dispatch({ kind: "text", role: "system", text: HELP_TEXT });
               return;
             }
             if (parsed.kind === "unknown") {
