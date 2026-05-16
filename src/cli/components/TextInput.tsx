@@ -29,10 +29,14 @@ export function TextInput({
   const [internal, setInternal] = useState(value);
   const [cursor, setCursor] = useState(value.length);
 
-  // Sync external value changes (e.g. parent clearing the input after submit)
+  // Sync external value changes (e.g. parent clearing the input after submit).
+  // Gated on `internalRef.current` so parent echoes of this component's own
+  // `onChange` calls are ignored — only genuine external diffs reset cursor.
   useEffect(() => {
-    setInternal(value);
-    setCursor(value.length);
+    if (value !== internalRef.current) {
+      setInternal(value);
+      setCursor(value.length);
+    }
   }, [value]);
 
   // Refs so the useInput closure always sees the latest values
