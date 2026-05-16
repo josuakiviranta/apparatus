@@ -121,4 +121,24 @@ describe("MultilineTextInput", () => {
     expect(row0After.length).toBe(row0Before.length);
     expect(row0After.replace(/\s+$/, "")).toBe(row0Before.replace(/\s+$/, ""));
   });
+
+  it("cursor preserved when parent echoes value prop", async () => {
+    const { stdin, lastFrame } = render(<Harness initial="change" />);
+    // Cursor starts at EOL (position 6). Move left once so it sits between
+    // 'g' and 'e' (position 5).
+    stdin.write("\u001b[D"); // left arrow
+    await delay();
+    // Type 'b' at the cursor → buffer becomes "changbe", cursor at 6
+    // (between 'b' and 'e'). This call triggers onChange, which the parent
+    // echoes back as a "new" value prop.
+    stdin.write("b");
+    await delay();
+    // Type 'X' next. If the value-sync effect re-fires on the parent's
+    // echo, the cursor was slammed to EOL (position 7) and 'X' is appended
+    // → "changbeX". With the gate in place, the cursor stayed at 6 and
+    // 'X' is inserted between 'b' and 'e' → "changbXe".
+    stdin.write("X");
+    await delay();
+    expect(lastFrame()).toContain("changbXe");
+  });
 });
