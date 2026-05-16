@@ -1,4 +1,4 @@
-- [ ] Earlier implementation had fixed bug from TUI input in interactive chats. However now the input is written only in one row instead that it would span to multiple rows like in the normal text areas. Also text in input area renders strangely if user want to modify already written text.
+- [x] Earlier implementation had fixed bug from TUI input in interactive chats. However now the input is written only in one row instead that it would span to multiple rows like in the normal text areas. Also text in input area renders strangely if user want to modify already written text.
 
 - [ ] tmus_tester in pipelines/parallel-illumination-to-implementation/ should not always run the same somke tests instead it should think which tests to run, and which aspects to focus it's attention based on what was actually implemented. Still it should also verify that basic functions work and nothing has broken after the implemented change.
 
