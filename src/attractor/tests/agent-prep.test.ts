@@ -3,6 +3,7 @@ import { mkdtempSync, mkdirSync, rmSync, readFileSync, existsSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { assembleAgentPrompt, buildAgentPrompt } from "../handlers/agent-prep.js";
+import { GROUNDED_OPENING_BLOCK } from "../transforms/grounded-opening.js";
 import type { AgentConfig } from "../../cli/lib/agent.js";
 import type { Node, PipelineContext } from "../types.js";
 import type { HandlerExecutionContext } from "../handlers/registry.js";
@@ -215,6 +216,78 @@ describe("buildAgentPrompt", () => {
       expect("fail" in built).toBe(false);
       const ok = built as Exclude<typeof built, { fail: string }>;
       expect(ok.prompt).toContain(`<AGENT_FILE_PATH>${join(pipelineDir, "fake.md")}</AGENT_FILE_PATH>`);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("buildAgentPrompt — grounded opening", () => {
+  it("appends GROUNDED_OPENING_BLOCK when node.interactive is true (boolean)", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "apparat-orient-"));
+    try {
+      const cfg = makeConfig();
+      const node: Node = { id: "n1", prompt: "STEERING", agent: "fake", interactive: true };
+      const ctx: PipelineContext = { values: {} };
+      const meta = makeMeta(tmp, tmp);
+
+      const built = buildAgentPrompt(node, ctx, meta, () => cfg);
+
+      expect("fail" in built).toBe(false);
+      const ok = built as Exclude<typeof built, { fail: string }>;
+      expect(ok.prompt).toContain(GROUNDED_OPENING_BLOCK);
+      expect(ok.prompt).toContain("## Grounded opening (mandatory)");
+      // Order check: orientation block follows steering, not precedes it.
+      expect(ok.prompt.indexOf("STEERING")).toBeLessThan(ok.prompt.indexOf(GROUNDED_OPENING_BLOCK));
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("appends GROUNDED_OPENING_BLOCK when node.interactive is string \"true\"", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "apparat-orient-str-"));
+    try {
+      const cfg = makeConfig();
+      const node: Node = { id: "n1", prompt: "STEERING", agent: "fake", interactive: "true" };
+      const ctx: PipelineContext = { values: {} };
+      const meta = makeMeta(tmp, tmp);
+
+      const built = buildAgentPrompt(node, ctx, meta, () => cfg);
+      const ok = built as Exclude<typeof built, { fail: string }>;
+      expect(ok.prompt).toContain(GROUNDED_OPENING_BLOCK);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("does NOT append GROUNDED_OPENING_BLOCK when node.interactive is unset", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "apparat-orient-off-"));
+    try {
+      const cfg = makeConfig();
+      const node: Node = { id: "n1", prompt: "STEERING", agent: "fake" };
+      const ctx: PipelineContext = { values: {} };
+      const meta = makeMeta(tmp, tmp);
+
+      const built = buildAgentPrompt(node, ctx, meta, () => cfg);
+      const ok = built as Exclude<typeof built, { fail: string }>;
+      expect(ok.prompt).not.toContain(GROUNDED_OPENING_BLOCK);
+      expect(ok.prompt).not.toContain("Grounded opening (mandatory)");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("does NOT append GROUNDED_OPENING_BLOCK when node.interactive is false", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "apparat-orient-false-"));
+    try {
+      const cfg = makeConfig();
+      const node: Node = { id: "n1", prompt: "STEERING", agent: "fake", interactive: false };
+      const ctx: PipelineContext = { values: {} };
+      const meta = makeMeta(tmp, tmp);
+
+      const built = buildAgentPrompt(node, ctx, meta, () => cfg);
+      const ok = built as Exclude<typeof built, { fail: string }>;
+      expect(ok.prompt).not.toContain(GROUNDED_OPENING_BLOCK);
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }
