@@ -23,7 +23,12 @@ export class InteractiveAgentHandler implements NodeHandler {
   }
 
   async execute(node: Node, ctx: PipelineContext, meta: HandlerExecutionContext): Promise<Outcome> {
-    const prep = assembleAgentPrompt(node, ctx, meta, this.load, this.create);
+    const loadWithEdit = (name: string, pipelineDir: string): AgentConfig => {
+      const cfg = this.load(name, pipelineDir);
+      const tools = Array.isArray(cfg.tools) ? cfg.tools : [];
+      return tools.includes("Edit") ? cfg : { ...cfg, tools: [...tools, "Edit"] };
+    };
+    const prep = assembleAgentPrompt(node, ctx, meta, loadWithEdit, this.create);
     if ("fail" in prep) return { status: "fail", failureReason: prep.fail };
     const { agent, agentVariables, prompt, nodeDir } = prep;
     const { cwd, onInteractiveRequest } = meta;
