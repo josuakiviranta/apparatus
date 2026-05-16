@@ -356,7 +356,7 @@ Use `wait_stable` and `capture` between runs.
 
 ## Phase 3 — Targeted manual exercise
 
-If the implementation node's diff touched a specific command (check `git log -1 --stat` and `git diff HEAD~1 HEAD --stat`), exercise that command interactively when practical:
+Using `impl_summary` (built in Phase 0b), check whether the diff touched a specific command — i.e. any path under `src/cli/commands/` (`impl_summary.categories.cli-commands` non-empty) or any TUI component reachable from one (`impl_summary.categories.components` non-empty). If yes, exercise that command interactively when practical:
 
 - TUI commands: drive them with `send_input` + `wait_stable`; capture the opened overlay; verify the new behavior actually appears.
 - Non-TUI commands: run directly, `wait_for_string` on an expected output token, capture result.
