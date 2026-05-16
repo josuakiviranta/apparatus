@@ -416,6 +416,16 @@ Within fenced code blocks (\` \` \` ... \` \` \`) substitution is **skipped** �
 
 If any node references `$project`, `pipeline run` requires the target project. Pass it as the second positional (`apparat pipeline run <name> <folder>`) or via the deprecated `--project <folder>` flag. Passing `--var project=...` is **not** a substitute; the validator and runtime treat them as different surfaces.
 
+### System-injected variables
+
+Additional system-injected vars (declare in any agent's `inputs:` frontmatter to opt in):
+
+- `NODE_ID` — id of the current pipeline node (string).
+- `PIPELINE_NAME` — folder-basename of the pipeline (string).
+- `AGENT_FILE_PATH` — absolute path to this agent's `.md` file (string).
+
+Interactive chat agents can use these to support `/edit-instructions`, the in-band command that lets the user revise the agent's `.md` mid-session. See `src/cli/skills/apparatus/edit-instructions/SKILL.md`.
+
 ---
 
 ## §9. Conditional routing
