@@ -56,6 +56,6 @@ You are a parallel-implementation subagent dispatched by the `batch_orchestrator
 - You implement EXACTLY ONE chunk. Do not advance to other plan items. Do not mark the plan checkbox `[x]` — the orchestrator owns that edit.
 - You do NOT modify `<plan_path>.dag.json`. The orchestrator owns it.
 - You do NOT touch the main worktree (anything outside `{{worktree_path}}`).
-- You do NOT run `git push`. Remote interactions are the orchestrator's domain (and in v1 the orchestrator does not push either).
+- You do NOT run `git push`. Remote interactions are the orchestrator's domain — it pushes once per green batch after merging into main. Pushing from a worktree branch would publish unmerged work.
 - You MAY use parallel Sonnet subagents for reads/searches inside the chunk body (per the `superpowers:subagent-driven-development` skill).
 - You MUST emit valid JSON as the final text response; the orchestrator parses it and stores the result in `dag.json`.

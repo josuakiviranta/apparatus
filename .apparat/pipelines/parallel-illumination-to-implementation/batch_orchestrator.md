@@ -71,7 +71,7 @@ Each iteration runs in a fresh context window. Per-iteration state lives in `dag
    - On clean exit: do NOT mark `merged` yet; wait for the post-merge test gate in step 9.
 
 9. **Run the project-wide test suite once.** `cd $project && {{test_command}}` (use Bash). Count successful merge commits created in step 8 — call this `merge_count`.
-   - **Green:** For every chunk just merged this batch: set `status = "merged"`, `merge_sha = <git -C $project rev-parse HEAD~N>` where N is its index from the end of the merge sequence. Edit `$plan_writer_plan_path` to flip each chunk's checkbox `- [ ]` → `- [x]` for the corresponding `## Chunk N` heading. `git -C $project commit --amend --no-edit -a` to fold the plan-checkbox edit into the final merge commit (so one commit per merged chunk remains in history). Write `dag.json` back.
+   - **Green:** For every chunk just merged this batch: set `status = "merged"`, `merge_sha = <git -C $project rev-parse HEAD~N>` where N is its index from the end of the merge sequence. Edit `$plan_writer_plan_path` to flip each chunk's checkbox `- [ ]` → `- [x]` for the corresponding `## Chunk N` heading. `git -C $project commit --amend --no-edit -a` to fold the plan-checkbox edit into the final merge commit (so one commit per merged chunk remains in history). Then `git -C $project push origin $(git -C $project branch --show-current)` so each green batch is visible on the remote as it lands (matches the single-flow sibling's per-chunk push cadence). Push failures (non-fast-forward, network) → emit `{ "done": false, "reason": "stuck", "conflicts_present": false }` with the git error in the prose preamble; the operator inspects and re-runs. Write `dag.json` back.
    - **Red:** `git -C $project reset --hard HEAD~<merge_count>`. For every chunk just merged this batch: set `status = "conflicted"`, `conflict_files = ["<test-failure-output>"]`. Write `dag.json` back.
 
 10. **Tear down green-chunk worktrees.** For every chunk now `status = "merged"`: `git -C $project worktree remove <chunk.worktree_path> --force`. Clear `worktree_path = null`. Write `dag.json` back. Conflicted chunks KEEP their worktrees (resolver needs them).
@@ -91,6 +91,7 @@ Each iteration runs in a fresh context window. Per-iteration state lives in `dag
 
 - You are the SOLE writer of `dag.json`. Subagents return results; you persist them.
 - You are the SOLE merge driver. Subagents never run `git merge`.
+- You are the SOLE pusher in Phase 2. Push exactly once per green batch (step 9 Green), after the amend commit. Subagents never `git push`.
 - You NEVER edit source code directly. Source edits happen inside subagent-owned worktrees only.
 - Plan checkboxes (`- [ ]` ↔ `- [x]`) are YOUR edits, not the subagents'.
 - Worktree teardown is YOUR responsibility. Create-on-dispatch (step 6 — actually the subagent creates its own per the template), destroy-on-merge.

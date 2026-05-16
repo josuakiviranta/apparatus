@@ -386,7 +386,7 @@ Be specific. "Something looked off" is not an issue; name the command, the surfa
 # Hard rules
 
 - **Commit** each passing fix (one commit per fix). Follow existing commit-message style.
-- **Do NOT `git push`.** `commit_push` is the only node that pushes.
+- **Do NOT `git push`.** Phase-2 `batch_orchestrator` pushes per green batch; the tail `commit_push` node sweeps anything left after this gate. Pushing here would race the orchestrator.
 - **Do NOT `cleanup_run`/`tmux kill-window`** on the test window — the pipeline owns its lifecycle.
 - **Do NOT run interactive commands that require a real human** (e.g. `apparat plan`, `apparat meditate` without pre-canned input). If a command opens a Claude session, skip it.
 - **Do NOT spawn more tmux windows.** Reuse the one already opened by `launch_tmux`.
