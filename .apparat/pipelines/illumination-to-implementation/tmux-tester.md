@@ -387,6 +387,11 @@ Emit JSON matching the schema:
 
   <one-line summary sentence matching test_summary>
 
+  ### Test focus
+  Changed: <comma-separated impl_summary.changed_paths, truncated to first 5 + "…N more" if longer>
+  Targeted: <comma-separated test files run in Phase 1b, or "none — no source files changed">
+  Scenarios: <one-line roll-up — "I included, S skipped (reason: <dominant tier name from Phase 3a ladder, or "per-scenario">)">
+
   ### Cycles run
   1. <Cycle 1 headline — what was observed, what broke, what was fixed>
   2. <Cycle 2 headline — ...>
