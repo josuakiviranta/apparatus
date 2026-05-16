@@ -23,9 +23,13 @@ export function MultilineTextInput({
   const [internal, setInternal] = useState(value);
   const [cursor, setCursor] = useState(value.length);
 
+  // Gated on `internalRef.current` so parent echoes of this component's own
+  // `onChange` calls are ignored — only genuine external diffs reset cursor.
   useEffect(() => {
-    setInternal(value);
-    setCursor(value.length);
+    if (value !== internalRef.current) {
+      setInternal(value);
+      setCursor(value.length);
+    }
   }, [value]);
 
   const internalRef = useRef(internal);
