@@ -58,8 +58,9 @@ describe("PR1 sessions kill — parallel-illumination-to-implementation rewire",
     expect(dot).not.toMatch(/memory_reflector\b/);
   });
 
-  it('routes tmux_confirm_gate -> done [label="Commit"]', () => {
-    expect(dot).toMatch(/tmux_confirm_gate\s*->\s*done\s*\[label="Commit"\]/);
+  it('routes tmux_confirm_gate -> commit_push [label="Commit"] -> done', () => {
+    expect(dot).toMatch(/tmux_confirm_gate\s*->\s*commit_push\s*\[label="Commit"\]/);
+    expect(dot).toMatch(/commit_push\s*->\s*done/);
   });
 
   it("memory-writer.md and memory-reflector.md are deleted", () => {
