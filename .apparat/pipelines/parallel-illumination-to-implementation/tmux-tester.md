@@ -223,15 +223,27 @@ If both git diff reads return empty (a true no-op implementation), `impl_summary
 
 ## Phase 1 — Automated verification
 
-1. Send into the window:
-   ```
-   cd $project && npm run build && npm test
-   ```
-2. `wait_for_string "Test Files"` with budget `300000ms` (fallback `wait_for_string "Tests"`).
-3. `capture`, read `current.txt`.
-4. Record pass/fail and the raw counts ("X passed, Y failed, Z total").
+1a. **Pick the targeted set.** From `impl_summary.changed_paths` (built in Phase 0b), identify 1–3 most relevant test files:
+   - For each `src/**/*.{ts,tsx}` path in `changed_paths`, find its co-located test via the project's convention — typically `src/cli/tests/<basename>.test.ts` or a sibling `*.test.tsx`. Use `Glob` to confirm the test file exists; if no test exists for a changed source file, skip that file (do not invent a path).
+   - If a changed path IS itself a test file (`**/*.test.ts(x)`), that file IS targeted.
+   - Cap the set at 3 files. If reasoning produces more, pick the 3 most directly tied to the changed modules (smallest enclosing scope wins).
+   - If reasoning produces zero (e.g. only `.md` or `.dot` files changed), skip 1b/1c and go directly to 1d.
 
-If Phase 1 fails, you MAY skip Phases 2–3 for this cycle and go straight to the **Fix step** — a broken build or red suite means smoke runs are unreliable.
+1b. **Run targeted sub-suite.** Send into the window:
+   ```
+   cd $project && npm run build && npm test -- <targeted-files>
+   ```
+   `wait_for_string "Test Files"` with budget `60000ms` (fallback `wait_for_string "Tests"`). `capture`, read `current.txt`. Record pass/fail counts for the narrow run.
+
+1c. **Red short-circuit.** If the targeted run is RED → skip to the **Fix step** without waiting for the full suite. The narrow signal is enough — fix the most-specific failure first. Do NOT proceed to 1d in this cycle.
+
+1d. **Full suite.** Send into the window:
+   ```
+   npm test
+   ```
+   The build is already warm from 1b, so this is the test re-run only. `wait_for_string "Test Files"` with budget `300000ms` (fallback `wait_for_string "Tests"`). `capture`, read `current.txt`. Record pass/fail and the raw counts ("X passed, Y failed, Z total").
+
+If Phase 1 (any of 1b or 1d) fails, you MAY skip Phases 2–3 for this cycle and go straight to the **Fix step** — a broken build or red suite means smoke runs are unreliable.
 
 ## Phase 1c — Diff cross-reference
 
