@@ -286,7 +286,12 @@ After Phase 1 (build + test) is GREEN, discover every bundled scenario at runtim
    - Use the diff already computed for Phase 1c: `git diff --name-only $capture_pre_sha.pre_sha HEAD`.
    - For each candidate folder, read `<folder>/pipeline.dot` and any sibling `.md` / `script_file` referenced via `agent="…"` or `script_file="…"`.
    - Reason about overlap: does the diff touch source the scenario depends on — agents it invokes, commands it drives, parser/validator/handler code in its execution path?
-   - **Cross-cutting fallback.** If the diff touches engine internals (`src/attractor/`, `src/cli/lib/dot/`, the validator, handler dispatch, the deep-loop runner, the streaming formatter) → INCLUDE all. Engine changes hit every scenario; do not try to be clever.
+   - **Cross-cutting fallback (tiered).** Walk the ladder top to bottom against `impl_summary.categories` (built in Phase 0b); the first matching tier defines the INCLUDE floor (other relevance reasoning may add more scenarios on top):
+     - `core` touched → INCLUDE all. Engine, validator, graph-ast, deep-loop runner, or streaming-formatter changes hit every scenario.
+     - `handlers` touched (and `core` not) → INCLUDE every scenario whose `.dot` declares a node with one of the touched handler kinds (read each candidate's `pipeline.dot` for the `handler="…"` attribute), PLUS one cross-cutting sanity scenario (`static-multi-node` or `conditional`, whichever is present).
+     - `cli-lib` touched (and `core`/`handlers` not) → INCLUDE only scenarios whose `pipeline.dot` invokes the specific command whose lib code changed (read each candidate's `.dot` for `apparat <command>` invocations in agent prose or `script_file`).
+     - `components` touched (and `core`/`handlers`/`cli-lib` not) → INCLUDE only scenarios that drive TUI interactively (folders containing `gate`, `chat-end-to-end`, or any node with `interactive=true`).
+     - None of `core`/`handlers`/`cli-lib`/`components` touched (only `scenarios`/`pipeline-agents`/`tests`/`other`) → no cross-cutting floor; per-scenario relevance reasoning decides INCLUDE/SKIP for each folder.
    - **Bias toward INCLUDE.** When uncertain, INCLUDE. The cost of a missed regression at `tmux_confirm_gate` exceeds the cost of one extra scenario run.
    - **Floor.** If your reasoning produces zero INCLUDEs, INCLUDE one scenario as sanity (pick the smallest / cheapest to run).
    - Record the call and a one-line reason for every folder — this feeds the `### Scenarios run` log so `tmux_confirm_gate` (and the human) can audit the selection.
