@@ -192,6 +192,34 @@ Before any cycle starts, read `$plan_writer.plan_path` and extract every back-ti
 
 Store the matches as the **candidate set** — a list of relative paths the plan claims to touch. Hold this set in working memory; you will diff against it in Phase 1c. If `$plan_writer.plan_path` is empty or unreadable, set the candidate set to `[]` and continue (Phase 1c will emit `plan_files_touched=0`, which the gate disambiguates).
 
+## Phase 0b — Implementation understanding
+
+Before any cycle starts, build a compact in-memory record of what the implementer node changed. Run in `$project`:
+
+```bash
+git diff --stat $capture_pre_sha.pre_sha HEAD
+git diff --name-only $capture_pre_sha.pre_sha HEAD
+```
+
+Record an `impl_summary` working-memory artifact with three fields:
+
+- `changed_paths`: the relative paths from `git diff --name-only`.
+- `size`: the final summary line from `git diff --stat` (e.g. `3 files changed, 47 insertions(+), 12 deletions(-)`).
+- `categories`: a map from category to list-of-paths, derived strictly from path prefixes:
+  - `handlers` → `src/attractor/handlers/`
+  - `core` → `src/attractor/core/` (validator, graph-ast, engine, deep-loop runner, streaming formatter)
+  - `cli-lib` → `src/cli/lib/` excluding `dot/` (which falls under `core`)
+  - `cli-commands` → `src/cli/commands/`
+  - `components` → `src/cli/components/`
+  - `scenarios` → `.apparat/scenarios/`
+  - `pipeline-agents` → `.apparat/pipelines/`
+  - `tests` → any path matching `**/tests/**` or `*.test.ts(x)`
+  - `other` → anything that doesn't match the above
+
+`impl_summary` is agent-local working memory: not a pipeline output (`outputs:` frontmatter is unchanged), not persisted, not surfaced in the JSON envelope. It drives the Phase 1 targeted-test selection, the Phase 3a tiered cross-cutting rule, and the Phase 3 manual-exercise trigger.
+
+If both git diff reads return empty (a true no-op implementation), `impl_summary.changed_paths` is `[]` and `impl_summary.categories` is empty; downstream phases handle this case explicitly (the targeted step skips, the cross-cutting ladder falls through to per-scenario reasoning).
+
 ## Phase 1 — Automated verification
 
 1. Send into the window:
