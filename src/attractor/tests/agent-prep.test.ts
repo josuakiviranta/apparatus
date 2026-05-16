@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mkdtempSync, rmSync, readFileSync, existsSync } from "fs";
+import { mkdtempSync, mkdirSync, rmSync, readFileSync, existsSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { assembleAgentPrompt, buildAgentPrompt } from "../handlers/agent-prep.js";
@@ -166,6 +166,55 @@ describe("buildAgentPrompt", () => {
       if ("fail" in built) {
         expect(built.fail).toMatch(/Failed to resolve agent "missing"/);
       }
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("injects NODE_ID, PIPELINE_NAME, AGENT_FILE_PATH derived from node.id and meta.dotDir", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "apparat-sysvars-"));
+    try {
+      const cfg = makeConfig();
+      const node: Node = { id: "chat_session", prompt: "s", agent: "fake" };
+      const ctx: PipelineContext = { values: {} };
+      // Simulate dotDir as a sibling pipeline folder so basename() is stable.
+      const pipelineDir = join(tmp, "illumination-to-implementation");
+      mkdirSync(pipelineDir, { recursive: true });
+      const meta = makeMeta(tmp, tmp);
+      meta.dotDir = pipelineDir;
+
+      const prep = assembleAgentPrompt(node, ctx, meta, () => cfg, () => ({} as any));
+      expect("fail" in prep).toBe(false);
+      const ok = prep as Exclude<typeof prep, { fail: string }>;
+
+      expect(ok.agentVariables.NODE_ID).toBe("chat_session");
+      expect(ok.agentVariables.PIPELINE_NAME).toBe("illumination-to-implementation");
+      expect(ok.agentVariables.AGENT_FILE_PATH).toBe(join(pipelineDir, "fake.md"));
+      // Pre-existing PROJECT_ROOT still present.
+      expect(ok.agentVariables.PROJECT_ROOT).toBeDefined();
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("renders an <AGENT_FILE_PATH> block in the prompt when declared in inputs", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "apparat-render-sysvar-"));
+    try {
+      const cfg: AgentConfig = {
+        ...makeConfig(),
+        inputs: ["AGENT_FILE_PATH"],
+      } as AgentConfig;
+      const pipelineDir = join(tmp, "p");
+      mkdirSync(pipelineDir, { recursive: true });
+      const node: Node = { id: "n1", prompt: "s", agent: "fake" };
+      const ctx: PipelineContext = { values: {} };
+      const meta = makeMeta(tmp, tmp);
+      meta.dotDir = pipelineDir;
+
+      const built = buildAgentPrompt(node, ctx, meta, () => cfg);
+      expect("fail" in built).toBe(false);
+      const ok = built as Exclude<typeof built, { fail: string }>;
+      expect(ok.prompt).toContain(`<AGENT_FILE_PATH>${join(pipelineDir, "fake.md")}</AGENT_FILE_PATH>`);
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }

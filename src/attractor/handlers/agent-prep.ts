@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync } from "fs";
-import { join } from "path";
+import { basename, join } from "path";
 import type { Node, PipelineContext, CheckpointState } from "../types.js";
 import type { HandlerExecutionContext } from "./registry.js";
 import { Agent, type AgentConfig } from "../../cli/lib/agent.js";
@@ -16,12 +16,23 @@ import { extractDefaults } from "../transforms/variable-expansion.js";
 export const SYSTEM_INJECTED_VARS = [
   "ILLUMINATION_SERVER_PATH",
   "PROJECT_ROOT",
+  "NODE_ID",
+  "PIPELINE_NAME",
+  "AGENT_FILE_PATH",
 ] as const;
 
-function buildSystemInjectedVars(projectRoot: string): Record<(typeof SYSTEM_INJECTED_VARS)[number], string> {
+function buildSystemInjectedVars(
+  projectRoot: string,
+  nodeId: string,
+  pipelineDir: string,
+  agentName: string,
+): Record<(typeof SYSTEM_INJECTED_VARS)[number], string> {
   return {
     ILLUMINATION_SERVER_PATH: getIlluminationServerPath(),
     PROJECT_ROOT: projectRoot,
+    NODE_ID: nodeId,
+    PIPELINE_NAME: basename(pipelineDir),
+    AGENT_FILE_PATH: join(pipelineDir, `${agentName}.md`),
   };
 }
 
@@ -85,7 +96,7 @@ export function buildAgentPrompt(
   }
 
   const agentVariables: Record<string, unknown> = {
-    ...buildSystemInjectedVars(meta.projectDir ?? cwd),
+    ...buildSystemInjectedVars(meta.projectDir ?? cwd, node.id, meta.dotDir, agentName),
     ...ctx.values,
   };
 
@@ -98,7 +109,7 @@ export function buildAgentPrompt(
   const rawDefaults = extractDefaults(node as unknown as Record<string, unknown>);
   const nodeAttrs: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(rawDefaults)) nodeAttrs[`default_${k}`] = v;
-  const inputsBlock = renderInputsBlock(declaredInputs, ctx.values, nodeAttrs);
+  const inputsBlock = renderInputsBlock(declaredInputs, agentVariables, nodeAttrs);
   const steeringRaw = (node.prompt ?? "").trim();
   const steeringBlock = steeringRaw ? `\n\n## Steering\n\n${steeringRaw}\n` : "";
   const assembledPrompt = `${agentInstructions}\n\n---\n\n${inputsBlock}${steeringBlock}`;
