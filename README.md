@@ -268,6 +268,12 @@ platforms (same shape as the sleep block above).
 Notification failures (missing `osascript`, broken Notification Centre,
 etc.) are swallowed so a banner glitch can never break a pipeline run.
 
+## Slash commands
+
+Interactive chat nodes accept the following in-band slash commands:
+
+- `/edit-instructions` — revise this agent's system prompt in-band. The agent prints its current `.md` body, asks what to change, proposes a unified diff, reasons about how the change will affect its behaviour in this node, and writes the change to disk after you reply `yes`. The new instructions take effect on the next session of this node.
+
 ## Stopping the loop
 
 Press `Ctrl+C`. apparat cleanly terminates its own claude subprocess without affecting any other running claude sessions.
