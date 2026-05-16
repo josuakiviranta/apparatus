@@ -4,7 +4,7 @@ import { Box, Text } from "ink";
 import type { InteractionDriver, DriverPayload, DriverRenderCtx } from "../driver.js";
 import type { LiveBlock, Block } from "../../pipelineEvents.js";
 import type { ChildHandle } from "../../agent.js";
-import { TextInput } from "../../../components/TextInput.js";
+import { MultilineTextInput } from "../../../components/MultilineTextInput.js";
 
 interface AgentState {
   child: ChildHandle;
@@ -28,7 +28,7 @@ export const agentDriver: InteractionDriver<"interactive-agent"> = {
     return (
       <Box>
         <Text color="gray">{"> "}</Text>
-        <TextInput
+        <MultilineTextInput
           prefixWidth={2}
           value={ctx.inputBuffer}
           onChange={ctx.onInputChange}
