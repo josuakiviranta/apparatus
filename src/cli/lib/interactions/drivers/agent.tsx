@@ -16,6 +16,8 @@ const states = new Map<string, AgentState>();
 // Exported for tests only — never imported by production code.
 export const __agentStatesForTest = states;
 
+const HELP_HINT = "/end /abort /help /edit-instructions · Esc to abort";
+
 export const agentDriver: InteractionDriver<"interactive-agent"> = {
   kind: "interactive-agent",
   initState: () => undefined,
@@ -24,16 +26,19 @@ export const agentDriver: InteractionDriver<"interactive-agent"> = {
     states.set(state.id, { child: payload.child, onDone: payload.onDone });
     return state;
   },
-  renderFooter(block: LiveBlock, ctx: DriverRenderCtx) {
+  renderFooter(_block: LiveBlock, ctx: DriverRenderCtx) {
     return (
-      <Box>
-        <Text color="gray">{"> "}</Text>
-        <MultilineTextInput
-          prefixWidth={2}
-          value={ctx.inputBuffer}
-          onChange={ctx.onInputChange}
-          onSubmit={ctx.onInputSubmit}
-        />
+      <Box flexDirection="column">
+        <Text dimColor>{HELP_HINT}</Text>
+        <Box>
+          <Text color="gray">{"> "}</Text>
+          <MultilineTextInput
+            prefixWidth={2}
+            value={ctx.inputBuffer}
+            onChange={ctx.onInputChange}
+            onSubmit={ctx.onInputSubmit}
+          />
+        </Box>
       </Box>
     );
   },
@@ -42,7 +47,7 @@ export const agentDriver: InteractionDriver<"interactive-agent"> = {
       const s = states.get(block.id);
       s?.child.kill("SIGTERM").catch(() => {});
     },
-    help: "/end /abort /help /edit-instructions · Esc to abort",
+    help: HELP_HINT,
   },
   onFreeze(live): Partial<Block> {
     const s = states.get(live.id);

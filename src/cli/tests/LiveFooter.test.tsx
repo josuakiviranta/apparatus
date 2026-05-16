@@ -43,6 +43,24 @@ describe("LiveFooter", () => {
     expect(out).toContain("hello");
   });
 
+  it("renders the keymap.help hint above the input for interactive-agent kind", () => {
+    const blk = block("interactive-agent", "a-help");
+    __agentStatesForTest.set("a-help", {
+      child: { kill: vi.fn() } as never,
+      onDone: vi.fn(),
+    });
+    const { lastFrame } = render(
+      <LiveFooter
+        block={blk}
+        inputBuffer=""
+        onInputChange={() => {}}
+        onInputSubmit={async () => {}}
+      />,
+    );
+    const out = lastFrame() ?? "";
+    expect(out).toContain("/edit-instructions");
+  });
+
   it("renders the gate driver's GateSelector for wait-human kind", () => {
     const blk = block("wait-human", "g-1");
     __gateStatesForTest.set("g-1", {
