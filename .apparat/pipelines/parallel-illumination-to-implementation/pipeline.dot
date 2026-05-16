@@ -19,6 +19,11 @@ digraph parallel_illumination_to_implementation {
                     script_file="consume.mjs",
                     script_args="$verifier.illumination_path declined"]
 
+  consume_implemented [type="tool",
+                       cwd="$project",
+                       script_file="consume.mjs",
+                       script_args="$verifier.illumination_path implemented"]
+
   explainer [agent="change-explainer", default_refinements=""]
 
   approval_gate [shape=hexagon, default_refinements=""]
@@ -107,5 +112,5 @@ digraph parallel_illumination_to_implementation {
   tmux_tester -> tmux_confirm_gate
   tmux_confirm_gate -> commit_push   [label="Commit"]
   tmux_confirm_gate -> tmux_tester   [label="Retry"]
-  commit_push -> done
+  commit_push -> consume_implemented -> done
 }
