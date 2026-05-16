@@ -390,6 +390,29 @@ body`,
     expect(diags.find(d => d.rule === "bare_input_not_in_caller_inputs_or_system")).toBeUndefined();
   });
 
+  it("does not fire for NODE_ID, PIPELINE_NAME, AGENT_FILE_PATH (new system-injected vars)", () => {
+    const dir = join(tmpdir(), `rule-binis-new-sysvars-${Date.now()}`);
+    setup(dir, {
+      "consumer.md": `---
+name: consumer
+description: x
+model: sonnet
+inputs: [NODE_ID, PIPELINE_NAME, AGENT_FILE_PATH]
+outputs: { foo: string }
+---
+body`,
+    });
+    const dot = `digraph g {
+      start [shape=Mdiamond]
+      c [agent="consumer"]
+      done [shape=Msquare]
+      start -> c -> done
+    }`;
+    const graph = parseDot(dot);
+    const diags = validateGraph(graph, dir);
+    expect(diags.find(d => d.rule === "bare_input_not_in_caller_inputs_or_system")).toBeUndefined();
+  });
+
   it("does not fire on agents without inputs declaration", () => {
     const dir = join(tmpdir(), `rule-binis-legacy-${Date.now()}`);
     setup(dir, {
