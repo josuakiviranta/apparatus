@@ -1,0 +1,15 @@
+digraph "interactive-orientation" {
+  goal="Freeze the grounded-opening contract for interactive agents"
+
+  start [shape=Mdiamond]
+  done  [shape=Msquare]
+
+  chat [shape=ellipse,
+        label="chat",
+        agent="fake-chat",
+        interactive="true",
+        default_verifier_summary="MAGIC_TOKEN_FOR_TEST_42"]
+
+  start -> chat
+  chat  -> done
+}
