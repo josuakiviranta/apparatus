@@ -1,0 +1,25 @@
+{
+  "plan_path": "docs/superpowers/plans/2026-05-16-interactive-chat-agents-lack-orientation-phase.md",
+  "pre_sha": "8480435002c4e52de6cb6eb67f9992f8ecfd61f5",
+  "batches": [
+    ["c1"]
+  ],
+  "chunks": [
+    {
+      "id": "c1",
+      "title": "Render `keymap.help` in `agentDriver.renderFooter` (RED → GREEN)",
+      "depends_on": [],
+      "files_touched": [
+        "src/cli/lib/interactions/drivers/agent.tsx",
+        "src/cli/tests/LiveFooter.test.tsx"
+      ],
+      "branch": "parallel-impl/c1-render-keymap-help-in-agentdriver-renderfooter-red-green",
+      "worktree_path": null,
+      "status": "merged",
+      "head_sha": "72c6db7bb53765c45e5269cb16cdc3b3d8dcd815",
+      "merge_sha": "2e0bf60d6ec3129f1cc12439a73e3093c8137f79",
+      "conflict_files": null,
+      "resolver_attempts": 0
+    }
+  ]
+}
