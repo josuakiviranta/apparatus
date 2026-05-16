@@ -42,7 +42,7 @@ export const agentDriver: InteractionDriver<"interactive-agent"> = {
       const s = states.get(block.id);
       s?.child.kill("SIGTERM").catch(() => {});
     },
-    help: "/end /abort /help · Esc to abort",
+    help: "/end /abort /help /edit-instructions · Esc to abort",
   },
   onFreeze(live): Partial<Block> {
     const s = states.get(live.id);

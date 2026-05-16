@@ -250,6 +250,28 @@ export function PipelineRunView({ pipelineName, pid, goal, nodes, runId, tracePa
               dispatch({ kind: "text", role: "system", text: `unknown command: ${parsed.raw}` });
               return;
             }
+            if (parsed.kind === "edit-instructions") {
+              if (state.live?.kind !== "interactive-agent") {
+                dispatch({
+                  kind: "text",
+                  role: "system",
+                  text: "/edit-instructions is only available during interactive chat nodes.",
+                });
+                return;
+              }
+              const liveId = state.live.id;
+              const editChild = __agentStatesForTest.get(liveId)?.child;
+              if (!editChild) return;
+              const syntheticInstruction = `The user invoked /edit-instructions. Follow the apparatus edit-instructions skill exactly: (1) print the current contents of $AGENT_FILE_PATH inside a triple-fenced code block, (2) ask what to change, (3) propose a targeted unified diff, (4) reason explicitly about how the change will alter your behaviour given that you are node "$NODE_ID" in pipeline "$PIPELINE_NAME", (5) wait for explicit "yes" before calling Edit on $AGENT_FILE_PATH. Do not call Edit until the user replies "yes".`;
+              try { await editChild.submit(syntheticInstruction); } catch (err) {
+                dispatch({
+                  kind: "text",
+                  role: "system",
+                  text: `Failed to send /edit-instructions: ${(err as Error).message}`,
+                });
+              }
+              return;
+            }
             const id = state.live?.id ?? null;
             const childEntry = id ? __agentStatesForTest.get(id) : undefined;
             const child = childEntry?.child;
