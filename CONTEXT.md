@@ -41,6 +41,23 @@ The `model:` field is enforced both by the in-code schema in
 fail validation at the node site with `pipeline.dot` source-location.
 There is no silent `opus` default.
 
+#### Grounded opening (interactive nodes only)
+
+When a node carries `interactive: true` (or the string `"true"`), the engine
+appends a canonical orientation block — `GROUNDED_OPENING_BLOCK`, exported
+from `src/attractor/transforms/grounded-opening.ts` — after the steering
+section of the assembled prompt. The block requires the agent to restate
+every injected value, quote `file:line` for every codebase claim, and open
+with three labelled sections (`Here is what I can see / read in the code /
+am inferring`) before its first question. The append is triggered by
+`isInteractiveAgent(node)` (`src/attractor/core/graph.ts:44`) inside
+`buildAgentPrompt` (`src/attractor/handlers/agent-prep.ts:115`); non-
+interactive nodes are byte-identical to the pre-append assembled prompt.
+
+The matching .md-side step ("Open with a grounded summary") in each
+interactive agent file keeps that file self-documenting when read out of
+pipeline context (e.g. `apparat pipeline explain` or direct read).
+
 ### Project-local layout
 
 A target project declares itself apparat-shaped by having a `<project>/.apparat/`

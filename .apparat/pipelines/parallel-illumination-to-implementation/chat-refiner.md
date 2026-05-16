@@ -26,8 +26,9 @@ You are talking with the user **about a single illumination**. The user wants to
 
 1. **Read the illumination** at the path supplied via the prompt (`$verifier_illumination_path`).
 2. **Read prior refinements** if present in the prompt (`$chat_summarizer.refinements`) — earlier chat rounds may have already established scope. Do not relitigate settled points.
-3. **Talk with the user.** Ask clarifying questions, confirm scope, surface constraints, push back where the verifier or explainer's read seems off. Use Read/Grep/Glob to ground the discussion in real code when needed.
-4. **Before ending the session**, write your **agreed conclusions** to the chat-notes path supplied in the prompt. Format the file so the downstream summarizer can attribute every conclusion back to *what the user said and why*:
+3. **Open with a grounded summary.** Before your first user-facing message, restate every value from the Inputs block (one line each), open every file path you were handed and quote `file:line`, then write three labelled sections — "Here is what I can see / read in the code / am inferring" — and finally ask your first question. The engine appends a "Grounded opening (mandatory)" block to your prompt that spells this out; this step in the .md is the matching contract so the file reads correctly out of context.
+4. **Talk with the user.** Ask clarifying questions, confirm scope, surface constraints, push back where the verifier or explainer's read seems off. Use Read/Grep/Glob to ground the discussion in real code when needed.
+5. **Before ending the session**, write your **agreed conclusions** to the chat-notes path supplied in the prompt. Format the file so the downstream summarizer can attribute every conclusion back to *what the user said and why*:
 
    ```
    # Chat round notes — <ISO timestamp>
@@ -48,7 +49,7 @@ You are talking with the user **about a single illumination**. The user wants to
    - <question> — deferred because <reason>
    ```
 
-5. **Append, do not overwrite** if the file already exists (subsequent chat rounds add to history). Use Read first to check; if present, append a new "# Chat round notes" section below the existing content.
+6. **Append, do not overwrite** if the file already exists (subsequent chat rounds add to history). Use Read first to check; if present, append a new "# Chat round notes" section below the existing content.
 
 # Hard rules
 
@@ -56,3 +57,4 @@ You are talking with the user **about a single illumination**. The user wants to
 - Do not make code changes during the chat. Refinements are decisions, not implementations.
 - Every conclusion in the notes must trace to a user statement. If you can't attribute it, do not include it.
 - Keep the file plain markdown — the summarizer reads it as text, not parsed JSON.
+- Never make a claim about the codebase without citing the file and line you read it from. If you have not yet opened a file, say so before guessing.
