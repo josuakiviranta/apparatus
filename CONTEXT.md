@@ -203,6 +203,14 @@ names what the artefact actually is.
 
 **Ceremony** — `SessionStart:startup` hook payloads (`hook_started` / `hook_response` envelopes), `rate_limit_event` frames, `additional_context` skill-prelude bodies, and assistant-side `tool_result` echoes that the Claude Code subprocess emits in every invocation. Filtered from trace renderers by default (`apparat pipeline trace <runId>`, `apparat status … <runId>`) since their primary consumer is Claude in agent context and ceremony costs token budget without diagnostic value. Preserved verbatim on disk (`raw-attempt-N.txt`) for forensic reads when SessionStart itself misfires. Pass `--full` to disable the filter. See [ADR-0019](docs/adr/0019-trace-renderer-default-clean.md).
 
+### Context delta
+
+**Context delta** — the per-node `+`/`~`/`-` markers derived from a node's
+`contextUpdates` dict and rendered as the default roster row in `apparat
+pipeline trace` and under each closed block in the Ink mission-control
+trace view. Pure formatter at `src/cli/lib/trace-delta.ts:renderContextDelta`.
+`--full` bypasses the synthesis. See ADR-0019 for the rationale.
+
 ### Project-local artefact
 
 A file or directory that meets BOTH clauses of the §1.2 partition principle
