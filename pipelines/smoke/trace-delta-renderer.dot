@@ -1,0 +1,13 @@
+digraph TraceDeltaRenderer {
+  // Smoke fixture for the per-node context-delta renderer.
+  // The fixture does not invoke 'apparat pipeline run' — it pre-stages a
+  // synthetic run dir under .apparat/runs/ and exercises 'apparat pipeline
+  // trace' directly (default + --full). This .dot exists to register the
+  // fixture name with the smoke index.
+  graph [name="trace-delta-renderer"];
+  start [shape=circle];
+  start -> demo;
+  demo  -> tail;
+  demo  [agent="demo.md"];
+  tail  [agent="tail.md"];
+}

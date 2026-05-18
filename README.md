@@ -113,7 +113,7 @@ Plain-text walkthrough of a pipeline's topology (per-node `consumes:` / `produce
 ```bash
 apparat pipeline trace <runId> [--node-receive <nodeReceiveId>] [--full]
 ```
-Inspect the context and trace logs for a completed pipeline run. `<runId>` accepts both the slug-prefixed shape (`meditate-2f8a91c3`, the new default) and the bare 8-char shape (`2f8a91c3`, used by older runs and daemon-spawned tasks). `--node-receive` filters to a specific node invocation (a per-execution id from the trace, not the static node id); `--full` disables the default ceremony filter and emits the raw Claude Code transcript including SessionStart hooks, `rate_limit_event` frames, and `tool_result` echoes (escape hatch — primary consumer is Claude in agent context, ceremony is filtered by default to save token budget).
+Inspect the context and trace logs for a completed pipeline run. `<runId>` accepts both the slug-prefixed shape (`meditate-2f8a91c3`, the new default) and the bare 8-char shape (`2f8a91c3`, used by older runs and daemon-spawned tasks). The default renderer prints **per-node context deltas** — one line per node showing the keys that node added or changed (`+ key=value` for adds, `~ key="old"→"new"` for changes when a future cross-node diff lands, `- key` for removes). `—` indicates a node that completed without producing any contextUpdates; `(no contextUpdates — node did not complete)` indicates a crash mid-node. `--node-receive` filters to a specific node invocation (a per-execution id from the trace, not the static node id) and renders the full structured snapshot for deep inspection; `--full` disables the default ceremony filter **and** emits raw JSONL including `contextSnapshot` dicts — escape hatch, primary consumer is Claude in agent context.
 
 ### Mission control
 
@@ -122,7 +122,7 @@ One verb, zoom by appending the next token:
 - `apparat status` — every project at a glance, with a **running now:** block at the top listing any pipeline runs in flight across all projects.
 - `apparat status <projectPath>` — zoom into one project: pipelines roster + recent runs table.
 - `apparat status <projectPath> <pipelineName>` — zoom into one pipeline: per-pipeline runs table.
-- `apparat status <projectPath> <pipelineName> <runId>` — zoom into one run: trace renderer. Auto-tails live if the run is in-progress; static replay if finished. Strips the same ceremony as `apparat pipeline trace` by default; pass `--full` for the raw stream.
+- `apparat status <projectPath> <pipelineName> <runId>` — zoom into one run: trace renderer. Auto-tails live if the run is in-progress; static replay if finished. Strips the same ceremony as `apparat pipeline trace` by default; pass `--full` for the raw stream. Each closed block carries a dim per-node delta line — the same `+ key=value` markers the CLI roster shows. `--full` disables that synthesis and emits the raw JSONL stream end-to-end.
 
 Every non-leaf output ends with a `zoom in:` line containing the exact next command to copy-paste.
 

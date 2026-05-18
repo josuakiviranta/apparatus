@@ -1,0 +1,8 @@
+
+run:     trace-delta-smoke-cafef00d
+outcome: success
+nodes:
+  start-1              start        tool               ✓  + $goal="demo"
+  demo-1               demo         agent              ✓  + demo.path="X"
+  tail-1               tail         tool               ✓  —
+

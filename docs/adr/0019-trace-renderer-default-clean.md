@@ -71,3 +71,25 @@ Filter rules:
 - Disk-format rewrites. The forensic record stays whole.
 - The pipeline.jsonl tracer (`src/attractor/tracer/jsonl-pipeline-tracer.ts`).
   Apparat's own frames are never ceremony; nothing to filter on that surface.
+
+## Update 2026-05-18 — delta default for the roster row
+
+Same primary-consumer rationale as the original decision (Claude in agent
+context: `memory_writer`, the planned `meditate` analyst, "dig into run X"
+operators), same token-budget lever. The default render now goes one step
+further: instead of printing the first three keys of each node's cumulative
+`contextSnapshot` (which is monotonically-growing and renders every row
+identically), the roster prints each node's **`contextUpdates`** as
+`+`/`~`/`-` delta markers via the new pure helper
+`src/cli/lib/trace-delta.ts:renderContextDelta`. The Ink mission-control
+trace view gains the same line under each closed block via
+`src/cli/lib/replayTraceIntoApp.ts:mapTraceLineToEvent` →
+`PipelineTraceView`.
+
+Same disk-format invariant: `pipeline.jsonl` continues to receive both
+`contextSnapshot` on `node-start` and `contextUpdates` on `node-end`. The
+delta is a read-time view only. `--full` continues to mean "no cleaner,
+no delta synthesis, raw stream" — verbatim continuation of the contract
+set above.
+
+See: `docs/superpowers/specs/2026-05-18-trace-emits-context-deltas-not-snapshots-design.md`.
