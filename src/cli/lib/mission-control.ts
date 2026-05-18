@@ -32,7 +32,7 @@ export type MissionZoom =
   | { level: "all" }
   | { level: "project";  projectPath: string }
   | { level: "pipeline"; projectPath: string; pipelineName: string }
-  | { level: "run";      projectPath: string; pipelineName: string; runId: string };
+  | { level: "run";      projectPath: string; pipelineName: string; runId: string; full?: boolean };
 
 export interface MissionRunningNow {
   projectPath: string;
@@ -75,6 +75,7 @@ export interface MissionStateRun {
   run: RunSummary;
   tracePath: string;
   isLive: boolean;
+  full?: boolean;
   zoomHint: "";
 }
 
@@ -90,7 +91,7 @@ export async function getMissionControlState(zoom: MissionZoom): Promise<Mission
     case "all":      return projectAll();
     case "project":  return projectOne(zoom.projectPath);
     case "pipeline": return projectPipeline(zoom.projectPath, zoom.pipelineName);
-    case "run":      return projectRun(zoom.projectPath, zoom.pipelineName, zoom.runId);
+    case "run":      return projectRun(zoom.projectPath, zoom.pipelineName, zoom.runId, zoom.full);
   }
 }
 
@@ -179,6 +180,7 @@ async function projectRun(
   projectPath: string,
   pipelineName: string,
   runId: string,
+  full?: boolean,
 ): Promise<MissionState> {
   const projects = readProjects();
   const project = projects.find(p => p.path === projectPath);
@@ -202,6 +204,7 @@ async function projectRun(
     run,
     tracePath,
     isLive: run.outcome === "in-progress",
+    full,
     zoomHint: "",
   };
 }

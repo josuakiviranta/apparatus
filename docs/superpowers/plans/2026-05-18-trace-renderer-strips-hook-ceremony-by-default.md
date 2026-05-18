@@ -471,7 +471,7 @@ Test files modified inline (signature-compatible — new param is optional, no e
 
 ### Task 3.1: `replayTraceIntoApp` — accept `full?: boolean` option
 
-- [ ] **Step 3.1.1: Write the failing test**
+- [x] **Step 3.1.1: Write the failing test**
 
 In `src/cli/tests/replayTraceIntoApp.test.ts`, append a new `describe` block at the end:
 
@@ -525,13 +525,13 @@ describe("replayTraceIntoApp ceremony filter", () => {
 });
 ```
 
-- [ ] **Step 3.1.2: Run the new tests to verify they fail**
+- [x] **Step 3.1.2: Run the new tests to verify they fail**
 
 Run: `npx vitest run src/cli/tests/replayTraceIntoApp.test.ts -t "ceremony filter"`
 
 Expected: both tests FAIL (function doesn't accept the new option; cleaner isn't called).
 
-- [ ] **Step 3.1.3: Implement — extend `replayTraceIntoApp`**
+- [x] **Step 3.1.3: Implement — extend `replayTraceIntoApp`**
 
 Edit `src/cli/lib/replayTraceIntoApp.ts`. Add the import at the top:
 
@@ -575,7 +575,7 @@ export function replayTraceIntoApp(
 
 Rationale for re-stringifying: `mapTraceLineToEvent` takes a `string`. Re-serialising the filtered object keeps the existing per-line parser API stable. The `__unparseable` carrier preserves the pre-filter tolerance for malformed lines that today's test `replayTraceIntoApp.test.ts:38-50` ("tolerates malformed lines (skips them)") pins.
 
-- [ ] **Step 3.1.4: Re-run the test suite for the file**
+- [x] **Step 3.1.4: Re-run the test suite for the file**
 
 Run: `npx vitest run src/cli/tests/replayTraceIntoApp.test.ts`
 
@@ -583,7 +583,7 @@ Expected: all tests PASS, including the 3 existing ones (smoke, malformed, non-e
 
 ### Task 3.2: `tailPipelineJsonl` — accept `full?: boolean` option
 
-- [ ] **Step 3.2.1: Write the failing test**
+- [x] **Step 3.2.1: Write the failing test**
 
 In `src/cli/tests/pipeline-jsonl-tail.test.ts`, append a new `describe` block at the end. Below uses the same `vi.doMock` pattern as Task 3.1.1:
 
@@ -639,13 +639,13 @@ describe("tailPipelineJsonl ceremony filter", () => {
 });
 ```
 
-- [ ] **Step 3.2.2: Run the new tests to verify they fail**
+- [x] **Step 3.2.2: Run the new tests to verify they fail**
 
 Run: `npx vitest run src/cli/tests/pipeline-jsonl-tail.test.ts -t "ceremony filter"`
 
 Expected: both tests FAIL.
 
-- [ ] **Step 3.2.3: Implement — extend `tailPipelineJsonl`**
+- [x] **Step 3.2.3: Implement — extend `tailPipelineJsonl`**
 
 Edit `src/cli/lib/pipeline-jsonl-tail.ts`. Add the import at the top:
 
@@ -718,7 +718,7 @@ for (const line of lines) {
 
 The per-line cleaner call (`cleanJsonlEvents([parsed])`) keeps the filter logic centralised in one module — design § 6 "Pure function discipline" allows this since the filter is `O(n)` over its input, so passing single-line arrays is the same cost as a per-frame predicate.
 
-- [ ] **Step 3.2.4: Re-run the test suite for the file**
+- [x] **Step 3.2.4: Re-run the test suite for the file**
 
 Run: `npx vitest run src/cli/tests/pipeline-jsonl-tail.test.ts`
 
@@ -726,7 +726,7 @@ Expected: all existing tests + the 2 new ones PASS.
 
 ### Task 3.3: `PipelineTraceView` — accept `full` prop
 
-- [ ] **Step 3.3.1: Modify the Props interface**
+- [x] **Step 3.3.1: Modify the Props interface**
 
 Edit `src/cli/components/PipelineTraceView.tsx`. Replace the `Props` interface:
 
@@ -763,7 +763,7 @@ to:
 export function PipelineTraceView({ tracePath, runId: _runId, isLive, full, onPipelineEnd }: Props) {
 ```
 
-- [ ] **Step 3.3.2: Thread `full` through to tail + replay**
+- [x] **Step 3.3.2: Thread `full` through to tail + replay**
 
 In the `useEffect` body, replace:
 
@@ -798,7 +798,7 @@ Also update the `useEffect` dependency array — replace `[tracePath, isLive]` w
 
 ### Task 3.4: `renderTraceView` — accept `full` arg
 
-- [ ] **Step 3.4.1: Modify the function signature**
+- [x] **Step 3.4.1: Modify the function signature**
 
 Edit `src/cli/lib/render-trace-view.ts`. Replace:
 
@@ -835,7 +835,7 @@ React.createElement(PipelineTraceView, {
 
 ### Task 3.5: `MissionStateRun` carries `full` flag
 
-- [ ] **Step 3.5.1: Extend the type**
+- [x] **Step 3.5.1: Extend the type**
 
 Edit `src/cli/lib/mission-control.ts`. Replace the `MissionStateRun` interface (currently at lines 71-79):
 
@@ -866,7 +866,7 @@ export interface MissionStateRun {
 }
 ```
 
-- [ ] **Step 3.5.2: Extend `MissionZoom` for the run level**
+- [x] **Step 3.5.2: Extend `MissionZoom` for the run level**
 
 Replace the `MissionZoom` type:
 
@@ -888,7 +888,7 @@ export type MissionZoom =
   | { level: "run";      projectPath: string; pipelineName: string; runId: string; full?: boolean };
 ```
 
-- [ ] **Step 3.5.3: Thread `full` through `projectRun`**
+- [x] **Step 3.5.3: Thread `full` through `projectRun`**
 
 In `src/cli/lib/mission-control.ts`, replace the `projectRun` function signature:
 
@@ -940,7 +940,7 @@ return {
 };
 ```
 
-- [ ] **Step 3.5.4: Forward `full` from `getMissionControlState`**
+- [x] **Step 3.5.4: Forward `full` from `getMissionControlState`**
 
 Replace the `getMissionControlState` body:
 
@@ -970,7 +970,7 @@ export async function getMissionControlState(zoom: MissionZoom): Promise<Mission
 
 ### Task 3.6: `mission-control-render` forwards `full` into `renderTraceView`
 
-- [ ] **Step 3.6.1: Modify `renderRun`**
+- [x] **Step 3.6.1: Modify `renderRun`**
 
 Edit `src/cli/lib/mission-control-render.ts`. Replace the `renderRun` body:
 
@@ -1001,7 +1001,7 @@ export async function renderRun(s: MissionStateRun): Promise<void> {
 
 ### Task 3.7: `statusCommand` accepts and forwards `full`
 
-- [ ] **Step 3.7.1: Modify the `StatusArgs` interface**
+- [x] **Step 3.7.1: Modify the `StatusArgs` interface**
 
 Edit `src/cli/commands/status.ts`. Replace the `StatusArgs` interface:
 
@@ -1024,7 +1024,7 @@ export interface StatusArgs {
 }
 ```
 
-- [ ] **Step 3.7.2: Thread `full` into the zoom**
+- [x] **Step 3.7.2: Thread `full` into the zoom**
 
 Replace the `toZoom` function:
 
@@ -1052,7 +1052,7 @@ function toZoom(args: StatusArgs): MissionZoom {
 
 ### Task 3.8: Register `--full` on `apparat status`
 
-- [ ] **Step 3.8.1: Edit `src/cli/program.ts:271-283`**
+- [x] **Step 3.8.1: Edit `src/cli/program.ts:271-283`**
 
 Replace the existing `status` command registration:
 
@@ -1099,19 +1099,19 @@ Examples:
 
 ### Task 3.9: Typecheck + run all affected suites
 
-- [ ] **Step 3.9.1: Typecheck**
+- [x] **Step 3.9.1: Typecheck**
 
 Run: `npx tsc --noEmit`
 
 Expected: no errors.
 
-- [ ] **Step 3.9.2: Run all tests touching the modified surfaces**
+- [x] **Step 3.9.2: Run all tests touching the modified surfaces**
 
 Run: `npx vitest run src/cli/tests/replayTraceIntoApp.test.ts src/cli/tests/pipeline-jsonl-tail.test.ts src/cli/tests/mission-control.test.ts src/cli/tests/pipeline-trace-command-validation.test.ts`
 
 Expected: all tests PASS.
 
-- [ ] **Step 3.9.3: Manual exercise — `apparat status --help` shows `--full`**
+- [x] **Step 3.9.3: Manual exercise — `apparat status --help` shows `--full`**
 
 Run: `npx tsx src/cli/index.ts status --help`
 
@@ -1119,7 +1119,7 @@ Expected: the printed help text contains a `--full` option whose description beg
 
 ### Task 3.10: Commit
 
-- [ ] **Step 3.10.1: Commit Chunk 3**
+- [x] **Step 3.10.1: Commit Chunk 3**
 
 ```bash
 git add src/cli/lib/replayTraceIntoApp.ts src/cli/lib/pipeline-jsonl-tail.ts \

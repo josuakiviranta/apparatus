@@ -2,6 +2,7 @@
 import { existsSync, readFileSync, watch, type FSWatcher } from "fs";
 import type { NodeEvent } from "./pipelineEvents.js";
 import { mapTraceLineToEvent } from "./replayTraceIntoApp.js";
+import { cleanJsonlEvents, type JsonlLine } from "./trace-cleaner.js";
 
 export interface TailHandle {
   stop(): void;
@@ -20,6 +21,7 @@ export function tailPipelineJsonl(
   tracePath: string,
   onEvent: (ev: NodeEvent) => void,
   onPipelineEnd?: () => void,
+  opts: { full?: boolean } = {},
 ): TailHandle {
   let offset = 0;
   let pending = "";
@@ -42,13 +44,21 @@ export function tailPipelineJsonl(
     pending = lines.pop() ?? "";
     for (const line of lines) {
       if (!line) continue;
-      try {
-        const obj = JSON.parse(line) as Record<string, unknown>;
-        if (obj.kind === "pipeline-end" && !endFired) {
+      let parsed: JsonlLine | null = null;
+      try { parsed = JSON.parse(line) as JsonlLine; } catch { /* fall through */ }
+      if (parsed) {
+        if (parsed.kind === "pipeline-end" && !endFired) {
           endFired = true;
           onPipelineEnd?.();
         }
-      } catch { /* fall through to mapper which also returns null */ }
+        if (!opts.full) {
+          const kept = cleanJsonlEvents([parsed]);
+          if (kept.length === 0) continue;
+          const ev = mapTraceLineToEvent(JSON.stringify(kept[0]));
+          if (ev) onEvent(ev);
+          continue;
+        }
+      }
       const ev = mapTraceLineToEvent(line);
       if (ev) onEvent(ev);
     }

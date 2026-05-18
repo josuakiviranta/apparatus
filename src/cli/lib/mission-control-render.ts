@@ -92,5 +92,6 @@ export async function renderRun(s: MissionStateRun): Promise<void> {
     tracePath: s.tracePath,
     runId: s.run.runId,
     isLive: s.isLive,
+    full: s.full,
   });
 }

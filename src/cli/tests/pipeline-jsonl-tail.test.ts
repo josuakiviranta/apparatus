@@ -77,3 +77,57 @@ describe("tailPipelineJsonl", () => {
     rmSync(dir, { recursive: true });
   });
 });
+
+describe("tailPipelineJsonl ceremony filter", () => {
+  it("calls cleanJsonlEvents per emitted line when full is not set", async () => {
+    const { mkdtempSync, writeFileSync, rmSync } = await import("fs");
+    const { tmpdir } = await import("os");
+    const { join } = await import("path");
+    const cleaner = vi.fn((lines: unknown[]) => lines);
+    vi.resetModules();
+    vi.doMock("../lib/trace-cleaner.js", () => ({ cleanJsonlEvents: cleaner }));
+
+    const dir = mkdtempSync(join(tmpdir(), "apparat-tail-clean-"));
+    const tracePath = join(dir, "pipeline.jsonl");
+    writeFileSync(
+      tracePath,
+      JSON.stringify({ kind: "node-start", nodeId: "n", nodeReceiveId: "n-1", timestamp: "t1" }) + "\n",
+    );
+
+    const mod = await import("../lib/pipeline-jsonl-tail.js");
+    const handle = mod.tailPipelineJsonl(tracePath, vi.fn());
+
+    expect(cleaner).toHaveBeenCalled();
+    handle.stop();
+
+    rmSync(dir, { recursive: true, force: true });
+    vi.doUnmock("../lib/trace-cleaner.js");
+    vi.resetModules();
+  });
+
+  it("skips the cleaner when full=true", async () => {
+    const { mkdtempSync, writeFileSync, rmSync } = await import("fs");
+    const { tmpdir } = await import("os");
+    const { join } = await import("path");
+    const cleaner = vi.fn((lines: unknown[]) => lines);
+    vi.resetModules();
+    vi.doMock("../lib/trace-cleaner.js", () => ({ cleanJsonlEvents: cleaner }));
+
+    const dir = mkdtempSync(join(tmpdir(), "apparat-tail-full-"));
+    const tracePath = join(dir, "pipeline.jsonl");
+    writeFileSync(
+      tracePath,
+      JSON.stringify({ kind: "node-start", nodeId: "n", nodeReceiveId: "n-1", timestamp: "t1" }) + "\n",
+    );
+
+    const mod = await import("../lib/pipeline-jsonl-tail.js");
+    const handle = mod.tailPipelineJsonl(tracePath, vi.fn(), undefined, { full: true });
+
+    expect(cleaner).not.toHaveBeenCalled();
+    handle.stop();
+
+    rmSync(dir, { recursive: true, force: true });
+    vi.doUnmock("../lib/trace-cleaner.js");
+    vi.resetModules();
+  });
+});

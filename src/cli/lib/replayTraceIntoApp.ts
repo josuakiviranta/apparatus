@@ -1,6 +1,7 @@
 // src/cli/lib/replayTraceIntoApp.ts
 import { readFileSync, existsSync } from "fs";
 import type { NodeEvent } from "./pipelineEvents.js";
+import { cleanJsonlEvents, type JsonlLine } from "./trace-cleaner.js";
 
 /**
  * Map one tracer JSONL line (already a string) to a NodeEvent that
@@ -57,6 +58,7 @@ export function mapTraceLineToEvent(line: string): NodeEvent | null {
 export function replayTraceIntoApp(
   tracePath: string,
   emit: (ev: NodeEvent) => void,
+  opts: { full?: boolean } = {},
 ): void {
   if (!existsSync(tracePath)) return;
   let content: string;
@@ -65,9 +67,20 @@ export function replayTraceIntoApp(
   } catch {
     return;
   }
-  for (const line of content.split("\n")) {
-    if (!line) continue;
-    const ev = mapTraceLineToEvent(line);
+  const rawLines = content.split("\n").filter(l => l.length > 0);
+  const parsed: JsonlLine[] = [];
+  for (const line of rawLines) {
+    try { parsed.push(JSON.parse(line) as JsonlLine); }
+    catch { parsed.push({ __unparseable: line } as JsonlLine); }
+  }
+  const visible = opts.full ? parsed : cleanJsonlEvents(parsed);
+  for (const obj of visible) {
+    if ((obj as { __unparseable?: string }).__unparseable !== undefined) {
+      const ev = mapTraceLineToEvent((obj as { __unparseable: string }).__unparseable);
+      if (ev) emit(ev);
+      continue;
+    }
+    const ev = mapTraceLineToEvent(JSON.stringify(obj));
     if (ev) emit(ev);
   }
 }
