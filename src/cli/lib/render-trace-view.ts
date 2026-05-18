@@ -6,6 +6,7 @@ export async function renderTraceView(args: {
   tracePath: string;
   runId: string;
   isLive: boolean;
+  full?: boolean;
 }): Promise<void> {
   let resolve!: () => void;
   const done = new Promise<void>((r) => { resolve = r; });
@@ -15,6 +16,7 @@ export async function renderTraceView(args: {
       tracePath: args.tracePath,
       runId: args.runId,
       isLive: args.isLive,
+      full: args.full,
       onPipelineEnd: () => resolve(),
     }),
     { patchConsole: false, exitOnCtrlC: true },

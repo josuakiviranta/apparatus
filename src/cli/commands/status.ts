@@ -12,6 +12,7 @@ export interface StatusArgs {
   project?: string;
   pipeline?: string;
   runId?: string;
+  full?: boolean;
 }
 
 export async function statusCommand(args: StatusArgs = {}): Promise<void> {
@@ -34,5 +35,5 @@ function toZoom(args: StatusArgs): MissionZoom {
   const projectPath = resolve(args.project);
   if (!args.pipeline) return { level: "project", projectPath };
   if (!args.runId)    return { level: "pipeline", projectPath, pipelineName: args.pipeline };
-  return { level: "run", projectPath, pipelineName: args.pipeline, runId: args.runId };
+  return { level: "run", projectPath, pipelineName: args.pipeline, runId: args.runId, full: args.full };
 }

@@ -271,15 +271,22 @@ placeholder values — no LLM invoked, no run dir created.
   program
     .command("status [project] [pipeline] [runId]")
     .description("Mission control — in-progress runs at top; zoom by appending the next token shown")
+    .option("--full", "disable the default ceremony filter on the run-zoom trace view (escape hatch — emits raw JSONL including SessionStart hooks, rate_limit_event, and tool_result echoes)")
     .addHelpText("after", `
 Examples:
   apparat status                                # all projects + running now
   apparat status /path/to/proj                  # one project: pipelines roster + recent runs
   apparat status /path/to/proj demo             # one pipeline: runs table
   apparat status /path/to/proj demo <runId>     # one run: trace (auto-tails if in-progress)
+  apparat status /path/to/proj demo <runId> --full   # run-zoom trace with ceremony filter disabled
 `)
-    .action(async (project: string | undefined, pipeline: string | undefined, runId: string | undefined) => {
-      await statusCommand({ project, pipeline, runId });
+    .action(async (
+      project: string | undefined,
+      pipeline: string | undefined,
+      runId: string | undefined,
+      opts: { full?: boolean },
+    ) => {
+      await statusCommand({ project, pipeline, runId, full: opts.full });
     });
 
   registerHeartbeatCommand(program);

@@ -157,3 +157,55 @@ describe("mapTraceLineToEvent", () => {
     expect(mapTraceLineToEvent("")).toBeNull();
   });
 });
+
+describe("replayTraceIntoApp ceremony filter", () => {
+  it("calls cleanJsonlEvents when full is not set", async () => {
+    const { mkdtempSync, writeFileSync, rmSync } = await import("fs");
+    const { tmpdir } = await import("os");
+    const { join } = await import("path");
+    const cleaner = vi.fn((lines: unknown[]) => lines);
+    vi.resetModules();
+    vi.doMock("../lib/trace-cleaner.js", () => ({ cleanJsonlEvents: cleaner }));
+
+    const dir = mkdtempSync(join(tmpdir(), "apparat-replay-clean-"));
+    const tracePath = join(dir, "pipeline.jsonl");
+    writeFileSync(
+      tracePath,
+      JSON.stringify({ kind: "node-start", nodeId: "n", nodeReceiveId: "n-1", timestamp: "t1" }) + "\n",
+    );
+
+    const mod = await import("../lib/replayTraceIntoApp.js");
+    mod.replayTraceIntoApp(tracePath, vi.fn());
+
+    expect(cleaner).toHaveBeenCalledTimes(1);
+
+    rmSync(dir, { recursive: true, force: true });
+    vi.doUnmock("../lib/trace-cleaner.js");
+    vi.resetModules();
+  });
+
+  it("skips the cleaner when full=true", async () => {
+    const { mkdtempSync, writeFileSync, rmSync } = await import("fs");
+    const { tmpdir } = await import("os");
+    const { join } = await import("path");
+    const cleaner = vi.fn((lines: unknown[]) => lines);
+    vi.resetModules();
+    vi.doMock("../lib/trace-cleaner.js", () => ({ cleanJsonlEvents: cleaner }));
+
+    const dir = mkdtempSync(join(tmpdir(), "apparat-replay-full-"));
+    const tracePath = join(dir, "pipeline.jsonl");
+    writeFileSync(
+      tracePath,
+      JSON.stringify({ kind: "node-start", nodeId: "n", nodeReceiveId: "n-1", timestamp: "t1" }) + "\n",
+    );
+
+    const mod = await import("../lib/replayTraceIntoApp.js");
+    mod.replayTraceIntoApp(tracePath, vi.fn(), { full: true });
+
+    expect(cleaner).not.toHaveBeenCalled();
+
+    rmSync(dir, { recursive: true, force: true });
+    vi.doUnmock("../lib/trace-cleaner.js");
+    vi.resetModules();
+  });
+});

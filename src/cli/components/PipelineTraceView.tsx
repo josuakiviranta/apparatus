@@ -18,12 +18,13 @@ interface Props {
   tracePath: string;
   runId: string;
   isLive: boolean;
+  full?: boolean;
   onPipelineEnd?: () => void;
 }
 
 const HEADER_WIDTH = 80;
 
-export function PipelineTraceView({ tracePath, runId: _runId, isLive, onPipelineEnd }: Props) {
+export function PipelineTraceView({ tracePath, runId: _runId, isLive, full, onPipelineEnd }: Props) {
   const [items, setItems] = useState<StaticItem[]>([]);
 
   useEffect(() => {
@@ -64,14 +65,17 @@ export function PipelineTraceView({ tracePath, runId: _runId, isLive, onPipeline
     };
 
     if (isLive) {
-      const handle: TailHandle = tailPipelineJsonl(tracePath, handleEvent, () => {
-        onPipelineEnd?.();
-      });
+      const handle: TailHandle = tailPipelineJsonl(
+        tracePath,
+        handleEvent,
+        () => { onPipelineEnd?.(); },
+        { full },
+      );
       return () => handle.stop();
     } else {
-      replayTraceIntoApp(tracePath, handleEvent);
+      replayTraceIntoApp(tracePath, handleEvent, { full });
     }
-  }, [tracePath, isLive]);
+  }, [tracePath, isLive, full]);
 
   return (
     <Static items={items}>
