@@ -1,0 +1,10 @@
+digraph TraceRendererStripCeremony {
+  // Smoke fixture for the trace renderer ceremony filter.
+  // The fixture does not invoke 'apparat pipeline run' — it pre-stages
+  // a synthetic run dir and exercises 'apparat pipeline trace' directly.
+  // This .dot exists to register the fixture name with the smoke index.
+  graph [name="trace-renderer-strip-ceremony"];
+  start [shape=circle];
+  start -> demo;
+  demo  [agent="demo.md"];
+}
