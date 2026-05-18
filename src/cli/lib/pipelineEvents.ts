@@ -27,7 +27,7 @@ export type NodeEvent =
   | { kind: "stats"; tokensIn: number; tokensOut: number }
   | { kind: "driver-event"; payload: DriverPayload }
   | { kind: "stream-line"; event: StreamEvent }
-  | { kind: "end"; outcome: Outcome; stats?: Partial<Stats> }
+  | { kind: "end"; outcome: Outcome; stats?: Partial<Stats>; contextDelta?: string }
   | { kind: "failure-handoff"; handoff: FailureHandoff };
 
 export type Block = {

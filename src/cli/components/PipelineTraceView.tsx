@@ -45,9 +45,17 @@ export function PipelineTraceView({ tracePath, runId: _runId, isLive, full, onPi
       } else if (ev.kind === "end" && liveBlockId && liveNodeId) {
         const closedId = liveBlockId;
         const closedNodeId = liveNodeId;
-        setItems(prev => [
-          ...prev,
-          {
+        const delta = ev.contextDelta;
+        setItems(prev => {
+          const next = [...prev];
+          if (delta) {
+            next.push({
+              kind: "body-line",
+              id: `${closedId}-delta`,
+              line: { kind: "text", role: "system", text: delta },
+            });
+          }
+          next.push({
             kind: "block-close",
             id: `${closedId}-close`,
             block: {
@@ -59,8 +67,9 @@ export function PipelineTraceView({ tracePath, runId: _runId, isLive, full, onPi
               outcome: ev.outcome,
               stats: { turns: 0, tokensIn: 0, tokensOut: 0, durationMs: 0 },
             },
-          },
-        ]);
+          });
+          return next;
+        });
       }
     };
 
