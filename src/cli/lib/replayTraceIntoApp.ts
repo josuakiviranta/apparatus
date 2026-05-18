@@ -2,6 +2,7 @@
 import { readFileSync, existsSync } from "fs";
 import type { NodeEvent } from "./pipelineEvents.js";
 import { cleanJsonlEvents, type JsonlLine } from "./trace-cleaner.js";
+import { renderContextDelta } from "./trace-delta.js";
 
 /**
  * Map one tracer JSONL line (already a string) to a NodeEvent that
@@ -38,12 +39,12 @@ export function mapTraceLineToEvent(line: string): NodeEvent | null {
     case "node-end": {
       const success = Boolean(trace.success);
       const failureReason = trace.failureReason != null ? String(trace.failureReason) : undefined;
+      const updates = trace.contextUpdates as Record<string, unknown> | undefined;
+      const delta = updates ? renderContextDelta(updates) : "";
       return {
         kind: "end",
-        outcome: {
-          status: success ? "success" : "fail",
-          reason: failureReason,
-        },
+        outcome: { status: success ? "success" : "fail", reason: failureReason },
+        contextDelta: delta || undefined,
       };
     }
     case "pipeline-start":

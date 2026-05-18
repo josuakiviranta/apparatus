@@ -43,6 +43,28 @@ describe("PipelineTraceView", () => {
     rmSync(dir, { recursive: true });
   });
 
+  it("renders a dim system body-line carrying the contextDelta under each closed block", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "trace-delta-view-"));
+    const file = join(dir, "pipeline.jsonl");
+    writeFileSync(file,
+      JSON.stringify({ kind: "node-start", nodeId: "verifier", nodeReceiveId: "verifier-1", contextSnapshot: {} }) + "\n" +
+      JSON.stringify({ kind: "node-end",   success: true, contextUpdates: { "verifier.ok": true } }) + "\n"
+    );
+    const { lastFrame, unmount } = render(
+      <PipelineTraceView tracePath={file} runId="r1" isLive={false} />
+    );
+    await flush();
+    const out = lastFrame() ?? "";
+    expect(out).toContain("verifier");
+    // The delta line contains the synthesized contextDelta; the leading "+"
+    // is rendered through marked-terminal which converts it to a list bullet,
+    // but the underlying data ("verifier.ok=true") is preserved verbatim.
+    expect(out).toContain("verifier.ok=true");
+    expect(out).toContain("system:");
+    unmount();
+    rmSync(dir, { recursive: true });
+  });
+
   it("fires onPipelineEnd callback when pipeline-end appears (live mode)", async () => {
     const dir = mkdtempSync(join(tmpdir(), "trace-end-"));
     const file = join(dir, "pipeline.jsonl");

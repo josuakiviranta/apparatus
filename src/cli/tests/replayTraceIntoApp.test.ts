@@ -156,6 +156,28 @@ describe("mapTraceLineToEvent", () => {
     expect(mapTraceLineToEvent("{not json")).toBeNull();
     expect(mapTraceLineToEvent("")).toBeNull();
   });
+
+  it("attaches a contextDelta string when node-end carries contextUpdates", () => {
+    const line = JSON.stringify({
+      kind: "node-end", success: true,
+      contextUpdates: { "verifier.ok": true, "verifier.summary": "design exists" },
+    });
+    const ev = mapTraceLineToEvent(line);
+    expect(ev?.kind).toBe("end");
+    expect((ev as any).contextDelta).toBe(`+ verifier.ok=true  + verifier.summary="design exists"`);
+  });
+
+  it("omits contextDelta (undefined) when contextUpdates is empty", () => {
+    const line = JSON.stringify({ kind: "node-end", success: true, contextUpdates: {} });
+    const ev = mapTraceLineToEvent(line);
+    expect((ev as any).contextDelta).toBeUndefined();
+  });
+
+  it("omits contextDelta when the node-end line lacks contextUpdates entirely", () => {
+    const line = JSON.stringify({ kind: "node-end", success: true });
+    const ev = mapTraceLineToEvent(line);
+    expect((ev as any).contextDelta).toBeUndefined();
+  });
 });
 
 describe("replayTraceIntoApp ceremony filter", () => {
