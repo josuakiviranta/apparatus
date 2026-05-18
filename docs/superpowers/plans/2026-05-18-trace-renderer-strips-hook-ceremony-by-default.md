@@ -265,7 +265,7 @@ plan_writer.under_declared_shape_consumer_suspected: c2 -> src/cli/lib/trace-cle
 
 ### Task 2.1: Failing test — `pipeline trace` invokes the cleaner
 
-- [ ] **Step 2.1.1: Add a failing test to `src/cli/tests/pipeline-trace-command-validation.test.ts`**
+- [x] **Step 2.1.1: Add a failing test to `src/cli/tests/pipeline-trace-command-validation.test.ts`**
 
 Open `src/cli/tests/pipeline-trace-command-validation.test.ts` and append a new `describe` block at the end of the file (preserve existing tests). The new block stubs the cleaner via vitest's module mock and verifies that running `pipelineTraceCommand(runId)` with `opts.full !== true` calls `cleanJsonlEvents` exactly once with the parsed line array, and with `opts.full === true` does NOT call it.
 
@@ -324,7 +324,7 @@ describe("pipelineTraceCommand routes through cleanJsonlEvents", () => {
 });
 ```
 
-- [ ] **Step 2.1.2: Run the test to verify it fails**
+- [x] **Step 2.1.2: Run the test to verify it fails**
 
 Run: `npx vitest run src/cli/tests/pipeline-trace-command-validation.test.ts -t "routes through cleanJsonlEvents"`
 
@@ -332,7 +332,7 @@ Expected: both new tests FAIL — the cleaner spy is never called because trace.
 
 ### Task 2.2: Wire cleaner into `pipelineTraceCommand`
 
-- [ ] **Step 2.2.1: Add the import to `src/cli/commands/pipeline/trace.ts`**
+- [x] **Step 2.2.1: Add the import to `src/cli/commands/pipeline/trace.ts`**
 
 At the top of the file, add the import alongside the existing imports:
 
@@ -340,7 +340,7 @@ At the top of the file, add the import alongside the existing imports:
 import { cleanJsonlEvents, type JsonlLine } from "../../lib/trace-cleaner.js";
 ```
 
-- [ ] **Step 2.2.2: Route the parsed line array through `cleanJsonlEvents`**
+- [x] **Step 2.2.2: Route the parsed line array through `cleanJsonlEvents`**
 
 In `src/cli/commands/pipeline/trace.ts`, replace the existing line 32:
 
@@ -357,13 +357,13 @@ const lines = (opts.full ? parsedLines : cleanJsonlEvents(parsedLines)) as Array
 
 The downstream code at lines 34–97 continues to treat `lines` as `Array<Record<string, unknown>>`. The cast preserves the existing typing.
 
-- [ ] **Step 2.2.3: Run the test to verify it passes**
+- [x] **Step 2.2.3: Run the test to verify it passes**
 
 Run: `npx vitest run src/cli/tests/pipeline-trace-command-validation.test.ts -t "routes through cleanJsonlEvents"`
 
 Expected: both new tests PASS.
 
-- [ ] **Step 2.2.4: Run the full pipeline trace validation suite to verify no regression**
+- [x] **Step 2.2.4: Run the full pipeline trace validation suite to verify no regression**
 
 Run: `npx vitest run src/cli/tests/pipeline-trace-command-validation.test.ts`
 
@@ -371,7 +371,7 @@ Expected: all existing tests in the file continue to PASS.
 
 ### Task 2.3: Update `--full` help text
 
-- [ ] **Step 2.3.1: Edit `src/cli/program.ts:221`**
+- [x] **Step 2.3.1: Edit `src/cli/program.ts:221`**
 
 Replace:
 
@@ -385,7 +385,7 @@ with:
 .option("--full", "disable the default ceremony filter; emit the raw JSONL trace including SessionStart hooks, rate_limit_event, and tool_result echoes (escape hatch — primary consumer is Claude in agent context, ceremony is filtered by default to save token budget)")
 ```
 
-- [ ] **Step 2.3.2: Verify the help output**
+- [x] **Step 2.3.2: Verify the help output**
 
 Run: `npx tsx src/cli/index.ts pipeline trace --help`
 
@@ -395,13 +395,13 @@ Expected: the `--full` line in the printed help text contains the phrase "disabl
 
 The `inspectCommand` recipe in `src/cli/lib/node-receive-inspector.ts:78-85` continues to emit `apparat pipeline trace <runId> --node-receive <id> --full` for failure recovery. The literal string is unchanged.
 
-- [ ] **Step 2.4.1: Re-run `failure-handoff.test.ts` and `pipeline-failure-footer-scenario.test.ts`**
+- [x] **Step 2.4.1: Re-run `failure-handoff.test.ts` and `pipeline-failure-footer-scenario.test.ts`**
 
 Run: `npx vitest run src/cli/tests/failure-handoff.test.ts src/cli/tests/pipeline-failure-footer-scenario.test.ts`
 
 Expected: all tests PASS without snapshot changes (no string drift).
 
-- [ ] **Step 2.4.2: Re-run `node-receive-inspector.test.ts`**
+- [x] **Step 2.4.2: Re-run `node-receive-inspector.test.ts`**
 
 The inspector's `opts.full` semantics (wrap toggle inside the context-snapshot printer) are preserved verbatim per design § 2 point 3.
 
@@ -411,13 +411,13 @@ Expected: all tests PASS, no snapshot drift.
 
 ### Task 2.5: Typecheck and commit
 
-- [ ] **Step 2.5.1: Typecheck**
+- [x] **Step 2.5.1: Typecheck**
 
 Run: `npx tsc --noEmit`
 
 Expected: no errors.
 
-- [ ] **Step 2.5.2: Commit Chunk 2**
+- [x] **Step 2.5.2: Commit Chunk 2**
 
 ```bash
 git add src/cli/commands/pipeline/trace.ts src/cli/program.ts src/cli/tests/pipeline-trace-command-validation.test.ts

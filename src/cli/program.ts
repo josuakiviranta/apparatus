@@ -218,7 +218,7 @@ When a plain name is given (no path separators or .dot extension), resolves to
     .command("trace <runId>")
     .description("inspect a pipeline run trace")
     .option("--node-receive <nodeReceiveId>", "show context snapshot for a specific node invocation")
-    .option("--full", "show full context values without truncation")
+    .option("--full", "disable the default ceremony filter; emit the raw JSONL trace including SessionStart hooks, rate_limit_event, and tool_result echoes (escape hatch — primary consumer is Claude in agent context, ceremony is filtered by default to save token budget)")
     .option("--project <folder>", "Project folder for trace lookup (defaults to cwd)")
     .action(async (runId: string, opts: { nodeReceive?: string; full?: boolean; project?: string }) => {
       await pipelineTraceCommand(runId, opts);

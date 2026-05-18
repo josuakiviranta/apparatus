@@ -3,6 +3,7 @@ import { resolve, join } from "path";
 import { runDir } from "../../lib/apparat-paths.js";
 import * as output from "../../lib/output.js";
 import { renderNodeReceive } from "../../lib/node-receive-inspector.js";
+import { cleanJsonlEvents, type JsonlLine } from "../../lib/trace-cleaner.js";
 
 export async function pipelineTraceCommand(
   runId: string,
@@ -29,7 +30,8 @@ export async function pipelineTraceCommand(
     return;
   }
 
-  const lines = raw.trim().split("\n").map(l => JSON.parse(l) as Record<string, unknown>);
+  const parsedLines = raw.trim().split("\n").map(l => JSON.parse(l) as JsonlLine);
+  const lines = (opts.full ? parsedLines : cleanJsonlEvents(parsedLines)) as Array<Record<string, unknown>>;
 
   if (opts.nodeReceive) {
     const event = lines.find(
