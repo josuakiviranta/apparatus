@@ -103,3 +103,57 @@ describe("pipeline trace --node-receive surfaces validation attempts", () => {
     }
   });
 });
+
+describe("pipelineTraceCommand routes through cleanJsonlEvents", () => {
+  it("calls cleanJsonlEvents once on the parsed lines when --full is absent", async () => {
+    vi.resetModules();
+    const cleaner = vi.fn((lines: unknown[]) => lines);
+    vi.doMock("../lib/trace-cleaner.js", () => ({ cleanJsonlEvents: cleaner }));
+
+    const { mkdtempSync, writeFileSync, mkdirSync } = await import("fs");
+    const { tmpdir } = await import("os");
+    const { join } = await import("path");
+    const project = mkdtempSync(join(tmpdir(), "apparat-trace-clean-"));
+    mkdirSync(join(project, ".apparat", "runs", "demo-1234"), { recursive: true });
+    writeFileSync(
+      join(project, ".apparat", "runs", "demo-1234", "pipeline.jsonl"),
+      JSON.stringify({ kind: "pipeline-start", runId: "demo-1234", timestamp: "t0" }) + "\n" +
+      JSON.stringify({ kind: "node-start", nodeId: "n1", nodeReceiveId: "n1-1", nodeKind: "agent", timestamp: "t1", contextSnapshot: {} }) + "\n" +
+      JSON.stringify({ kind: "node-end", nodeId: "n1", nodeReceiveId: "n1-1", success: true, timestamp: "t2" }) + "\n" +
+      JSON.stringify({ kind: "pipeline-end", runId: "demo-1234", outcome: "success", timestamp: "t3" }) + "\n",
+    );
+
+    const mod = await import("../commands/pipeline/trace.js");
+    await mod.pipelineTraceCommand("demo-1234", { project });
+
+    expect(cleaner).toHaveBeenCalledTimes(1);
+    expect(cleaner.mock.calls[0][0]).toHaveLength(4);
+
+    vi.doUnmock("../lib/trace-cleaner.js");
+    vi.resetModules();
+  });
+
+  it("does NOT call cleanJsonlEvents when --full is set", async () => {
+    vi.resetModules();
+    const cleaner = vi.fn((lines: unknown[]) => lines);
+    vi.doMock("../lib/trace-cleaner.js", () => ({ cleanJsonlEvents: cleaner }));
+
+    const { mkdtempSync, writeFileSync, mkdirSync } = await import("fs");
+    const { tmpdir } = await import("os");
+    const { join } = await import("path");
+    const project = mkdtempSync(join(tmpdir(), "apparat-trace-full-"));
+    mkdirSync(join(project, ".apparat", "runs", "demo-5678"), { recursive: true });
+    writeFileSync(
+      join(project, ".apparat", "runs", "demo-5678", "pipeline.jsonl"),
+      JSON.stringify({ kind: "node-start", nodeId: "n1", nodeReceiveId: "n1-1", nodeKind: "agent", timestamp: "t1", contextSnapshot: {} }) + "\n",
+    );
+
+    const mod = await import("../commands/pipeline/trace.js");
+    await mod.pipelineTraceCommand("demo-5678", { project, full: true });
+
+    expect(cleaner).not.toHaveBeenCalled();
+
+    vi.doUnmock("../lib/trace-cleaner.js");
+    vi.resetModules();
+  });
+});
