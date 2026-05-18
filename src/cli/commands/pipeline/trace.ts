@@ -4,6 +4,7 @@ import { runDir } from "../../lib/apparat-paths.js";
 import * as output from "../../lib/output.js";
 import { renderNodeReceive } from "../../lib/node-receive-inspector.js";
 import { cleanJsonlEvents, type JsonlLine } from "../../lib/trace-cleaner.js";
+import { renderContextDelta } from "../../lib/trace-delta.js";
 
 export async function pipelineTraceCommand(
   runId: string,
@@ -89,13 +90,15 @@ export async function pipelineTraceCommand(
 
   for (const ns of nodeStarts) {
     const ne = nodeEnds.find(e => e.nodeReceiveId === ns.nodeReceiveId);
-    const snapshot = (ns.contextSnapshot as Record<string, unknown>) ?? {};
-    const ctxKeys = Object.keys(snapshot);
-    const ctxDisplay = ctxKeys.length === 0
-      ? "{}"
-      : `{${ctxKeys.slice(0, 3).join(", ")}${ctxKeys.length > 3 ? ", ..." : ""}}`;
     const status = ne ? (ne.success ? "✓" : "✗") : "…";
-    console.log(`  ${String(ns.nodeReceiveId).padEnd(20)} ${String(ns.nodeId).padEnd(12)} ${String(ns.nodeKind).padEnd(18)} ${status}  ctx: ${ctxDisplay}`);
+    let ctxDisplay: string;
+    if (!ne) {
+      ctxDisplay = "(no contextUpdates — node did not complete)";
+    } else {
+      const updates = (ne.contextUpdates as Record<string, unknown>) ?? {};
+      ctxDisplay = renderContextDelta(updates) || "—";
+    }
+    console.log(`  ${String(ns.nodeReceiveId).padEnd(20)} ${String(ns.nodeId).padEnd(12)} ${String(ns.nodeKind).padEnd(18)} ${status}  ${ctxDisplay}`);
   }
   console.log();
 }

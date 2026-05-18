@@ -157,3 +157,75 @@ describe("pipelineTraceCommand routes through cleanJsonlEvents", () => {
     vi.resetModules();
   });
 });
+
+describe("pipelineTraceCommand roster renders per-node deltas (not snapshot keys)", () => {
+  const logs: string[] = [];
+  const origLog = console.log;
+  beforeEach(() => { logs.length = 0; });
+  beforeAll(() => { console.log = (...a: unknown[]) => logs.push(a.map(String).join(" ")); });
+  afterAll(() => { console.log = origLog; });
+
+  it("prints `+ key=value` per node-end contextUpdates, not snapshot keys", async () => {
+    const projectRoot = mkdtempSync(join(tmpdir(), "trace-delta-"));
+    const traceDir = runDir(projectRoot, "delta-r1");
+    mkdirSync(traceDir, { recursive: true });
+    const tracePath = join(traceDir, "pipeline.jsonl");
+
+    const lines = [
+      { kind: "pipeline-start", runId: "delta-r1", pipelineName: "p", nodes: ["start","verifier"], timestamp: "" },
+      { kind: "node-start", nodeReceiveId: "start-1", nodeId: "start", nodeKind: "tool", timestamp: "t0", contextSnapshot: { $goal: "demo" } },
+      { kind: "node-end",   nodeReceiveId: "start-1", nodeId: "start", success: true, contextUpdates: { $goal: "demo" } },
+      { kind: "node-start", nodeReceiveId: "verifier-1", nodeId: "verifier", nodeKind: "agent", timestamp: "t1", contextSnapshot: { $goal: "demo", "verifier.ok": true } },
+      { kind: "node-end",   nodeReceiveId: "verifier-1", nodeId: "verifier", success: true, contextUpdates: { "verifier.ok": true, "verifier.summary": "design exists" } },
+      { kind: "pipeline-end", runId: "delta-r1", outcome: "success", timestamp: "t2" },
+    ];
+    writeFileSync(tracePath, lines.map(l => JSON.stringify(l)).join("\n"));
+
+    await pipelineTraceCommand("delta-r1", { project: projectRoot });
+
+    const out = logs.join("\n");
+    expect(out).toMatch(/\+ \$goal="demo"/);
+    expect(out).toMatch(/\+ verifier\.ok=true/);
+    expect(out).toMatch(/\+ verifier\.summary="design exists"/);
+    expect(out).not.toMatch(/ctx:\s*\{\$goal,/);
+  });
+
+  it("renders the em-dash sentinel when node-end has empty contextUpdates", async () => {
+    const projectRoot = mkdtempSync(join(tmpdir(), "trace-delta-empty-"));
+    const traceDir = runDir(projectRoot, "delta-r2");
+    mkdirSync(traceDir, { recursive: true });
+    const tracePath = join(traceDir, "pipeline.jsonl");
+
+    const lines = [
+      { kind: "pipeline-start", runId: "delta-r2", pipelineName: "p", nodes: ["tail"], timestamp: "" },
+      { kind: "node-start", nodeReceiveId: "tail-1", nodeId: "tail", nodeKind: "tool", timestamp: "t0", contextSnapshot: {} },
+      { kind: "node-end",   nodeReceiveId: "tail-1", nodeId: "tail", success: true, contextUpdates: {} },
+      { kind: "pipeline-end", runId: "delta-r2", outcome: "success", timestamp: "t1" },
+    ];
+    writeFileSync(tracePath, lines.map(l => JSON.stringify(l)).join("\n"));
+
+    await pipelineTraceCommand("delta-r2", { project: projectRoot });
+
+    const out = logs.join("\n");
+    expect(out).toMatch(/tail-1 .* —$/m);
+  });
+
+  it("renders the missing-node-end sentinel when a node crashed mid-run", async () => {
+    const projectRoot = mkdtempSync(join(tmpdir(), "trace-delta-crash-"));
+    const traceDir = runDir(projectRoot, "delta-r3");
+    mkdirSync(traceDir, { recursive: true });
+    const tracePath = join(traceDir, "pipeline.jsonl");
+
+    const lines = [
+      { kind: "pipeline-start", runId: "delta-r3", pipelineName: "p", nodes: ["doomed"], timestamp: "" },
+      { kind: "node-start", nodeReceiveId: "doomed-1", nodeId: "doomed", nodeKind: "agent", timestamp: "t0", contextSnapshot: {} },
+      { kind: "pipeline-end", runId: "delta-r3", outcome: "failure", timestamp: "t1" },
+    ];
+    writeFileSync(tracePath, lines.map(l => JSON.stringify(l)).join("\n"));
+
+    await pipelineTraceCommand("delta-r3", { project: projectRoot });
+
+    const out = logs.join("\n");
+    expect(out).toMatch(/\(no contextUpdates — node did not complete\)/);
+  });
+});
