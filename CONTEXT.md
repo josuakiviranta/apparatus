@@ -199,6 +199,10 @@ overloaded across Claude Code's auto-memory feature, ADR-0007's empty
 `.apparat/memory/` slot, and these closure files. "Session-closure file"
 names what the artefact actually is.
 
+### Ceremony
+
+**Ceremony** — `SessionStart:startup` hook payloads (`hook_started` / `hook_response` envelopes), `rate_limit_event` frames, `additional_context` skill-prelude bodies, and assistant-side `tool_result` echoes that the Claude Code subprocess emits in every invocation. Filtered from trace renderers by default (`apparat pipeline trace <runId>`, `apparat status … <runId>`) since their primary consumer is Claude in agent context and ceremony costs token budget without diagnostic value. Preserved verbatim on disk (`raw-attempt-N.txt`) for forensic reads when SessionStart itself misfires. Pass `--full` to disable the filter. See [ADR-0019](docs/adr/0019-trace-renderer-default-clean.md).
+
 ### Project-local artefact
 
 A file or directory that meets BOTH clauses of the §1.2 partition principle

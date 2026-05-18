@@ -1,0 +1,6 @@
+
+run:     trace-smoke-deadbeef
+outcome: success
+nodes:
+  demo-1                demo         agent              ✓  ctx: {}
+
