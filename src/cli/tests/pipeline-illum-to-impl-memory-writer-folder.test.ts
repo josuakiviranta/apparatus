@@ -59,8 +59,9 @@ describe("PR1 sessions kill — parallel-illumination-to-implementation rewire",
     expect(dot).not.toMatch(/memory_reflector\b/);
   });
 
-  it('routes tmux_confirm_gate -> commit_push [label="Commit"] -> consume_implemented -> done', () => {
-    expect(dot).toMatch(/tmux_confirm_gate\s*->\s*commit_push\s*\[label="Commit"\]/);
+  it('routes tmux_confirm_gate -> doc_drift_sync [label="Commit"] -> commit_push -> consume_implemented -> done', () => {
+    expect(dot).toMatch(/tmux_confirm_gate\s*->\s*doc_drift_sync\s*\[label="Commit"\]/);
+    expect(dot).toMatch(/doc_drift_sync\s*->\s*commit_push/);
     expect(dot).toMatch(/commit_push\s*->\s*consume_implemented\s*->\s*done/);
   });
 

@@ -56,6 +56,8 @@ digraph parallel_illumination_to_implementation {
 
   tmux_confirm_gate [shape=hexagon]
 
+  doc_drift_sync [agent="doc-drift-sync"]
+
   // Tail safety-net push: re-pushes anything still pending after tmux_confirm_gate
   // (memory/doc/plan edits that may land in future tail nodes). Idempotent —
   // already-pushed SHAs are a no-op. Per-batch push lives in batch_orchestrator.
@@ -110,7 +112,8 @@ digraph parallel_illumination_to_implementation {
   // ── Routing: Phase 3 ─────────────────────────────────────────────────────
   // No review_gate — orchestrator/resolver feed tmux_tester directly per design.
   tmux_tester -> tmux_confirm_gate
-  tmux_confirm_gate -> commit_push   [label="Commit"]
+  tmux_confirm_gate -> doc_drift_sync [label="Commit"]
+  doc_drift_sync    -> commit_push
   tmux_confirm_gate -> tmux_tester   [label="Retry"]
   commit_push -> consume_implemented -> done
 }
