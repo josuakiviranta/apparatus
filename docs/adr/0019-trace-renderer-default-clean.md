@@ -62,6 +62,7 @@ Filter rules:
 - **Future renderer surfaces share one seam.** Any new view that renders
   raw-attempt JSONL routes through `cleanJsonlEvents`. No drift between CLI and
   TUI; no per-call deny-list customisation.
+- 2026-05-19: The cross-node trace timeline view (`apparat pipeline trace <runId> --timeline`) is the first downstream beneficiary of `cleanJsonlEvents` — it routes every per-node `raw-attempt-N.txt` through the same filter, so hook frames and assistant-side `tool_result` echoes never reach the timeline. Validates the seam.
 
 ## Out of scope
 

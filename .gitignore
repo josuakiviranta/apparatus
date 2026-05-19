@@ -37,3 +37,5 @@ docs/superpowers/plans/2026-05-14-textinput-terminal-wrap-causes-duplication.md.
 docs/superpowers/plans/2026-05-16-interactive-chat-transcripts-as-prompt-evolution-signal.md.dag.json
 docs/superpowers/plans/2026-05-16-interactive-chat-agents-lack-orientation-phase.md.dag.json
 docs/superpowers/plans/2026-05-16-textinput-wrong-ux-model-multirow-is-right.md.dag.json
+docs/superpowers/plans/2026-05-18-trace-emits-context-deltas-not-snapshots.md.dag.json
+docs/superpowers/plans/2026-05-19-trace-timeline-cross-node-tool-chronology.md.dag.json

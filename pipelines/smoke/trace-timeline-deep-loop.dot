@@ -1,0 +1,12 @@
+digraph TraceTimelineDeepLoop {
+  // Smoke fixture for the cross-node trace timeline view.
+  // The fixture does not invoke 'apparat pipeline run' — it pre-stages a
+  // synthetic run dir under .apparat/runs/ with one looping `implement`
+  // node that issues two Read of the same plan.md across iterations 1 + 2,
+  // then exercises 'apparat pipeline trace --timeline' and the two
+  // mutual-exclusion error paths. Sibling of trace-delta-renderer.
+  graph [name="trace-timeline-deep-loop"];
+  start [shape=circle];
+  start    -> implement;
+  implement [agent="implement.md"];
+}
