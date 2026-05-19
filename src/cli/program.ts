@@ -219,8 +219,9 @@ When a plain name is given (no path separators or .dot extension), resolves to
     .description("inspect a pipeline run trace")
     .option("--node-receive <nodeReceiveId>", "show context snapshot for a specific node invocation")
     .option("--full", "disable the default ceremony filter; emit the raw JSONL trace including SessionStart hooks, rate_limit_event, and tool_result echoes (escape hatch — primary consumer is Claude in agent context, ceremony is filtered by default to save token budget)")
+    .option("--timeline", "render a cross-node chronological tool-use table; one row per tool_use event across all nodes, sorted by timestamp, with ← re-read annotations on duplicate (toolName, input) pairs (mutually exclusive with --node-receive and --full)")
     .option("--project <folder>", "Project folder for trace lookup (defaults to cwd)")
-    .action(async (runId: string, opts: { nodeReceive?: string; full?: boolean; project?: string }) => {
+    .action(async (runId: string, opts: { nodeReceive?: string; full?: boolean; timeline?: boolean; project?: string }) => {
       await pipelineTraceCommand(runId, opts);
     });
 
