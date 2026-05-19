@@ -115,6 +115,26 @@ apparat pipeline trace <runId> [--node-receive <nodeReceiveId>] [--full]
 ```
 Inspect the context and trace logs for a completed pipeline run. `<runId>` accepts both the slug-prefixed shape (`meditate-2f8a91c3`, the new default) and the bare 8-char shape (`2f8a91c3`, used by older runs and daemon-spawned tasks). The default renderer prints **per-node context deltas** — one line per node showing the keys that node added or changed (`+ key=value` for adds, `~ key="old"→"new"` for changes when a future cross-node diff lands, `- key` for removes). `—` indicates a node that completed without producing any contextUpdates; `(no contextUpdates — node did not complete)` indicates a crash mid-node. `--node-receive` filters to a specific node invocation (a per-execution id from the trace, not the static node id) and renders the full structured snapshot for deep inspection; `--full` disables the default ceremony filter **and** emits raw JSONL including `contextSnapshot` dicts — escape hatch, primary consumer is Claude in agent context.
 
+**`--timeline` — cross-node tool chronology.** A niche but irreplaceable forensic
+view. Renders one row per `tool_use` event across every node, sorted by
+timestamp, with `← re-read` on duplicate `(toolName, normalized-input)` pairs.
+Inherits the default ceremony filter (ADR-0019) — hook frames and `tool_result`
+echoes do not appear. Mutually exclusive with `--node-receive` and `--full`.
+
+```
+$ apparat pipeline trace <runId> --timeline
+
+run:     <runId>
+outcome: success
+timeline:
+  t=0.3s   verifier        Read   illuminations/auth.md      1.8KB
+  t=5.0s   implement[1]    Read   plan.md                    2.1KB
+  t=6.0s   implement[2]    Read   plan.md                    2.1KB  ← re-read
+```
+
+Probably used 5–10× less often than `--node-receive`; for cross-node "where did
+wallclock go" or deep-loop re-read audits, `--node-receive` is strictly worse.
+
 ### Mission control
 
 One verb, zoom by appending the next token:

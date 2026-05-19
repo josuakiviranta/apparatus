@@ -1,0 +1,7 @@
+
+run:     trace-timeline-smoke-deadc0de
+outcome: success
+timeline:
+  t=0.0s   implement[1]   Read   plan.md
+  t=3.0s   implement[2]   Read   plan.md         ← re-read
+

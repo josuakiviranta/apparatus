@@ -211,6 +211,12 @@ pipeline trace` and under each closed block in the Ink mission-control
 trace view. Pure formatter at `src/cli/lib/trace-delta.ts:renderContextDelta`.
 `--full` bypasses the synthesis. See ADR-0019 for the rationale.
 
+- **Timeline** — cross-node tool-use chronology produced by
+  `apparat pipeline trace <runId> --timeline`. One row per `tool_use` event
+  across every node, sorted by timestamp, with `← re-read` on duplicate
+  `(toolName, normalized-input)` pairs. Inherits the default ceremony filter
+  (ADR-0019). Primary consumer is Claude in agent context.
+
 ### Project-local artefact
 
 A file or directory that meets BOTH clauses of the §1.2 partition principle
