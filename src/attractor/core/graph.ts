@@ -17,6 +17,13 @@ export const UNIMPLEMENTED_TYPES = new Set([
   "stack.manager_loop",              // no handler registered
 ]);
 
+// DOT shape → node type. Dual vocabulary is intentional: graphviz shapes
+// render meaningfully in `pipeline show` (start = Mdiamond, gate = hexagon,
+// tool = parallelogram, etc.), but the engine routes by `type`. Authors may
+// set `type=` explicitly on a node — that wins over shape inference in
+// resolveHandlerType below. Adding a new type? Pick a shape here so DOT-only
+// authors get routing for free; otherwise unknown shapes fall through to
+// "codergen" (the marker fallback).
 export const SHAPE_TO_TYPE: Record<string, string> = {
   Mdiamond: "start", Msquare: "exit", box: "codergen",
   hexagon: "wait.human", diamond: "conditional",

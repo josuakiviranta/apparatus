@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-13
 **Originating design:** `docs/superpowers/specs/2026-05-13-prevent-system-sleep-design.md`
-**Originating ADR:** `docs/adr/0018-prevent-system-sleep-during-pipeline-runs.md`
+**Originating ADR:** `docs/adr/0021-prevent-system-sleep-during-pipeline-runs.md`
 
 ## Pre-flight context (read before starting)
 
@@ -225,7 +225,7 @@ This is always on; there is no flag to disable it. macOS user logout
 the daemon. Lock the screen instead of logging out for overnight runs.
 
 Linux and Windows have no sleep protection today; the seam is stubbed
-for future expansion. See `docs/adr/0018-prevent-system-sleep-during-pipeline-runs.md`.
+for future expansion. See `docs/adr/0021-prevent-system-sleep-during-pipeline-runs.md`.
 ```
 
 ### Step 2.4 — Commit

@@ -13,7 +13,7 @@ mkdir my-app && cd my-app
 apparat init
 ````
 
-`apparat init` is idempotent. It creates `.apparat/{pipelines,meditations/{illuminations,stimuli},sessions,runs}` plus root `docs/adr/`, scaffolds empty `CONTEXT.md`, `VISION.md`, and `README.md` at repo root, runs `git init -b main` if the directory is not yet a repo, and appends `.apparat/runs/` to `.gitignore`. It also drops a Claude Code skill shim at `.claude/skills/apparatus/SKILL.md` so that any `claude` session in the project knows how to drive apparat (run, validate, trace, author pipelines). Re-running it on an existing project fills in any missing subfolders without overwriting your files — including the skill shim, which is preserved if you've customised it.
+`apparat init` is idempotent. It creates `.apparat/{pipelines,meditations/{illuminations,stimuli},sessions}` plus root `docs/adr/` (the gitignored `.apparat/runs/` is created on first pipeline run), scaffolds empty `CONTEXT.md`, `VISION.md`, and `README.md` at repo root, runs `git init -b main` if the directory is not yet a repo, and appends `.apparat/runs/` to `.gitignore`. It also drops a Claude Code skill shim at `.claude/skills/apparatus/SKILL.md` so that any `claude` session in the project knows how to drive apparat (run, validate, trace, author pipelines), and an `/orient` slash command at `.claude/commands/orient.md` that loads README.md / CONTEXT.md / VISION.md into the session context in one keystroke. Re-running it on an existing project fills in any missing subfolders without overwriting your files — including the skill shim and the `/orient` command, which are preserved if you've customised them.
 
 The skill shim points Claude at a deeper authoring reference (`pipelines.md`) that lives **inside the installed `apparat-cli` npm package**, not in your repo. That keeps the reference always in sync with your pinned CLI version while keeping your project tree free of churn on apparat upgrades. See [`docs/adr/0011-skill-as-shim-plus-live-reference.md`](docs/adr/0011-skill-as-shim-plus-live-reference.md).
 
@@ -259,7 +259,7 @@ This is always on; there is no flag to disable it. macOS user logout
 the daemon. Lock the screen instead of logging out for overnight runs.
 
 Linux and Windows have no sleep protection today; the seam is stubbed
-for future expansion. See `docs/adr/0018-prevent-system-sleep-during-pipeline-runs.md`.
+for future expansion. See `docs/adr/0021-prevent-system-sleep-during-pipeline-runs.md`.
 
 ## Notifications (macOS)
 

@@ -44,7 +44,7 @@ Getting started (typical workflow):
   apparat implement my-app                  Run the agentic build loop (Ctrl-C to stop)
 
 Background scheduling (heartbeat):
-  apparat heartbeat meditate my-app --every 30            Run meditate on my-app every 30 min
+  apparat heartbeat pipeline meditate --project my-app --every 30   Run meditate on my-app every 30 min
   apparat heartbeat implement my-app --every 60           Run implement on my-app every 60 min
   apparat heartbeat pipeline workflow.dot --project my-app --every 60   Run a pipeline every 60 min
   apparat heartbeat list                                  Show all scheduled tasks
@@ -165,7 +165,7 @@ after every node advance. --resume loads that checkpoint (currentNode,
 completedNodes, context, nodeRetries) and continues from the node that was about
 to execute when the run stopped. Works after Ctrl-C, node failures, or process
 crashes. Without --resume, a fresh run starts in a new <runId> directory; older
-runs are pruned lazily (keep last 50, override with APPARAT_RUNS_KEEP). Scripts
+runs are pruned lazily (keep last 10, override with APPARAT_RUNS_KEEP). Scripts
 called from tool nodes should still be idempotent so --resume can safely
 re-execute the node that failed.
 

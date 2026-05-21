@@ -3,11 +3,11 @@
 **Date:** 2026-05-14
 **Status:** draft (pending review)
 **Originating illumination:** `.apparat/meditations/illuminations/2026-05-14T1519-pipeline-completion-notification-gap.md`
-**Sibling precedent:** `docs/adr/0018-prevent-system-sleep-during-pipeline-runs.md` (same macOS-only silent-no-op pattern)
+**Sibling precedent:** `docs/adr/0021-prevent-system-sleep-during-pipeline-runs.md` (same macOS-only silent-no-op pattern)
 
 ## 1. Motivation
 
-A pipeline run is a long-haul operation — `illumination-to-implementation` runs ~17 nodes for an hour or more, `parallel-illumination-to-implementation` runs several hours. ADR-0018 already commits to "leave the computer and trust the pipeline finishes": the engine is caffeinated for its full lifetime so the box does not sleep mid-run. `apparat heartbeat` further assumes the operator is away for hours between ticks.
+A pipeline run is a long-haul operation — `illumination-to-implementation` runs ~17 nodes for an hour or more, `parallel-illumination-to-implementation` runs several hours. ADR-0021 already commits to "leave the computer and trust the pipeline finishes": the engine is caffeinated for its full lifetime so the box does not sleep mid-run. `apparat heartbeat` further assumes the operator is away for hours between ticks.
 
 What is missing is the symmetric signal: nothing tells the operator that a run has finished, or that a gate is blocked waiting on a human choice. Today the only way to know is to keep the terminal in focus. The spider/web charter in VISION.md says the human is the spider and the pipeline is the web — the spider should leave the web and return only when something is on it. Polling a tmux pane is not "returning when something is on it"; it is watching the web.
 
@@ -25,7 +25,7 @@ The verifier subagent confirmed there is no notification scaffolding anywhere un
 
 ### What this design explicitly does **not** close
 
-- Linux and Windows notifications. macOS-only silent-no-op today, matching ADR-0018.
+- Linux and Windows notifications. macOS-only silent-no-op today, matching ADR-0021.
 - A cross-platform notification library (`node-notifier` etc.) — explicitly rejected as a new npm dependency for a single-machine personal tool.
 - Notifications for engine-internal events (node start, retry, validation failure). Only the two operator-facing "you need to look now" signals: run done and gate blocked.
 - Focus / Do Not Disturb behavior. macOS silences banners when Focus is on; that is OS policy, not apparatus's concern. README caveats it.
@@ -45,13 +45,13 @@ A single new helper file plus two one-line call sites. No `.dot` schema change, 
    - On `darwin`: `execSync` throwing is swallowed (no rethrow).
    - On `linux` / `win32`: `execSync` not called; helper returns void.
 
-5. **README "Sleep behaviour (macOS)" neighbourhood** (currently lines 227–242) gains a parallel **"Notifications (macOS)"** section: what fires, when, and the Focus / Do Not Disturb caveat. ADR-0019 mirroring ADR-0018 is optional and not blocking on ship.
+5. **README "Sleep behaviour (macOS)" neighbourhood** (currently lines 227–242) gains a parallel **"Notifications (macOS)"** section: what fires, when, and the Focus / Do Not Disturb caveat. ADR-0019 mirroring ADR-0021 is optional and not blocking on ship.
 
 ## 3. Architecture
 
 ### 3.1 Module shape
 
-`src/lib/notify.ts` follows ADR-0018's `prevent-sleep.ts` template, with one deviation: it uses `execSync` rather than `spawn`. `execSync` is correct here because notifications are fire-and-forget and synchronous — the helper returns void either way, and there is no PID to watch. `prevent-sleep.ts` needs `spawn` because `caffeinate` must outlive the call.
+`src/lib/notify.ts` follows ADR-0021's `prevent-sleep.ts` template, with one deviation: it uses `execSync` rather than `spawn`. `execSync` is correct here because notifications are fire-and-forget and synchronous — the helper returns void either way, and there is no PID to watch. `prevent-sleep.ts` needs `spawn` because `caffeinate` must outlive the call.
 
 - **Interface:** `notifyUser(title: string, body: string, subtitle?: string): void`. Three string params, no return, no teardown.
 - **Implementation:** hides the `osascript` AppleScript string, the `execSync` choice, the `try/catch`, and the `process.platform` branch.
@@ -197,7 +197,7 @@ The notification call is synchronous and short. `execSync` blocks the engine thr
 - `src/attractor/handlers/wait-human.ts:18-33` — `prompt` and `choices` resolution.
 - `src/attractor/handlers/wait-human.ts:35-39` — `this.interviewer.ask(...)` block where Site B lands.
 - `src/attractor/handlers/registry.ts:13-41` — `HandlerExecutionContext`; `dotDir: string` required, `projectDir?: string` optional. No new fields added.
-- `src/lib/prevent-sleep.ts:1-20` — ADR-0018 precedent for macOS-only silent-no-op. `notify.ts` mirrors the platform branch shape but uses `execSync` not `spawn` because the call is fire-and-forget.
+- `src/lib/prevent-sleep.ts:1-20` — ADR-0021 precedent for macOS-only silent-no-op. `notify.ts` mirrors the platform branch shape but uses `execSync` not `spawn` because the call is fire-and-forget.
 - `README.md:227-242` — existing "Sleep behaviour (macOS)" section that the new "Notifications (macOS)" section sits adjacent to.
 
 ## 5. Blast radius / impact surface
@@ -218,7 +218,7 @@ The notification call is synchronous and short. `execSync` blocks the engine thr
   - [ ] `src/daemon/runner.ts` — insert ~5 lines inside `child.on("close")` block, add `path` import if not already present (it is — line 3 `import { join, dirname } from "path"`; either widen that import or add a fresh one).
   - [ ] `src/attractor/handlers/wait-human.ts` — insert ~5 lines before `this.interviewer.ask`, add `path` import, inline `truncate` helper.
   - [ ] `README.md` — add "Notifications (macOS)" paragraph adjacent to lines 227–242, including Focus / Do Not Disturb caveat.
-  - [ ] `docs/adr/0019-...md` — **optional.** ADR-0019 mirroring ADR-0018 if the operator wants the historical record; non-blocking.
+  - [ ] `docs/adr/0019-...md` — **optional.** ADR-0019 mirroring ADR-0021 if the operator wants the historical record; non-blocking.
   - [ ] `CONTEXT.md` — **optional.** Glossary stub for `notifyUser` if domain vocabulary is being maintained; non-blocking.
   - [ ] `.apparat/scenarios/` — no fixture; this is a product-side notification, not engine behavior. No smoke test.
 

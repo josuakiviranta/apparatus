@@ -24,7 +24,7 @@ The seam (`AgentConfig` in `src/cli/lib/agent.ts:49-62`) already has the shape o
 
 ### Why this slot
 
-The lever is to make both axes mandatory and rendered visible — in the frontmatter, in the validator, in `apparat pipeline show`, and in the skill. `docs/adr/0001-agents-live-next-to-pipeline.md` (agents live next to `pipeline.dot`), `docs/adr/0012-validation-context.md` (clustered validator architecture, signature `(ctx, node) => void`), `docs/adr/0018-pipeline-show-opens-svg.md` (pipeline-show SVG annotation as the established surface) all directly support extending these primitives. (Note: there are two ADRs numbered 0018 in the repo; this design refers exclusively to `0018-pipeline-show-opens-svg.md`, not `0018-prevent-system-sleep-during-pipeline-runs.md`.) No new mechanism is invented.
+The lever is to make both axes mandatory and rendered visible — in the frontmatter, in the validator, in `apparat pipeline show`, and in the skill. `docs/adr/0001-agents-live-next-to-pipeline.md` (agents live next to `pipeline.dot`), `docs/adr/0012-validation-context.md` (clustered validator architecture, signature `(ctx, node) => void`), `docs/adr/0018-pipeline-show-opens-svg.md` (pipeline-show SVG annotation as the established surface) all directly support extending these primitives. (Note: this design refers to `0018-pipeline-show-opens-svg.md`; the earlier `0018` collision has since been resolved by renumbering the sleep ADR to `0021-prevent-system-sleep-during-pipeline-runs.md`.) No new mechanism is invented.
 
 ## 2. Decision summary
 
@@ -229,7 +229,7 @@ One-paragraph principle: **opus = decide / design / verify under ambiguity; sonn
 
 - `docs/adr/0001-agents-live-next-to-pipeline.md` — one-paragraph amendment noting `model:` is now required, `thinking:` optional.
 - `docs/adr/0012-validation-context.md` — list `model_required` in the rule inventory.
-- `docs/adr/0018-pipeline-show-opens-svg.md` — note model + thinking now appear in node labels. (The repo has a numeric collision with `docs/adr/0018-prevent-system-sleep-during-pipeline-runs.md`; this ripple touches only the pipeline-show-opens-svg ADR.)
+- `docs/adr/0018-pipeline-show-opens-svg.md` — note model + thinking now appear in node labels. (The prior numeric collision was resolved by renumbering the sleep ADR to `docs/adr/0021-prevent-system-sleep-during-pipeline-runs.md`; this ripple touches only the pipeline-show-opens-svg ADR.)
 - `README.md:174` — update example frontmatter block.
 - `CONTEXT.md` — the upstream verifier flagged "~line 141"; on direct inspection that line is a smoke-pipeline-scenario reference, not a canonical frontmatter list. **Action:** implementer greps `CONTEXT.md` for the agent-frontmatter description block (search for `model:` / `outputs:` mentions) and either (a) updates it in place if a canonical list exists or (b) adds a new short subsection naming the required `model:` enum and the optional `thinking:` field. Do not edit line 141 mechanically.
 - `src/cli/skills/apparatus/SKILL.md` — new "Choosing model + thinking" subsection with the §5 rubric.
@@ -282,7 +282,7 @@ Test fixtures (7):
 Docs (7):
 - [ ] `docs/adr/0001-agents-live-next-to-pipeline.md`
 - [ ] `docs/adr/0012-validation-context.md`
-- [ ] `docs/adr/0018-pipeline-show-opens-svg.md` (specifically — not the unrelated `0018-prevent-system-sleep-…` ADR)
+- [ ] `docs/adr/0018-pipeline-show-opens-svg.md` (specifically — not the unrelated `0021-prevent-system-sleep-…` ADR)
 - [ ] `README.md:174`
 - [ ] `CONTEXT.md` — implementer locates the right block; see §6
 - [ ] `src/cli/skills/apparatus/SKILL.md`

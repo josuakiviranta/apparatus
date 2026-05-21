@@ -23,6 +23,7 @@ export default defineConfig({
     // After Chunk 2, every bundled pipeline is folder-form there.
     cpSync("src/cli/pipelines", "dist/pipelines", { recursive: true });
     cpSync("src/cli/skills", "dist/skills", { recursive: true });
+    cpSync("src/cli/commands-bundle", "dist/commands-bundle", { recursive: true });
     console.log("Assets copied to dist/");
 
     const bundle = readFileSync("dist/cli/index.js", "utf8");

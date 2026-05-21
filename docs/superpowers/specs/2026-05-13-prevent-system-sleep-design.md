@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-13
 **Status:** draft (pending review)
-**Originating ADR:** `docs/adr/0018-prevent-system-sleep-during-pipeline-runs.md`
+**Originating ADR:** `docs/adr/0021-prevent-system-sleep-during-pipeline-runs.md`
 
 ## 1. Motivation
 
@@ -127,7 +127,7 @@ Edge case: if the engine is killed by `SIGKILL` (which cannot be trapped), `caff
 - **Surfaces crossed:** CLI command (`pipeline/run.ts`), new helper file (`lib/prevent-sleep.ts`), README "Stopping the loop" paragraph, vitest unit test.
 - **Breaking changes:** none. macOS operators who previously relied on "my Mac sleeps when idle during a pipeline run" lose that behavior — flagged as a CHANGELOG note (apparatus is single-operator; the affected operator is the one shipping this change).
 - **Update checklist:**
-  - [ ] `docs/adr/0018-prevent-system-sleep-during-pipeline-runs.md` — exists, status `Accepted`.
+  - [ ] `docs/adr/0021-prevent-system-sleep-during-pipeline-runs.md` — exists, status `Accepted`.
   - [ ] `README.md` — add paragraph under "Stopping the loop" or new "Sleep behaviour" subsection.
   - [ ] `src/cli/tests/` — no new tests; existing `pipeline-run-*` tests run unchanged.
   - [ ] `CONTEXT.md` — no glossary addition (`preventSleep` is a private helper, not domain vocabulary).

@@ -1,4 +1,4 @@
-# ADR 0018 — Prevent system sleep for the lifetime of every pipeline run
+# ADR 0021 — Prevent system sleep for the lifetime of every pipeline run
 
 **Status:** Accepted
 **Date:** 2026-05-13

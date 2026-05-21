@@ -123,6 +123,25 @@ describe("apparat init", () => {
     expect(existsSync(refPath)).toBe(false);
   });
 
+  it("copies the /orient slash command to .claude/commands/orient.md", async () => {
+    await initCommand(projectDir);
+    const cmdPath = join(projectDir, ".claude/commands/orient.md");
+    expect(existsSync(cmdPath)).toBe(true);
+    const body = readFileSync(cmdPath, "utf8");
+    expect(body).toContain("README.md");
+    expect(body).toContain("CONTEXT.md");
+    expect(body).toContain("VISION.md");
+    expect(body).toContain("docs/adr/");
+  });
+
+  it("does not overwrite a customised orient.md on re-init", async () => {
+    const cmdPath = join(projectDir, ".claude/commands/orient.md");
+    mkdirSync(join(projectDir, ".claude/commands"), { recursive: true });
+    writeFileSync(cmdPath, "custom orient content");
+    await initCommand(projectDir);
+    expect(readFileSync(cmdPath, "utf8")).toBe("custom orient content");
+  });
+
   it("scaffolds an empty notes.md stub at .apparat/notes.md", async () => {
     await initCommand(projectDir);
     const notesPath = join(projectDir, ".apparat/notes.md");

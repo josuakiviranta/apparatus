@@ -8,7 +8,7 @@ import {
   stimuliDir,
   sessionsDir,
 } from "../lib/apparat-paths.js";
-import { getBundledSkillsDir } from "../lib/assets.js";
+import { getBundledSkillsDir, getBundledCommandsDir } from "../lib/assets.js";
 import { join } from "node:path";
 
 export async function initCommand(projectRoot: string): Promise<void> {
@@ -50,6 +50,7 @@ export async function initCommand(projectRoot: string): Promise<void> {
   appendGitignoreLine(projectRoot, ".apparat/runs/");
 
   copyApparatusSkillShim(projectRoot);
+  copyOrientCommand(projectRoot);
 
   if (!existsSync(join(projectRoot, ".git"))) {
     try {
@@ -66,6 +67,15 @@ function copyApparatusSkillShim(projectRoot: string): void {
   const src = join(getBundledSkillsDir(), "apparatus", "SKILL.md");
   if (!existsSync(src)) return;
   mkdirSync(join(projectRoot, ".claude", "skills", "apparatus"), { recursive: true });
+  copyFileSync(src, dest);
+}
+
+function copyOrientCommand(projectRoot: string): void {
+  const dest = join(projectRoot, ".claude", "commands", "orient.md");
+  if (existsSync(dest)) return;
+  const src = join(getBundledCommandsDir(), "orient.md");
+  if (!existsSync(src)) return;
+  mkdirSync(join(projectRoot, ".claude", "commands"), { recursive: true });
   copyFileSync(src, dest);
 }
 
