@@ -100,8 +100,7 @@ Agent nodes dispatch to one of two handlers at runtime via
 
 Selection is via `isInteractiveAgent(node)` at
 `src/attractor/core/graph.ts:51` — the canonical predicate that coerces
-the DOT-parsed string/boolean union. Historical context in
-`docs/superpowers/specs/2026-05-06-interactive-agent-predicate-duplicated-design.md`.
+the DOT-parsed string/boolean union.
 
 ### Edge conditions
 

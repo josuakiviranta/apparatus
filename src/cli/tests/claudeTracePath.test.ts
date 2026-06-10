@@ -5,13 +5,13 @@ import { claudeTracePath } from "../lib/claudeTracePath.js";
 
 describe("claudeTracePath", () => {
   it("encodes the project directory by replacing / with -", () => {
-    const p = claudeTracePath("sid-abc", "/Users/josu/Documents/projects/apparatus");
+    const p = claudeTracePath("sid-abc", "/home/dev/projects/apparatus");
     expect(p).toBe(
       join(
         homedir(),
         ".claude",
         "projects",
-        "-Users-josu-Documents-projects-apparatus",
+        "-home-dev-projects-apparatus",
         "sid-abc.jsonl",
       ),
     );

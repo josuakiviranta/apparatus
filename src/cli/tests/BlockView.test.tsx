@@ -32,7 +32,7 @@ describe("BlockView", () => {
   it("shows trace path for agent blocks", () => {
     const block = makeBlock({
       kind: "agent",
-      tracePath: "/Users/josu/.claude/projects/-cwd/abc123.jsonl",
+      tracePath: "/home/dev/.claude/projects/-cwd/abc123.jsonl",
     });
     const { lastFrame } = render(<BlockView block={block} index={1} />);
     const frame = lastFrame() ?? "";

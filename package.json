@@ -3,6 +3,26 @@
   "version": "0.2.0",
   "description": "Apparatus — agentic loop runner CLI for AI-assisted project development",
   "type": "module",
+  "license": "MIT",
+  "author": "Josua Kiviranta <josua.kiviranta@gmail.com>",
+  "homepage": "https://github.com/josuakiviranta/apparatus#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/josuakiviranta/apparatus.git"
+  },
+  "bugs": {
+    "url": "https://github.com/josuakiviranta/apparatus/issues"
+  },
+  "keywords": [
+    "agent",
+    "agentic",
+    "ai",
+    "claude",
+    "cli",
+    "pipeline",
+    "orchestration",
+    "llm"
+  ],
   "bin": {
     "apparat": "./dist/cli/index.js"
   },

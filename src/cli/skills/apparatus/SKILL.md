@@ -73,7 +73,7 @@ Resolve the path and read it before writing or editing any `.dot` or sibling age
 ```bash
 # 1. Resolve the npm global root (works for npm; pnpm/yarn report differently)
 npm root -g
-# → e.g. /Users/josu/.npm-global/lib/node_modules
+# → e.g. /usr/local/lib/node_modules (or ~/.npm-global/lib/node_modules)
 ```
 
 Then use the `Read` tool on:
