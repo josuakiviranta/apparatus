@@ -83,7 +83,6 @@ function expandSegment(
  * (ctx + defaults maps are keyed by the literal $var name authors wrote).
  * E.g. { defaultRefinements: "none" }      → { refinements: "none" }
  *      { defaultTestResult: "" }           → { test_result: "" }
- *      { defaultChatNotesPath: "" }        → { chat_notes_path: "" }
  */
 export function extractDefaults(obj: Record<string, unknown>): Record<string, string> {
   const defaults: Record<string, string> = {};
